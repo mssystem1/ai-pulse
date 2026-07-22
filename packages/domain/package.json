@@ -1,0 +1,25 @@
+{
+  "name": "@pulse/domain",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --experimental-vm-modules ../../node_modules/tsx/dist/cli.mjs --test src/**/*.test.ts"
+  },
+  "dependencies": {
+    "@pulse/schemas": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "tsx": "^4.19.3",
+    "@types/node": "^22.13.10"
+  }
+}

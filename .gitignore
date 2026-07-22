@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.next/
+.turbo/
+coverage/
+.env
+.env.local
+*.log
+.DS_Store
+.vscode/
+.idea/
+*.tsbuildinfo
+apps/web/out/
+data/*.db
+data/cache/
+docs/

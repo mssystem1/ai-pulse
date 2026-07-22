@@ -1,0 +1,8 @@
+# PULSE
+
+PULSE is OKX spot intelligence for humans and AI agents, paid per signal in USDT0 on X Layer through x402.
+
+- [Product documentation](/)
+- [Machine-readable service metadata](/v1/metadata)
+- [MCP endpoint](/mcp)
+- [API health](/healthz)

@@ -1,0 +1,45 @@
+{
+  "name": "PULSE",
+  "type": "A2MCP",
+  "category": "Financial Assistant",
+  "tagline": "OKX spot intelligence. Pay per signal on X Layer.",
+  "taglineZh": "欧易现货智能研报 · X Layer 按次付费",
+  "shortDescription": "Free OKX spot tickers & candles. Grok base ($0.03) and premium ($0.06) analysis from live OHLCV only — settled in USD₮0 via x402 on X Layer.",
+  "description": "PULSE is an A2MCP service for OKX.AI. Free teaser: live OKX spot instruments, tickers, and candles (chart data from OKX API only — no image upload). Paid: Grok market analysis base ($0.03) and premium ($0.06) using that series — regime, levels, price targets, invalidation, agent checklist. Safety tools for token risk and pre-trade checks. Settles per call in USD₮0 on X Layer via OKX Payment SDK (x402). EN/CN UI. Agents call MCP; marketplace callers pay with Agentic Wallet automatically.",
+  "logo": {
+    "svg": "assets/logo.svg",
+    "servedAt": "/brand/logo.svg",
+    "png": "assets/logo.png",
+    "alt": "PULSE waveform logo — mint to cyan pulse on void black"
+  },
+  "network": "eip155:196",
+  "settlementAsset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+  "settlementAssetSymbol": "USD₮0",
+  "paymentProtocol": "x402",
+  "wallet": {
+    "marketplaceCallers": "OKX Agentic Wallet (automatic on OKX.AI)",
+    "aspRegistration": "Agentic Wallet email login via Onchain OS",
+    "browser": "Injected EVM wallet; keys stay client-side",
+    "operatorTesting": "Server checkout is disabled by default and reserved for controlled E2E verification"
+  },
+  "languages": ["en", "zh"],
+  "pricing": {
+    "freeTeaser": 0,
+    "analysisBase": 0.03,
+    "analysisPremium": 0.06,
+    "tokenScan": 0.01,
+    "preflight": 0.05
+  },
+  "endpoints": {
+    "health": "/healthz",
+    "metadata": "/v1/metadata",
+    "mcp": "/mcp",
+    "ticker": "GET /v1/market/ticker",
+    "candles": "GET /v1/market/candles",
+    "analysisBase": "POST /v1/analysis/base",
+    "analysisPremium": "POST /v1/analysis/premium",
+    "checkout": "POST /v1/checkout"
+  },
+  "timeframes": ["15m", "1H", "4H", "1D", "1W"],
+  "tags": ["x402", "a2mcp", "xlayer", "okx", "spot", "grok", "market-analysis"]
+}

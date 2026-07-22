@@ -1,0 +1,42 @@
+{
+  "name": "pulse",
+  "version": "1.0.0",
+  "private": true,
+  "description": "PULSE — pay-per-signal OKX spot intelligence and pre-trade safety for humans and AI agents on X Layer.",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
+    "build:vercel": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
+    "e2e:paid": "node scripts/e2e-paid.mjs",
+    "dev:api": "npm run dev -w @pulse/api",
+    "dev:web": "npm run dev -w @pulse/web",
+    "dev:web:safe": "scripts\\dev-web.cmd",
+    "start:api": "npm run start -w @pulse/api",
+    "test": "npm run test -w @pulse/domain && npm run test -w @pulse/api",
+    "smoke": "npm run smoke -w @pulse/api"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "okx",
+    "xlayer",
+    "a2mcp",
+    "asp",
+    "x402",
+    "mcp",
+    "agents"
+  ],
+  "license": "MIT",
+  "author": "PULSE",
+  "dependencies": {
+    "@okxweb3/x402-fetch": "^0.1.0",
+    "viem": "^2.55.5"
+  },
+  "optionalDependencies": {
+    "@esbuild/win32-x64": "^0.28.1"
+  }
+}

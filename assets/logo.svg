@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none" role="img" aria-label="PULSE">
+  <defs>
+    <linearGradient id="g" x1="70" y1="80" x2="440" y2="430" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#00E5A0"/>
+      <stop offset="1" stop-color="#00C4FF"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#00E5A0" stop-opacity="0.35"/>
+      <stop offset="65%" stop-color="#00C4FF" stop-opacity="0.08"/>
+      <stop offset="100%" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="#070A0F"/>
+  <circle cx="256" cy="250" r="190" fill="url(#glow)"/>
+  <circle cx="256" cy="250" r="148" stroke="url(#g)" stroke-width="4" opacity="0.2"/>
+  <circle cx="256" cy="250" r="104" stroke="url(#g)" stroke-width="5" opacity="0.35"/>
+  <!-- pulse waveform -->
+  <path d="M72 268 H150 L186 160 L228 360 L272 140 L316 310 L350 250 H440"
+        stroke="url(#g)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="256" cy="250" r="11" fill="#00E5A0"/>
+</svg>

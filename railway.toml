@@ -1,0 +1,12 @@
+# Railway: deploy from GitHub → set env vars in dashboard
+# Docs: docs/DEPLOY.md
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install --legacy-peer-deps && npm run build"
+
+[deploy]
+startCommand = "npm run start -w @pulse/api"
+healthcheckPath = "/healthz"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

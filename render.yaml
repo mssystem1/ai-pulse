@@ -1,0 +1,41 @@
+# Render Blueprint — connect GitHub and apply this file
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: pulse-api
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install --legacy-peer-deps && npm run build
+    startCommand: npm run start -w @pulse/api
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: X402_NETWORK
+        value: eip155:196
+      - key: X402_ASSET
+        value: 0x779ded0c9e1022225f8e0630b35a9b54be713736
+      - key: X402_MOCK
+        value: "0"
+      - key: PRODUCT_NAME
+        value: PULSE
+      - key: ENABLE_SERVER_PAY
+        value: "0"
+      - key: OKX_BASE_URL
+        value: https://web3.okx.com
+      - key: PAY_TO_ADDRESS
+        sync: false
+      - key: OKX_XLAYER_API_KEY
+        sync: false
+      - key: OKX_XLAYER_API_SECRET
+        sync: false
+      - key: OKX_XLAYER_API_PASSPHRASE
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+      - key: BASE_URL
+        sync: false
