@@ -2,6 +2,7 @@
   "name": "pulse",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "PULSE — pay-per-signal OKX spot intelligence and pre-trade safety for humans and AI agents on X Layer.",
   "workspaces": [
     "packages/*",
@@ -19,7 +20,7 @@
     "smoke": "npm run smoke -w @pulse/api"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "keywords": [
     "okx",

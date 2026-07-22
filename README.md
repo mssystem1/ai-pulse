@@ -185,7 +185,7 @@ The internal workspace scope is `@pulse/*`. “Preflight” is reserved for the 
 
 ### Requirements
 
-- Node.js 20 or newer
+- Node.js 22.x (the production runtime pinned in `package.json`)
 - npm 10 or newer
 - Optional for paid AI output: xAI API key
 - Optional for live settlement: OKX API credentials and a non-zero X Layer recipient
@@ -292,8 +292,10 @@ The repository includes root and web Vercel configuration. The preferred judging
 2. Use the repository install command (`npm install`).
 3. Set production variables from `.env.example`.
 4. Set `BASE_URL` to the final HTTPS origin.
-5. Keep `VITE_API_URL` empty for same-origin routing.
+5. Do not create `VITE_API_URL` for this one-origin deployment; browser requests stay on the current origin.
 6. Deploy and run the readiness checks below.
+
+The root package is explicitly ESM (`"type": "module"`) because the Vercel function imports the ESM-only `@pulse/*` workspaces. Keep that setting and the pinned Node 22 runtime when changing deployment configuration.
 
 ### Split deployment
 
