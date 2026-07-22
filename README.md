@@ -335,28 +335,6 @@ Detailed platform instructions are in [docs/DEPLOY.md](docs/DEPLOY.md).
 
 Current dependency, architecture, and release audit notes are tracked in [docs/PRODUCT_AUDIT.md](docs/PRODUCT_AUDIT.md). The earlier embedded DEX package and its separate-wallet boundary were removed; PULSE now owns the compact swap UI and uses server-authenticated OKX Exchange OS calls for quotes and unsigned transaction preparation.
 
-## Hackathon package
-
-PULSE is designed for the **OKX.AI / X Layer agent economy**:
-
-- discoverable A2MCP tools;
-- free acquisition funnel plus paid, machine-consumable output;
-- native x402 monetization in USDT0;
-- human-quality UX and agent-quality structured responses;
-- official OKX market, payment, wallet, and DEX touchpoints;
-- transparent separation between live sources and prototype methodologies.
-
-Submission resources:
-
-- [Product audit and release gates](docs/PRODUCT_AUDIT.md)
-- [OKX.AI listing pack](docs/okx-listing.md)
-- [90-second demo script](docs/DEMO_SCRIPT.md)
-- [Submission post](docs/SUBMISSION_POST.md)
-- [Deployment guide](docs/DEPLOY.md)
-- [Wallet and funding flow](docs/UI_WALLET_FLOW.md)
-- [Wallet test report](docs/WALLET_TEST_REPORT.md)
-- [Local setup guide](docs/GUIDE_FROM_SCRATCH.md)
-
 ## Status
 
 | Area | State |
