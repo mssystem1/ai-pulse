@@ -335,12 +335,18 @@ node scripts/asp-compliance.mjs https://your-domain.example
 
 The compliance script does not spend by default. After independently checking the funded test wallet, route prices, and `payTo`, set `RUN_LIVE_PAY=1` only for the final low-value settlement proof.
 
+Latest production proof (2026-07-23): the Railway token-scan endpoint settled
+`0.01` USDT0 on X Layer, returned the complete report inline, and emitted a
+successful payment receipt:
+`0x58283dc47cd8285a5e8a3ec99b10697482004bd09fb488dfee11ef1fe2e4aab2`.
+
 Before submitting:
 
 - `GET /healthz` reports `paymentMode: "okx"`, `hasOkxCredentials: true`, and `hasXaiKey: true`.
 - An unpaid paid route returns HTTP 402 with X Layer, USDT0, the correct amount, and the intended `payTo` address.
 - `GET /v1/token/scan` returns `400 input_required`; its valid paid POST replay returns the scan report inline.
-- `/v1/metadata`, `/mcp`, `/brand/logo.svg`, and `/brand/logo.png` are public.
+- `/v1/metadata`, `/mcp`, `/brand/logo.svg`, and the canonical square
+  `/brand/logo.png` marketplace avatar are public.
 - The wallet drawer shows OKB and USDT0; a live OKX route is returned for OKB → USDT0 without a second wallet prompt.
 - The pair picker lists live OKX instruments and does not allow an arbitrary pair value.
 - The token picker returns chain 196 entries, labels its sources, selects an address, and leaves manual address entry available.

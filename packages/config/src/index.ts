@@ -231,7 +231,9 @@ export function loadConfig(): AppConfig {
   const paymentMode: "mock" | "okx" =
     !parsed.X402_MOCK && hasOkxCredentials ? "okx" : "mock";
 
-  const logoPath = "/brand/logo.svg";
+  // The marketplace avatar is a true square PNG with square outer corners.
+  // Keep SVG available for the web UI and repository documentation.
+  const logoPath = "/brand/logo.png";
   const logoUrl =
     parsed.PRODUCT_LOGO_URL ||
     `${parsed.BASE_URL.replace(/\/$/, "")}${logoPath}`;

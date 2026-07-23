@@ -152,10 +152,39 @@ if (meta.status === 200 && meta.json?.asp?.name && meta.json?.asp?.description) 
 
 const logoSvg = await fetch(`${BASE}/brand/logo.svg`);
 const logoPng = await fetch(`${BASE}/brand/logo.png`);
-if (logoSvg.status === 200) pass("GET /brand/logo.svg", logoSvg.headers.get("content-type") || "");
-else fail("GET /brand/logo.svg", String(logoSvg.status));
-if (logoPng.status === 200) pass("GET /brand/logo.png");
-else fail("GET /brand/logo.png", "optional png missing");
+if (logoSvg.status === 200) {
+  const text = await logoSvg.text();
+  const viewBox = text.match(/viewBox=["']\s*[\d.-]+\s+[\d.-]+\s+([\d.]+)\s+([\d.]+)\s*["']/i);
+  const square = viewBox && Number(viewBox[1]) === Number(viewBox[2]);
+  const roundedOuterRect = /<rect\b[^>]*\b(?:rx|ry)=/i.test(text);
+  if (square && !roundedOuterRect) {
+    pass("GET /brand/logo.svg", "square canvas · square outer corners");
+  } else {
+    fail("GET /brand/logo.svg", "marketplace logo must be 1:1 with no rounded outer corners");
+  }
+} else fail("GET /brand/logo.svg", String(logoSvg.status));
+
+if (logoPng.status === 200) {
+  const bytes = Buffer.from(await logoPng.arrayBuffer());
+  const isPng =
+    bytes.length >= 26 && bytes.subarray(0, 8).toString("hex") === "89504e470d0a1a0a";
+  const width = isPng ? bytes.readUInt32BE(16) : 0;
+  const height = isPng ? bytes.readUInt32BE(20) : 0;
+  if (isPng && width === height && width >= 256 && bytes.length <= 1_000_000) {
+    pass("GET /brand/logo.png", `${width}×${height} · ${(bytes.length / 1024).toFixed(0)} KiB`);
+  } else {
+    fail(
+      "GET /brand/logo.png",
+      `expected real square PNG, 256px+, ≤1 MB; got ${width}×${height}, ${bytes.length} bytes`,
+    );
+  }
+} else fail("GET /brand/logo.png", "marketplace avatar missing");
+
+if (meta.json?.asp?.logo?.endsWith("/brand/logo.png")) {
+  pass("metadata canonical logo", meta.json.asp.logo);
+} else {
+  fail("metadata canonical logo", String(meta.json?.asp?.logo || "missing"));
+}
 
 // ── 2. Free endpoints (must 200, no 402) ────────────────────────────
 console.log("\n2) Free endpoints (HTTP 200, no payment)");
@@ -253,8 +282,12 @@ if (process.env.RUN_LIVE_PAY !== "1") {
     ) {
       liveSettlementVerified = true;
       pass("PAID POST /v1/token/scan inline report", `riskScore=${r.json.riskScore}`);
-      if (r.paymentResponse) pass("PAYMENT-RESPONSE on token scan");
-      else fail("PAYMENT-RESPONSE on token scan", "missing after successful paid replay");
+      if (r.paymentResponse) {
+        const receipt = decode402(r.paymentResponse);
+        const transaction =
+          receipt?.transaction || receipt?.txHash || receipt?.tx_hash || "receipt decoded";
+        pass("PAYMENT-RESPONSE on token scan", String(transaction));
+      } else fail("PAYMENT-RESPONSE on token scan", "missing after successful paid replay");
     } else {
       fail(
         "PAID POST /v1/token/scan inline report",
@@ -321,8 +354,9 @@ if (mcpUnpaid.status === 402 && mcpUnpaid.paymentRequired) {
   fail("MCP paid unpaid", `status=${mcpUnpaid.status}`);
 }
 
-// Paid MCP with settlement
-if (process.env.RUN_LIVE_PAY === "1" && process.env.TEST_WALLET_PRIVATE_KEY) {
+// Optional, separately authorized MCP settlement. RUN_LIVE_PAY deliberately
+// covers only the single $0.01 token scan above.
+if (process.env.RUN_LIVE_MCP_PAY === "1" && process.env.TEST_WALLET_PRIVATE_KEY) {
   try {
     const mcpPaid = await req("POST", "/mcp", {
       body: {
@@ -333,8 +367,13 @@ if (process.env.RUN_LIVE_PAY === "1" && process.env.TEST_WALLET_PRIVATE_KEY) {
       },
       pay: true,
     });
-    if (mcpPaid.status === 200 && mcpPaid.json?.result) {
-      pass("MCP paid tools/call analysis_base settled");
+    if (
+      mcpPaid.status === 200 &&
+      mcpPaid.json?.result &&
+      mcpPaid.json.result.isError !== true &&
+      mcpPaid.paymentResponse
+    ) {
+      pass("MCP paid tools/call analysis_base settled", "PAYMENT-RESPONSE present");
     } else {
       fail("MCP paid tools/call", `status=${mcpPaid.status} ${JSON.stringify(mcpPaid.json).slice(0, 180)}`);
     }
@@ -375,9 +414,13 @@ console.log(
 
 // Human checklist still needed
 console.log("Human steps still required for marketplace:");
-console.log("  1. Use a stable HTTPS host that is not a *.vercel.app hostname");
-console.log("  2. Run one controlled $0.01 replay with RUN_LIVE_PAY=1");
-console.log("  3. Update and resubmit existing OKX.AI agent 8355 (do not register a duplicate)");
+if (new URL(BASE).hostname.endsWith(".vercel.app")) {
+  console.log("  - Use a stable HTTPS host that is not a *.vercel.app hostname");
+}
+if (!liveSettlementVerified) {
+  console.log("  - Run one controlled $0.01 replay with RUN_LIVE_PAY=1");
+}
+console.log("  - Update and resubmit existing OKX.AI agent 8355 (do not register a duplicate)");
 console.log("");
 
 process.exit(failed === 0 ? 0 : 1);
