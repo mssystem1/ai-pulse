@@ -3,6 +3,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 COPY packages ./packages
 COPY apps/api ./apps/api
+COPY assets ./assets
 COPY tsconfig.base.json ./
 RUN npm install --legacy-peer-deps
 RUN npm run build -w @pulse/schemas \

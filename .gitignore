@@ -13,4 +13,5 @@ coverage/
 apps/web/out/
 data/*.db
 data/cache/
+.codex-tmp-ui/
 docs/

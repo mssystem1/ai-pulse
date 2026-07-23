@@ -32,9 +32,17 @@ function pick(...keys: string[]): string {
   return "";
 }
 
+export function normalizeHost(value: string): string {
+  const host = value.trim();
+  // URL notation uses brackets around IPv6 literals, but Node's listen()
+  // expects the raw address. Railway should bind on all interfaces.
+  if (host === "[::]" || host === "::") return "0.0.0.0";
+  return host || "0.0.0.0";
+}
+
 const EnvSchema = z.object({
   PORT: z.coerce.number().default(4000),
-  HOST: z.string().default("0.0.0.0"),
+  HOST: z.string().default("0.0.0.0").transform(normalizeHost),
   BASE_URL: z.string().default("http://localhost:4000"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   X402_NETWORK: z.string().default("eip155:196"),
@@ -216,7 +224,9 @@ export function loadConfig(): AppConfig {
   );
   const hasXaiKey = Boolean(parsed.XAI_API_KEY);
   const hasServerPay = Boolean(
-    parsed.ENABLE_SERVER_PAY && parsed.TEST_WALLET_PRIVATE_KEY,
+    parsed.NODE_ENV !== "production" &&
+      parsed.ENABLE_SERVER_PAY &&
+      parsed.TEST_WALLET_PRIVATE_KEY,
   );
   const paymentMode: "mock" | "okx" =
     !parsed.X402_MOCK && hasOkxCredentials ? "okx" : "mock";

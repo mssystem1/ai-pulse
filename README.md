@@ -230,6 +230,8 @@ Copy [`.env.example`](.env.example) and review every production value.
 | `VITE_API_URL` | Split deployment | Public API origin used by the web app |
 
 Never expose server credentials or test private keys through a `VITE_*` variable. Never ship with `X402_MOCK=1`, a zero `PAY_TO_ADDRESS`, or `ENABLE_SERVER_PAY=1` in a public environment.
+PULSE also disables the operator-only server-funded checkout whenever
+`NODE_ENV=production`, even if those test variables are accidentally present.
 
 ## API examples
 
@@ -283,6 +285,19 @@ const report = await pulse.preflight({
 ```
 
 ## Deployment
+
+### Current production topology
+
+- Web product: `https://pulse-puce-nu.vercel.app`
+- Marketplace API, REST, MCP, x402, and public metadata: `https://pulse-api-production-8d1f.up.railway.app`
+- OKX.AI token-scan service: `https://pulse-api-production-8d1f.up.railway.app/v1/token/scan`
+
+Railway must set `BASE_URL=https://pulse-api-production-8d1f.up.railway.app`. If the
+browser should use the Railway API directly, set Vercel Production
+`VITE_API_URL=https://pulse-api-production-8d1f.up.railway.app` and redeploy; otherwise
+the web app keeps using its working same-origin Vercel API rewrites. The OKX.AI
+listing must use the Railway origin because the moderator's buyer-side policy
+blocked the literal `vercel.app` hostname.
 
 ### One-origin deployment with a custom domain
 
