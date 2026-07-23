@@ -76,6 +76,8 @@ function findBrandDir(): string {
 
 export function createApp(cfg: AppConfig) {
   const app = express();
+  app.set("trust proxy", true);
+    
   app.use(cors({ exposedHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE"] }));
   app.use(express.json({ limit: "12mb" }));
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));
