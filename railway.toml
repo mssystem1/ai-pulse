@@ -2,8 +2,8 @@
 # Docs: docs/DEPLOY.md
 
 [build]
-builder = "NIXPACKS"
-buildCommand = "npm install --legacy-peer-deps && npm run build"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
 startCommand = "npm run start -w @pulse/api"

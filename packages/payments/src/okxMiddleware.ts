@@ -4,6 +4,7 @@ import { priceLabel } from "@pulse/config";
 import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { OKXFacilitatorClient } from "@okxweb3/x402-core";
+import { buildX402PaymentRequiredBody } from "./inputContracts.js";
 
 /**
  * Official OKX x402 seller middleware.
@@ -40,6 +41,10 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
       }>;
       description: string;
       mimeType: string;
+      unpaidResponseBody: () => {
+        contentType: string;
+        body: unknown;
+      };
     }
   > = {};
 
@@ -56,6 +61,10 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
       ],
       description: info.description,
       mimeType: "application/json",
+      unpaidResponseBody: () => ({
+        contentType: "application/json",
+        body: buildX402PaymentRequiredBody(routeKey.split(" ")[1] || routeKey),
+      }),
     };
   }
 

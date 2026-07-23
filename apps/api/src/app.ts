@@ -6,7 +6,11 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import type { AppConfig } from "@pulse/config";
 import { buildAspMetadata, priceLabel } from "@pulse/config";
-import { createPaymentGate } from "@pulse/payments";
+import {
+  buildX402InputRequired,
+  createPaymentGate,
+  getX402OutputSchema,
+} from "@pulse/payments";
 import { runGrokAnalysis } from "@pulse/analysis";
 import {
   getCandles,
@@ -140,6 +144,7 @@ export function createApp(cfg: AppConfig) {
         priceUsd: info.priceUsd,
         free: Boolean(info.free),
         description: info.description,
+        outputSchema: info.free ? undefined : getX402OutputSchema(route.split(" ")[1] || route),
       })),
       mcp: "/mcp",
       metadata: "/v1/metadata",
@@ -147,7 +152,19 @@ export function createApp(cfg: AppConfig) {
   });
 
   app.get("/v1/metadata", (_req, res) => {
-    res.json(buildAspMetadata(cfg));
+    const metadata = buildAspMetadata(cfg);
+    const withInputContract = <T extends { path: string; free: boolean }>(service: T) => ({
+      ...service,
+      outputSchema: service.free ? undefined : getX402OutputSchema(service.path),
+    });
+    res.json({
+      ...metadata,
+      asp: {
+        ...metadata.asp,
+        services: metadata.asp.services.map(withInputContract),
+        featuredServices: metadata.asp.featuredServices.map(withInputContract),
+      },
+    });
   });
 
   // ── Free OKX spot teaser ──────────────────────────────────────────
@@ -341,6 +358,41 @@ export function createApp(cfg: AppConfig) {
 
   app.get("/v1/reports", (_req, res) => {
     res.json({ reports: listReports(30) });
+  });
+
+  // OKX.AI task clients probe paid endpoints with GET before they know the
+  // business parameters. Return a machine-readable contract that the client
+  // can use to assemble the POST body before requesting payment.
+  for (const path of [
+    "/v1/analysis/base",
+    "/v1/analysis/premium",
+    "/v1/token/scan",
+    "/v1/preflight",
+    "/v1/wallet/scan",
+    "/v1/market/pulse",
+    "/v1/swap/quote",
+  ]) {
+    app.get(path, (_req, res) => {
+      res.status(400).json(buildX402InputRequired(path));
+    });
+  }
+
+  // Validate the scan body before the payment gate. This prevents a buyer from
+  // paying for a request that cannot produce a report.
+  app.post("/v1/token/scan", (req, res, next) => {
+    const parsed = TokenScanRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json(buildX402InputRequired("/v1/token/scan", parsed.error.issues));
+    }
+    if ((parsed.data.chainId ?? "196") !== "196") {
+      return res.status(400).json(
+        buildX402InputRequired("/v1/token/scan", [
+          { path: ["chainId"], message: "Token Risk Scan is available on X Layer chain 196 only." },
+        ]),
+      );
+    }
+    req.body = parsed.data;
+    next();
   });
 
   // Payment gate for paid routes

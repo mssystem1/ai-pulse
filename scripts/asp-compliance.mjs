@@ -23,8 +23,10 @@ const BASE = (process.argv[2] || process.env.BASE_URL || "http://127.0.0.1:4000"
 const USDT0 = "0x779ded0c9e1022225f8e0630b35a9b54be713736".toLowerCase();
 const NETWORK = "eip155:196";
 const PAY_TO = (process.env.PAY_TO_ADDRESS || "").toLowerCase();
+const TEST_TOKEN = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
 
 const results = [];
+let liveSettlementVerified = false;
 function pass(name, detail = "") {
   results.push({ ok: true, name, detail });
   console.log(`  ✅ ${name}${detail ? " — " + detail : ""}`);
@@ -120,6 +122,20 @@ console.log("BASE", BASE);
 console.log("PAY_TO", PAY_TO || "(from .env)");
 console.log("");
 
+try {
+  const hostname = new URL(BASE).hostname.toLowerCase();
+  if (hostname.endsWith(".vercel.app")) {
+    fail(
+      "OKX.AI moderation hostname",
+      "vercel.app is blocked by some buyer security policies; use a custom domain or a non-Vercel API host",
+    );
+  } else if (hostname !== "127.0.0.1" && hostname !== "localhost") {
+    pass("OKX.AI moderation hostname", hostname);
+  }
+} catch {
+  fail("BASE_URL", "must be an absolute URL");
+}
+
 // ── 1. Identity / listing surfaces ──────────────────────────────────
 console.log("1) Listing surfaces (metadata, health, logo)");
 const health = await req("GET", "/healthz");
@@ -157,6 +173,20 @@ for (const [method, path, body] of freePaths) {
 
 // ── 3. Paid REST: unpaid → 402 + PAYMENT-REQUIRED header ────────────
 console.log("\n3) Paid REST — unpaid must be HTTP 402 + PAYMENT-REQUIRED header");
+const discovery = await req("GET", "/v1/token/scan");
+if (
+  discovery.status === 400 &&
+  discovery.json?.status === "input_required" &&
+  discovery.json?.fields?.some?.((field) => field.name === "address" && field.required)
+) {
+  pass("GET /v1/token/scan input discovery", "400 input_required with address field");
+} else {
+  fail(
+    "GET /v1/token/scan input discovery",
+    `status=${discovery.status} body=${JSON.stringify(discovery.json).slice(0, 240)}`,
+  );
+}
+
 const paidSpecs = [
   { path: "/v1/analysis/base", body: { instId: "BTC-USDT", timeframe: "1H", lang: "en" }, amount: "30000", label: "base $0.03" },
   { path: "/v1/analysis/premium", body: { instId: "ETH-USDT", timeframe: "1H", lang: "en" }, amount: "60000", label: "premium $0.06" },
@@ -189,42 +219,50 @@ for (const spec of paidSpecs) {
   const ch = decode402(r.paymentRequired);
   challenges[spec.path] = ch;
   validateChallenge(ch, spec.amount, spec.label);
+  const outputSchema = ch?.outputSchema || r.json?.outputSchema;
+  if (
+    outputSchema?.method === "POST" &&
+    outputSchema?.input &&
+    Object.values(outputSchema.input).every((field) => field.carrier === "body")
+  ) {
+    pass(`${spec.label}: POST body contract`);
+  } else {
+    fail(`${spec.label}: POST body contract`, "missing outputSchema/input carrier metadata");
+  }
 }
 
 // ── 4. Paid REST with real x402 settlement ──────────────────────────
-console.log("\n4) Paid REST — settle with test wallet (x402 buyer SDK)");
+console.log("\n4) Paid REST replay proof (one deliberate $0.01 token scan)");
 if (process.env.RUN_LIVE_PAY !== "1") {
-  fail("Live settlement proof", "skipped — set RUN_LIVE_PAY=1 deliberately after verifying wallet, recipient, and prices");
+  console.log(
+    "  SKIP Live settlement proof - set RUN_LIVE_PAY=1 only after verifying wallet, recipient, and the $0.01 price",
+  );
 } else if (!process.env.TEST_WALLET_PRIVATE_KEY) {
-  fail("TEST_WALLET_PRIVATE_KEY", "missing — cannot run explicitly requested live pay");
+  fail("TEST_WALLET_PRIVATE_KEY", "missing - cannot run explicitly requested live pay");
 } else {
-  for (const path of ["/v1/analysis/base", "/v1/analysis/premium"]) {
-    const body =
-      path.includes("premium")
-        ? { instId: "ETH-USDT", timeframe: "1H", lang: "en" }
-        : { instId: "BTC-USDT", timeframe: "1H", lang: "en" };
-    try {
-      const r = await req("POST", path, { body, pay: true });
-      if (r.status === 200 && (r.json?.service || r.json?.analysis)) {
-        pass(`PAID ${path}`, r.json?.analysis?.headline?.slice?.(0, 60) || r.json?.service);
-        if (r.paymentResponse) pass(`PAYMENT-RESPONSE on ${path}`);
-        else pass(`PAYMENT-RESPONSE optional on ${path}`);
-      } else {
-        fail(`PAID ${path}`, `status=${r.status} ${JSON.stringify(r.json).slice(0, 200)}`);
-      }
-    } catch (e) {
-      fail(`PAID ${path}`, String(e.message || e));
+  try {
+    const r = await req("POST", "/v1/token/scan", {
+      body: { address: TEST_TOKEN, chainId: "196" },
+      pay: true,
+    });
+    if (
+      r.status === 200 &&
+      r.json?.service === "token_scan" &&
+      r.json?.address?.toLowerCase?.() === TEST_TOKEN &&
+      Array.isArray(r.json?.components)
+    ) {
+      liveSettlementVerified = true;
+      pass("PAID POST /v1/token/scan inline report", `riskScore=${r.json.riskScore}`);
+      if (r.paymentResponse) pass("PAYMENT-RESPONSE on token scan");
+      else fail("PAYMENT-RESPONSE on token scan", "missing after successful paid replay");
+    } else {
+      fail(
+        "PAID POST /v1/token/scan inline report",
+        `status=${r.status} ${JSON.stringify(r.json).slice(0, 240)}`,
+      );
     }
-  }
-
-  // Checkout path (server pay — UI E2E)
-  const checkout = await req("POST", "/v1/checkout", {
-    body: { path: "/v1/analysis/base", body: { instId: "OKB-USDT", timeframe: "1H", lang: "en" } },
-  });
-  if (checkout.status === 200 && checkout.json?.ok && checkout.json?.result?.analysis) {
-    pass("POST /v1/checkout (server pay)", checkout.json.paidBy);
-  } else {
-    fail("POST /v1/checkout", JSON.stringify(checkout.json).slice(0, 200));
+  } catch (e) {
+    fail("PAID POST /v1/token/scan", String(e.message || e));
   }
 }
 
@@ -329,15 +367,17 @@ console.log(`Passed: ${passed}`);
 console.log(`Failed: ${failed}`);
 console.log(
   failed === 0
-    ? "\n✅ ASP COMPLIANCE: READY for OKX.AI listing (after public HTTPS BASE_URL)\n"
+    ? liveSettlementVerified
+      ? "\n✅ ASP COMPLIANCE: technical checks and live $0.01 replay passed\n"
+      : "\n✅ ASP COMPLIANCE: non-spending checks passed; live settlement was not executed\n"
     : "\n❌ ASP COMPLIANCE: fix failures above before listing\n",
 );
 
 // Human checklist still needed
 console.log("Human steps still required for marketplace:");
-console.log("  1. Deploy public HTTPS BASE_URL (Vercel/Railway)");
-console.log("  2. Onchain OS: register A2MCP ASP + list on OKX.AI");
-console.log("  3. Publish the final demo and required hackathon submission form");
+console.log("  1. Use a stable HTTPS host that is not a *.vercel.app hostname");
+console.log("  2. Run one controlled $0.01 replay with RUN_LIVE_PAY=1");
+console.log("  3. Update and resubmit existing OKX.AI agent 8355 (do not register a duplicate)");
 console.log("");
 
 process.exit(failed === 0 ? 0 : 1);

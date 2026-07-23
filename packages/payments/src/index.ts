@@ -2,9 +2,11 @@ import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { AppConfig } from "@pulse/config";
 import { usdToAtomic } from "@pulse/config";
 import { createOkxPaymentMiddleware } from "./okxMiddleware.js";
+import { buildX402PaymentRequiredBody, getX402OutputSchema } from "./inputContracts.js";
 
 export type PaymentChallenge = {
   x402Version: number;
+  outputSchema?: ReturnType<typeof getX402OutputSchema>;
   resource: {
     url: string;
     description: string;
@@ -30,6 +32,7 @@ export function buildChallenge(
   const url = `${cfg.BASE_URL.replace(/\/$/, "")}${path}`;
   return {
     x402Version: 2,
+    outputSchema: getX402OutputSchema(path),
     resource: {
       url,
       description,
@@ -81,12 +84,12 @@ export function createX402Middleware(cfg: AppConfig): RequestHandler {
     res.setHeader("Content-Type", "application/json");
     return res.status(402).json({
       error: "Payment Required",
-      message: "Attach PAYMENT-SIGNATURE after settling x402 on X Layer, then retry.",
       priceUsd: route.priceUsd,
       network: cfg.X402_NETWORK,
       x402Version: 2,
       accepts: challenge.accepts,
       paymentMode: cfg.paymentMode,
+      ...buildX402PaymentRequiredBody(path),
     });
   };
 }
@@ -136,3 +139,9 @@ export function createPaymentGate(cfg: AppConfig): RequestHandler {
 
 export { createMcpPaymentGate } from "./mcpGate.js";
 export { createOkxPaymentMiddleware } from "./okxMiddleware.js";
+export {
+  buildX402InputRequired,
+  buildX402PaymentRequiredBody,
+  getX402InputDefinition,
+  getX402OutputSchema,
+} from "./inputContracts.js";

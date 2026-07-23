@@ -284,22 +284,31 @@ const report = await pulse.preflight({
 
 ## Deployment
 
-### One-origin Vercel deployment
+### One-origin deployment with a custom domain
 
-The repository includes root and web Vercel configuration. The preferred judging/demo setup serves the Vite application and rewrites API traffic to the Node serverless entrypoint under one HTTPS origin.
+The repository includes root and web Vercel configuration. It serves the Vite application and rewrites API traffic to the Node serverless entrypoint under one HTTPS origin. For OKX.AI submission, attach a custom domain: moderator tooling may block commands containing a `*.vercel.app` endpoint even when the website itself works.
 
 1. Import the repository into Vercel.
 2. Use the repository install command (`npm install`).
 3. Set production variables from `.env.example`.
-4. Set `BASE_URL` to the final HTTPS origin.
-5. Do not create `VITE_API_URL` for this one-origin deployment; browser requests stay on the current origin.
-6. Deploy and run the readiness checks below.
+4. Add and verify a custom domain in the project.
+5. Set `BASE_URL` to that final custom HTTPS origin.
+6. Do not create `VITE_API_URL` for this one-origin deployment; browser requests stay on the current origin.
+7. Deploy and run the readiness checks below.
 
 The root package is explicitly ESM (`"type": "module"`) because the Vercel function imports the ESM-only `@pulse/*` workspaces. Keep that setting and the pinned Node 22 runtime when changing deployment configuration.
 
 ### Split deployment
 
 Run `apps/api` on Railway, Render, or a Node container and deploy `apps/web` to Vercel. Set `BASE_URL` to the API hostname and `VITE_API_URL` to the same origin during the web build. CORS already exposes the x402 payment headers.
+
+GitHub Codespaces is appropriate for `onchainos` login and verification, but not as the marketplace production origin. A forwarded port depends on the codespace remaining active and is not a stable service URL.
+
+### OKX.AI x402 replay contract
+
+PULSE self-describes every paid POST route for agent clients. For token safety, `GET /v1/token/scan` returns `400 input_required` with the required address field; a valid unpaid POST returns the x402 `accepts[]` and POST-body schema; the paid replay returns the complete `token_scan` JSON inline. The Onchain OS task client saves a successful replay body as the task deliverable.
+
+The moderator-specific diagnosis, production-host migration, verification commands, and agent #8355 resubmission gate are in [docs/OKX_AI_MODERATION.md](docs/OKX_AI_MODERATION.md).
 
 ### Release gates
 
@@ -315,6 +324,7 @@ Before submitting:
 
 - `GET /healthz` reports `paymentMode: "okx"`, `hasOkxCredentials: true`, and `hasXaiKey: true`.
 - An unpaid paid route returns HTTP 402 with X Layer, USDT0, the correct amount, and the intended `payTo` address.
+- `GET /v1/token/scan` returns `400 input_required`; its valid paid POST replay returns the scan report inline.
 - `/v1/metadata`, `/mcp`, `/brand/logo.svg`, and `/brand/logo.png` are public.
 - The wallet drawer shows OKB and USDT0; a live OKX route is returned for OKB → USDT0 without a second wallet prompt.
 - The pair picker lists live OKX instruments and does not allow an arbitrary pair value.
