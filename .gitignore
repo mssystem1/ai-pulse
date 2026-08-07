@@ -16,5 +16,7 @@ apps/web/out/
 data/*.db
 data/cache/
 .codex-tmp-ui/
+.codex-ui-review/
+node
 .env.cloud
 *-report.json
