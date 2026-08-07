@@ -36,7 +36,7 @@ Agents get the same capability through MCP with structured JSON. Safety is expli
 | Field | Answer |
 | --- | --- |
 | Product | PULSE |
-| Category | Financial Assistant / A2MCP |
+| Category | Trading / A2MCP |
 | Tagline | OKX spot intelligence. Pay per signal on X Layer. |
 | Network | X Layer (`eip155:196`) |
 | Payment asset | USDT0 (`0x779d…3736`) |

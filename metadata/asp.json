@@ -2,7 +2,7 @@
   "name": "PULSE",
   "version": "2.0.0",
   "type": "A2MCP",
-  "category": "Financial Assistant",
+  "category": "Trading",
   "tagline": "Multichain spot and prediction-market intelligence. Pay per report on your selected network.",
   "taglineZh": "多链现货与预测市场智能研报 · 按所选网络按次付费",
   "shortDescription": "PULSE delivers separate OKX Crypto Market and crypto-focused Polymarket analysis with readable, recoverable reports on X Layer, Base, Arbitrum One, and Arc Testnet.",

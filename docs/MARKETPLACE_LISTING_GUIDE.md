@@ -8,7 +8,7 @@ Prepare one versioned package from the deployed product:
 
 - Name: PULSE.
 - Version: 2.0.0.
-- Category: Financial Assistant / market intelligence.
+- OKX.AI ASP category: Trading. Circle positioning remains Financial analysis / market intelligence.
 - Square PNG logo and SVG brand asset served over public HTTPS.
 - Short and long descriptions from `/v1/metadata`.
 - Support/privacy/terms URLs if the destination requires them.

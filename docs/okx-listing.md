@@ -8,7 +8,7 @@ Use this document as the single copy source when registering the A2MCP service. 
 | --- | --- |
 | Name | **PULSE** |
 | Type | **A2MCP** |
-| Category | **Financial Assistant** |
+| Category | **Trading** |
 | Tagline | **OKX spot intelligence. Pay per signal on X Layer.** |
 | One-liner | Live OKX market context, Grok-powered trading scenarios, and pre-trade safety—available to humans and agents through x402. |
 | Network | X Layer · `eip155:196` |

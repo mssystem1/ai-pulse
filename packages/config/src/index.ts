@@ -98,7 +98,7 @@ const EnvSchema = z.object({
   PRICE_ANALYSIS_BASE: z.coerce.number().default(0.10),
   PRICE_ANALYSIS_PREMIUM: z.coerce.number().default(0.20),
   PRODUCT_LOGO_URL: z.string().optional().default(""),
-  PRODUCT_CATEGORY: z.string().optional().default("Financial Assistant"),
+  PRODUCT_CATEGORY: z.string().optional().default("Trading"),
   PRODUCT_NAME: z.string().optional().default("PULSE"),
   TEST_WALLET_PRIVATE_KEY: z.string().optional().default(""),
   TEST_WALLET_ADDRESS: z.string().optional().default(""),
