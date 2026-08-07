@@ -1,7 +1,7 @@
 export type X402InputField = {
   name: string;
   carrier: "body";
-  type: "string" | "number";
+  type: "string" | "number" | "array";
   required: boolean;
   description: string;
   default?: string | number;
@@ -12,6 +12,7 @@ export type X402InputField = {
 export type X402InputContract = {
   method: "POST";
   input: Record<string, Omit<X402InputField, "name">>;
+  output?: Record<string, unknown>;
 };
 
 type RouteInputDefinition = {
@@ -271,6 +272,37 @@ const routeInputs: Record<string, RouteInputDefinition> = {
   },
 };
 
+routeInputs["/v1/analysis/spot/standard"] = routeInputs["/v1/analysis/base"];
+routeInputs["/v1/analysis/spot/premium"] = routeInputs["/v1/analysis/premium"];
+
+const predictionFields: X402InputField[] = [
+  { name: "primaryMarketId", carrier: "body", type: "string", required: true, description: "Explicit Polymarket market or pm:condition ID." },
+  { name: "additionalMarketIds", carrier: "body", type: "array", required: false, description: "Optional array of additional explicitly selected market IDs." },
+  { name: "lang", carrier: "body", type: "string", required: false, default: "en", enum: ["en", "zh"], description: "Report language." },
+  { name: "userNote", carrier: "body", type: "string", required: false, description: "Optional focus note, maximum 500 characters." },
+];
+for (const path of ["/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium"]) {
+  routeInputs[path] = { message: "Select the primary Polymarket market before requesting payment.", requiredArgs: ["primaryMarketId"], fields: predictionFields };
+}
+const fusedFields: X402InputField[] = [
+  { name: "instId", carrier: "body", type: "string", required: true, description: "OKX spot instrument ID, for example BTC-USDT." },
+  { name: "timeframe", carrier: "body", type: "string", required: false, default: "1H", description: "Spot candle timeframe." },
+  ...predictionFields,
+];
+for (const path of ["/v1/analysis/fused/standard", "/v1/analysis/fused/premium", "/v1/analysis/divergence"]) {
+  routeInputs[path] = { message: "Provide an OKX instrument and explicit primary Polymarket market.", requiredArgs: ["instId", "primaryMarketId"], fields: fusedFields };
+}
+routeInputs["/v1/preflight/event-risk"] = {
+  message: "Select the primary Polymarket market for event-risk preflight.", requiredArgs: ["primaryMarketId"],
+  fields: [
+    ...predictionFields,
+    { name: "intent", carrier: "body", type: "string", required: false, default: "generic", enum: ["swap", "transfer", "approve", "hire_agent", "generic"], description: "Action being checked." },
+    { name: "tokenAddress", carrier: "body", type: "string", required: false, pattern: EVM_ADDRESS_PATTERN, description: "Optional token contract." },
+    { name: "walletAddress", carrier: "body", type: "string", required: false, pattern: EVM_ADDRESS_PATTERN, description: "Optional wallet address." },
+    { name: "amount", carrier: "body", type: "string", required: false, description: "Optional action amount." },
+  ],
+};
+
 export function getX402InputDefinition(path: string): RouteInputDefinition | undefined {
   return routeInputs[path];
 }
@@ -278,11 +310,28 @@ export function getX402InputDefinition(path: string): RouteInputDefinition | und
 export function getX402OutputSchema(path: string): X402InputContract | undefined {
   const definition = getX402InputDefinition(path);
   if (!definition) return undefined;
+  const asynchronous = [
+    "/v1/analysis/spot/standard", "/v1/analysis/spot/premium",
+    "/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium",
+    "/v1/analysis/fused/standard", "/v1/analysis/fused/premium",
+    "/v1/analysis/divergence", "/v1/preflight/event-risk",
+  ].includes(path);
   return {
     method: "POST",
     input: Object.fromEntries(
       definition.fields.map(({ name, ...field }) => [name, field]),
     ),
+    ...(asynchronous ? { output: {
+      status: 202,
+      delivery: "durable_job",
+      fields: {
+        job: { type: "object", description: "Persisted job and current stage." },
+        recoveryToken: { type: "string", description: "Opaque capability returned once for authenticated polling." },
+        pollUrl: { type: "string", description: "GET with PULSE-RECOVERY-TOKEN; never submit another payment to poll." },
+      },
+      terminalStages: ["completed", "completed_partial", "failed_terminal", "manual_reconciliation"],
+      reportPath: "/v1/jobs/{jobId}/report",
+    } } : {}),
   };
 }
 

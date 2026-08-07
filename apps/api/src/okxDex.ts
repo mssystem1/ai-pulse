@@ -7,6 +7,34 @@ const USDT0 = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
 
 type OkxEnvelope = { code?: string; msg?: string; data?: unknown[] };
 
+export function createOkxSignature(
+  secretKey: string,
+  timestamp: string,
+  method: "GET" | "POST",
+  requestPath: string,
+  body = "",
+): string {
+  return createHmac("sha256", secretKey)
+    .update(`${timestamp}${method}${requestPath}${body}`)
+    .digest("base64");
+}
+
+export function createOkxDexHeaders(
+  cfg: Pick<AppConfig, "OKX_API_KEY" | "OKX_SECRET_KEY" | "OKX_PASSPHRASE">,
+  timestamp: string,
+  method: "GET" | "POST",
+  requestPath: string,
+  body = "",
+): Record<string, string> {
+  return {
+    "OK-ACCESS-KEY": cfg.OKX_API_KEY.trim(),
+    "OK-ACCESS-SIGN": createOkxSignature(cfg.OKX_SECRET_KEY.trim(), timestamp, method, requestPath, body),
+    "OK-ACCESS-PASSPHRASE": cfg.OKX_PASSPHRASE.trim(),
+    "OK-ACCESS-TIMESTAMP": timestamp,
+    Accept: "application/json",
+  };
+}
+
 async function okxDexGetMany(
   cfg: AppConfig,
   path: string,
@@ -18,22 +46,17 @@ async function okxDexGetMany(
   }
   const query = `?${new URLSearchParams(params)}`;
   const timestamp = new Date().toISOString();
-  const signature = createHmac("sha256", cfg.OKX_SECRET_KEY)
-    .update(`${timestamp}GET${path}${query}`)
-    .digest("base64");
+  const requestPath = `${path}${query}`;
   const response = await fetch(`${cfg.OKX_BASE_URL.replace(/\/$/, "")}${path}${query}`, {
-    headers: {
-      "OK-ACCESS-KEY": cfg.OKX_API_KEY,
-      "OK-ACCESS-SIGN": signature,
-      "OK-ACCESS-PASSPHRASE": cfg.OKX_PASSPHRASE,
-      "OK-ACCESS-TIMESTAMP": timestamp,
-      Accept: "application/json",
-    },
+    headers: createOkxDexHeaders(cfg, timestamp, "GET", requestPath),
     signal: AbortSignal.timeout(timeoutMs),
   });
   const body = (await response.json().catch(() => ({}))) as OkxEnvelope;
   if (!response.ok || body.code !== "0" || !Array.isArray(body.data)) {
-    throw new Error(`OKX DEX ${body.msg || `HTTP ${response.status}`}`);
+    const providerCode = body.code ? ` code=${body.code}` : "";
+    throw new Error(
+      `OKX DEX upstream HTTP ${response.status}${providerCode}: ${body.msg || "unexpected response"}`,
+    );
   }
   return body.data as Record<string, unknown>[];
 }

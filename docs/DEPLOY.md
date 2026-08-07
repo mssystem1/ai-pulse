@@ -94,7 +94,9 @@ Terminate TLS at the platform/load balancer and set `BASE_URL` to the external H
 | `ENABLE_SERVER_PAY` | `0` | `0` |
 | `VITE_API_URL` | empty or localhost API | unset for same origin; API origin only if split |
 
-The `OKX_XLAYER_API_*` aliases remain supported. Keep all credentials server-side.
+The `OKX_XLAYER_API_*` aliases remain supported. Exchange OS DEX funding uses the same API key, secret, and passphrase with the documented signed headers; it does not require a separate project-ID variable. The x402 facilitator URL remains independently configurable. Keep all credentials server-side.
+
+Run `npm run readiness:okx` in the final API runtime. It performs only authenticated read-only token-catalog and quote requests; it never signs a wallet transaction or broadcasts on-chain. Run it from the deployed region as well as localhost because OKX service access may differ by source region. A provider business code such as `50125` means the request reached OKX and should be investigated as service/region access—not rewritten as a missing or malformed credential.
 
 For Railway, set `HOST=0.0.0.0` or omit `HOST` and use the application default. Do not use URL-form IPv6 notation such as `HOST=[::]`; Node interprets the brackets as a hostname. PULSE also normalizes `[::]` defensively in case a platform supplies it.
 

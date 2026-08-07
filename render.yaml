@@ -27,6 +27,8 @@ services:
         value: "0"
       - key: OKX_BASE_URL
         value: https://web3.okx.com
+      - key: OKX_FACILITATOR_URL
+        value: https://web3.okx.com
       - key: PAY_TO_ADDRESS
         sync: false
       - key: OKX_XLAYER_API_KEY
@@ -37,5 +39,73 @@ services:
         sync: false
       - key: XAI_API_KEY
         sync: false
+      - key: ENABLED_NETWORKS
+        value: xlayer
+      - key: DEFAULT_NETWORK
+        value: xlayer
+      - key: FEATURE_POLYMARKET
+        value: "0"
+      - key: FEATURE_WALLET_APPKIT
+        value: "0"
+      - key: FEATURE_BASE_PAYMENTS
+        value: "0"
+      - key: FEATURE_ARBITRUM_PAYMENTS
+        value: "0"
+      - key: FEATURE_ARC_PAYMENTS
+        value: "0"
+      - key: FEATURE_JOBS
+        value: "1"
+      - key: FEATURE_LIVE_SAFETY
+        value: "0"
+      - key: FEATURE_PREDICTION_ANALYSIS
+        value: "0"
+      - key: FEATURE_FUSED_ANALYSIS
+        value: "0"
+      - key: FEATURE_DIVERGENCE_ANALYSIS
+        value: "0"
+      - key: FEATURE_EVENT_RISK_ANALYSIS
+        value: "0"
+      - key: ARC_AI_MODE
+        value: fixture
+      - key: ARC_LIVE_WALLET_HOURLY_LIMIT
+        value: "10"
+      - key: ARC_LIVE_IP_HOURLY_LIMIT
+        value: "20"
+      - key: ARC_LIVE_WALLET_DAILY_LIMIT
+        value: "25"
+      - key: ARC_LIVE_DAILY_COST_LIMIT_USD
+        value: "5"
+      - key: GROK_MAX_INPUT_STANDARD
+        value: "12000"
+      - key: GROK_MAX_INPUT_PREMIUM
+        value: "24000"
+      - key: GROK_MAX_OUTPUT_STANDARD
+        value: "700"
+      - key: GROK_MAX_OUTPUT_PREMIUM
+        value: "1200"
+      - key: XAI_INPUT_COST_PER_MILLION_USD
+        value: "0"
+      - key: XAI_OUTPUT_COST_PER_MILLION_USD
+        value: "0"
+      - key: QUEUE_PROVIDER
+        value: memory
+      - key: STORAGE_PROVIDER
+        value: memory
+      - key: KV_REST_API_URL
+        sync: false
+      - key: KV_REST_API_TOKEN
+        sync: false
+      - key: BLOB_READ_WRITE_TOKEN
+        sync: false
+      - key: CDP_API_KEY_ID
+        sync: false
+      - key: CDP_API_KEY_SECRET
+        sync: false
+      - key: CIRCLE_GATEWAY_ENABLED
+        value: "0"
+      - key: CIRCLE_GATEWAY_SELLER_ADDRESS
+        sync: false
+      - key: BAZAAR_DISCOVERABLE
+        value: "0"
       - key: BASE_URL
         sync: false

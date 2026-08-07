@@ -2,10 +2,28 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
 import { loadConfig } from "@pulse/config";
-import { createApp } from "./app.js";
+import { createApp, estimateAiCostUsd } from "./app.js";
+import type { PolymarketClient } from "@pulse/market";
+
+it("prices cached xAI input at the configured cached-token rate", () => {
+  const cost = estimateAiCostUsd({
+    XAI_INPUT_COST_PER_MILLION_USD: 1.25,
+    XAI_CACHED_INPUT_COST_PER_MILLION_USD: 0.20,
+    XAI_OUTPUT_COST_PER_MILLION_USD: 2.50,
+  }, { promptTokens: 1_000, cachedTokens: 200, completionTokens: 100 });
+  assert.equal(cost, 0.00129);
+  assert.equal(estimateAiCostUsd({
+    XAI_INPUT_COST_PER_MILLION_USD: 1.25,
+    XAI_CACHED_INPUT_COST_PER_MILLION_USD: undefined as unknown as number,
+    XAI_OUTPUT_COST_PER_MILLION_USD: 2.50,
+  }, { promptTokens: 1_000, cachedTokens: 200, completionTokens: 100 }), 0.0015);
+});
 
 let server: Server;
 let port: number;
+let testConfig: ReturnType<typeof loadConfig>;
+const ADDRESS = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
+const apiUrl = () => `http://127.0.0.1:${port}`;
 
 async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
   const headers: Record<string, string> = {
@@ -25,8 +43,30 @@ describe("PULSE API", () => {
       ...loadConfig(),
       X402_MOCK: true,
       paymentMode: "mock" as const,
+      FEATURE_LIVE_SAFETY: false,
+      QUEUE_PROVIDER: "memory" as const,
+      STORAGE_PROVIDER: "memory" as const,
     };
-    const app = createApp(cfg);
+    testConfig = cfg;
+    const polymarket = {
+      async getMarket(id: string) {
+        const closed = id === "pm:closed";
+        const missingBook = id === "pm:missing-book";
+        return {
+          id, gammaMarketId: "fixture", eventIds: [], conditionId: `0x${"a".repeat(64)}`,
+          questionId: null, slug: null, question: "Fixture market", description: null, resolutionSource: null,
+          outcomes: [{ name: "Yes", tokenId: missingBook ? "missing-book" : "1", referencePrice: .5 }, { name: "No", tokenId: "2", referencePrice: .5 }],
+          active: !closed, closed, archived: false, restricted: false, enableOrderBook: true, negRisk: false,
+          endDate: null, updatedAt: null, volumeUsd: 1, liquidityUsd: 1,
+          eligibility: closed ? "closed" : "active", observedAt: new Date().toISOString(),
+        };
+      },
+      async getOrderBook(tokenId: string) {
+        if (tokenId === "missing-book") throw new Error("order book unavailable");
+        return { asset_id: tokenId, bids: [], asks: [] };
+      },
+    } as unknown as PolymarketClient;
+    const app = createApp(cfg, { polymarket });
     await new Promise<void>((resolve) => {
       server = app.listen(0, "127.0.0.1", () => resolve());
     });
@@ -44,6 +84,22 @@ describe("PULSE API", () => {
     const { res, json } = await jfetch("/healthz");
     assert.equal(res.status, 200);
     assert.equal(json.ok, true);
+  });
+
+  it("emits correlation IDs and Prometheus request metrics", async () => {
+    const health = await fetch(`${apiUrl()}/healthz`, { headers: { "X-Correlation-ID": "pulse-test-correlation" } });
+    assert.equal(health.headers.get("x-correlation-id"), "pulse-test-correlation");
+    const metrics = await fetch(`${apiUrl()}/metrics`);
+    const text = await metrics.text();
+    assert.equal(metrics.status, 200);
+    assert.match(text, /pulse_http_requests_total/);
+    assert.match(text, /pulse_process_uptime_seconds/);
+  });
+
+  it("validates the in-app Base and Arbitrum native-USDC swap request", async () => {
+    const { res, json } = await jfetch("/v1/dex/cdp/native-usdc", { method: "POST", body: JSON.stringify({ network: "ethereum", amount: "0", userWalletAddress: "bad" }) });
+    assert.equal(res.status, 400);
+    assert.ok(json.error);
   });
 
   it("publishes the free X Layer catalog route", async () => {
@@ -65,6 +121,25 @@ describe("PULSE API", () => {
     assert.equal(service.outputSchema.method, "POST");
     assert.equal(service.outputSchema.input.address.carrier, "body");
     assert.equal(service.outputSchema.input.address.required, true);
+  });
+
+  it("publishes provider-specific multichain payment aliases", async () => {
+    const { res, json } = await jfetch("/v1/metadata");
+    assert.equal(res.status, 200);
+    const services = json.asp.networkServices as Array<{ path: string; network: string; paymentProvider: string }>;
+    assert.ok(services.some((item) => item.path === "/xlayer/v1/analysis/prediction/premium" && item.paymentProvider === "okx"));
+    assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
+    assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));
+    assert.equal(services.some((item) => item.path === "/base/v1/token/scan"), false);
+    assert.equal(json.asp.version, "2.0.0");
+    assert.ok(json.asp.tags.includes("polymarket"));
+    assert.ok(json.asp.tags.includes("multichain"));
+    const publicPaths = (json.asp.services as Array<{ path: string }>).map((item) => item.path);
+    for (const hidden of ["/v1/wallet/scan", "/v1/market/pulse", "/v1/swap/quote", "/v1/analysis/fused/standard", "/v1/analysis/fused/premium", "/v1/analysis/divergence", "/v1/preflight/event-risk"]) {
+      assert.equal(publicPaths.includes(hidden), false, hidden);
+    }
+    assert.ok(publicPaths.includes("/v1/analysis/prediction/standard"));
+    assert.ok(publicPaths.includes("/v1/analysis/prediction/premium"));
   });
 
   it("returns 402 without payment", async () => {
@@ -115,6 +190,64 @@ describe("PULSE API", () => {
     assert.equal(res.headers.get("payment-required"), null);
   });
 
+  it("validates V5 prediction selection before payment", async () => {
+    const invalid = await jfetch("/v1/analysis/prediction/standard", {
+      method: "POST", body: JSON.stringify({ additionalMarketIds: [] }),
+    });
+    assert.equal(invalid.res.status, 400);
+    assert.equal(invalid.res.headers.get("payment-required"), null);
+
+    const unpaid = await jfetch("/v1/analysis/prediction/standard", {
+      method: "POST", body: JSON.stringify({ primaryMarketId: "pm:condition" }),
+    });
+    assert.equal(unpaid.res.status, 402);
+    assert.equal(unpaid.json.priceUsd, testConfig.PRICE_ANALYSIS_PREDICTION_STANDARD);
+    assert.ok(unpaid.res.headers.get("payment-required"));
+
+    const ineligible = await jfetch("/v1/analysis/prediction/standard", {
+      method: "POST", body: JSON.stringify({ primaryMarketId: "pm:closed" }),
+    });
+    assert.equal(ineligible.res.status, 422);
+    assert.equal(ineligible.json.code, "market_closed");
+    assert.equal(ineligible.res.headers.get("payment-required"), null);
+
+    const missingEvidence = await jfetch("/v1/analysis/prediction/standard", {
+      method: "POST", body: JSON.stringify({ primaryMarketId: "pm:missing-book" }),
+    });
+    assert.equal(missingEvidence.res.status, 503);
+    assert.equal(missingEvidence.json.code, "prediction_evidence_unavailable");
+    assert.equal(missingEvidence.res.headers.get("payment-required"), null);
+  });
+
+  it("publishes Arc Gateway-shaped payment requirements on the Arc alias", async () => {
+    const { res, json } = await jfetch("/arc/v1/analysis/prediction/standard", {
+      method: "POST", body: JSON.stringify({ primaryMarketId: "pm:condition" }),
+    });
+    assert.equal(res.status, 402);
+    assert.equal(json.network, "eip155:5042002");
+    const encoded = res.headers.get("payment-required");
+    assert.ok(encoded);
+    const challenge = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8"));
+    assert.match(challenge.resource.url, /\/arc\/v1\/analysis\/prediction\/standard$/);
+    assert.equal(challenge.accepts[0].asset.toLowerCase(), "0x3600000000000000000000000000000000000000");
+  });
+
+  it("namespaces Base and Arbitrum payment challenges", async () => {
+    for (const expected of [
+      { alias: "base", network: "eip155:8453", asset: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913" },
+      { alias: "arbitrum", network: "eip155:42161", asset: "0xaf88d065e77c8cc2239327c5edb3a432268e5831" },
+    ]) {
+      const { res } = await jfetch(`/${expected.alias}/v1/analysis/prediction/standard`, {
+        method: "POST", body: JSON.stringify({ primaryMarketId: "pm:condition" }),
+      });
+      assert.equal(res.status, 402);
+      const challenge = JSON.parse(Buffer.from(res.headers.get("payment-required")!, "base64").toString("utf8"));
+      assert.equal(challenge.accepts[0].network, expected.network);
+      assert.equal(challenge.accepts[0].asset.toLowerCase(), expected.asset);
+      assert.match(challenge.resource.url, new RegExp(`/${expected.alias}/v1/analysis/prediction/standard$`));
+    }
+  });
+
   it("returns the token risk JSON inline on paid replay", async () => {
     const address = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
     const { res, json } = await jfetch("/v1/token/scan", {
@@ -162,5 +295,127 @@ describe("PULSE API", () => {
     });
     assert.equal(res.status, 400);
     assert.match(json.error, /Invalid EVM address/);
+  });
+
+  it("returns explicit unknown evidence when live safety is disabled", async () => {
+    const { res, json } = await jfetch("/v1/safety/evidence", {
+      method: "POST", body: JSON.stringify({ address: ADDRESS }),
+    });
+    assert.equal(res.status, 503);
+    assert.equal(json.evidenceStatus, "unavailable");
+    assert.equal(json.safetyVerdict, "unknown");
+    assert.equal("riskScore" in json, false);
+  });
+
+  it("preserves legacy paid-route discovery probes", async () => {
+    for (const path of [
+      "/v1/analysis/base",
+      "/v1/analysis/premium",
+      "/v1/token/scan",
+      "/v1/preflight",
+      "/v1/wallet/scan",
+      "/v1/market/pulse",
+      "/v1/swap/quote",
+    ]) {
+      const res = await fetch(`${apiUrl()}${path}`);
+      assert.equal(res.status, 400, path);
+      const body = await res.json() as { status?: string; outputSchema?: { method?: string } };
+      assert.equal(body.status, "input_required", path);
+      assert.equal(body.outputSchema?.method, "POST", path);
+      assert.equal(res.headers.get("payment-required"), null, path);
+    }
+  });
+
+  it("publishes durable-job delivery semantics for every canonical V5 route", async () => {
+    for (const path of [
+      "/v1/analysis/spot/standard", "/v1/analysis/spot/premium",
+      "/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium",
+      "/v1/analysis/fused/standard", "/v1/analysis/fused/premium",
+      "/v1/analysis/divergence", "/v1/preflight/event-risk",
+    ]) {
+      const response = await fetch(`${apiUrl()}${path}`);
+      assert.equal(response.status, 400, path);
+      const body = await response.json() as { outputSchema?: { output?: { status?: number; delivery?: string; reportPath?: string } } };
+      assert.equal(body.outputSchema?.output?.status, 202, path);
+      assert.equal(body.outputSchema?.output?.delivery, "durable_job", path);
+      assert.equal(body.outputSchema?.output?.reportPath, "/v1/jobs/{jobId}/report", path);
+    }
+  });
+
+  it("preserves MCP protocol and current tool names", async () => {
+    const initialize = await fetch(`${apiUrl()}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+    });
+    const initialized = await initialize.json() as {
+      result?: { protocolVersion?: string; serverInfo?: { name?: string; version?: string } };
+    };
+    assert.equal(initialized.result?.protocolVersion, "2024-11-05");
+    assert.equal(initialized.result?.serverInfo?.name, "pulse");
+    assert.equal(initialized.result?.serverInfo?.version, "2.0.0");
+
+    const list = await fetch(`${apiUrl()}/mcp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list", params: {} }),
+    });
+    const listed = await list.json() as { result?: { tools?: Array<{ name: string }> } };
+    const names = listed.result?.tools?.map((tool) => tool.name) || [];
+    assert.deepEqual(names.slice(0, 7), [
+      "spot_search",
+      "spot_ticker",
+      "analysis_base",
+      "analysis_premium",
+      "token_scan",
+      "preflight",
+      "resolve",
+    ]);
+    for (const additive of ["spot_analysis_standard", "prediction_analysis_standard", "prediction_analysis_premium", "job_status", "job_report"]) {
+      assert.ok(names.includes(additive), additive);
+    }
+    for (const hidden of ["fused_analysis_premium", "divergence_analysis", "event_risk_preflight"]) assert.equal(names.includes(hidden), false, hidden);
+  });
+
+  it("publishes the configured V5 MCP payment challenge", async () => {
+    const response = await fetch(`${apiUrl()}/mcp`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 20, method: "tools/call", params: {
+        name: "prediction_analysis_premium", arguments: { primaryMarketId: "pm:condition" },
+      } }),
+    });
+    const body = await response.json() as { priceUsd?: number; tool?: string };
+    assert.equal(response.status, 402);
+    assert.equal(body.tool, "prediction_analysis_premium");
+    assert.equal(body.priceUsd, testConfig.PRICE_ANALYSIS_PREDICTION_PREMIUM);
+  });
+
+  it("preserves MCP x402 challenge headers and replay shape", async () => {
+    const call = (pay = false) => fetch(`${apiUrl()}/mcp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(pay ? { "PAYMENT-SIGNATURE": "test-payment-signature-ok" } : {}),
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 3,
+        method: "tools/call",
+        params: { name: "token_scan", arguments: { address: ADDRESS, chainId: "196" } },
+      }),
+    });
+
+    const unpaid = await call();
+    assert.equal(unpaid.status, 402);
+    assert.ok(unpaid.headers.get("payment-required"));
+
+    const paid = await call(true);
+    assert.equal(paid.status, 200);
+    const body = await paid.json() as {
+      result?: { content?: Array<{ type?: string; text?: string }>; structuredContent?: { service?: string } };
+    };
+    assert.equal(body.result?.content?.[0]?.type, "text");
+    assert.equal(body.result?.structuredContent?.service, "token_scan");
+    assert.equal(JSON.parse(body.result?.content?.[0]?.text || "{}").service, "token_scan");
   });
 });

@@ -1,10 +1,12 @@
-import { buildMarketContext } from "@pulse/market";
+import { buildMarketContext, type SpotMarketContext } from "@pulse/market";
+import { SpotGeneratedAnalysisSchema } from "@pulse/schemas";
 import { systemPrompt, userPromptPayload, type AnalysisLang, type AnalysisTier } from "./prompts.js";
 
 export type GrokConfig = {
   apiKey: string;
   baseUrl: string;
   model: string;
+  fetchImpl?: typeof fetch;
 };
 
 export type AnalysisRequest = {
@@ -17,6 +19,9 @@ export type AnalysisRequest = {
   chartImageMime?: string;
   userNote?: string;
   candleLimit?: number;
+  maxInputTokens?: number;
+  maxOutputTokens?: number;
+  reasoningEffort?: "none" | "low";
 };
 
 export type AnalysisResult = {
@@ -37,26 +42,39 @@ export type AnalysisResult = {
   rawText?: string;
   generatedAt: string;
   methodology_version: string;
+  usage?: Readonly<{ promptTokens: number; completionTokens: number; totalTokens: number; cachedTokens: number; reasoningTokens: number }>;
+  analysisProfile: Readonly<{ mode: "live"; model: string; reasoningEffort: "none" | "low" }>;
 };
+
+const SPOT_ANALYSIS_JSON_SCHEMA = {
+  type: "object", additionalProperties: false,
+  properties: {
+    headline: { type: "string" }, regime: { type: "string", enum: ["trend_up", "trend_down", "range", "transition"] },
+    bias: { type: "string", enum: ["bullish", "bearish", "neutral"] }, confidence: { type: "number", minimum: 0, maximum: 100 }, summary: { type: "string" },
+    keyLevels: { type: "object", additionalProperties: false, properties: { support: { type: "array", items: { type: "number" } }, resistance: { type: "array", items: { type: "number" } } }, required: ["support", "resistance"] },
+    targets: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: { type: "string" }, price: { type: "number" }, rationale: { type: "string" } }, required: ["label", "price", "rationale"] } },
+    invalidation: { type: "object", additionalProperties: false, properties: { price: { type: ["number", "null"] }, condition: { type: "string" } }, required: ["price", "condition"] },
+    scenarios: { type: "array", items: { type: "object", additionalProperties: false, properties: { name: { type: "string", enum: ["bull", "base", "bear"] }, thesis: { type: "string" }, target: { type: ["number", "null"] }, invalidation: { type: ["number", "null"] } }, required: ["name", "thesis", "target", "invalidation"] } },
+    chartNotes: { type: "string" }, agentAction: { type: "string" }, agentChecklist: { type: "array", items: { type: "string" } }, riskNotes: { type: "array", items: { type: "string" } }, limitations: { type: "array", items: { type: "string" } }, disclaimer: { type: "string" },
+  },
+  required: ["headline", "regime", "bias", "confidence", "summary", "keyLevels", "targets", "invalidation", "scenarios", "chartNotes", "agentAction", "agentChecklist", "riskNotes", "limitations", "disclaimer"],
+} as const;
 
 function extractJson(text: string): Record<string, unknown> {
   const cleaned = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
   try {
     return JSON.parse(cleaned) as Record<string, unknown>;
-  } catch {
+  } catch (initialError) {
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start >= 0 && end > start) {
-      return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+      try {
+        return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
+      } catch {
+        // Report one strict structured-output failure below.
+      }
     }
-    return {
-      headline: "Analysis returned unstructured text",
-      summary: cleaned.slice(0, 2000),
-      bias: "neutral",
-      confidence: 40,
-      disclaimer: "NFA / DYOR — not financial advice",
-      limitations: ["Model output was not valid JSON; raw text embedded in summary."],
-    };
+    throw new Error(`Grok structured output is not valid JSON: ${initialError instanceof Error ? initialError.message : "parse failed"}`);
   }
 }
 
@@ -73,6 +91,24 @@ export async function runGrokAnalysis(
     timeframe,
     candleLimit: req.candleLimit ?? (req.tier === "premium" ? 120 : 80),
   });
+
+  return runPreparedSpotAnalysis(cfg, req, market);
+}
+
+/**
+ * Context-first analysis seam. Provider access and validation happen before
+ * this function; it performs only prompt construction, model invocation, and
+ * legacy-compatible response shaping.
+ */
+export async function runPreparedSpotAnalysis(
+  cfg: GrokConfig,
+  req: AnalysisRequest,
+  market: SpotMarketContext,
+): Promise<AnalysisResult> {
+  if (!cfg.apiKey) throw new Error("XAI_API_KEY not configured");
+
+  const lang = req.lang ?? "en";
+  const timeframe = req.timeframe ?? "1H";
 
   // Compact candles for token efficiency: sample last N
   const compactCandles = market.candles.slice(-60).map((c) => [
@@ -108,17 +144,24 @@ export async function runGrokAnalysis(
     hasImage: false,
     userNote: req.userNote,
   });
+  const estimatedInputTokens = Math.ceil((sys.length + userText.length) / 3);
+  if (req.maxInputTokens && estimatedInputTokens > req.maxInputTokens) {
+    throw new Error(`Prepared AI context exceeds input budget (${estimatedInputTokens} > ${req.maxInputTokens} estimated tokens)`);
+  }
 
   const body = {
     model: cfg.model,
     temperature: 0.3,
+    reasoning_effort: req.reasoningEffort || (req.tier === "premium" ? "low" : "none"),
+    response_format: { type: "json_schema", json_schema: { name: `pulse_spot_${req.tier}`, strict: true, schema: SPOT_ANALYSIS_JSON_SCHEMA } },
+    ...(req.maxOutputTokens ? { max_tokens: req.maxOutputTokens } : {}),
     messages: [
       { role: "system", content: sys },
       { role: "user", content: userText },
     ],
   };
 
-  const res = await fetch(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
+  const res = await (cfg.fetchImpl ?? fetch)(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -134,6 +177,7 @@ export async function runGrokAnalysis(
 
   let parsed: {
     choices?: Array<{ message?: { content?: string | Array<{ type: string; text?: string }> } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; completion_tokens_details?: { reasoning_tokens?: number } };
   };
   try {
     parsed = JSON.parse(raw);
@@ -148,8 +192,15 @@ export async function runGrokAnalysis(
     text = content.map((c) => c.text || "").join("\n");
   }
 
-  const analysis = extractJson(text);
+  const candidate = extractJson(text);
+  const validated = SpotGeneratedAnalysisSchema.safeParse(candidate);
+  if (!validated.success) {
+    const issue = validated.error.issues[0];
+    throw new Error(`Grok structured output failed validation at ${issue?.path.join(".") || "root"}: ${issue?.message || "invalid output"}`);
+  }
+  const analysis = validated.data;
 
+  const usage = parsed.usage ? Object.freeze({ promptTokens: parsed.usage.prompt_tokens || 0, completionTokens: parsed.usage.completion_tokens || 0, totalTokens: parsed.usage.total_tokens || 0, cachedTokens: parsed.usage.prompt_tokens_details?.cached_tokens || 0, reasoningTokens: parsed.usage.completion_tokens_details?.reasoning_tokens || 0 }) : undefined;
   return {
     service: req.tier === "premium" ? "analysis_premium" : "analysis_base",
     tier: req.tier,
@@ -168,5 +219,7 @@ export async function runGrokAnalysis(
     rawText: text.slice(0, 4000),
     generatedAt: new Date().toISOString(),
     methodology_version: "pulse-v2.0.0",
+    analysisProfile: { mode: "live", model: cfg.model, reasoningEffort: req.reasoningEffort || (req.tier === "premium" ? "low" : "none") },
+    ...(usage ? { usage } : {}),
   };
 }

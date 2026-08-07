@@ -1,8 +1,10 @@
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 import type { AppConfig } from "@pulse/config";
-import { usdToAtomic } from "@pulse/config";
+import { getNetwork, usdToAtomic, type NetworkKey } from "@pulse/config";
 import { createOkxPaymentMiddleware } from "./okxMiddleware.js";
 import { buildX402PaymentRequiredBody, getX402OutputSchema } from "./inputContracts.js";
+import { createCircleGatewayPaymentMiddleware } from "./circleMiddleware.js";
+import { createCdpPaymentMiddleware } from "./cdpMiddleware.js";
 
 export type PaymentChallenge = {
   x402Version: number;
@@ -28,11 +30,12 @@ export function buildChallenge(
   path: string,
   priceUsd: number,
   description: string,
+  contractPath = path,
 ): PaymentChallenge {
   const url = `${cfg.BASE_URL.replace(/\/$/, "")}${path}`;
   return {
     x402Version: 2,
-    outputSchema: getX402OutputSchema(path),
+    outputSchema: getX402OutputSchema(contractPath),
     resource: {
       url,
       description,
@@ -78,14 +81,22 @@ export function createX402Middleware(cfg: AppConfig): RequestHandler {
       return next();
     }
 
-    const challenge = buildChallenge(cfg, path, route.priceUsd, route.description);
+    const networkKey = (req as Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+    const network = getNetwork(networkKey);
+    const effectiveCfg = {
+      ...cfg, X402_NETWORK: network.caip2,
+      X402_ASSET: network.paymentAsset.address || cfg.X402_ASSET,
+      PAY_TO_ADDRESS: networkKey === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+    };
+    const publicPath = req.originalUrl.split("?")[0] || path;
+    const challenge = buildChallenge(effectiveCfg, publicPath, route.priceUsd, route.description, path);
     const encoded = Buffer.from(JSON.stringify(challenge), "utf8").toString("base64");
     res.setHeader("PAYMENT-REQUIRED", encoded);
     res.setHeader("Content-Type", "application/json");
     return res.status(402).json({
       error: "Payment Required",
       priceUsd: route.priceUsd,
-      network: cfg.X402_NETWORK,
+      network: network.caip2,
       x402Version: 2,
       accepts: challenge.accepts,
       paymentMode: cfg.paymentMode,
@@ -124,21 +135,36 @@ function normalizePath(path: string): string {
  * Official OKX x402 middleware when paymentMode=okx, else mock gate.
  */
 export function createPaymentGate(cfg: AppConfig): RequestHandler {
-  if (cfg.paymentMode === "okx") {
-    try {
-      console.log("[payments] Using official OKX x402 Payment SDK (live facilitator)");
-      return createOkxPaymentMiddleware(cfg);
-    } catch (err) {
-      console.error("[payments] Failed to init OKX middleware, falling back to mock:", err);
-      return createX402Middleware({ ...cfg, paymentMode: "mock", X402_MOCK: true });
+  const mock = createX402Middleware(cfg);
+  const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_SELLER_ADDRESS
+    ? createCircleGatewayPaymentMiddleware(cfg) : null;
+  const cdp = (cfg.FEATURE_BASE_PAYMENTS || cfg.FEATURE_ARBITRUM_PAYMENTS) && cfg.CDP_API_KEY_ID && cfg.CDP_API_KEY_SECRET
+    ? createCdpPaymentMiddleware(cfg) : null;
+  const xlayer = cfg.paymentMode === "okx" ? (() => {
+    try { return createOkxPaymentMiddleware(cfg); }
+    catch (err) { console.error("[payments] Failed to init OKX middleware, falling back to mock:", err); return mock; }
+  })() : mock;
+  return (req, res, next) => {
+    const networkKey = (req as Request & { pulseNetworkKey?: string }).pulseNetworkKey || "xlayer";
+    if (cfg.X402_MOCK || cfg.paymentMode === "mock") return mock(req, res, next);
+    if (networkKey === "arc-testnet") {
+      if (!circle) return res.status(503).json({ error: "Circle Gateway payment adapter is disabled" });
+      return circle(req, res, next);
     }
-  }
-  console.log("[payments] Using mock x402 gate (set X402_MOCK=0 + OKX keys for live)");
-  return createX402Middleware(cfg);
+    if (networkKey === "base" || networkKey === "arbitrum") {
+      if (!cdp) return res.status(503).json({ error: "CDP payment adapter is not initialized" });
+      return cdp(req, res, next);
+    }
+    return xlayer(req, res, next);
+  };
 }
 
 export { createMcpPaymentGate } from "./mcpGate.js";
 export { createOkxPaymentMiddleware } from "./okxMiddleware.js";
+export { createCircleGatewayPaymentMiddleware } from "./circleMiddleware.js";
+export { createCdpPaymentMiddleware } from "./cdpMiddleware.js";
+export { createCdpJwt } from "./cdpAuth.js";
+export { inlineSettlement, validateSignedPayment, type PulseSettlement, type SettlementRequest } from "./inlineSettlement.js";
 export {
   buildX402InputRequired,
   buildX402PaymentRequiredBody,

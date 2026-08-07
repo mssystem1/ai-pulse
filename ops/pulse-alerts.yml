@@ -1,0 +1,78 @@
+groups:
+  - name: pulse-availability
+    rules:
+      - alert: PulseApiDown
+        expr: up{job="pulse-api"} == 0
+        for: 2m
+        labels: { severity: critical }
+        annotations:
+          summary: PULSE API is unavailable
+          description: Prometheus has failed to scrape the PULSE API for two minutes.
+
+      - alert: PulseHttpErrorRateHigh
+        expr: sum(rate(pulse_http_errors_total[10m])) / clamp_min(sum(rate(pulse_http_requests_total[10m])), 0.001) > 0.05
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: PULSE HTTP 5xx rate exceeds 5%
+          description: Investigate the affected release before enabling another network.
+
+      - alert: PulseProviderErrorRateHigh
+        expr: sum by (provider, operation) (rate(pulse_provider_errors_total[10m])) / clamp_min(sum by (provider, operation) (rate(pulse_provider_requests_total[10m])), 0.001) > 0.10
+        for: 10m
+        labels: { severity: warning }
+        annotations:
+          summary: Upstream provider error rate exceeds 10%
+          description: Provider {{ $labels.provider }} operation {{ $labels.operation }} is degrading.
+
+  - name: pulse-payments-and-delivery
+    rules:
+      - alert: PulsePaymentFailureRateHigh
+        expr: sum by (provider, network) (rate(pulse_payment_failures_total{phase="verify_settle"}[10m])) / clamp_min(sum by (provider, network) (rate(pulse_payment_attempts_total{phase="verify_settle"}[10m])), 0.001) > 0.05
+        for: 5m
+        labels: { severity: critical }
+        annotations:
+          summary: x402 settlement failure rate exceeds 5%
+          description: Disable the affected {{ $labels.network }} rollout flag; do not disable report recovery.
+
+      - alert: PulseUnfinishedJobsBacklog
+        expr: pulse_unfinished_jobs > 20
+        for: 15m
+        labels: { severity: critical }
+        annotations:
+          summary: Settled PULSE jobs are not reaching a terminal state
+          description: Preserve Upstash and Blob, inspect worker leases, and keep recovery endpoints online.
+
+      - alert: PulseManualReconciliationRequired
+        expr: increase(pulse_job_events_total{stage="manual_reconciliation"}[5m]) > 0
+        for: 0m
+        labels: { severity: critical }
+        annotations:
+          summary: A settled payment requires manual reconciliation
+          description: Use the persisted receipt and job events; never ask the buyer to pay again.
+
+      - alert: PulseTerminalJobFailures
+        expr: increase(pulse_job_events_total{stage="failed_terminal"}[10m]) > 0
+        for: 0m
+        labels: { severity: warning }
+        annotations:
+          summary: One or more paid deliverables failed terminally
+          description: Inspect provider evidence and receipt-bound regeneration history.
+
+  - name: pulse-ai-cost
+    rules:
+      - alert: PulseAiDailyCostNearLimit
+        expr: increase(pulse_ai_estimated_cost_usd_total[24h]) > 4
+        for: 5m
+        labels: { severity: warning }
+        annotations:
+          summary: Estimated 24-hour AI cost exceeds $4
+          description: Review Arc reservations and model usage before the configured $5 hard ceiling.
+
+      - alert: PulseAiDailyCostLimitExceeded
+        expr: increase(pulse_ai_estimated_cost_usd_total[24h]) > 5
+        for: 1m
+        labels: { severity: critical }
+        annotations:
+          summary: Estimated 24-hour AI cost exceeds $5
+          description: Set ARC_AI_MODE=fixture while reconciling configured prices and durable reservations.

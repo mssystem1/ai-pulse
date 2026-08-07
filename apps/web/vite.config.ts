@@ -3,6 +3,9 @@ import react from "@vitejs/plugin-react";
 import { nodePolyfills } from "vite-plugin-node-polyfills";
 
 export default defineConfig({
+  // Keep one repository-level environment contract for API and web; Vite only
+  // exposes variables prefixed with VITE_ to browser code.
+  envDir: "../../",
   plugins: [
     react(),
     nodePolyfills({

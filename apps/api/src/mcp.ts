@@ -109,6 +109,15 @@ const TOOLS = [
       required: ["query"],
     },
   },
+  ...["standard", "premium"].flatMap((tier) => [
+    { name: `spot_analysis_${tier}`, description: `Paid: ${tier} OKX spot analysis`, inputSchema: { type: "object", properties: { instId: { type: "string" }, timeframe: { type: "string" }, lang: { type: "string", enum: ["en", "zh"] }, userNote: { type: "string" } }, required: ["instId"] } },
+    { name: `prediction_analysis_${tier}`, description: `Paid: ${tier} selected-market prediction analysis`, inputSchema: { type: "object", properties: { primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } }, lang: { type: "string", enum: ["en", "zh"] }, userNote: { type: "string" } }, required: ["primaryMarketId"] } },
+    { name: `fused_analysis_${tier}`, description: `Paid: ${tier} fused spot and selected-market analysis`, inputSchema: { type: "object", properties: { instId: { type: "string" }, timeframe: { type: "string" }, primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } }, lang: { type: "string", enum: ["en", "zh"] }, userNote: { type: "string" } }, required: ["instId", "primaryMarketId"] } },
+  ]),
+  { name: "divergence_analysis", description: "Paid: deterministic spot and selected-market divergence", inputSchema: { type: "object", properties: { instId: { type: "string" }, timeframe: { type: "string" }, primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } } }, required: ["instId", "primaryMarketId"] } },
+  { name: "event_risk_preflight", description: "Paid: selected prediction-market event-risk preflight", inputSchema: { type: "object", properties: { primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } }, intent: { type: "string" } }, required: ["primaryMarketId"] } },
+  { name: "job_status", description: "Free authenticated status read for a previously paid durable job; never pay again to poll", inputSchema: { type: "object", properties: { jobId: { type: "string" }, recoveryToken: { type: "string" } }, required: ["jobId", "recoveryToken"] } },
+  { name: "job_report", description: "Free authenticated final-report retrieval for a previously paid durable job; never pay again to retrieve", inputSchema: { type: "object", properties: { jobId: { type: "string" }, recoveryToken: { type: "string" } }, required: ["jobId", "recoveryToken"] } },
 ];
 
 const AnalysisArgs = z.object({
@@ -117,6 +126,16 @@ const AnalysisArgs = z.object({
   lang: z.enum(["en", "zh"]).optional(),
   userNote: z.string().optional(),
 });
+
+function availableTools(cfg: AppConfig) {
+  return TOOLS.filter((tool) => {
+    if (tool.name.startsWith("prediction_analysis_")) return cfg.FEATURE_PREDICTION_ANALYSIS;
+    if (tool.name.startsWith("fused_analysis_")) return cfg.FEATURE_FUSED_ANALYSIS;
+    if (tool.name === "divergence_analysis") return cfg.FEATURE_DIVERGENCE_ANALYSIS;
+    if (tool.name === "event_risk_preflight") return cfg.FEATURE_EVENT_RISK_ANALYSIS;
+    return true;
+  });
+}
 
 export function createMcpHandler(cfg: AppConfig) {
   const gate = createMcpPaymentGate(cfg);
@@ -131,7 +150,7 @@ export function createMcpHandler(cfg: AppConfig) {
       return res.json({
         name: cfg.productName.toLowerCase(),
         version: "2.0.0",
-        tools: TOOLS.map((t) => t.name),
+        tools: availableTools(cfg).map((t) => t.name),
       });
     }
 
@@ -152,7 +171,7 @@ export function createMcpHandler(cfg: AppConfig) {
     }
 
     if (method === "tools/list") {
-      return res.json({ jsonrpc: "2.0", id, result: { tools: TOOLS } });
+      return res.json({ jsonrpc: "2.0", id, result: { tools: availableTools(cfg) } });
     }
     if (method === "notifications/initialized") return res.status(204).end();
 
@@ -170,7 +189,7 @@ export function createMcpHandler(cfg: AppConfig) {
       }
 
       try {
-        const result = await dispatch(name, args, cfg, grokCfg);
+        const result = await dispatch(name, args, cfg, grokCfg, paymentSig);
         return res.json({
           jsonrpc: "2.0",
           id,
@@ -201,8 +220,36 @@ async function dispatch(
   args: Record<string, unknown>,
   cfg: AppConfig,
   grokCfg: { apiKey: string; baseUrl: string; model: string },
+  paymentSignature = "",
 ): Promise<unknown> {
   const mv = cfg.methodologyVersion;
+  if (name === "job_status" || name === "job_report") {
+    const jobId = z.string().uuid().parse(args.jobId);
+    const recoveryToken = z.string().min(32).parse(args.recoveryToken);
+    const suffix = name === "job_report" ? "/report" : "";
+    const response = await fetch(`${cfg.BASE_URL.replace(/\/$/, "")}/v1/jobs/${encodeURIComponent(jobId)}${suffix}`, {
+      headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, Accept: "application/json" },
+    });
+    const result = await response.json() as unknown;
+    if (!response.ok) throw new Error(`PULSE job read ${response.status}: ${JSON.stringify(result)}`);
+    return result;
+  }
+
+  const legacyPaidRoute: Record<string, string> = {
+    analysis_base: "/v1/analysis/base", analysis_premium: "/v1/analysis/premium",
+    token_scan: "/v1/token/scan", wallet_scan: "/v1/wallet/scan", market_pulse: "/v1/market/pulse",
+    swap_quote: "/v1/swap/quote", preflight: "/v1/preflight",
+  };
+  if (!cfg.X402_MOCK && cfg.paymentMode !== "mock" && legacyPaidRoute[name]) {
+    const response = await fetch(`${cfg.BASE_URL.replace(/\/$/, "")}${legacyPaidRoute[name]}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}) },
+      body: JSON.stringify(args),
+    });
+    const result = await response.json() as unknown;
+    if (!response.ok) throw new Error(`PULSE REST ${response.status}: ${JSON.stringify(result)}`);
+    return result;
+  }
   switch (name) {
     case "spot_search": {
       const q = String(args.query ?? "");
@@ -252,6 +299,19 @@ async function dispatch(
       return report;
     }
     default:
+      if (/^(spot|prediction|fused)_analysis_(standard|premium)$/.test(name) || name === "divergence_analysis" || name === "event_risk_preflight") {
+        const route = name === "divergence_analysis" ? "/v1/analysis/divergence"
+          : name === "event_risk_preflight" ? "/v1/preflight/event-risk"
+            : `/v1/analysis/${name.replace("_analysis_", "/")}`;
+        const response = await fetch(`${cfg.BASE_URL.replace(/\/$/, "")}${route}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(paymentSignature ? { "PAYMENT-SIGNATURE": paymentSignature } : {}) },
+          body: JSON.stringify(args),
+        });
+        const result = await response.json() as unknown;
+        if (!response.ok) throw new Error(`PULSE REST ${response.status}: ${JSON.stringify(result)}`);
+        return result;
+      }
       throw new Error(`Unknown tool: ${name}`);
   }
 }

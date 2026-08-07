@@ -5,6 +5,7 @@ import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { OKXFacilitatorClient } from "@okxweb3/x402-core";
 import { buildX402PaymentRequiredBody } from "./inputContracts.js";
+import { inlineSettlement } from "./inlineSettlement.js";
 
 /**
  * Official OKX x402 seller middleware.
@@ -21,7 +22,9 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
     apiKey: cfg.OKX_API_KEY,
     secretKey: cfg.OKX_SECRET_KEY,
     passphrase: cfg.OKX_PASSPHRASE,
-    baseUrl: cfg.OKX_BASE_URL || "https://web3.okx.com",
+    // Kept separate from the Exchange OS DEX URL so deployments can route the
+    // facilitator independently (for example when OKX changes or regionalizes it).
+    baseUrl: cfg.OKX_FACILITATOR_URL,
     syncSettle: true,
   });
 
@@ -38,6 +41,7 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
         network: `${string}:${string}`;
         payTo: string;
         price: string;
+        extra: { decimals: number; symbol: string };
       }>;
       description: string;
       mimeType: string;
@@ -57,6 +61,9 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
           network,
           payTo: cfg.PAY_TO_ADDRESS,
           price: priceLabel(info.priceUsd),
+          // Explicit decimals keep OKX.AI validation warning-free for X Layer
+          // USD₮0, which is not yet in the task validator's USDT/USDG aliases.
+          extra: { decimals: 6, symbol: "USDT0" },
         },
       ],
       description: info.description,
@@ -68,7 +75,7 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
     };
   }
 
-  return paymentMiddleware(
+  const challengeMiddleware = paymentMiddleware(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     routes as any,
     resourceServer,
@@ -79,6 +86,32 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
       testnet: String(cfg.X402_NETWORK).includes("1952"),
     },
     undefined,
-    true,
+    // The SDK's eager initialization promise can reject before Express gets a
+    // request and becomes an unhandled rejection. Initialize explicitly below
+    // so a facilitator outage cannot terminate the API process.
+    false,
   );
+
+  let initialized = false;
+  let initialization: Promise<void> | null = null;
+  const guardedChallenge: RequestHandler = async (req, res, next) => {
+    if (!initialized) {
+      initialization ??= resourceServer.initialize();
+      try {
+        await initialization;
+        initialized = true;
+      } catch (error) {
+        // Permit a later request to retry after a transient facilitator error.
+        initialization = null;
+        console.error("[payments] OKX x402 facilitator initialization failed:", error);
+        if (!res.headersSent) {
+          res.status(502).json({ error: "OKX x402 facilitator is temporarily unavailable" });
+        }
+        return;
+      }
+    }
+    return challengeMiddleware(req, res, next);
+  };
+
+  return inlineSettlement(cfg, "okx", facilitatorClient, guardedChallenge);
 }

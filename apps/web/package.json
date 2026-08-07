@@ -6,20 +6,30 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 5173",
     "build": "tsc -p tsconfig.json && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@circle-fin/x402-batching": "^3.2.0",
+    "@circle-fin/w3s-pw-web-sdk": "1.1.11",
     "@okxweb3/x402-core": "^0.1.0",
     "@okxweb3/x402-evm": "^0.2.1",
     "@okxweb3/x402-fetch": "^0.1.0",
+    "@reown/appkit": "^1.8.23",
+    "@reown/appkit-adapter-wagmi": "^1.8.23",
+    "@tanstack/react-query": "^5.101.4",
+    "@x402/core": "^2.20.0",
+    "@x402/evm": "^2.20.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "viem": "^2.55.5"
+    "viem": "^2.55.5",
+    "wagmi": "^3.7.5"
   },
   "devDependencies": {
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
     "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2",
     "vite": "^6.2.2",
     "vite-plugin-node-polyfills": "^0.28.0"

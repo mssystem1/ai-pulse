@@ -12,6 +12,14 @@ const PAID_TOOLS: Record<string, { routePath: string; priceKey: string }> = {
   market_pulse: { routePath: "/v1/market/pulse", priceKey: "POST /v1/market/pulse" },
   swap_quote: { routePath: "/v1/swap/quote", priceKey: "POST /v1/swap/quote" },
   preflight: { routePath: "/v1/preflight", priceKey: "POST /v1/preflight" },
+  spot_analysis_standard: { routePath: "/v1/analysis/spot/standard", priceKey: "POST /v1/analysis/spot/standard" },
+  spot_analysis_premium: { routePath: "/v1/analysis/spot/premium", priceKey: "POST /v1/analysis/spot/premium" },
+  prediction_analysis_standard: { routePath: "/v1/analysis/prediction/standard", priceKey: "POST /v1/analysis/prediction/standard" },
+  prediction_analysis_premium: { routePath: "/v1/analysis/prediction/premium", priceKey: "POST /v1/analysis/prediction/premium" },
+  fused_analysis_standard: { routePath: "/v1/analysis/fused/standard", priceKey: "POST /v1/analysis/fused/standard" },
+  fused_analysis_premium: { routePath: "/v1/analysis/fused/premium", priceKey: "POST /v1/analysis/fused/premium" },
+  divergence_analysis: { routePath: "/v1/analysis/divergence", priceKey: "POST /v1/analysis/divergence" },
+  event_risk_preflight: { routePath: "/v1/preflight/event-risk", priceKey: "POST /v1/preflight/event-risk" },
 };
 
 export type McpGateResult =

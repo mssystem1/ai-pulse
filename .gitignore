@@ -5,6 +5,8 @@ dist/
 coverage/
 .env
 .env.local
+.env.scripts
+.env.wallets
 *.log
 .DS_Store
 .vscode/
@@ -14,3 +16,5 @@ apps/web/out/
 data/*.db
 data/cache/
 .codex-tmp-ui/
+.env.cloud
+*-report.json

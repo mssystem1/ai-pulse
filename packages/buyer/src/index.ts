@@ -1,5 +1,5 @@
 import { wrapFetchWithPaymentFromConfig } from "@okxweb3/x402-fetch";
-import { ExactEvmScheme } from "@okxweb3/x402-evm";
+import { ExactEvmScheme, toClientEvmSigner } from "@okxweb3/x402-evm";
 import {
   createPublicClient,
   createWalletClient,
@@ -56,31 +56,8 @@ function buildSigner(privateKey: string, rpcUrl: string): ClientEvmSigner {
     transport: http(rpcUrl),
   });
 
-  return {
-    address: account.address,
-    async signTypedData(params) {
-      // TypedData shapes come from x402 facilitator; cast for viem
-      return (walletClient as unknown as {
-        signTypedData: (a: unknown) => Promise<`0x${string}`>;
-      }).signTypedData({
-        account,
-        domain: params.domain,
-        types: params.types,
-        primaryType: params.primaryType,
-        message: params.message,
-      });
-    },
-    async readContract(args) {
-      return (publicClient as unknown as {
-        readContract: (a: unknown) => Promise<unknown>;
-      }).readContract({
-        address: args.address,
-        abi: args.abi,
-        functionName: args.functionName,
-        args: args.args,
-      });
-    },
-  };
+  void walletClient;
+  return toClientEvmSigner(account as never, publicClient as never) as ClientEvmSigner;
 }
 
 /**
@@ -92,14 +69,7 @@ export function createPaidFetch(cfg: BuyerConfig): typeof fetch {
   const signer = buildSigner(cfg.privateKey, rpc);
   const network = (cfg.network || "eip155:196") as `${string}:${string}`;
 
-  return wrapFetchWithPaymentFromConfig(fetch, {
-    schemes: [
-      {
-        network,
-        client: new ExactEvmScheme(signer),
-      },
-    ],
-  }) as typeof fetch;
+  return wrapFetchWithPaymentFromConfig(fetch, { schemes: [{ network, client: new ExactEvmScheme(signer) }] }) as typeof fetch;
 }
 
 export function buyerAddress(privateKey: string): string {

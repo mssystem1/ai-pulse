@@ -2,8 +2,8 @@ export type Lang = "en" | "zh";
 
 const dict = {
   en: {
-    brandSub: "OKX spot · Grok · x402 · X Layer",
-    tagline: "OKX spot intelligence. Pay per signal on X Layer.",
+    brandSub: "OKX spot · Polymarket · multichain x402",
+    tagline: "Spot + prediction intelligence. Pay per report on your network.",
     heroLead:
       "Live OKX candles and tickers for free. Pay only when you need a Grok signal or safety check.",
     nfa: "NFA / DYOR — not financial advice. Targets are scenarios, not guarantees.",
@@ -36,14 +36,14 @@ const dict = {
     howPay:
       "Web users sign x402 with their wallet. OKX.AI agents pay through Agentic Wallet when calling MCP.",
     walletNote:
-      "Fees go to the ASP payTo address on X Layer. Your private key stays in your wallet extension.",
+      "Fees go to the published payTo address on the selected network. Your private key stays in your wallet.",
     safetyTitle: "Safety checks",
-    safetyLead: "Inspect any X Layer address with live RPC evidence, then add paid token or pre-trade heuristics when relevant.",
-    safetyNetwork: "X Layer only · Chain 196",
-    safetyMethod: "Live RPC evidence + clearly separated heuristics",
-    safetyRpc: "The free inspection reads X Layer RPC directly. Paid scores remain deterministic heuristics—not audits or transaction simulations.",
-    contractInspect: "Inspect contract on X Layer · Free",
-    contractAddressTip: "Any EVM address on X Layer. Free inspection returns live RPC facts; paid token risk adds a separate heuristic score.",
+    safetyLead: "Inspect an address on the selected network using live RPC contract and token-interface evidence.",
+    safetyNetwork: "Selected EVM network",
+    safetyMethod: "Live RPC evidence · unknown stays unknown",
+    safetyRpc: "The free inspection reads the selected chain directly. It does not invent a score when audit, ownership, liquidity, or simulation evidence is missing.",
+    contractInspect: "Inspect live contract evidence · Free",
+    contractAddressTip: "Any EVM address on the selected network. Interface observations can be spoofed and are evidence, not an audit or endorsement.",
     tokenScan: "Token risk · $0.01",
     tokenScanTip: "Heuristic risk score for a contract address. Paid by your wallet via x402.",
     preflight: "Pre-trade check · $0.05",
@@ -68,7 +68,7 @@ const dict = {
     installWallet: "Install OKX Wallet",
   },
   zh: {
-    brandSub: "欧易现货 · Grok · x402 · X Layer",
+    brandSub: "欧易现货 · Polymarket · 多链 x402",
     tagline: "欧易现货智能研报 · X Layer 按次付费",
     heroLead: "免费查看欧易行情与K线。仅在需要 Grok 信号或安全检查时按次付费。",
     nfa: "非投资建议 / 请自行研究。目标价仅为情景，不构成保证。",

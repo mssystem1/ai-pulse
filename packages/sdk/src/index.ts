@@ -11,6 +11,14 @@ import type {
   TokenScanResponse,
   WalletScanRequest,
   WalletScanResponse,
+  PredictionAnalysisRequest,
+  PredictionAnalysisResponse,
+  FusedAnalysisRequest,
+  FusedAnalysisResponse,
+  DivergenceAnalysisRequest,
+  DivergenceAnalysisResponse,
+  EventRiskPreflightRequest,
+  EventRiskPreflightResponse,
 } from "@pulse/schemas";
 
 export type PulseClientOptions = {
@@ -19,6 +27,28 @@ export type PulseClientOptions = {
   paymentSignature?: string | (() => string | Promise<string>);
   fetchImpl?: typeof fetch;
 };
+
+export type PulseJob = {
+  id: string;
+  mode: "spot" | "prediction" | "fused" | "divergence" | "event-risk";
+  tier: "standard" | "premium" | null;
+  network: string;
+  stage: string;
+  reportId: string | null;
+  events: Array<{ stage: string; at: string; detail?: string }>;
+  receipt?: unknown;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PulseJobAccepted = {
+  job: PulseJob;
+  recoveryToken?: string;
+  pollUrl?: string;
+  replay?: boolean;
+};
+
+export type PulseJobReport<T> = { report: T; metadata: unknown; job: PulseJob };
 
 export class PulseError extends Error {
   constructor(
@@ -84,8 +114,74 @@ export class PulseClient {
     return this.request("POST", "/v1/preflight", body, true) as Promise<PreflightResponse>;
   }
 
+  async predictionAnalysis(body: PredictionAnalysisRequest, tier: "standard" | "premium" = "standard"): Promise<PulseJobAccepted> {
+    return this.request("POST", `/v1/analysis/prediction/${tier}`, body, true) as Promise<PulseJobAccepted>;
+  }
+
+  async fusedAnalysis(body: FusedAnalysisRequest, tier: "standard" | "premium" = "standard"): Promise<PulseJobAccepted> {
+    return this.request("POST", `/v1/analysis/fused/${tier}`, body, true) as Promise<PulseJobAccepted>;
+  }
+
+  async divergenceAnalysis(body: DivergenceAnalysisRequest): Promise<PulseJobAccepted> {
+    return this.request("POST", "/v1/analysis/divergence", body, true) as Promise<PulseJobAccepted>;
+  }
+
+  async eventRiskPreflight(body: EventRiskPreflightRequest): Promise<PulseJobAccepted> {
+    return this.request("POST", "/v1/preflight/event-risk", body, true) as Promise<PulseJobAccepted>;
+  }
+
+  async getJob(jobId: string, recoveryToken: string): Promise<{ job: PulseJob; storedReport?: unknown }> {
+    return this.request("GET", `/v1/jobs/${encodeURIComponent(jobId)}`, undefined, false, {
+      "PULSE-RECOVERY-TOKEN": recoveryToken,
+    }) as Promise<{ job: PulseJob; storedReport?: unknown }>;
+  }
+
+  async getJobReport<T = unknown>(jobId: string, recoveryToken: string): Promise<PulseJobReport<T>> {
+    return this.request("GET", `/v1/jobs/${encodeURIComponent(jobId)}/report`, undefined, false, {
+      "PULSE-RECOVERY-TOKEN": recoveryToken,
+    }) as Promise<PulseJobReport<T>>;
+  }
+
+  async waitForJobReport<T = unknown>(accepted: PulseJobAccepted, options: { intervalMs?: number; timeoutMs?: number; signal?: AbortSignal } = {}): Promise<PulseJobReport<T>> {
+    if (!accepted.recoveryToken) throw new PulseError("This replay response does not contain the one-time recovery capability; use the token saved from the original 202 response", 403, accepted);
+    const intervalMs = Math.max(250, options.intervalMs ?? 1_000);
+    const timeoutMs = Math.max(intervalMs, options.timeoutMs ?? 120_000);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (options.signal?.aborted) throw new DOMException("Polling aborted", "AbortError");
+      const status = await this.getJob(accepted.job.id, accepted.recoveryToken);
+      if (status.job.stage === "completed" || status.job.stage === "completed_partial") {
+        return this.getJobReport<T>(accepted.job.id, accepted.recoveryToken);
+      }
+      if (status.job.stage === "failed_terminal" || status.job.stage === "manual_reconciliation") {
+        throw new PulseError(`Job ended in ${status.job.stage}`, 409, status);
+      }
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, intervalMs);
+        options.signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("Polling aborted", "AbortError")); }, { once: true });
+      });
+    }
+    throw new PulseError("Timed out waiting for report; keep the recovery token and poll again without paying", 408, accepted);
+  }
+
   async getReport(shareId: string): Promise<PreflightResponse> {
     return this.request("GET", `/v1/reports/${shareId}`) as Promise<PreflightResponse>;
+  }
+
+  async getPrivateReport(reportId: string): Promise<unknown> {
+    return this.request("GET", `/v1/private/reports/${encodeURIComponent(reportId)}`, undefined, true);
+  }
+
+  async createReportShare(reportId: string): Promise<{ reportId: string; shareToken: string; shareUrl: string }> {
+    return this.request("POST", `/v1/private/reports/${encodeURIComponent(reportId)}/shares`, {}, true) as Promise<{ reportId: string; shareToken: string; shareUrl: string }>;
+  }
+
+  async revokeReportShare(reportId: string, shareToken: string): Promise<void> {
+    await this.request("DELETE", `/v1/private/reports/${encodeURIComponent(reportId)}/shares/${encodeURIComponent(shareToken)}`, undefined, true);
+  }
+
+  async getSharedReport(shareToken: string): Promise<unknown> {
+    return this.request("GET", `/v1/shared/reports/${encodeURIComponent(shareToken)}`);
   }
 
   private async request(
@@ -93,9 +189,11 @@ export class PulseClient {
     path: string,
     body?: unknown,
     paid = false,
+    extraHeaders: Record<string, string> = {},
   ): Promise<unknown> {
     const headers: Record<string, string> = {
       Accept: "application/json",
+      ...extraHeaders,
     };
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (paid && this.paymentSignature) {
@@ -112,7 +210,7 @@ export class PulseClient {
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
 
-    const json = await res.json().catch(() => ({}));
+    const json = res.status === 204 ? undefined : await res.json().catch(() => ({}));
     if (res.status === 402) {
       throw new PulsePaymentRequired(
         res.headers.get("PAYMENT-REQUIRED") ?? res.headers.get("payment-required"),
@@ -139,4 +237,12 @@ export type {
   TokenScanResponse,
   WalletScanRequest,
   WalletScanResponse,
+  PredictionAnalysisRequest,
+  PredictionAnalysisResponse,
+  FusedAnalysisRequest,
+  FusedAnalysisResponse,
+  DivergenceAnalysisRequest,
+  DivergenceAnalysisResponse,
+  EventRiskPreflightRequest,
+  EventRiskPreflightResponse,
 };

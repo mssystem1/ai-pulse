@@ -11,20 +11,28 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@circle-fin/x402-batching": "^3.2.0",
     "@okxweb3/x402-core": "^0.1.0",
     "@okxweb3/x402-evm": "^0.2.1",
     "@okxweb3/x402-express": "^0.1.1",
     "@okxweb3/x402-fetch": "^0.1.0",
     "@pulse/config": "1.0.0",
+    "@x402/core": "^2.20.0",
+    "@x402/evm": "^2.20.0",
+    "@x402/express": "^2.20.0",
+    "@x402/extensions": "^2.20.0",
+    "jose": "^6.2.8",
     "viem": "^2.55.5"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
     "@types/node": "^22.13.10",
     "express": "^4.21.2",
+    "tsx": "^4.19.3",
     "typescript": "^5.8.2"
   },
   "peerDependencies": {

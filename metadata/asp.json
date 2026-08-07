@@ -1,45 +1,145 @@
 {
   "name": "PULSE",
+  "version": "2.0.0",
   "type": "A2MCP",
   "category": "Financial Assistant",
-  "tagline": "OKX spot intelligence. Pay per signal on X Layer.",
-  "taglineZh": "欧易现货智能研报 · X Layer 按次付费",
-  "shortDescription": "Free OKX spot tickers & candles. Grok base ($0.03) and premium ($0.06) analysis from live OHLCV only — settled in USD₮0 via x402 on X Layer.",
-  "description": "PULSE is an A2MCP service for OKX.AI. Free teaser: live OKX spot instruments, tickers, and candles (chart data from OKX API only — no image upload). Paid: Grok market analysis base ($0.03) and premium ($0.06) using that series — regime, levels, price targets, invalidation, agent checklist. Safety tools for token risk and pre-trade checks. Settles per call in USD₮0 on X Layer via OKX Payment SDK (x402). EN/CN UI. Agents call MCP; marketplace callers pay with Agentic Wallet automatically.",
+  "tagline": "Multichain spot and prediction-market intelligence. Pay per report on your selected network.",
+  "taglineZh": "多链现货与预测市场智能研报 · 按所选网络按次付费",
+  "shortDescription": "PULSE delivers separate OKX Crypto Market and crypto-focused Polymarket analysis with readable, recoverable reports on X Layer, Base, Arbitrum One, and Arc Testnet.",
+  "description": "PULSE is an independent intelligence product for humans and AI agents. One responsive web workspace contains Crypto Market, Prediction Market, and Safety. Prediction Market filters Polymarket to active crypto price and direction questions, lets the user explicitly select one market in a popup, displays its live public evidence, and offers Base or Premium structured analysis. Reports present confidence, probabilities, market quality, invalidation, limitations, provenance, and disclaimers instead of raw provider JSON. Polymarket remains read-only; PULSE never places orders. Network-aware x402 payments settle through OKX on X Layer, CDP on Base and Arbitrum One, and Circle Gateway on Arc Testnet.",
   "logo": {
     "svg": "assets/logo.svg",
-    "servedAt": "/brand/logo.svg",
     "png": "assets/logo.png",
-    "alt": "PULSE waveform logo — mint to cyan pulse on void black"
+    "servedAt": "/brand/logo.svg",
+    "pngServedAt": "/brand/logo.png",
+    "alt": "PULSE waveform logo"
   },
+  "methodologyVersion": "pulse-v3.0.0",
+  "languages": ["en", "zh"],
   "network": "eip155:196",
   "settlementAsset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
   "settlementAssetSymbol": "USD₮0",
-  "paymentProtocol": "x402",
-  "wallet": {
-    "marketplaceCallers": "OKX Agentic Wallet (automatic on OKX.AI)",
-    "aspRegistration": "Agentic Wallet email login via Onchain OS",
-    "browser": "Injected EVM wallet; keys stay client-side",
-    "operatorTesting": "Server checkout is disabled by default and reserved for controlled E2E verification"
+  "networks": [
+    {
+      "key": "xlayer",
+      "label": "X Layer",
+      "network": "eip155:196",
+      "routePrefix": "/xlayer",
+      "paymentAsset": "USD₮0",
+      "paymentAssetAddress": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+      "paymentProvider": "OKX x402",
+      "environment": "mainnet"
+    },
+    {
+      "key": "base",
+      "label": "Base",
+      "network": "eip155:8453",
+      "routePrefix": "/base",
+      "paymentAsset": "USDC",
+      "paymentAssetAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "paymentProvider": "CDP x402",
+      "environment": "mainnet"
+    },
+    {
+      "key": "arbitrum",
+      "label": "Arbitrum One",
+      "network": "eip155:42161",
+      "routePrefix": "/arbitrum",
+      "paymentAsset": "Native USDC",
+      "paymentAssetAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+      "paymentProvider": "CDP x402",
+      "environment": "mainnet"
+    },
+    {
+      "key": "arc-testnet",
+      "label": "Arc Testnet",
+      "network": "eip155:5042002",
+      "routePrefix": "/arc",
+      "paymentAsset": "Test USDC",
+      "paymentAssetAddress": "0x3600000000000000000000000000000000000000",
+      "paymentProvider": "Circle Gateway",
+      "environment": "testnet"
+    }
+  ],
+  "pricingUsd": {
+    "spotStandard": 0.10,
+    "spotPremium": 0.20,
+    "predictionStandard": 0.10,
+    "predictionPremium": 0.20,
+    "tokenScan": 0.10,
+    "preflight": 0.20
   },
-  "languages": ["en", "zh"],
   "pricing": {
     "freeTeaser": 0,
-    "analysisBase": 0.03,
-    "analysisPremium": 0.06,
-    "tokenScan": 0.01,
-    "preflight": 0.05
+    "analysisBase": 0.10,
+    "analysisPremium": 0.20,
+    "tokenScan": 0.10,
+    "preflight": 0.20,
+    "predictionStandard": 0.10,
+    "predictionPremium": 0.20
   },
   "endpoints": {
     "health": "/healthz",
     "metadata": "/v1/metadata",
     "mcp": "/mcp",
+    "jobs": "/v1/jobs/:jobId",
     "ticker": "GET /v1/market/ticker",
     "candles": "GET /v1/market/candles",
+    "xlayerTokens": "GET /v1/xlayer/tokens",
+    "contractEvidence": "POST /v1/contract/inspect",
     "analysisBase": "POST /v1/analysis/base",
     "analysisPremium": "POST /v1/analysis/premium",
-    "checkout": "POST /v1/checkout"
+    "tokenScan": "POST /v1/token/scan",
+    "preflight": "POST /v1/preflight",
+    "checkout": "POST /v1/checkout",
+    "polymarketDiscovery": "/v1/polymarket/markets",
+    "spotStandard": "POST /v1/analysis/spot/standard",
+    "spotPremium": "POST /v1/analysis/spot/premium",
+    "predictionStandard": "POST /v1/analysis/prediction/standard",
+    "predictionPremium": "POST /v1/analysis/prediction/premium",
+    "cryptoPredictionDiscovery": "GET /v1/polymarket/crypto"
   },
   "timeframes": ["15m", "1H", "4H", "1D", "1W"],
-  "tags": ["x402", "a2mcp", "xlayer", "okx", "spot", "grok", "market-analysis"]
+  "paymentProtocol": "x402",
+  "wallet": {
+    "browser": "Reown AppKit, Wagmi and Viem; wallet keys remain client-side",
+    "marketplaceCallers": "Agent-compatible x402 buyer",
+    "aspRegistration": "Agentic Wallet email login via Onchain OS",
+    "operatorTesting": "Server checkout is disabled by default and reserved for controlled E2E verification",
+    "funding": "In-app native-to-payment-asset swaps on X Layer, Base and Arbitrum; separate wallet/Gateway USDC balances and Circle Gateway deposit on Arc Testnet",
+    "networkSelection": "Last selected enabled network persists across reloads; DEFAULT_NETWORK applies only when no saved choice exists"
+  },
+  "webExperience": {
+    "navigation": ["Crypto Market", "Prediction Market", "Safety"],
+    "predictionSelection": "Single active crypto price/direction market selected from an in-page popup; no separate predictions page",
+    "predictionReport": "Readable confidence, summary, outcome probabilities, bid/ask, evidence quality, market metrics, invalidation, limitations, provenance, and disclaimer; technical JSON is collapsed",
+    "focusNote": "Optional report emphasis such as outcome case, counter-case, catalysts, liquidity, resolution risk, or invalidation; never an order",
+    "themes": "Network-aware Base, Arbitrum, and Arc themes with the original X Layer design preserved"
+  },
+  "arcAi": {
+    "live": "Real xAI market analysis with Arc budget and rate controls",
+    "fixture": "Deterministic payment/job plumbing validation only; no market inference"
+  },
+  "dataPolicy": {
+    "polymarket": "Public read-only evidence only; no order placement",
+    "selection": "User-selected markets only; no silent substitution",
+    "restrictedMarkets": "May be analyzed read-only when active and orderbook-enabled; restriction remains disclosed",
+    "paymentSafety": "Primary market and required order books are validated before payment and revalidated by the worker"
+  },
+  "tags": [
+    "x402",
+    "a2mcp",
+    "multichain",
+    "xlayer",
+    "base",
+    "arbitrum",
+    "arc-testnet",
+    "okx",
+    "polymarket",
+    "prediction-markets",
+    "crypto-predictions",
+    "grok",
+    "market-intelligence",
+    "recoverable-reports"
+  ]
 }

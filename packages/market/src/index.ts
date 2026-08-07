@@ -1,4 +1,8 @@
 const OKX_REST = "https://www.okx.com";
+import { ProviderCircuitBreaker, retryDelayMs } from "./resilience.js";
+
+export * from "./polymarket.js";
+export * from "./resilience.js";
 
 export type SpotInstrument = {
   instId: string;
@@ -29,14 +33,35 @@ export type Candle = {
   volumeCcy: number;
 };
 
+export type SpotMarketContext = {
+  source: "okx-public-spot";
+  instId: string;
+  bar: string;
+  ticker: SpotTicker;
+  candles: Candle[];
+  summary: ReturnType<typeof summarizeCandles>;
+  fetchedAt: string;
+};
+
+const okxCircuit = new ProviderCircuitBreaker("okx-public", 5, 30_000);
 async function okxGet<T>(path: string): Promise<T> {
-  const res = await fetch(`${OKX_REST}${path}`, {
-    headers: { Accept: "application/json" },
+  return okxCircuit.run(async () => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const res = await fetch(`${OKX_REST}${path}`, {
+        headers: { Accept: "application/json" }, signal: AbortSignal.timeout(8_000),
+      });
+      if (res.ok) {
+        const body = (await res.json()) as { code: string; msg: string; data: T };
+        if (body.code !== "0") throw new Error(`OKX error ${body.code}: ${body.msg}`);
+        return body.data;
+      }
+      lastError = new Error(`OKX HTTP ${res.status} ${path}`);
+      if (attempt >= 2 || (res.status < 500 && res.status !== 429)) throw lastError;
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs(res, attempt)));
+    }
+    throw lastError;
   });
-  if (!res.ok) throw new Error(`OKX HTTP ${res.status} ${path}`);
-  const body = (await res.json()) as { code: string; msg: string; data: T };
-  if (body.code !== "0") throw new Error(`OKX error ${body.code}: ${body.msg}`);
-  return body.data;
 }
 
 /** Map UI timeframe → OKX bar */
@@ -191,7 +216,7 @@ export async function buildMarketContext(opts: {
   instId: string;
   timeframe?: string;
   candleLimit?: number;
-}) {
+}): Promise<SpotMarketContext> {
   const bar = toOkxBar(opts.timeframe ?? "1H");
   const [ticker, candles] = await Promise.all([
     getTicker(opts.instId),

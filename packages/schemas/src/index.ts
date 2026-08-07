@@ -4,6 +4,137 @@ export const AddressSchema = z
   .string()
   .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid EVM address");
 
+export const AnalysisTierSchema = z.enum(["standard", "premium"]);
+export const PolymarketIdSchema = z.string().min(1).max(256);
+export const PredictionSelectionSchema = z.object({
+  primaryMarketId: PolymarketIdSchema,
+  additionalMarketIds: z.array(PolymarketIdSchema).max(7).default([]),
+});
+export const PredictionAnalysisRequestSchema = PredictionSelectionSchema.extend({
+  lang: z.enum(["en", "zh"]).default("en"),
+  userNote: z.string().max(500).optional(),
+});
+export const FusedAnalysisRequestSchema = PredictionAnalysisRequestSchema.extend({
+  instId: z.string().min(1).max(64),
+  timeframe: z.string().min(1).max(16).default("1H"),
+});
+export const DivergenceAnalysisRequestSchema = FusedAnalysisRequestSchema;
+export const EventRiskPreflightRequestSchema = PredictionAnalysisRequestSchema.extend({
+  intent: z.enum(["swap", "transfer", "approve", "hire_agent", "generic"]).default("generic"),
+  tokenAddress: AddressSchema.optional(),
+  walletAddress: AddressSchema.optional(),
+  amount: z.string().optional(),
+});
+
+const RejectedPredictionMarketSchema = z.object({
+  id: z.string(),
+  reason: z.string(),
+});
+const PredictionContextReportSchema = z.object({
+  selectionMode: z.literal("user"),
+  primaryMarketId: z.string(),
+  requestedAdditionalMarketIds: z.array(z.string()),
+  usedMarketIds: z.array(z.string()),
+  rejectedMarkets: z.array(RejectedPredictionMarketSchema),
+  markets: z.array(z.record(z.string(), z.unknown())),
+  partial: z.boolean(),
+  missingSources: z.array(z.string()),
+});
+const GeneratedAnalysisSchema = z.object({
+  headline: z.string(),
+  summary: z.string(),
+  confidence: z.number().min(0).max(100),
+  stance: z.enum(["YES", "NO", "NO_EDGE", "INSUFFICIENT_EVIDENCE"]),
+  marketProbabilityPct: z.number().min(0).max(100),
+  fairProbabilityRange: z.object({ low: z.number().min(0).max(100), high: z.number().min(0).max(100) }).strict().refine((value) => value.low <= value.high),
+  decision: z.object({ action: z.enum(["CONSIDER_YES", "CONSIDER_NO", "WAIT", "AVOID"]), rationale: z.string() }).strict(),
+  evidenceDrivers: z.array(z.string()).min(1), counterEvidence: z.array(z.string()).min(1),
+  entryConditions: z.array(z.string()).min(1), noTradeConditions: z.array(z.string()).min(1),
+  catalystsForYes: z.array(z.string()).min(1), catalystsForNo: z.array(z.string()).min(1), executionRisks: z.array(z.string()).min(1),
+  limitations: z.array(z.string()),
+  invalidationConditions: z.array(z.string()),
+  disclaimer: z.string(),
+  usage: z.object({ promptTokens: z.number().int().nonnegative(), completionTokens: z.number().int().nonnegative(), totalTokens: z.number().int().nonnegative(), cachedTokens: z.number().int().nonnegative().optional().default(0), reasoningTokens: z.number().int().nonnegative().optional().default(0) }).optional(),
+  fixture: z.literal(true).optional(),
+}).strict();
+const AiCostSchema = z.object({ promptTokens: z.number().int().nonnegative(), completionTokens: z.number().int().nonnegative(), totalTokens: z.number().int().nonnegative(), cachedTokens: z.number().int().nonnegative().optional().default(0), reasoningTokens: z.number().int().nonnegative().optional().default(0), estimatedCostUsd: z.number().nonnegative(), pricingConfigured: z.boolean() });
+export const AnalysisProfileSchema = z.object({
+  mode: z.enum(["live", "fixture", "deterministic"]),
+  model: z.string(),
+  reasoningEffort: z.enum(["none", "low"]),
+});
+
+export const SpotGeneratedAnalysisSchema = z.object({
+  headline: z.string(),
+  regime: z.enum(["trend_up", "trend_down", "range", "transition"]),
+  bias: z.enum(["bullish", "bearish", "neutral"]),
+  confidence: z.number().min(0).max(100),
+  summary: z.string(),
+  keyLevels: z.object({ support: z.array(z.number()), resistance: z.array(z.number()) }).strict(),
+  targets: z.array(z.object({ label: z.string(), price: z.number(), rationale: z.string() }).strict()),
+  invalidation: z.object({ price: z.number().nullable(), condition: z.string() }).strict(),
+  scenarios: z.array(z.object({
+    name: z.enum(["bull", "base", "bear"]), thesis: z.string(),
+    target: z.number().nullable(), invalidation: z.number().nullable(),
+  }).strict()),
+  chartNotes: z.string(),
+  agentAction: z.string(),
+  agentChecklist: z.array(z.string()),
+  riskNotes: z.array(z.string()),
+  limitations: z.array(z.string()),
+  disclaimer: z.string(),
+}).strict();
+
+export const PredictionAnalysisResponseSchema = z.object({
+  service: z.enum(["prediction_analysis_standard", "prediction_analysis_premium"]),
+  tier: AnalysisTierSchema,
+  predictionContext: PredictionContextReportSchema,
+  analysis: GeneratedAnalysisSchema,
+  aiCost: AiCostSchema.optional(),
+  analysisProfile: AnalysisProfileSchema,
+  methodology_version: z.string(),
+  generatedAt: z.string().datetime(),
+});
+
+export const FusionFeaturesSchema = z.object({
+  spotDirection: z.enum(["bullish", "bearish", "neutral"]),
+  predictionDirection: z.enum(["rising", "falling", "flat", "unknown"]),
+  agreement: z.enum(["agreement", "divergence", "neutral", "incompatible"]),
+  divergenceStrength: z.number().min(0).max(100),
+  horizonCompatibility: z.enum(["high", "medium", "low", "unknown"]),
+});
+
+export const FusedAnalysisResponseSchema = z.object({
+  service: z.enum(["fused_analysis_standard", "fused_analysis_premium"]),
+  tier: AnalysisTierSchema,
+  instId: z.string(),
+  timeframe: z.string(),
+  market: z.record(z.string(), z.unknown()),
+  predictionContext: PredictionContextReportSchema,
+  fusion: FusionFeaturesSchema,
+  analysis: GeneratedAnalysisSchema,
+  aiCost: AiCostSchema.optional(),
+  analysisProfile: AnalysisProfileSchema,
+  methodology_version: z.string(),
+  generatedAt: z.string().datetime(),
+});
+
+export const DivergenceAnalysisResponseSchema = FusedAnalysisResponseSchema.omit({ analysis: true, tier: true })
+  .extend({ service: z.literal("divergence_analysis") });
+
+export const EventRiskPreflightResponseSchema = z.object({
+  service: z.literal("event_risk_preflight"),
+  predictionContext: PredictionContextReportSchema,
+  eventRisk: z.object({
+    verdict: z.enum(["PASS", "WARN", "FAIL"]),
+    score: z.number().min(0).max(100),
+    reasons: z.array(z.string()),
+  }),
+  analysisProfile: AnalysisProfileSchema,
+  methodology_version: z.string(),
+  generatedAt: z.string().datetime(),
+});
+
 export const ChainIdSchema = z.enum(["196", "1", "56", "137", "8453", "42161"]).default("196");
 
 export const ResolveRequestSchema = z.object({
@@ -189,3 +320,11 @@ export type PreflightResponse = z.infer<typeof PreflightResponseSchema>;
 export type ResolveResponse = z.infer<typeof ResolveResponseSchema>;
 export type RiskGrade = z.infer<typeof RiskGradeSchema>;
 export type Verdict = z.infer<typeof VerdictSchema>;
+export type PredictionAnalysisRequest = z.infer<typeof PredictionAnalysisRequestSchema>;
+export type FusedAnalysisRequest = z.infer<typeof FusedAnalysisRequestSchema>;
+export type DivergenceAnalysisRequest = z.infer<typeof DivergenceAnalysisRequestSchema>;
+export type EventRiskPreflightRequest = z.infer<typeof EventRiskPreflightRequestSchema>;
+export type PredictionAnalysisResponse = z.infer<typeof PredictionAnalysisResponseSchema>;
+export type FusedAnalysisResponse = z.infer<typeof FusedAnalysisResponseSchema>;
+export type DivergenceAnalysisResponse = z.infer<typeof DivergenceAnalysisResponseSchema>;
+export type EventRiskPreflightResponse = z.infer<typeof EventRiskPreflightResponseSchema>;

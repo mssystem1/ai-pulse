@@ -1,8 +1,9 @@
 # PULSE
 
-PULSE is OKX spot intelligence for humans and AI agents, paid per signal in USDT0 on X Layer through x402.
+PULSE is multichain crypto-market and prediction-market intelligence for humans and AI agents. One responsive workspace provides Crypto Market, Prediction Market, and Safety. It combines live OKX spot data with one explicitly selected, active crypto-focused Polymarket question and offers readable, recoverable Base or Premium reports on X Layer, Base, Arbitrum, and Arc Testnet. Polymarket is public read-only evidence; PULSE never places prediction-market orders.
 
 - [Product documentation](/)
 - [Machine-readable service metadata](/v1/metadata)
+- [Crypto Polymarket discovery](/v1/polymarket/crypto)
 - [MCP endpoint](/mcp)
 - [API health](/healthz)
