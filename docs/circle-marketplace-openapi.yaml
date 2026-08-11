@@ -1,0 +1,219 @@
+openapi: 3.1.0
+info:
+  title: PULSE Circle Agent Marketplace API
+  version: 2.0.0
+  description: >-
+    Four x402-paid market-intelligence resources on Arc Testnet. Payments use
+    test USDC through Circle Gateway. PULSE provides decision support and does
+    not execute trades or place Polymarket orders.
+  contact:
+    url: https://www.ai-pulse.tech
+  license:
+    name: MIT
+    identifier: MIT
+externalDocs:
+  description: PULSE source repository
+  url: https://github.com/mssystem1/ai-pulse
+servers:
+  - url: https://pulse-api-production-7aae.up.railway.app
+    description: Production API origin; Arc routes use Arc Testnet payments
+tags:
+  - name: Spot analysis
+  - name: Prediction analysis
+paths:
+  /arc/v1/analysis/spot/standard:
+    post:
+      operationId: createArcSpotStandardReport
+      summary: Create a standard OKX spot analysis report
+      tags: [Spot analysis]
+      x-pulse-price-usd: 0.10
+      x-x402-network: eip155:5042002
+      x-x402-asset: "0x3600000000000000000000000000000000000000"
+      x-x402-provider: circle-gateway
+      requestBody:
+        $ref: "#/components/requestBodies/SpotRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+  /arc/v1/analysis/spot/premium:
+    post:
+      operationId: createArcSpotPremiumReport
+      summary: Create a premium OKX spot analysis report
+      tags: [Spot analysis]
+      x-pulse-price-usd: 0.20
+      x-x402-network: eip155:5042002
+      x-x402-asset: "0x3600000000000000000000000000000000000000"
+      x-x402-provider: circle-gateway
+      requestBody:
+        $ref: "#/components/requestBodies/SpotRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+  /arc/v1/analysis/prediction/standard:
+    post:
+      operationId: createArcPredictionStandardReport
+      summary: Analyze one explicitly selected crypto Polymarket market
+      tags: [Prediction analysis]
+      x-pulse-price-usd: 0.10
+      x-x402-network: eip155:5042002
+      x-x402-asset: "0x3600000000000000000000000000000000000000"
+      x-x402-provider: circle-gateway
+      requestBody:
+        $ref: "#/components/requestBodies/PredictionRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+  /arc/v1/analysis/prediction/premium:
+    post:
+      operationId: createArcPredictionPremiumReport
+      summary: Produce detailed analysis of one selected crypto Polymarket market
+      tags: [Prediction analysis]
+      x-pulse-price-usd: 0.20
+      x-x402-network: eip155:5042002
+      x-x402-asset: "0x3600000000000000000000000000000000000000"
+      x-x402-provider: circle-gateway
+      requestBody:
+        $ref: "#/components/requestBodies/PredictionRequest"
+      responses:
+        "202":
+          $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+components:
+  requestBodies:
+    SpotRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SpotRequest"
+          examples:
+            bitcoinHourly:
+              value:
+                instId: BTC-USDT
+                timeframe: 1H
+                lang: en
+    PredictionRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/PredictionRequest"
+          examples:
+            selectedMarket:
+              value:
+                primaryMarketId: "POLYMARKET_MARKET_ID"
+                additionalMarketIds: []
+                lang: en
+  schemas:
+    SpotRequest:
+      type: object
+      additionalProperties: false
+      required: [instId]
+      properties:
+        instId:
+          type: string
+          minLength: 3
+          maxLength: 32
+          examples: [BTC-USDT]
+        timeframe:
+          type: string
+          default: 1H
+          examples: [15m, 1H, 4H, 1D, 1W]
+        lang:
+          type: string
+          enum: [en, zh]
+          default: en
+        userNote:
+          type: string
+          maxLength: 500
+    PredictionRequest:
+      type: object
+      additionalProperties: false
+      required: [primaryMarketId]
+      properties:
+        primaryMarketId:
+          type: string
+          minLength: 1
+          maxLength: 256
+        additionalMarketIds:
+          type: array
+          maxItems: 7
+          default: []
+          items:
+            type: string
+            minLength: 1
+            maxLength: 256
+        lang:
+          type: string
+          enum: [en, zh]
+          default: en
+        userNote:
+          type: string
+          maxLength: 500
+    JobAccepted:
+      type: object
+      description: Durable paid job accepted for asynchronous processing.
+      required: [job]
+      properties:
+        job:
+          type: object
+          additionalProperties: true
+          properties:
+            id:
+              type: string
+              format: uuid
+            state:
+              type: string
+            recoveryToken:
+              type: string
+              description: Private capability used to poll and recover the report without repaying.
+        replay:
+          type: boolean
+    Error:
+      type: object
+      additionalProperties: true
+      properties:
+        error:
+          type: string
+  responses:
+    JobAccepted:
+      description: Payment accepted and durable report job created or recovered.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/JobAccepted"
+    BadRequest:
+      description: Invalid input or unavailable required market evidence.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    PaymentRequired:
+      description: >-
+        x402 payment challenge for Arc Testnet test USDC through Circle Gateway.
+        Payment requirements are returned in the standard payment-required headers and body.
+      headers:
+        PAYMENT-REQUIRED:
+          description: Base64-encoded x402 payment requirements when supplied by the server.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: true

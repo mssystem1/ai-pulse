@@ -1,45 +1,62 @@
 # PULSE · Circle Agent Marketplace listing
 
-## Listing copy
+This file is the canonical, copy-ready submission package for Circle's Agent Marketplace intake form.
+
+## Public links
 
 | Field | Value |
 |---|---|
-| Name | PULSE |
-| Category | Financial analysis / market intelligence |
-| Tagline | Spot and prediction-market intelligence, paid per report in USDC. |
-| Environment | Arc Testnet — test-value payments; live market data and model calls may incur real provider cost. |
-| Short description | PULSE combines live OKX spot evidence with explicitly selected Polymarket markets and delivers structured, recoverable analysis through Circle Gateway-compatible x402 services. |
-| Networks | Arc Testnet for this listing; PULSE also publishes separate X Layer, Base, and Arbitrum resources. |
-| Payment asset | Arc Testnet USDC |
-| Delivery | Immediate `202` job acceptance, opaque recovery capability, authenticated polling, normalized payment receipt, and private final report. |
-| Safety | Decision support only; selected market IDs, source timestamps, missing sources, limitations, invalidation conditions, analysis profile, and methodology version are disclosed. |
+| Website | https://www.ai-pulse.tech |
+| Repository | https://github.com/mssystem1/ai-pulse |
+| API origin | https://pulse-api-production-7aae.up.railway.app |
+| MCP endpoint | https://pulse-api-production-7aae.up.railway.app/mcp |
+| Machine-readable metadata | https://pulse-api-production-7aae.up.railway.app/v1/metadata |
+| OpenAPI specification | https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml |
+| Logo | https://pulse-api-production-7aae.up.railway.app/brand/logo.png |
 
-## Long description
+The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the four marketplace endpoints.
 
-PULSE is one multichain intelligence product for humans and agents. On Arc Testnet, callers pay test USDC through Circle Gateway for structured spot, prediction-only, fused OKX + Polymarket, divergence, or event-risk analysis. Prediction context is always explicitly selected by the caller and reloaded server-side after payment. PULSE does not trade on Polymarket and does not accept Polygon as a PULSE payment network.
+## Form answers
 
-Paid analysis is delivered as a durable job so a slow provider or closed browser does not lose a settled purchase. The response includes a recovery capability; the final private report records the payment network, Gateway batch settlement mode, selected/rejected market IDs, data freshness, partial sources, model/fixture profile, limitations, and cost evidence. Arc is visibly testnet/test-value. `ARC_AI_MODE=fixture` is the default; live Grok is enabled only after explicit cost and alert gates.
+| Field | Value |
+|---|---|
+| Service Name | PULSE |
+| Website | https://www.ai-pulse.tech |
+| Primary Service Category | Financial analysis / market intelligence; if unavailable, choose Data & Analytics |
+| Number of Endpoints | 4 |
+| Pricing Model | Usage-based, pay per report through x402. Standard analysis costs $0.10 in Arc Testnet USDC; Premium analysis costs $0.20. Public discovery and metadata are free. |
+| Contact Name | Enter the legal or operational contact responsible for PULSE. |
+| Endpoints Documentation URL | https://github.com/mssystem1/ai-pulse/blob/main/docs/circle-marketplace-openapi.yaml |
 
-## Published Arc service paths
+### Description
 
-Use the final custom API origin in place of `<API_ORIGIN>`:
+PULSE is independent market intelligence for humans and AI agents. It combines live OKX spot-market evidence with one explicitly selected, read-only crypto Polymarket question and produces structured, recoverable reports. Reports disclose confidence, probabilities, market quality, invalidation conditions, limitations, source freshness, and provenance. For this listing, callers pay per report in test USDC through Circle Gateway on Arc Testnet. PULSE provides decision support only and never places trades or Polymarket orders.
 
-- `POST <API_ORIGIN>/arc/v1/analysis/spot/standard`
-- `POST <API_ORIGIN>/arc/v1/analysis/spot/premium`
-- `POST <API_ORIGIN>/arc/v1/analysis/prediction/standard`
-- `POST <API_ORIGIN>/arc/v1/analysis/prediction/premium`
-- `POST <API_ORIGIN>/arc/v1/analysis/fused/standard`
-- `POST <API_ORIGIN>/arc/v1/analysis/fused/premium`
-- `POST <API_ORIGIN>/arc/v1/analysis/divergence`
-- `POST <API_ORIGIN>/arc/v1/preflight/event-risk`
+### Anything else?
 
-Machine-readable schemas, examples, prices, payment provider, CAIP-2 network, asset, and payee are published at `<API_ORIGIN>/v1/metadata`. Free service inspection must return the declared input contract before payment.
+PULSE is submitted as an Arc Testnet service using test USDC through Circle Gateway. Arc is clearly identified as a test environment throughout the payment and report lifecycle. Paid analysis is delivered as a durable asynchronous job with authenticated recovery, so a caller can retrieve a settled report without paying twice. Prediction markets are explicitly selected by the caller and reloaded server-side; PULSE uses public read-only evidence and never submits orders. The project also exposes an MCP server for agent clients at `https://pulse-api-production-7aae.up.railway.app/mcp` and source code at `https://github.com/mssystem1/ai-pulse`.
 
-## Publication gate
+## Published Arc service endpoints
 
-- Deploy the exact release candidate with `arc-testnet` enabled, Circle Gateway enabled, and fixture mode first.
-- Confirm the seller address, Arc Testnet USDC, price, resource URL, and Gateway batch semantics in the 402 challenge.
-- Complete one controlled test-USDC payment through the deployed route and recover the private report without repaying.
-- Confirm the receipt says `gateway_batch`, finality says `gateway_batch_accepted`, and no immediate on-chain transaction is fabricated.
-- Verify listing search/inspection from Circle CLI and save the returned marketplace identifier.
-- Enable live AI only after current xAI rates, budget ceilings, and notifications are verified.
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/standard` — $0.10
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/premium` — $0.20
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/standard` — $0.10
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/premium` — $0.20
+
+All four declare Arc Testnet `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, the `exact` x402 scheme, and Circle Gateway in public metadata. Fused, divergence, and event-risk routes are intentionally excluded because they are disabled in the public product.
+
+## MCP verification
+
+`GET /mcp` publishes the server and available tool names. `POST /mcp` supports JSON-RPC 2.0 initialization and tool discovery, currently negotiating MCP protocol version `2024-11-05`. MCP tool pricing is generated from the same runtime configuration as REST pricing.
+
+## Submission gate
+
+- Confirm the website, health endpoint, metadata, MCP initialization, and MCP `tools/list` return HTTP 200.
+- Confirm the four Arc resources and prices appear under `asp.networkServices` in `/v1/metadata`.
+- Send a valid unpaid request to each Arc endpoint and confirm its HTTP 402 challenge declares the exact network, asset, amount, seller, and resource URL.
+- Complete one controlled test-USDC payment for each distinct price/payment contract and recover the private report without repaying.
+- Confirm the receipt identifies Circle Gateway batch settlement and does not fabricate an immediate on-chain transaction.
+- Submit the endpoint URL, payout wallet, description, and published OpenAPI specification through Circle's official intake form.
+- Save the submission identifier, approval result, and Discovery API record.
+
+Do not include secrets, recovery tokens, private reports, mock-payment evidence, or an unverified payout address in the submission.

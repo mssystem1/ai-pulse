@@ -7,6 +7,11 @@
   "taglineZh": "多链现货与预测市场智能研报 · 按所选网络按次付费",
   "shortDescription": "PULSE delivers separate OKX Crypto Market and crypto-focused Polymarket analysis with readable, recoverable reports on X Layer, Base, Arbitrum One, and Arc Testnet.",
   "description": "PULSE is an independent intelligence product for humans and AI agents. One responsive web workspace contains Crypto Market, Prediction Market, and Safety. Prediction Market filters Polymarket to active crypto price and direction questions, lets the user explicitly select one market in a popup, displays its live public evidence, and offers Base or Premium structured analysis. Reports present confidence, probabilities, market quality, invalidation, limitations, provenance, and disclaimers instead of raw provider JSON. Polymarket remains read-only; PULSE never places orders. Network-aware x402 payments settle through OKX on X Layer, CDP on Base and Arbitrum One, and Circle Gateway on Arc Testnet.",
+  "website": "https://www.ai-pulse.tech",
+  "repository": "https://github.com/mssystem1/ai-pulse",
+  "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
+  "documentation": "https://github.com/mssystem1/ai-pulse/blob/main/docs/CIRCLE_AGENT_MARKETPLACE_LISTING.md",
+  "openApiSpec": "https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml",
   "logo": {
     "svg": "assets/logo.svg",
     "png": "assets/logo.png",
@@ -101,6 +106,12 @@
   },
   "timeframes": ["15m", "1H", "4H", "1D", "1W"],
   "paymentProtocol": "x402",
+  "agentInterfaces": {
+    "restMetadata": "https://pulse-api-production-7aae.up.railway.app/v1/metadata",
+    "mcp": "https://pulse-api-production-7aae.up.railway.app/mcp",
+    "mcpTransport": "JSON-RPC 2.0 over HTTP",
+    "mcpProtocolVersion": "2024-11-05"
+  },
   "wallet": {
     "browser": "Reown AppKit, Wagmi and Viem; wallet keys remain client-side",
     "marketplaceCallers": "Agent-compatible x402 buyer",

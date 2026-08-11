@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { AppConfig } from "@pulse/config";
+import { priceLabel, type AppConfig } from "@pulse/config";
 import { createMcpPaymentGate } from "@pulse/payments";
 import { runGrokAnalysis } from "@pulse/analysis";
 import { getTicker, searchSpotInstruments } from "@pulse/market";
@@ -134,6 +134,14 @@ function availableTools(cfg: AppConfig) {
     if (tool.name === "divergence_analysis") return cfg.FEATURE_DIVERGENCE_ANALYSIS;
     if (tool.name === "event_risk_preflight") return cfg.FEATURE_EVENT_RISK_ANALYSIS;
     return true;
+  }).map((tool) => {
+    if (tool.name === "analysis_base") {
+      return { ...tool, description: `Paid ${priceLabel(cfg.PRICE_ANALYSIS_BASE)}: Grok base analysis grounded in live OKX spot OHLCV` };
+    }
+    if (tool.name === "analysis_premium") {
+      return { ...tool, description: `Paid ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)}: Grok premium multi-scenario OKX spot analysis` };
+    }
+    return tool;
   });
 }
 
