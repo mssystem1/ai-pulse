@@ -116,6 +116,14 @@ GROK_MAX_OUTPUT_PREMIUM=3200
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
 
+PULSE also carries the same verified mainnet release addresses in its server-side
+execution catalog. A valid Railway address variable overrides that catalog for
+an intentional migration; an omitted or malformed duplicate falls back to the
+published release instead of silently disabling Limit, TP/SL or Autopilot. This
+fallback covers capability discovery, account lookup and both automation
+workers. Keep the variables populated for operational clarity, and always
+verify any override against the intended chain before deployment.
+
 Important Railway rules:
 
 - Do not set any private value with a `VITE_` prefix.
@@ -295,6 +303,7 @@ Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` va
 | Product becomes stale after inactivity | Railway Serverless/app sleeping is enabled or the service restarted | Disable sleeping, inspect restart logs and verify KV recovery. |
 | Logs say `Using mock x402 gate` | Mock mode is enabled or required OKX credentials are absent | Set `X402_MOCK=0`, supply the complete credentials and redeploy. |
 | Analysis works but automation does not | Worker disabled, role missing, contract mismatch, no native gas or kill switch active | Check the automation activation gate and logs before retrying. |
+| Spot route is live but Limit/Autopilot says its factory is not configured | The API deployment is older than the published-address fallback or its address block is missing | Deploy the current API build. Then inspect `/v1/trading/capabilities?network=xlayer` (and Base/Arbitrum): every contract must be a real address and `contractAddressSource` must identify the published release with environment override. |
 | Browser says API offline | Wrong build-time `VITE_API_URL`, failed Railway health or TLS/CORS issue | Open Railway `/healthz`, compare the exact API origin, then rebuild Vercel. |
 | Reports or dashboards disappear | Vercel and Railway point to different KV/Blob resources or namespaces | Verify Railway storage variables; Vercel web must not own authoritative storage. |
 | Paid report reaches `failed terminal` or `manual reconciliation` with `Cannot use private access on a public store` | Railway `BLOB_ACCESS` does not match the Vercel Blob store | For the supplied public store, set `BLOB_ACCESS=public` and the stable server-only `REPORT_ENCRYPTION_KEY`; redeploy, sign into Paid report history and press **Retry**. The settled receipt is reused and no second payment occurs. |

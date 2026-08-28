@@ -21,6 +21,7 @@ import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js"
 import { listV6Activity, recordV6Activity } from "./v6Store.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
+import { executionContractAddress } from "./executionContracts.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
 import { AUTOPILOT_STRATEGY_HASH_KEY, decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 
@@ -84,31 +85,31 @@ const configs = {
     id: 196,
     rpc: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech",
     rpcFallback: () => process.env.X_LAYER_RPC_FALLBACK || "https://xlayerrpc.okx.com",
-    oracle: () => process.env.XLAYER_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.XLAYER_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.XLAYER_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.XLAYER_OKX_APPROVAL_ADDRESS,
-    factory: () => process.env.XLAYER_AUTOPILOT_VAULT_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("xlayer", "oracleRouter"),
+    adapter: () => executionContractAddress("xlayer", "executionAdapter"),
+    router: () => executionContractAddress("xlayer", "okxRouter"),
+    spender: () => executionContractAddress("xlayer", "okxApproval"),
+    factory: () => executionContractAddress("xlayer", "autopilotFactory"),
   },
   base: {
     id: 8453,
     rpc: () => process.env.BASE_RPC_URL || "https://mainnet.base.org",
     rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base",
-    oracle: () => process.env.BASE_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.BASE_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.BASE_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.BASE_OKX_APPROVAL_ADDRESS,
-    factory: () => process.env.BASE_AUTOPILOT_VAULT_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("base", "oracleRouter"),
+    adapter: () => executionContractAddress("base", "executionAdapter"),
+    router: () => executionContractAddress("base", "okxRouter"),
+    spender: () => executionContractAddress("base", "okxApproval"),
+    factory: () => executionContractAddress("base", "autopilotFactory"),
   },
   arbitrum: {
     id: 42161,
     rpc: () => process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
     rpcFallback: () => process.env.ARBITRUM_RPC_FALLBACK_URL || "https://arbitrum-one-rpc.publicnode.com",
-    oracle: () => process.env.ARBITRUM_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.ARBITRUM_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.ARBITRUM_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.ARBITRUM_OKX_APPROVAL_ADDRESS,
-    factory: () => process.env.ARBITRUM_AUTOPILOT_VAULT_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("arbitrum", "oracleRouter"),
+    adapter: () => executionContractAddress("arbitrum", "executionAdapter"),
+    router: () => executionContractAddress("arbitrum", "okxRouter"),
+    spender: () => executionContractAddress("arbitrum", "okxApproval"),
+    factory: () => executionContractAddress("arbitrum", "autopilotFactory"),
   },
 } as const;
 const StrategySchema = z.object({

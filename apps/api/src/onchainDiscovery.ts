@@ -1,4 +1,5 @@
 import { createPublicClient, fallback, http, type PublicClient } from "viem";
+import { executionContractAddress } from "./executionContracts.js";
 
 export type ExecutionNetwork = "xlayer" | "base" | "arbitrum";
 
@@ -46,18 +47,12 @@ export type OnchainAccountSnapshot = {
 const snapshots = new Map<string, { value: OnchainAccountSnapshot; expiresAt: number }>();
 const inflight = new Map<string, Promise<OnchainAccountSnapshot>>();
 
-function configuredAddress(name: string) {
-  const value = process.env[name]?.trim() || "";
-  return ADDRESS.test(value) ? value as `0x${string}` : null;
-}
-
 async function readSnapshot(network: ExecutionNetwork, owner: string): Promise<OnchainAccountSnapshot> {
-  const cfg = NETWORKS[network];
   const client = executionPublicClient(network);
-  const protectionFactory = configuredAddress(`${cfg.prefix}_SPOT_ORDER_FACTORY_ADDRESS`);
-  const limitFactory = configuredAddress(`${cfg.prefix}_SPOT_LIMIT_FACTORY_ADDRESS`);
-  const bracketFactory = configuredAddress(`${cfg.prefix}_SPOT_BRACKET_FACTORY_ADDRESS`);
-  const autopilotFactory = configuredAddress(`${cfg.prefix}_AUTOPILOT_VAULT_FACTORY_ADDRESS`);
+  const protectionFactory = executionContractAddress(network, "spotFactory");
+  const limitFactory = executionContractAddress(network, "spotLimitFactory");
+  const bracketFactory = executionContractAddress(network, "spotBracketFactory");
+  const autopilotFactory = executionContractAddress(network, "autopilotFactory");
   const contracts = [
     ...(protectionFactory ? [{ address: protectionFactory, abi: factoryAccountAbi, functionName: "accountOf" as const, args: [owner as `0x${string}`] }] : []),
     ...(limitFactory ? [{ address: limitFactory, abi: factoryAccountAbi, functionName: "accountOf" as const, args: [owner as `0x${string}`] }] : []),

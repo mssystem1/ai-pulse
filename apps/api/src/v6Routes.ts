@@ -6,6 +6,10 @@ import { reconcileV6Activity, recordV6Activity, v6ActivityPersistenceStatus } fr
 import { asyncRoute } from "./httpResilience.js";
 import { kvCircuitStatus } from "./resilientKv.js";
 import { getOnchainAccountSnapshot } from "./onchainDiscovery.js";
+import {
+  executionContractAddress,
+  executionContracts,
+} from "./executionContracts.js";
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const HASH = /^0x[a-fA-F0-9]{64}$/;
@@ -15,7 +19,7 @@ const NETWORKS = {
   arbitrum: { chainId: "42161", prefix: "ARBITRUM", rpc: () => process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc" },
 } as const;
 
-const TradeSchema = z.object({
+export const TradeSchema = z.object({
   network: z.enum(["xlayer", "base", "arbitrum"]),
   fromTokenAddress: z.string().regex(ADDRESS),
   toTokenAddress: z.string().regex(ADDRESS),
@@ -26,11 +30,6 @@ const TradeSchema = z.object({
   maxAutoSlippagePercent: z.coerce.number().min(0.1).max(5).optional().default(1),
 });
 
-function address(name: string) {
-  const value = process.env[name]?.trim() || "";
-  return ADDRESS.test(value) ? value : null;
-}
-
 export function createV6Router(cfg: AppConfig) {
   const router = Router();
 
@@ -39,15 +38,7 @@ export function createV6Router(cfg: AppConfig) {
     if (network === "arc-testnet") return res.json({ version: "v6.0.0", network, analysis: true, spot: { visible: false, enabled: false }, autopilot: { visible: false, enabled: false }, reasons: { spot: "Arc Testnet is analysis/payment only", autopilot: "Arc Testnet is analysis/payment only" } });
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     if (!chain) return res.status(400).json({ error: "Unsupported network" });
-    const contracts = {
-      registry: address(`${chain.prefix}_PULSE_REGISTRY_ADDRESS`),
-      oracleRouter: address(`${chain.prefix}_ORACLE_ROUTER_ADDRESS`),
-      executionAdapter: address(`${chain.prefix}_EXECUTION_ADAPTER_ADDRESS`),
-      spotFactory: address(`${chain.prefix}_SPOT_ORDER_FACTORY_ADDRESS`),
-      spotLimitFactory: address(`${chain.prefix}_SPOT_LIMIT_FACTORY_ADDRESS`),
-      spotBracketFactory: address(`${chain.prefix}_SPOT_BRACKET_FACTORY_ADDRESS`),
-      autopilotFactory: address(`${chain.prefix}_AUTOPILOT_VAULT_FACTORY_ADDRESS`),
-    };
+    const contracts = executionContracts(network as keyof typeof NETWORKS);
     const automationReady = process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY || "");
     const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN && process.env.BLOB_READ_WRITE_TOKEN);
     res.json({
@@ -59,6 +50,7 @@ export function createV6Router(cfg: AppConfig) {
       spot: { visible: cfg.FEATURE_TRADING, enabled: cfg.FEATURE_TRADING && cfg.hasOkxCredentials, market: cfg.hasOkxCredentials, limit: automationReady && Boolean(contracts.spotLimitFactory && contracts.oracleRouter && contracts.executionAdapter), bracket: automationReady && Boolean(contracts.spotBracketFactory && contracts.oracleRouter && contracts.executionAdapter), protectedOrders: automationReady && Boolean(contracts.spotFactory && contracts.oracleRouter && contracts.executionAdapter) },
       autopilot: { visible: cfg.FEATURE_AUTOPILOT, enabled: cfg.FEATURE_AUTOPILOT && autopilotRuntimeReady && Boolean(contracts.autopilotFactory && contracts.executionAdapter) && !cfg.AUTOPILOT_KILL_SWITCH },
       contracts,
+      contractAddressSource: "published_release_with_environment_override",
       persistence: process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? "upstash_kv" : "memory-development",
       persistenceHealth: kvCircuitStatus(),
       reasons: {
@@ -216,8 +208,8 @@ export function createV6Router(cfg: AppConfig) {
         autoSlippage: parsed.data.slippageMode === "auto",
         maxAutoSlippagePercent: String(parsed.data.maxAutoSlippagePercent),
       });
-      const approvedRouter = address(`${NETWORKS[parsed.data.network].prefix}_OKX_ROUTER_ADDRESS`);
-      const approvalAddress = address(`${NETWORKS[parsed.data.network].prefix}_OKX_APPROVAL_ADDRESS`);
+      const approvedRouter = executionContractAddress(parsed.data.network, "okxRouter");
+      const approvalAddress = executionContractAddress(parsed.data.network, "okxApproval");
       const quotedFrom = String(prepared.quote?.fromToken?.address || "").toLowerCase();
       const quotedTo = String(prepared.quote?.toToken?.address || "").toLowerCase();
       if (!approvedRouter || prepared.tx.to.toLowerCase() !== approvedRouter.toLowerCase())

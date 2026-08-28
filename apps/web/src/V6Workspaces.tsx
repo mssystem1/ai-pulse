@@ -17,7 +17,12 @@ import {
 } from "./networks";
 import type { ReportTradeIntent } from "./Report";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
-import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition } from "./dashboardMetrics";
+import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
+import {
+  DEFAULT_AUTOPILOT_CAPITAL,
+  DEFAULT_TRADE_AMOUNT,
+  positiveTokenAmount,
+} from "./tradeAmounts";
 
 type Capability = {
   network: string;
@@ -1029,8 +1034,8 @@ export function SpotWorkspace({
   }>({ base: null, quote: null });
   const [fromToken, setFromToken] = useState("");
   const [toToken, setToToken] = useState("");
-  const [amount, setAmount] = useState("1000000");
-  const [amountHuman, setAmountHuman] = useState("10");
+  const [amount, setAmount] = useState("0");
+  const [amountHuman, setAmountHuman] = useState(DEFAULT_TRADE_AMOUNT);
   const [slippage, setSlippage] = useState("0.5");
   const [slippageMode, setSlippageMode] = useState<"auto" | "manual">("auto");
   const [protectAfterFill, setProtectAfterFill] = useState(false);
@@ -1240,13 +1245,10 @@ export function SpotWorkspace({
     const buy = side === "buy" ? baseToken : quoteToken;
     if (sell) setFromToken(sell.address);
     if (buy) setToToken(buy.address);
-    if (sell) {
-      try {
-        setAmount(parseUnits(amountHuman || "0", sell.decimals).toString());
-      } catch {
-        setAmount("0");
-      }
-    }
+    if (sell)
+      setAmount(
+        positiveTokenAmount(amountHuman, sell.decimals)?.toString() || "0",
+      );
     if (baseToken) setProtectedAsset(baseToken.address);
     if (quoteToken) setSettlementAsset(quoteToken.address);
     if (baseToken && protectedAmountHuman) {
@@ -2445,6 +2447,17 @@ export function SpotWorkspace({
   const selectedLimitAccountStatus = bracketSelected
     ? bracketAccountStatus
     : limitAccountStatus;
+  const amountReady = /^\d+$/.test(amount) && BigInt(amount) > 0n;
+  const selectedLimitCapabilityReady = bracketSelected
+    ? capability?.spot.bracket === true
+    : capability?.spot.limit === true;
+  const selectedLimitCapabilityReason = selectedLimitCapabilityReady
+    ? ""
+    : capability
+      ? capability.reasons?.[bracketSelected ? "bracket" : "limit"] ||
+        capability.reasons?.automation ||
+        `${bracketSelected ? "Limit + TP/SL" : "Limit"} execution is not available on this API runtime.`
+      : "Loading live execution capability…";
   let quoteHuman = "—";
   if (quoteData?.toTokenAmount && buyAsset) {
     try {
@@ -2756,7 +2769,13 @@ export function SpotWorkspace({
           {executionReady && executionMode === "market" && (
             <>
               <div className="friendly-fields">
-                <label className={insufficientBalance ? "field-invalid" : ""}>
+                <label
+                  className={
+                    insufficientBalance || (!amountReady && amountHuman !== "")
+                      ? "field-invalid"
+                      : ""
+                  }
+                >
                   <span>
                     Amount to spend{" "}
                     <button
@@ -2773,6 +2792,7 @@ export function SpotWorkspace({
                       aria-invalid={insufficientBalance}
                       inputMode="decimal"
                       value={amountHuman}
+                      placeholder="0.00"
                       onChange={(event) => {
                         setAmountHuman(event.target.value);
                         setQuote(null);
@@ -2929,6 +2949,11 @@ export function SpotWorkspace({
                   </button>
                 </div>
               )}
+              {!amountReady && amountHuman !== "" && (
+                <div className="inline-warning">
+                  Enter any positive amount representable in {sellAsset?.symbol || "the selected token"}. There is no fixed fiat minimum.
+                </div>
+              )}
               {quoteData && (
                 <div className="quote-box">
                   <span>Expected output</span>
@@ -3017,7 +3042,9 @@ export function SpotWorkspace({
                 <span>1</span>
                 <div>
                   <strong>
-                    {selectedLimitAccount
+                    {!selectedLimitCapabilityReady
+                      ? "Order execution is not ready"
+                      : selectedLimitAccount
                       ? "Order setup ready"
                       : selectedLimitAccountStatus === "checking"
                         ? "Checking your existing order setup…"
@@ -3026,9 +3053,9 @@ export function SpotWorkspace({
                           : "PULSE will prepare the order setup when you review"}
                   </strong>
                   <p>
-                    No contract address or atomic amount is required. If this is
-                    your first order on this network, the wallet will show one
-                    additional setup transaction.
+                    {selectedLimitCapabilityReady
+                      ? "No contract address or atomic amount is required. If this is your first order on this network, the wallet will show one additional setup transaction."
+                      : selectedLimitCapabilityReason}
                   </p>
                 </div>
               </div>
@@ -3048,7 +3075,13 @@ export function SpotWorkspace({
                 </div>
               )}
               <div className="friendly-fields three">
-                <label className={insufficientBalance ? "field-invalid" : ""}>
+                <label
+                  className={
+                    insufficientBalance || (!amountReady && amountHuman !== "")
+                      ? "field-invalid"
+                      : ""
+                  }
+                >
                   <span>
                     Amount to spend{" "}
                     <button
@@ -3065,6 +3098,7 @@ export function SpotWorkspace({
                       aria-invalid={insufficientBalance}
                       inputMode="decimal"
                       value={amountHuman}
+                      placeholder="0.00"
                       onChange={(event) => setAmountHuman(event.target.value)}
                     />
                     <b>{sellAsset?.symbol || "token"}</b>
@@ -3176,15 +3210,28 @@ export function SpotWorkspace({
                   </button>
                 </div>
               )}
+              {!amountReady && amountHuman !== "" && (
+                <div className="inline-warning">
+                  Enter any positive amount representable in {sellAsset?.symbol || "the selected token"}. There is no fixed fiat minimum.
+                </div>
+              )}
+              {!selectedLimitCapabilityReady && (
+                <div className="account-lookup-error" role="status">
+                  <span>Limit execution is unavailable on the connected API.</span>
+                  <small>{selectedLimitCapabilityReason}</small>
+                </div>
+              )}
               <button
                 className="btn btn-primary full"
                 disabled={
                   busy !== "" ||
                   !wallet ||
                   !mappingReady ||
+                  !amountReady ||
                   !limitTrigger ||
                   !limitMinOut ||
                   insufficientBalance ||
+                  !selectedLimitCapabilityReady ||
                   selectedLimitAccountStatus === "checking" ||
                   selectedLimitAccountStatus === "error" ||
                   (bracketSelected &&
@@ -3197,6 +3244,8 @@ export function SpotWorkspace({
                   ? "Opening wallet…"
                   : insufficientBalance
                     ? `Use ${sellAsset?.symbol || "wallet"} balance first`
+                    : !selectedLimitCapabilityReady
+                      ? "Limit execution unavailable"
                     : bracketSelected
                       ? "Review limit + TP / SL"
                       : "Review limit order"}
@@ -3787,7 +3836,7 @@ export function AutopilotWorkspace({
   const [riskProfile, setRiskProfile] = useState<
     "conservative" | "balanced" | "active"
   >("balanced");
-  const [capitalHuman, setCapitalHuman] = useState("100");
+  const [capitalHuman, setCapitalHuman] = useState(DEFAULT_AUTOPILOT_CAPITAL);
   const [capitalAction, setCapitalAction] = useState<"add" | "withdraw">("add");
   const [addAmountHuman, setAddAmountHuman] = useState("");
   const [withdrawAmountHuman, setWithdrawAmountHuman] = useState("");
@@ -3837,11 +3886,7 @@ export function AutopilotWorkspace({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const settlementDecimals = WEB_NETWORKS[networkKey].payment.decimals;
-  const activeStrategy = selectedVault
-    ? strategies.find(
-        (item) => item.vault.toLowerCase() === selectedVault.toLowerCase(),
-      )
-    : strategies[0];
+  const activeStrategy = selectedAutopilotStrategy(strategies, selectedVault);
   const activeVault = vaultDetails.find(
     (item) => item.address.toLowerCase() === selectedVault.toLowerCase(),
   );
@@ -3856,11 +3901,7 @@ export function AutopilotWorkspace({
     activeVault?.settlementSymbol ||
     WEB_NETWORKS[networkKey].payment.symbol;
   const parsedCapital = useMemo(() => {
-    try {
-      return parseUnits(capitalHuman || "0", settlementDecimals);
-    } catch {
-      return 0n;
-    }
+    return positiveTokenAmount(capitalHuman, settlementDecimals) || 0n;
   }, [capitalHuman, settlementDecimals]);
   const existingVaultCapital =
     activeVault?.balanceAtomic && /^\d+$/.test(activeVault.balanceAtomic)
@@ -4960,6 +5001,12 @@ export function AutopilotWorkspace({
     ? message || "Preparing Autopilot…"
     : !wallet
       ? "Connect wallet to continue"
+      : !capability?.autopilot.enabled
+        ? "Autopilot execution unavailable"
+        : !autopilotRouteAvailable
+          ? "Choose a pair with a live route"
+          : effectiveCapital <= 0n
+            ? `Enter ${WEB_NETWORKS[networkKey].payment.symbol} capital to continue`
       : autopilotInsufficientCapital
         ? `Use available ${WEB_NETWORKS[networkKey].payment.symbol} balance first`
         : vaultStatus === "checking"
@@ -5142,6 +5189,7 @@ export function AutopilotWorkspace({
                   inputMode="decimal"
                   value={capitalHuman}
                   onChange={(event) => setCapitalHuman(event.target.value)}
+                  placeholder="0.00"
                 />
                 <b>{WEB_NETWORKS[networkKey].payment.symbol}</b>
               </div>
@@ -7086,11 +7134,12 @@ export function DocsWorkspace() {
               </article>
             </div>
             <div className="docs-callout">
-              <b>Example from Base</b>
+              <b>Amount choice stays yours</b>
               <span>
-                A live WETH/USDC route plus 3.817733 USDC in the wallet can
-                quote a 10 USDC trade, but cannot submit it. Choose 3.817733
-                USDC or less and leave some native ETH for gas.
+                Market, Limit and Autopilot amount fields start empty. Enter any
+                positive value representable by the token, including 0.1 USDC
+                or USDT0, provided the live route accepts it and the connected
+                wallet has enough balance. Keep native gas separately.
               </span>
             </div>
           </section>

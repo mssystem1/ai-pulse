@@ -160,6 +160,13 @@ This table is the operational checklist for variables that require a choice. Fix
 | `AUTOPILOT_RISK_INTERVAL_MS` | Milliseconds, at least `30000` | `60000` | `60000` | Independent live TP/SL and latched partial-exit monitor. It does not call xAI, continues during an AI outage, and still uses the vault cooldown, oracle, route, simulation and nonce safeguards. |
 | `TEST_WALLET_ADDRESS` / `TEST_WALLET_PRIVATE_KEY` | Ignored operator secrets | Scripts and bounded acceptance only | Never deploy | Funded checkout automation. The browser never reads these values. |
 
+The X Layer, Base and Arbitrum contract/router variables in the environment
+templates are public deployment configuration, not secrets. The API embeds the
+same verified release as a fail-safe: a valid environment value overrides it
+for a deliberate migration, while a missing or malformed duplicate falls back
+to the published release. Secrets, feature gates, the automation signer and RPC
+URLs never receive such a fallback.
+
 ## Pricing: preserve current services, add V5 services
 
 The existing pricing contract is unchanged and must remain wired to the existing routes, MCP tools, SDK behavior, metadata, and OKX.AI replay flow:

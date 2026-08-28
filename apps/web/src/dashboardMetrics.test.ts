@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition } from "./dashboardMetrics.js";
+import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics.js";
 
 const protectedStrategy = {
   status: "active",
@@ -75,4 +75,11 @@ test("capital actions fail closed until the correct source balance is known", ()
   assert.equal(assessBalanceAmount("100000", null), "balance_unavailable");
   assert.equal(assessBalanceAmount("600000", "500000"), "insufficient");
   assert.equal(assessBalanceAmount("500000", "500000"), "ready");
+});
+
+test("a stale runtime strategy cannot masquerade as the currently selected Autopilot", () => {
+  const strategies = [{ vault: "0xAAA", status: "active" }];
+  assert.equal(selectedAutopilotStrategy(strategies, ""), undefined);
+  assert.equal(selectedAutopilotStrategy(strategies, "0xBBB"), undefined);
+  assert.equal(selectedAutopilotStrategy(strategies, "0xaaa"), strategies[0]);
 });

@@ -17,6 +17,7 @@ import { getTicker } from "@pulse/market";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
 import { recordV6Activity } from "./v6Store.js";
 import { executionPublicClient, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
+import { executionContractAddress } from "./executionContracts.js";
 
 type Network = "xlayer" | "base" | "arbitrum";
 type RegisteredOrder = {
@@ -55,37 +56,37 @@ const networks = {
     id: 196,
     rpc: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech",
     rpcFallback: () => process.env.X_LAYER_RPC_FALLBACK || "https://xlayerrpc.okx.com",
-    oracle: () => process.env.XLAYER_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.XLAYER_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.XLAYER_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.XLAYER_OKX_APPROVAL_ADDRESS,
-    ocoFactory: () => process.env.XLAYER_SPOT_ORDER_FACTORY_ADDRESS,
-    limitFactory: () => process.env.XLAYER_SPOT_LIMIT_FACTORY_ADDRESS,
-    bracketFactory: () => process.env.XLAYER_SPOT_BRACKET_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("xlayer", "oracleRouter"),
+    adapter: () => executionContractAddress("xlayer", "executionAdapter"),
+    router: () => executionContractAddress("xlayer", "okxRouter"),
+    spender: () => executionContractAddress("xlayer", "okxApproval"),
+    ocoFactory: () => executionContractAddress("xlayer", "spotFactory"),
+    limitFactory: () => executionContractAddress("xlayer", "spotLimitFactory"),
+    bracketFactory: () => executionContractAddress("xlayer", "spotBracketFactory"),
   },
   base: {
     id: 8453,
     rpc: () => process.env.BASE_RPC_URL || "https://mainnet.base.org",
     rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base",
-    oracle: () => process.env.BASE_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.BASE_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.BASE_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.BASE_OKX_APPROVAL_ADDRESS,
-    ocoFactory: () => process.env.BASE_SPOT_ORDER_FACTORY_ADDRESS,
-    limitFactory: () => process.env.BASE_SPOT_LIMIT_FACTORY_ADDRESS,
-    bracketFactory: () => process.env.BASE_SPOT_BRACKET_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("base", "oracleRouter"),
+    adapter: () => executionContractAddress("base", "executionAdapter"),
+    router: () => executionContractAddress("base", "okxRouter"),
+    spender: () => executionContractAddress("base", "okxApproval"),
+    ocoFactory: () => executionContractAddress("base", "spotFactory"),
+    limitFactory: () => executionContractAddress("base", "spotLimitFactory"),
+    bracketFactory: () => executionContractAddress("base", "spotBracketFactory"),
   },
   arbitrum: {
     id: 42161,
     rpc: () => process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
     rpcFallback: () => process.env.ARBITRUM_RPC_FALLBACK_URL || "https://arbitrum-one-rpc.publicnode.com",
-    oracle: () => process.env.ARBITRUM_ORACLE_ROUTER_ADDRESS,
-    adapter: () => process.env.ARBITRUM_EXECUTION_ADAPTER_ADDRESS,
-    router: () => process.env.ARBITRUM_OKX_ROUTER_ADDRESS,
-    spender: () => process.env.ARBITRUM_OKX_APPROVAL_ADDRESS,
-    ocoFactory: () => process.env.ARBITRUM_SPOT_ORDER_FACTORY_ADDRESS,
-    limitFactory: () => process.env.ARBITRUM_SPOT_LIMIT_FACTORY_ADDRESS,
-    bracketFactory: () => process.env.ARBITRUM_SPOT_BRACKET_FACTORY_ADDRESS,
+    oracle: () => executionContractAddress("arbitrum", "oracleRouter"),
+    adapter: () => executionContractAddress("arbitrum", "executionAdapter"),
+    router: () => executionContractAddress("arbitrum", "okxRouter"),
+    spender: () => executionContractAddress("arbitrum", "okxApproval"),
+    ocoFactory: () => executionContractAddress("arbitrum", "spotFactory"),
+    limitFactory: () => executionContractAddress("arbitrum", "spotLimitFactory"),
+    bracketFactory: () => executionContractAddress("arbitrum", "spotBracketFactory"),
   },
 } as const;
 const schema = z.object({

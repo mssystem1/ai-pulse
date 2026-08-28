@@ -95,6 +95,16 @@ export function averageKnownPnl(values: Array<number | null | undefined>) {
   return known.length ? known.reduce((sum, value) => sum + value, 0) / known.length : null;
 }
 
+export function selectedAutopilotStrategy<T extends { vault: string }>(
+  strategies: T[],
+  selectedVault: string,
+) {
+  if (!selectedVault) return undefined;
+  return strategies.find(
+    (item) => item.vault.toLowerCase() === selectedVault.toLowerCase(),
+  );
+}
+
 export type BalanceAmountState =
   | "empty"
   | "balance_unavailable"
