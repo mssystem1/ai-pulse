@@ -86,7 +86,7 @@ Autopilot is independent from manual Spot Trading. The trader chooses a market, 
 
 ### Private report recovery
 
-Paid reports are stored as private Blob objects and indexed by the paying wallet in KV. If a hosting configuration requires public Blob transport, PULSE encrypts the report body with authenticated AES-256-GCM before upload and refuses an unencrypted public configuration. A wallet signature creates a short-lived read-only history session; it cannot pay, trade, or authorize Autopilot. This makes report history available on desktop, iOS, Android, Mac, or another browser while retaining a same-device recovery fallback.
+Paid reports are stored as private Blob objects and indexed by the paying wallet in KV. If a hosting configuration requires public Blob transport, PULSE encrypts the report body with authenticated AES-256-GCM before upload and refuses an unencrypted public configuration. A wallet signature creates a short-lived report-access session that may open reports or retry an already-settled failure; it cannot create a payment, trade, or authorize Autopilot. This makes report history available on desktop, iOS, Android, Mac, or another browser while retaining a same-device recovery fallback.
 
 ### Risk Guard
 
@@ -385,7 +385,7 @@ sequenceDiagram
   API-->>Web: Report, stage history and normalized receipt
 ```
 
-The payment authorization is bound to network, asset, amount, payee, resource URL, and request hash. Replaying one authorization resolves to one idempotent job. A settled job whose deliverable failed can be retried within policy without a second payment. A five-minute wallet challenge creates a separate 15-minute, read-only report-history session for cross-device retrieval; that signature cannot pay or trade.
+The payment authorization is bound to network, asset, amount, payee, resource URL, and request hash. Replaying one authorization resolves to one idempotent job. A settled job whose deliverable failed can be retried within policy without a second payment. A five-minute wallet challenge creates a separate 15-minute report-history session for cross-device retrieval and receipt-bound recovery; that signature cannot create a payment or trade.
 
 ### Manual Spot and automatic protection
 
@@ -500,9 +500,10 @@ PULSE does not use PostgreSQL or another relational database. Production persist
 <ns>:payer-jobs:<payerDigest>            wallet report-history index
 
 <ns>:report:<reportId>                   Blob path, owner, checksum and creation time
+<ns>:report-body-fallback:<reportId>     bounded private paid-report fallback when Blob write fails
 <ns>:report-share:<tokenDigest>          revocable expiring share mapping
 <ns>:report-history-challenge:<digest>   one-use five-minute wallet challenge
-<ns>:report-history-session:<digest>     15-minute read-only wallet session
+<ns>:report-history-session:<digest>     15-minute report-access/recovery session
 
 pulse:v6:activity-map:<network>:<wallet> per-transaction Spot/Autopilot activity hash
 pulse:v6:activity:<network>:<wallet>     read-only legacy activity list used during migration
@@ -529,6 +530,7 @@ Memory stores exist only for local/unit use. A production capability response la
 - The KV report record contains the paying wallet, Blob path, SHA-256 checksum, private visibility, and creation time.
 - Private Blob reads bypass caches and verify the body checksum before JSON parsing.
 - If a deployment must use public Blob access, the body is encrypted with authenticated AES-256-GCM before upload; unencrypted public reports are rejected by configuration.
+- A bounded private-KV report-body fallback protects already-paid delivery when Blob rejects a write or is temporarily unavailable. It uses the report retention TTL and the same SHA-256 verification; Blob remains the primary artifact store.
 - Autopilot stores the canonical decision payload before execution and binds its hash to the vault action. Private Blob is preferred; configured private KV is the fail-closed evidence fallback.
 - Blob never stores the only current copy of a balance, active order, vault policy, position status, or P&L projection.
 
@@ -566,7 +568,7 @@ The browser also maintains a latest-request epoch. Starting Premium supersedes a
 - User wallet private keys and seed phrases never enter the API, KV, Blob, logs, or report payloads.
 - `TEST_WALLET_PRIVATE_KEY` and the restricted automation executor key are server/worker environment values only and are never exposed through `VITE_*`.
 - Provider keys, xAI credentials, Blob tokens, KV tokens, Telegram secrets, `CRON_SECRET`, and report encryption keys stay server-side.
-- Wallet-history nonces and sessions are hashed in keys and expire; they provide read-only access.
+- Wallet-history nonces and sessions are hashed in keys and expire; they can read reports and retry only an already-settled report job, never pay or trade.
 - Browser-announced activity can only be `pending`; confirmation is derived from a receipt whose sender matches the wallet.
 - Logs and metrics contain correlation IDs, stages, timings and outcome counts—not private report bodies or signing secrets.
 
@@ -635,7 +637,7 @@ Spot Trading and Autopilot are independent systems. A Spot report action never a
 │           ├── tradeAutomation.ts   deterministic Spot reconciliation/trigger worker
 │           ├── autopilotPolicy.ts   explicit entry, Hold and exit rule engine
 │           ├── autopilotAutomation.ts strategy/evidence/simulation/execution loop
-│           ├── reportHistoryAuth.ts wallet challenge and read-only history sessions
+│           ├── reportHistoryAuth.ts wallet challenge and scoped report recovery sessions
 │           ├── resilientKv.ts       bounded retry and recovering KV circuit
 │           ├── automationTick.ts    secret serverless scheduler entry and lease
 │           └── telegram.ts          webhook, checkout handoff and durable delivery

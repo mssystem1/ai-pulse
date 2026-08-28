@@ -46,3 +46,26 @@ it("fails closed when Arc live AI cost prices are not configured", () => {
     }
   }
 });
+
+it("defaults PULSE Blob access to public and rejects a private production override", () => {
+  const keys = ["STORAGE_PROVIDER", "BLOB_ACCESS", "BLOB_READ_WRITE_TOKEN", "KV_REST_API_URL", "KV_REST_API_TOKEN", "REPORT_ENCRYPTION_KEY"] as const;
+  const before = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  try {
+    process.env.STORAGE_PROVIDER = "memory";
+    delete process.env.BLOB_ACCESS;
+    assert.equal(loadConfig().BLOB_ACCESS, "public");
+
+    process.env.STORAGE_PROVIDER = "vercel_blob";
+    process.env.BLOB_ACCESS = "private";
+    process.env.BLOB_READ_WRITE_TOKEN = "test-blob-token";
+    process.env.KV_REST_API_URL = "https://example.upstash.io";
+    process.env.KV_REST_API_TOKEN = "test-kv-token";
+    process.env.REPORT_ENCRYPTION_KEY = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+    assert.throws(() => loadConfig(), /Invalid literal value/);
+  } finally {
+    for (const key of keys) {
+      const value = before[key];
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
+  }
+});

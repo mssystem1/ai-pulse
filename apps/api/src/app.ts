@@ -28,7 +28,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runPreparedSpotAnalysis, runPreparedV5Analysis } from "@pulse/analysis";
+import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -132,6 +132,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   arcBudget?: ArcBudgetStore;
   spotContext?: typeof buildMarketContext;
   automationTick?: Partial<AutomationTickDependencies>;
+  startDurableWorker?: boolean;
 } = {}) {
   const app = express();
   const polymarket = dependencies.polymarket || new PolymarketClient({
@@ -141,9 +142,10 @@ export function createApp(cfg: AppConfig, dependencies: {
     observer: recordProvider,
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
+  const shouldRunDurableWorker = dependencies.startDurableWorker !== false;
   let durableWorker: DurableJobWorker | undefined;
   const wakeWorker = () => {
-    void durableWorker?.notify();
+    if (shouldRunDurableWorker) void durableWorker?.notify();
   };
   const reportHistoryAuth = new ReportHistoryAuth(cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || buildMarketContext;
@@ -228,6 +230,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       grokModel: cfg.GROK_MODEL,
       network: cfg.X402_NETWORK,
       logo: cfg.logoUrl,
+      reportStorage: { provider: cfg.STORAGE_PROVIDER, blobAccess: cfg.STORAGE_PROVIDER === "vercel_blob" ? cfg.BLOB_ACCESS : null },
       dependencies: { kv: kvCircuitStatus() },
     });
   });
@@ -734,6 +737,25 @@ export function createApp(cfg: AppConfig, dependencies: {
     const token = String(req.header("PULSE-RECOVERY-TOKEN") || req.query.recoveryToken || "");
     return verifyRecoveryToken(job, token) ? job : false;
   };
+  const retrySettledReportJob = async (job: AnalysisJob) => {
+    if (job.reportId || job.stage === "completed" || job.stage === "completed_partial") {
+      return { status: 200, body: { job: publicJobView(job), reportReady: true } } as const;
+    }
+    if (!job.receiptId || job.receipt?.settlementResult !== "settled") {
+      return { status: 409, body: { error: "A settled receipt is required before report regeneration" } } as const;
+    }
+    const retryable = job.stage === "failed_retriable" || job.stage === "failed_terminal" || job.stage === "manual_reconciliation";
+    if (!retryable) {
+      // The job is already owned by the durable worker. Wake maintenance, but
+      // never enqueue a duplicate concurrent model call.
+      wakeWorker();
+      return { status: 202, body: { job: publicJobView(job), alreadyProcessing: true } } as const;
+    }
+    const queued = await persistence.jobs.transition(job.id, "fetching_context", "owner-requested receipt-bound recovery; no new payment");
+    await persistence.jobs.enqueue(job.id);
+    wakeWorker();
+    return { status: 202, body: { job: publicJobView(queued), retriedWithoutPayment: true } } as const;
+  };
   const asyncRoute = (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
     (req, res, next) => { void handler(req, res).catch(next); };
 
@@ -841,6 +863,17 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (!record || record.ownerWallet !== session.wallet) return res.status(404).json({ error: "Stored report not found" });
     return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record), job: publicJobView(job) });
   }));
+  app.post("/v1/report-history/:jobId/retry", asyncRoute(async (req, res) => {
+    const session = await historySession(req);
+    if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
+    const job = await persistence.jobs.get(String(req.params.jobId));
+    if (!job) return res.status(404).json({ error: "Report job not found" });
+    if (job.payer.toLowerCase() !== session.wallet || job.networkKey !== session.networkKey) {
+      return res.status(403).json({ error: "This report does not belong to the authenticated wallet and network" });
+    }
+    const outcome = await retrySettledReportJob(job);
+    return res.status(outcome.status).json(outcome.body);
+  }));
 
   // Job state is a live coordination resource. Browser ETags caused Safari to
   // keep replaying a stale 304 while the worker was progressing in KV, so no
@@ -879,23 +912,8 @@ export function createApp(cfg: AppConfig, dependencies: {
     const job = await authorizedJob(req);
     if (job === null) return res.status(404).json({ error: "Job not found" });
     if (job === false) return res.status(403).json({ error: "Valid PULSE-RECOVERY-TOKEN required" });
-    if (job.reportId || job.stage === "completed" || job.stage === "completed_partial") {
-      return res.json({ job: publicJobView(job), reportReady: true });
-    }
-    if (!job.receiptId || job.receipt?.settlementResult !== "settled") {
-      return res.status(409).json({ error: "A settled receipt is required before report regeneration" });
-    }
-    const retryable = job.stage === "failed_retriable" || job.stage === "failed_terminal" || job.stage === "manual_reconciliation";
-    if (!retryable) {
-      // The job is already owned by the durable worker. Wake maintenance, but
-      // never enqueue a duplicate concurrent model call.
-      wakeWorker();
-      return res.status(202).json({ job: publicJobView(job), alreadyProcessing: true });
-    }
-    const queued = await persistence.jobs.transition(job.id, "fetching_context", "owner-requested receipt-bound recovery; no new payment");
-    await persistence.jobs.enqueue(job.id);
-    wakeWorker();
-    return res.status(202).json({ job: publicJobView(queued), retriedWithoutPayment: true });
+    const outcome = await retrySettledReportJob(job);
+    return res.status(outcome.status).json(outcome.body);
   }));
 
   app.get("/v1/private/reports/:reportId", asyncRoute(async (req, res) => {
@@ -1078,7 +1096,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   const isArc = (req: express.Request) => (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey === "arc-testnet";
   const modelLimits = (tier: "standard" | "premium") => ({
     maxInputTokens: tier === "premium" ? cfg.GROK_MAX_INPUT_PREMIUM : cfg.GROK_MAX_INPUT_STANDARD,
-    maxOutputTokens: tier === "premium" ? cfg.GROK_MAX_OUTPUT_PREMIUM : cfg.GROK_MAX_OUTPUT_STANDARD,
+    maxOutputTokens: spotOutputTokenLimit(tier === "premium" ? "premium" : "base", tier === "premium" ? cfg.GROK_MAX_OUTPUT_PREMIUM : cfg.GROK_MAX_OUTPUT_STANDARD),
     reasoningEffort: tier === "premium" ? cfg.GROK_REASONING_PREMIUM : cfg.GROK_REASONING_STANDARD,
   });
   const predictionModelLimits = (tier: "standard" | "premium") => ({
@@ -1575,7 +1593,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     cfg.JOB_WORKER_CONCURRENCY,
     executePersistedJob,
   );
-  void durableWorker.start().catch((error) => console.error("Durable job worker failed to start", error));
+  if (shouldRunDurableWorker) {
+    void durableWorker.start().catch((error) => console.error("Durable job worker failed to start", error));
+  }
 
   const mv = cfg.methodologyVersion;
 

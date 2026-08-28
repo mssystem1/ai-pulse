@@ -5,10 +5,11 @@ import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 
 const account = privateKeyToAccount("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
-test("wallet signature creates a scoped, expiring, read-only report-history session", async () => {
+test("wallet signature creates a scoped, expiring report-access and recovery session", async () => {
   const auth = new ReportHistoryAuth();
   const now = Date.parse("2026-08-20T12:00:00.000Z");
   const challenge = await auth.issue(account.address, "arbitrum", now);
+  assert.match(challenge.message, /retry an already-settled report/);
   const signature = await account.signMessage({ message: challenge.message });
   const authorized = await auth.authorize(account.address, "arbitrum", challenge.nonce, signature, now + 1_000);
   assert.deepEqual(await auth.authenticate(authorized.sessionToken, now + 2_000), {

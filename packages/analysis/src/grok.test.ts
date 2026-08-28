@@ -52,7 +52,7 @@ describe("context-first Grok analysis", () => {
           calls += 1;
           const request = JSON.parse(String(init?.body)) as { max_tokens?: number; reasoning_effort?: string; response_format?: { type?: string; json_schema?: { name?: string; strict?: boolean } }; messages: Array<{ content: string }> };
           assert.match(request.messages[1].content, /BTC-USDT/);
-          assert.equal(request.max_tokens, 700);
+          assert.equal(request.max_tokens, 1_800);
           assert.equal(request.reasoning_effort, "none");
           assert.equal(request.response_format?.type, "json_schema");
           assert.equal(request.response_format?.json_schema?.strict, true);
@@ -74,6 +74,15 @@ describe("context-first Grok analysis", () => {
     assert.equal(result.analysis.headline, "Prepared context used");
     assert.equal(result.usage?.totalTokens, 120);
     assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "none" });
+  });
+
+  it("reports provider length termination before attempting to parse truncated JSON", async () => {
+    await assert.rejects(() => runPreparedSpotAnalysis({
+      apiKey: "test", baseUrl: "https://xai.invalid/v1", model: "grok-4.3",
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ finish_reason: "length", message: { content: '{"headline":"truncated' } }],
+      }), { status: 200 }),
+    }, { instId: "BTC-USDT", tier: "base", maxOutputTokens: 700 }, market), /1800-token limit/);
   });
 
   it("rejects an oversized spot prompt before calling xAI", async () => {

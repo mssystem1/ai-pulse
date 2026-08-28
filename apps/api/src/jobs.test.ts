@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { randomBytes } from "node:crypto";
-import { MemoryJobStore, MemoryReportStore, createPersistence, decryptReport, encryptReport, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type PaymentReceipt } from "./jobs.js";
+import { MemoryJobStore, MemoryReportStore, VercelBlobReportStore, createPersistence, decryptReport, encryptReport, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type PaymentReceipt, type ReportStoreDependencies } from "./jobs.js";
 
 const receipt = (id = "receipt-1"): PaymentReceipt => ({
   id, provider: "mock", network: "eip155:196", chainId: 196, asset: "0x3333333333333333333333333333333333333333",
@@ -190,6 +190,29 @@ describe("paid jobs and private reports", () => {
     const envelope = JSON.parse(encrypted) as { ciphertext: string };
     envelope.ciphertext = `${envelope.ciphertext.startsWith("A") ? "B" : "A"}${envelope.ciphertext.slice(1)}`;
     assert.throws(() => decryptReport(JSON.stringify(envelope), key));
+  });
+
+  it("retains a paid report privately in KV when Blob persistence fails", async () => {
+    const values = new Map<string, unknown>();
+    const redis = {
+      async get<T>(key: string) { return (values.get(key) as T | undefined) ?? null; },
+      async set(key: string, value: unknown) { values.set(key, value); return "OK"; },
+      async del(key: string) { return values.delete(key) ? 1 : 0; },
+    } as unknown as NonNullable<ReportStoreDependencies["redis"]>;
+    const originalWarn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const store = new VercelBlobReportStore(
+        "blob-token", "", "", 3_600, "test", "public", randomBytes(32).toString("base64url"),
+        { redis, putBlob: async () => { throw new Error("Blob access mode mismatch"); } },
+      );
+      const record = await store.save("0xABC", { paid: true, answer: 42 });
+      assert.match(record.blobPath, /^kv-report:/);
+      assert.deepEqual(await store.get(record.id), record);
+      assert.deepEqual(await store.read(record), { answer: 42, paid: true });
+    } finally {
+      console.warn = originalWarn;
+    }
   });
 
   it("creates opaque revocable report shares", async () => {

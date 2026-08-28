@@ -46,6 +46,13 @@ export type AnalysisResult = {
   analysisProfile: Readonly<{ mode: "live"; model: string; reasoningEffort: "none" | "low" }>;
 };
 
+export const SPOT_OUTPUT_TOKEN_FLOORS = Object.freeze({ base: 1_800, premium: 3_200 });
+
+export function spotOutputTokenLimit(tier: AnalysisTier, configured?: number): number {
+  const requested = Number.isFinite(configured) ? Math.max(0, Number(configured)) : 0;
+  return Math.max(SPOT_OUTPUT_TOKEN_FLOORS[tier], requested);
+}
+
 const SPOT_ANALYSIS_JSON_SCHEMA = {
   type: "object", additionalProperties: false,
   properties: {
@@ -227,6 +234,7 @@ export async function runPreparedSpotAnalysis(
   if (req.maxInputTokens && estimatedInputTokens > req.maxInputTokens) {
     throw new Error(`Prepared AI context exceeds input budget (${estimatedInputTokens} > ${req.maxInputTokens} estimated tokens)`);
   }
+  const maxOutputTokens = spotOutputTokenLimit(req.tier, req.maxOutputTokens);
 
   const body = {
     model: cfg.model,
@@ -236,7 +244,7 @@ export async function runPreparedSpotAnalysis(
     // compiled schema by name and otherwise keep returning the pre-Elliott V5
     // object even after the schema body changes.
     response_format: { type: "json_schema", json_schema: { name: `pulse_spot_${req.tier}_v6_elliott`, strict: true, schema: SPOT_ANALYSIS_JSON_SCHEMA } },
-    ...(req.maxOutputTokens ? { max_tokens: req.maxOutputTokens } : {}),
+    max_tokens: maxOutputTokens,
     messages: [
       { role: "system", content: sys },
       { role: "user", content: userText },
@@ -259,13 +267,17 @@ export async function runPreparedSpotAnalysis(
   }
 
   let parsed: {
-    choices?: Array<{ message?: { content?: string | Array<{ type: string; text?: string }> } }>;
+    choices?: Array<{ finish_reason?: string; message?: { content?: string | Array<{ type: string; text?: string }> } }>;
     usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; completion_tokens_details?: { reasoning_tokens?: number } };
   };
   try {
     parsed = JSON.parse(raw);
   } catch {
     throw new Error(`Grok API invalid JSON: ${raw.slice(0, 300)}`);
+  }
+
+  if (parsed.choices?.[0]?.finish_reason === "length") {
+    throw new Error(`Grok structured output reached its ${maxOutputTokens}-token limit before completing JSON`);
   }
 
   const content = parsed.choices?.[0]?.message?.content;

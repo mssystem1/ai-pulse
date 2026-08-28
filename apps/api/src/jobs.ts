@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Redis } from "@upstash/redis";
 import { kvClientResilienceOptions } from "./resilientKv.js";
-import { get as getBlob, put as putBlob } from "@vercel/blob";
+import { put as putBlob } from "@vercel/blob";
 
 export const JOB_STAGES = [
   "payment_authorized", "payment_verified", "payment_settled", "fetching_context",
@@ -525,45 +525,72 @@ export class MemoryReportStore implements ReportStore {
   async revokeShare(token: string) { return this.shares.delete(shareKey(token)); }
 }
 
+const KV_REPORT_FALLBACK_PREFIX = "kv-report:";
+const MAX_KV_REPORT_FALLBACK_BYTES = 512 * 1024;
+
+export type ReportStoreDependencies = Readonly<{
+  redis?: Pick<Redis, "get" | "set" | "del">;
+  putBlob?: typeof putBlob;
+  fetchImpl?: typeof fetch;
+}>;
+
 export class VercelBlobReportStore implements ReportStore {
-  private redis: Redis;
+  private redis: Pick<Redis, "get" | "set" | "del">;
+  private putBlob: typeof putBlob;
+  private fetchImpl: typeof fetch;
   constructor(
     private token: string,
     redisUrl: string,
     redisToken: string,
     private retentionSeconds = 7_776_000,
     private namespace = "pulse",
-    private access: "private" | "public" = "private",
+    private access: "public" = "public",
     private encryptionKey = "",
-  ) { this.redis = new Redis({ url: redisUrl, token: redisToken, ...kvClientResilienceOptions() }); }
+    dependencies: ReportStoreDependencies = {},
+  ) {
+    this.redis = dependencies.redis || new Redis({ url: redisUrl, token: redisToken, ...kvClientResilienceOptions() });
+    this.putBlob = dependencies.putBlob || putBlob;
+    this.fetchImpl = dependencies.fetchImpl || fetch;
+  }
   private recordKey(id: string) { return `${this.namespace}:report:${id}`; }
+  private fallbackBodyKey(id: string) { return `${this.namespace}:report-body-fallback:${id}`; }
   private shareRecordKey(token: string) { return `${this.namespace}:report-share:${shareKey(token)}`; }
   async save(ownerWallet: string, report: unknown) {
     const body = canonicalJson(report);
     const checksum = createHash("sha256").update(body).digest("hex");
     const id = randomUUID();
     const blobPath = `reports/${this.namespace.replace(/[^a-zA-Z0-9_-]/g, "-")}/${id}.json`;
-    const storedBody = this.access === "public" ? encryptReport(body, this.encryptionKey) : body;
-    const created = await putBlob(blobPath, storedBody, {
-      access: this.access, token: this.token, addRandomSuffix: false, allowOverwrite: false,
-      contentType: "application/json",
-    });
+    const storedBody = encryptReport(body, this.encryptionKey);
+    let persistedPath: string;
+    try {
+      const created = await this.putBlob(blobPath, storedBody, {
+        access: this.access, token: this.token, addRandomSuffix: false, allowOverwrite: false,
+        contentType: "application/json",
+      });
+      persistedPath = created.url;
+    } catch (error) {
+      const bodyBytes = Buffer.byteLength(body, "utf8");
+      if (bodyBytes > MAX_KV_REPORT_FALLBACK_BYTES) throw error;
+      // Paid delivery must not be lost because a Blob store is temporarily
+      // unavailable or its public/private mode was configured incorrectly.
+      // Upstash remains server-authenticated, private, checksum-verified and
+      // uses the same retention bound as the primary report record.
+      await this.redis.set(this.fallbackBodyKey(id), body, { ex: this.retentionSeconds });
+      persistedPath = `${KV_REPORT_FALLBACK_PREFIX}${id}`;
+      console.warn(`[report-store] Blob write failed; report ${id} was retained privately in KV fallback: ${error instanceof Error ? error.message : String(error)}`);
+    }
     const record = Object.freeze({
       id, ownerWallet: ownerWallet.toLowerCase(), visibility: "private" as const,
-      blobPath: this.access === "public" ? created.url : blobPath, checksum, createdAt: nowIso(),
+      blobPath: persistedPath, checksum, createdAt: nowIso(),
     });
     await this.redis.set(this.recordKey(id), record, { ex: this.retentionSeconds });
     return record;
   }
   async get(reportId: string) { return this.redis.get<StoredReport>(this.recordKey(reportId)); }
   async read(record: StoredReport) {
-    const payload = this.access === "public"
-      ? decryptReport(await this.readPublicBlob(record.blobPath), this.encryptionKey)
-      : await (async () => {
-          const result = await getBlob(record.blobPath, { access: "private", token: this.token, useCache: false });
-          if (!result?.stream) return "";
-          return new Response(result.stream).text();
-        })();
+    const payload = record.blobPath.startsWith(KV_REPORT_FALLBACK_PREFIX)
+      ? await this.redis.get<string>(this.fallbackBodyKey(record.id))
+      : decryptReport(await this.readPublicBlob(record.blobPath), this.encryptionKey);
     if (!payload) return null;
     const checksum = createHash("sha256").update(payload).digest("hex");
     if (checksum !== record.checksum) throw new Error("Stored report checksum mismatch");
@@ -573,7 +600,7 @@ export class VercelBlobReportStore implements ReportStore {
     let lastError: unknown;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+        const response = await this.fetchImpl(url, { signal: AbortSignal.timeout(15_000) });
         if (!response.ok) throw new Error(`Blob HTTP ${response.status}`);
         return await response.text();
       } catch (error) {
@@ -605,7 +632,7 @@ export type PersistenceConfig = Readonly<{
   JOB_STAGE_RETENTION_DAYS: number;
   REPORT_RETENTION_DAYS: number;
   PERSISTENCE_NAMESPACE?: string;
-  BLOB_ACCESS?: "private" | "public";
+  BLOB_ACCESS?: "public";
   REPORT_ENCRYPTION_KEY?: string;
 }>;
 
@@ -626,7 +653,7 @@ export function createPersistence(config: PersistenceConfig): {
         config.BLOB_READ_WRITE_TOKEN, config.KV_REST_API_URL, config.KV_REST_API_TOKEN,
         config.REPORT_RETENTION_DAYS * 86_400,
         config.PERSISTENCE_NAMESPACE || "pulse",
-        config.BLOB_ACCESS || "private",
+        config.BLOB_ACCESS || "public",
         config.REPORT_ENCRYPTION_KEY || "",
       )
     : new MemoryReportStore();

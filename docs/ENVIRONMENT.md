@@ -149,8 +149,8 @@ This table is the operational checklist for variables that require a choice. Fix
 | `STORAGE_PROVIDER` | `memory` or `vercel_blob` | `memory` for isolated testing, or configured Blob for recovery E2E | `vercel_blob` | Report-body persistence. Blob requires its token and KV metadata. |
 | `QUEUE_PROVIDER` | `memory` or `upstash_kv` | `memory` for one process, or Upstash for durability E2E | `upstash_kv` | Jobs, locks, receipts, idempotency, and shared budgets. |
 | `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates jobs, reports, history, budgets and cron keys. V6 trading keys use a stable prefix, so never reuse the production KV database for localhost tests. |
-| `BLOB_ACCESS` | `private` or `public` | Match store | Prefer `private` | Public Blob requires a valid `REPORT_ENCRYPTION_KEY`. |
-| `REPORT_ENCRYPTION_KEY` | Base64url 32-byte key or empty | Required only for public Blob | Same | Encrypts report bodies stored in public Blob. |
+| `BLOB_ACCESS` | `public` | `public` | `public` | The supplied PULSE Blob store is public; report bodies are encrypted before upload. |
+| `REPORT_ENCRYPTION_KEY` | Base64url 32-byte key | Required for the supplied public Blob | Same stable key | Encrypts report bodies stored in public Blob. Changing it makes earlier encrypted reports unreadable. |
 | `REPORT_DEFAULT_VISIBILITY` | `private` | `private` | `private` | Default paid-report access policy. |
 | `REPORT_SHARE_LINK_ENABLED` | `0` or `1` | Product choice | Product choice | Allows explicit revocable sharing; it never makes reports public by default. |
 | `AUTOMATION_WORKER_ENABLED` | `0` or `1` | `1` only during live acceptance | `1` on the single Railway worker | Enables guarded Spot reconciliation and Autopilot evaluation. Do not also run a Vercel cron. |
@@ -285,7 +285,7 @@ Use `ARC_AI_MODE=fixture` only for a pre-release plumbing canary that is explici
 
 Fused, divergence, and event-risk flags remain documented for backward-compatible API operation, but the current product strategy keeps all three disabled. The web product exposes only base and premium prediction analysis.
 
-AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. `GROK_MAX_OUTPUT_STANDARD` / `GROK_MAX_OUTPUT_PREMIUM` remain the hard `max_tokens` values for Global Market reports. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
+AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. Global Market V6 enforces effective output floors of `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`; this prevents the strict Elliott-wave JSON object from being cut off before its closing braces. Higher configured values remain valid. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
 
 Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=upstash_kv`, these counters are shared across instances and survive deployments; `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
 
@@ -366,17 +366,18 @@ REDIS_URL=<same Redis URL when required by a library>
 DATABASE_URL=
 ```
 
-`DATABASE_URL` remains empty for this design. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Upstash job complete with the Blob URL and checksum.
+`DATABASE_URL` remains empty for this design. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Upstash job complete with the Blob URL and checksum. If that bounded Blob write fails after payment—for example, during an access-mode mismatch or transient outage—the API stores report bodies up to 512 KiB in a private, retention-bound KV fallback and still verifies the SHA-256 checksum on read. This is a paid-delivery safety net, not the normal artifact path.
 
 `PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain stable `pulse:v6:*` keys to preserve existing mainnet continuity. Therefore local, canary, and production deployments must use separate Upstash databases; a different namespace alone is not sufficient isolation for V6 trading tests.
 
-For a native-private Vercel Blob store, keep `BLOB_ACCESS=private` and leave `REPORT_ENCRYPTION_KEY` empty. If the existing store is public, set `BLOB_ACCESS=public` and provide a server-only base64url encoding of 32 random bytes in `REPORT_ENCRYPTION_KEY`; PULSE then stores only AES-256-GCM ciphertext publicly and verifies the decrypted plaintext checksum. The current supplied Blob token was probed as a public store, so it requires this encrypted mode or replacement with a private-store token.
+The supplied PULSE Blob store is public. Set `BLOB_ACCESS=public` and provide a server-only base64url encoding of 32 random bytes in `REPORT_ENCRYPTION_KEY`; PULSE stores only AES-256-GCM ciphertext in Blob and verifies the decrypted plaintext checksum. Keep the same encryption key across deployments so retained reports remain readable.
 
 ## Approved report privacy and paid-failure policy
 
-Environment settings:
+Environment settings for the supplied public store:
 
-    BLOB_ACCESS=private
+    BLOB_ACCESS=public
+    REPORT_ENCRYPTION_KEY=<BASE64URL_32_BYTE_REPORT_ENCRYPTION_KEY>
     REPORT_DEFAULT_VISIBILITY=private
     REPORT_SHARE_LINK_ENABLED=1
     PAID_REGENERATION_MAX_ATTEMPTS=2

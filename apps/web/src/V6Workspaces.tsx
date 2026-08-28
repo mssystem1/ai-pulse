@@ -7481,12 +7481,15 @@ export function DocsWorkspace() {
                   <b>Paid report history</b>.
                 </li>
                 <li>
-                  Press <b>Sync with wallet</b> and sign the read-only message.
-                  It cannot pay or trade.
+                  Press <b>Sync with wallet</b> and sign the report-access
+                  message. It can reopen reports and retry an already-settled
+                  failure, but it cannot create a payment or trade.
                 </li>
                 <li>
-                  Choose any indexed report and press <b>Open</b>. The private
-                  Blob payload is returned only after wallet authentication.
+                  Choose a completed report and press <b>Open</b>. If a row is
+                  marked failed, press <b>Retry</b>; PULSE reuses its settled
+                  receipt without charging again. The private report payload is
+                  returned only after wallet authentication.
                 </li>
               </ol>
               <div className="docs-callout">
@@ -7501,7 +7504,7 @@ export function DocsWorkspace() {
               </div>
             </div>
             <div className="recovery-diagram">
-              <span>wallet signs read-only challenge</span>
+              <span>wallet signs report-access challenge</span>
               <i>→</i>
               <span>KV wallet index</span>
               <i>→</i>

@@ -40,7 +40,7 @@ export class ReportHistoryAuth {
       `Nonce: ${nonce}`,
       `Expires: ${new Date(expiresAt).toISOString()}`,
       "",
-      "Read-only access. This does not authorize payment or trading.",
+      "Report access and receipt-bound recovery only. This may retry an already-settled report; it cannot authorize a new payment or trading.",
     ].join("\n");
     const challenge = { wallet: wallet.toLowerCase(), networkKey, nonce, message, expiresAt } satisfies Challenge;
     await this.set(this.challengeKey(nonce), challenge, 300);

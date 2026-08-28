@@ -103,9 +103,15 @@ AUTOMATION_WORKER_ENABLED=1
 AUTOMATION_EXECUTOR_PRIVATE_KEY=<dedicated-restricted-executor-key>
 
 STORAGE_PROVIDER=vercel_blob
-BLOB_ACCESS=private
+# The supplied PULSE store is public transport with server-side AES-GCM.
+BLOB_ACCESS=public
+REPORT_ENCRYPTION_KEY=<BASE64URL_32_BYTE_REPORT_ENCRYPTION_KEY>
 QUEUE_PROVIDER=upstash_kv
 PERSISTENCE_NAMESPACE=pulse:production
+
+# V6 Global reports require enough room to complete the strict Elliott schema.
+GROK_MAX_OUTPUT_STANDARD=1800
+GROK_MAX_OUTPUT_PREMIUM=3200
 ```
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
@@ -117,7 +123,9 @@ Important Railway rules:
 - Keep `ENABLE_SERVER_PAY=0`; production users sign payment and trading transactions in their own wallets.
 - Keep `X402_MOCK=0`.
 - `PAY_TO_ADDRESS` must be a deliberately verified non-zero seller address.
-- `REPORT_ENCRYPTION_KEY` stays empty with a native private Blob store. If a public Blob store is intentionally retained, use the encrypted-public-store configuration documented in [`ENVIRONMENT.md`](ENVIRONMENT.md).
+- The supplied PULSE Blob store is public, so Railway must use `BLOB_ACCESS=public` with the same server-only 32-byte `REPORT_ENCRYPTION_KEY` used for all report reads. Do not change this access mode during deployment.
+- Production startup fails closed before accepting traffic if `STORAGE_PROVIDER=vercel_blob` is combined with any Blob access mode other than `public`, or if the encryption key is missing or invalid.
+- Do not reduce `GROK_MAX_OUTPUT_STANDARD` below `1800` or `GROK_MAX_OUTPUT_PREMIUM` below `3200`. The runtime clamps obsolete lower values, but the environment should reflect the actual cost ceiling used by V6 reports.
 - `DATABASE_URL` remains empty. PULSE uses KV and Blob, not PostgreSQL.
 - Leave `CRON_SECRET` empty in this Railway topology.
 
@@ -289,6 +297,8 @@ Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` va
 | Analysis works but automation does not | Worker disabled, role missing, contract mismatch, no native gas or kill switch active | Check the automation activation gate and logs before retrying. |
 | Browser says API offline | Wrong build-time `VITE_API_URL`, failed Railway health or TLS/CORS issue | Open Railway `/healthz`, compare the exact API origin, then rebuild Vercel. |
 | Reports or dashboards disappear | Vercel and Railway point to different KV/Blob resources or namespaces | Verify Railway storage variables; Vercel web must not own authoritative storage. |
+| Paid report reaches `failed terminal` or `manual reconciliation` with `Cannot use private access on a public store` | Railway `BLOB_ACCESS` does not match the Vercel Blob store | For the supplied public store, set `BLOB_ACCESS=public` and the stable server-only `REPORT_ENCRYPTION_KEY`; redeploy, sign into Paid report history and press **Retry**. The settled receipt is reused and no second payment occurs. |
+| Global report logs show `Unterminated string` near the end of Grok JSON | Obsolete Global output limits truncated the strict V6 schema | Set `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`, redeploy, then retry the settled job from report history. |
 
 ## Alternative: all-in-one Vercel serverless
 

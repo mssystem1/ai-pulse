@@ -37,7 +37,7 @@ An alert configuration file in Git does not configure an external notification d
 
 Run `npm run readiness:upstash` against each deployment's server-side environment. It uses a random isolated namespace, proves atomic receipt enqueue, worker claim, lease heartbeat, atomic completion linkage, acknowledgement, and an empty final queue, then deletes only the exact temporary keys it created.
 
-Run `npm run readiness:blob` to prove a private Blob write, authenticated read, and checksum match. The probe deletes only its random temporary object in a `readiness/` prefix.
+Run `npm run readiness:blob` to prove an encrypted public-Blob write, authenticated decryption, and checksum match. The probe deletes only its random temporary object in a `readiness/` prefix.
 8. Enable `BAZAAR_DISCOVERABLE=1` only for a deployment that uses CDP verify and settle. Indexing occurs after successful settlement, not after verify.
 
 ## Required gates per network
