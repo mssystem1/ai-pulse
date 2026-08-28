@@ -1,0 +1,34 @@
+{
+  "name": "@pulse/contracts",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/compile.mjs",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "preflight": "npm run build && node scripts/preflight.mjs",
+    "deploy:xlayer": "npm run build && node scripts/deploy.mjs xlayer",
+    "deploy:base": "npm run build && node scripts/deploy.mjs base",
+    "deploy:arbitrum": "npm run build && node scripts/deploy.mjs arbitrum",
+    "verify:xlayer": "node scripts/verify.mjs xlayer",
+    "verify:base": "node scripts/verify.mjs base",
+    "verify:arbitrum": "node scripts/verify.mjs arbitrum",
+    "certify": "node scripts/certify.mjs",
+    "configure:mainnets": "node scripts/configure.mjs",
+    "configure:routers": "node scripts/configure-routers.mjs",
+    "deploy:adapter-v2": "node scripts/deploy-adapter-v2.mjs",
+    "verify:adapter-v2": "node scripts/verify-adapter-v2.mjs",
+    "deploy:v2:xlayer": "npm run build && node scripts/deploy-v2.mjs xlayer",
+    "deploy:v2:base": "npm run build && node scripts/deploy-v2.mjs base",
+    "deploy:v2:arbitrum": "npm run build && node scripts/deploy-v2.mjs arbitrum",
+    "verify:v2:xlayer": "node scripts/verify-v2.mjs xlayer",
+    "verify:v2:base": "node scripts/verify-v2.mjs base",
+    "verify:v2:arbitrum": "node scripts/verify-v2.mjs arbitrum"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.7",
+    "hardhat": "^3.13.0",
+    "solc": "0.8.26",
+    "viem": "^2.55.5"
+  }
+}

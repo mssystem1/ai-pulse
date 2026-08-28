@@ -1,0 +1,423 @@
+{
+  "release": "pulse-v6.2.0",
+  "network": "arbitrum",
+  "chainId": 42161,
+  "deployer": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "deployedAt": "2026-08-20T10:30:21.098Z",
+  "contracts": {
+    "registry": {
+      "address": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "txHash": "0x2e5e63a1ca1800e2376a85c152dbdbede9f2693c324a7407d3934be158ec4cbb",
+      "blockNumber": "496484565"
+    },
+    "oracleRouter": {
+      "address": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "txHash": "0x10d62b0db296c6b922ae7ac72644e158c09ba4f543f71cfbffacb80e82c794e2",
+      "blockNumber": "496484606"
+    },
+    "executionAdapter": {
+      "address": "0x24eb07fdde101420dd9bf994674eee6043c99057",
+      "txHash": "0x1079ce5a32471564074cbed9b3714c1f93d566d1d4dc85ae064b5bf99235bbab",
+      "blockNumber": "498232805",
+      "version": "v2"
+    },
+    "spotFactory": {
+      "address": "0x8f34357586bbb2c74d46b68ac71e8238bb3d7f63",
+      "txHash": "0x902224011b77c574935e6b5ca3be2fff28a0af78bdb783112fc4762f63aa6a8a",
+      "blockNumber": "496491743"
+    },
+    "autopilotFactory": {
+      "address": "0x45ba7d5282d0df187803f7f64ce9d7b8dbb4e8ed",
+      "txHash": "0x0f1a794b3efb4d3a51087d05b80ac76a6b3c516030ef54c34c02948ee3217e37",
+      "blockNumber": "496491785"
+    },
+    "spotBracketFactory": {
+      "address": "0x80196239a939c4664cd1a12de3194c92685a929a",
+      "txHash": "0x6913937ab5a176d0767ad5367ba02ef1dae56407ffe8d55bfdca5fb0cac171c5",
+      "blockNumber": "497178845"
+    }
+  },
+  "configurationTransactions": {
+    "allowAdapter": "0x2b559cf1eadcb60fd271fd0f8db7de72de76c5755852dd87a67db6ee0dd1c366"
+  },
+  "verification": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T10:30:45.304Z",
+    "results": {
+      "registry": {
+        "status": "verified",
+        "address": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+        "verificationId": "137d37ce-6111-441d-92b6-7f08ff06d6e6",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "137d37ce-6111-441d-92b6-7f08ff06d6e6",
+          "jobStartTime": "2026-08-20T10:30:29Z",
+          "jobFinishTime": "2026-08-20T10:30:29Z",
+          "compilationTime": "95",
+          "externalVerifications": {
+            "etherscan": {
+              "verificationId": "gbw4vgetjteudjz2zthxn4hsyaist5ts7qpsdlvcfdg3xyfcrw",
+              "statusUrl": "https://api.etherscan.io/v2/api?chainid=42161&module=contract&action=checkverifystatus&guid=gbw4vgetjteudjz2zthxn4hsyaist5ts7qpsdlvcfdg3xyfcrw",
+              "explorerUrl": "https://arbiscan.io//address/0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07",
+              "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=42161&module=contract&action=getabi&address=0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07"
+            },
+            "blockscout": {
+              "verificationId": "e54dc99228463dad2c4f2762c9e1baf2d6f2ee076a86d745",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=e54dc99228463dad2c4f2762c9e1baf2d6f2ee076a86d745",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07",
+            "verifiedAt": "2026-08-20T10:30:29Z",
+            "matchId": "43870879"
+          }
+        }
+      },
+      "oracleRouter": {
+        "status": "verified",
+        "address": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+        "verificationId": "dea8a2ed-b64e-472b-bd9f-6585de7f4713",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "dea8a2ed-b64e-472b-bd9f-6585de7f4713",
+          "jobStartTime": "2026-08-20T10:30:32Z",
+          "jobFinishTime": "2026-08-20T10:30:32Z",
+          "compilationTime": "125",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "c2cf8dd0ba67142c539053c51fc1da9cc52e1af36a86d748",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=c2cf8dd0ba67142c539053c51fc1da9cc52e1af36a86d748",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0xC2CF8Dd0ba67142C539053C51fc1Da9cC52e1af3",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0xC2CF8Dd0ba67142C539053C51fc1Da9cC52e1af3"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0xC2CF8Dd0ba67142C539053C51fc1Da9cC52e1af3",
+            "verifiedAt": "2026-08-20T10:30:32Z",
+            "matchId": "43870880"
+          }
+        }
+      },
+      "executionAdapter": {
+        "status": "verified",
+        "address": "0xa4546529b1174765d4d8e256c951365359c853fa",
+        "verificationId": "1914f44b-5aff-402a-a4af-b61f95e24b30",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "1914f44b-5aff-402a-a4af-b61f95e24b30",
+          "jobStartTime": "2026-08-20T10:30:34Z",
+          "jobFinishTime": "2026-08-20T10:30:34Z",
+          "compilationTime": "247",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "a4546529b1174765d4d8e256c951365359c853fa6a86d74a",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=a4546529b1174765d4d8e256c951365359c853fa6a86d74a",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0xa4546529b1174765d4D8e256C951365359C853FA",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0xa4546529b1174765d4D8e256C951365359C853FA"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0xa4546529b1174765d4D8e256C951365359C853FA",
+            "verifiedAt": "2026-08-20T10:30:34Z",
+            "matchId": "43870881"
+          }
+        }
+      },
+      "spotFactory": {
+        "status": "verified",
+        "address": "0x951ac8cb1524a7856b2940966ab9751c2259af63",
+        "verificationId": "f0201f8c-2bf6-44e8-b4df-ac0db062319d",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "f0201f8c-2bf6-44e8-b4df-ac0db062319d",
+          "jobStartTime": "2026-08-20T10:30:36Z",
+          "jobFinishTime": "2026-08-20T10:30:38Z",
+          "compilationTime": "476",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "951ac8cb1524a7856b2940966ab9751c2259af636a86d74e",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=951ac8cb1524a7856b2940966ab9751c2259af636a86d74e",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0x951AC8cB1524A7856B2940966AB9751c2259aF63",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0x951AC8cB1524A7856B2940966AB9751c2259aF63"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0x951AC8cB1524A7856B2940966AB9751c2259aF63",
+            "verifiedAt": "2026-08-20T10:30:38Z",
+            "matchId": "43870888"
+          }
+        }
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0xba6f5fad746d23881aa33bd306072d680bd1cb68",
+        "verificationId": "7f40ecaf-7174-4698-a418-341aca808321",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "7f40ecaf-7174-4698-a418-341aca808321",
+          "jobStartTime": "2026-08-20T10:30:38Z",
+          "jobFinishTime": "2026-08-20T10:30:41Z",
+          "compilationTime": "596",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "ba6f5fad746d23881aa33bd306072d680bd1cb686a86d751",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=ba6f5fad746d23881aa33bd306072d680bd1cb686a86d751",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0xba6f5faD746d23881AA33Bd306072D680bD1CB68",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0xba6f5faD746d23881AA33Bd306072D680bD1CB68"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0xba6f5faD746d23881AA33Bd306072D680bD1CB68",
+            "verifiedAt": "2026-08-20T10:30:41Z",
+            "matchId": "43870897"
+          }
+        }
+      }
+    }
+  },
+  "certification": {
+    "certifiedAt": "2026-08-20T12:22:44.084Z",
+    "rpc": "https://arb1.arbitrum.io/rpc",
+    "blockNumber": "496511880",
+    "adapterApproved": true,
+    "keeperApproved": true,
+    "executorApproved": true,
+    "routerApproved": true,
+    "immutableWiring": true,
+    "codeHashes": {
+      "registry": "0xebc0fd24abea41ba1cafcb3fd23e396c9ff46e8d7a156aa15d0cf3dcb2567cc4",
+      "oracleRouter": "0x82d6923e468eb80d5e7e86e2257da9abe8dc71d0d1cc4644452d1ab6b7456c6e",
+      "executionAdapter": "0xb5c488c1c1f68eb2b90b2c5d0ac86abb71924963953f8194383e35418bc3dd84",
+      "spotFactory": "0x71cbb3f5f7e73e1110fbede66258c4e770a132960ffe1211c2dc93d35633d257",
+      "autopilotFactory": "0x79c38e7c90af6a7210adeb1aedec9fbe6e2786ec847c2be6fc02fd55f38a43c8"
+    }
+  },
+  "configuration": {
+    "configuredAt": "2026-08-20T10:36:29.370Z",
+    "keeper": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "executor": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "approvedRouter": "0x7CF6b330b437E9fb432B1400DE17B03357Cf049A",
+    "transactions": [
+      "0xed7a36089d67fb124685007b3abd0fd56e4085d4395f6c0c8148af58c627b06e",
+      "0x48678af44835bc5b91ad64f5e1c9504a912c68de6c4f8affacacbdd5335f54f1",
+      "0xc7035c5471bebf57388d059c2c439aa0af543001b1e2ad91cfe208e73688f8b3"
+    ]
+  },
+  "previousFactories": [
+    {
+      "version": "pulse-v6.0.0",
+      "spotFactory": {
+        "address": "0x951ac8cb1524a7856b2940966ab9751c2259af63",
+        "txHash": "0xa551c7acb067ea06c525197523969309f4ecfdad8bbae147bad101d4c599b979",
+        "blockNumber": "496484688"
+      },
+      "autopilotFactory": {
+        "address": "0xba6f5fad746d23881aa33bd306072d680bd1cb68",
+        "txHash": "0x8d92ee78889a00b66e35c805e470b9542011a6aefce0b2c8033377ecec86194d",
+        "blockNumber": "496484729"
+      },
+      "replacedAt": "2026-08-20T10:59:29.150Z"
+    }
+  ],
+  "v2": {
+    "guardrails": [
+      "asset allowlist",
+      "oracle-valued trade and exposure caps",
+      "slippage and daily-loss bounds",
+      "cooldown and expiry",
+      "nonce and policy version",
+      "owner-only recovery"
+    ],
+    "conditionalSpot": [
+      "buy/sell trigger direction",
+      "minimum output",
+      "batch cancel"
+    ]
+  },
+  "verificationV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T11:00:57.182Z",
+    "results": {
+      "spotFactory": {
+        "status": "already_verified",
+        "address": "0x8f34357586bbb2c74d46b68ac71e8238bb3d7f63"
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0x45ba7d5282d0df187803f7f64ce9d7b8dbb4e8ed",
+        "verificationId": "c139f552-259f-4640-8a0a-ea1a0fcef10e",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "c139f552-259f-4640-8a0a-ea1a0fcef10e",
+          "jobStartTime": "2026-08-20T11:00:42Z",
+          "jobFinishTime": "2026-08-20T11:00:52Z",
+          "compilationTime": "4722",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "45ba7d5282d0df187803f7f64ce9d7b8dbb4e8ed6a86de65",
+              "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=45ba7d5282d0df187803f7f64ce9d7b8dbb4e8ed6a86de65",
+              "explorerUrl": "https://arbitrum.blockscout.com//address/0x45Ba7d5282D0dF187803F7F64cE9d7b8DBb4E8ED",
+              "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0x45Ba7d5282D0dF187803F7F64cE9d7b8DBb4E8ED"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "42161",
+            "address": "0x45Ba7d5282D0dF187803F7F64cE9d7b8DBb4E8ED",
+            "verifiedAt": "2026-08-20T11:00:53Z",
+            "matchId": "43871854"
+          }
+        }
+      }
+    }
+  },
+  "bracket": {
+    "model": "OTOCO",
+    "phases": [
+      "pending entry",
+      "protected TP/SL",
+      "executed or owner-cancelled"
+    ],
+    "ownerRecovery": true,
+    "keeperMayNotChangePolicy": true
+  },
+  "verificationBracket": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-22T10:42:54.834Z",
+    "result": {
+      "status": "verified",
+      "address": "0x80196239a939c4664cd1a12de3194c92685a929a",
+      "verificationId": "f04aa78e-866e-450d-b781-99980f4af05e",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "f04aa78e-866e-450d-b781-99980f4af05e",
+        "jobStartTime": "2026-08-22T10:42:39Z",
+        "jobFinishTime": "2026-08-22T10:42:51Z",
+        "compilationTime": "5554",
+        "externalVerifications": {
+          "etherscan": {
+            "verificationId": "wsgtmkuwvanlcb86jfpwcypu8zidmf7ugnvdtftmnf59qsvtj6",
+            "statusUrl": "https://api.etherscan.io/v2/api?chainid=42161&module=contract&action=checkverifystatus&guid=wsgtmkuwvanlcb86jfpwcypu8zidmf7ugnvdtftmnf59qsvtj6",
+            "explorerUrl": "https://arbiscan.io//address/0x80196239A939c4664cd1A12De3194c92685a929a",
+            "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=42161&module=contract&action=getabi&address=0x80196239A939c4664cd1A12De3194c92685a929a"
+          },
+          "blockscout": {
+            "verificationId": "80196239a939c4664cd1a12de3194c92685a929a6a897d2b",
+            "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=80196239a939c4664cd1a12de3194c92685a929a6a897d2b",
+            "explorerUrl": "https://arbitrum.blockscout.com//address/0x80196239A939c4664cd1A12De3194c92685a929a",
+            "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0x80196239A939c4664cd1A12De3194c92685a929a"
+          }
+        },
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "42161",
+          "address": "0x80196239A939c4664cd1A12De3194c92685a929a",
+          "verifiedAt": "2026-08-22T10:42:51Z",
+          "matchId": "45329004"
+        }
+      }
+    }
+  },
+  "routerUpgrade": {
+    "configuredAt": "2026-08-25T12:15:05.242Z",
+    "router": "0x09f94b5fc68e227c323a6fbae3bd98c97fd8c849",
+    "adapter": "0xa4546529b1174765d4d8e256c951365359c853fa",
+    "transaction": "0xe34572eabc92d3605f7e8cacf46001cf25f59bf3a25e0c81491fcd57ebb908ba",
+    "verifiedOnchain": true
+  },
+  "previousExecutionAdapters": [
+    {
+      "address": "0xa4546529b1174765d4d8e256c951365359c853fa",
+      "txHash": "0x5e4ce5fce729a9f40bdff59811329f0ffed513e33c4ff996d2edb388d29fc793",
+      "blockNumber": "496484647"
+    }
+  ],
+  "executionAdapterV2": {
+    "deployedAt": "2026-08-25T12:22:18.188Z",
+    "router": "0x09f94b5fc68e227c323a6fbae3bd98c97fd8c849",
+    "spender": "0x70cBb871E8f30Fc8Ce23609E9E0Ea87B6b222F58",
+    "allowAdapterTx": "0x677f19be6acee4483be2bb98ffc1d4c3de562644fcc73ab914cfb5c9a58e77fe",
+    "routerTx": "0x93e21693d99ed2894fc1c0833853494eaec438aea4ed2b41efb1377a2ea4835c",
+    "spenderTx": "0x5acb555ff957c4c29bbb2dd43f2c15574696a941b094176f9f5dc9ea3b1ccabd",
+    "verifiedOnchain": true
+  },
+  "verificationAdapterV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-25T12:23:18.355Z",
+    "result": {
+      "status": "verified",
+      "address": "0x24eb07fdde101420dd9bf994674eee6043c99057",
+      "verificationId": "693ba2bd-1dca-45b6-b7c7-7ab93defd685",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "693ba2bd-1dca-45b6-b7c7-7ab93defd685",
+        "jobStartTime": "2026-08-25T12:23:12Z",
+        "jobFinishTime": "2026-08-25T12:23:13Z",
+        "compilationTime": "601",
+        "externalVerifications": {
+          "etherscan": {
+            "error": "Daily limit of 500 source code submissions reached"
+          },
+          "blockscout": {
+            "verificationId": "24eb07fdde101420dd9bf994674eee6043c990576a8d8933",
+            "statusUrl": "https://arbitrum.blockscout.com/api?module=contract&action=checkverifystatus&chainid=42161&guid=24eb07fdde101420dd9bf994674eee6043c990576a8d8933",
+            "explorerUrl": "https://arbitrum.blockscout.com//address/0x24eb07fdDE101420Dd9Bf994674EEE6043C99057",
+            "contractApiUrl": "https://arbitrum.blockscout.com/api?module=contract&action=getabi&chainid=42161&address=0x24eb07fdDE101420Dd9Bf994674EEE6043C99057"
+          }
+        },
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "42161",
+          "address": "0x24eb07fdDE101420Dd9Bf994674EEE6043C99057",
+          "verifiedAt": "2026-08-25T12:23:13Z",
+          "matchId": "46816521"
+        }
+      }
+    }
+  }
+}

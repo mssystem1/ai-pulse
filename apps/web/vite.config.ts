@@ -23,6 +23,7 @@ export default defineConfig({
       "/healthz": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/mcp": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/brand": { target: "http://127.0.0.1:4000", changeOrigin: true },
+      "/guides": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/api": {
         target: "http://127.0.0.1:4000",
         changeOrigin: true,

@@ -1,3 +1,5 @@
 User-agent: *
 Allow: /
 
+Sitemap: https://www.ai-pulse.tech/sitemap.xml
+

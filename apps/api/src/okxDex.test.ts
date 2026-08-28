@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
-import { createOkxDexHeaders, createOkxSignature } from "./okxDex.js";
+import { createOkxDexHeaders, createOkxSignature, matchesUnderlyingToken } from "./okxDex.js";
 
 test("OKX signing includes the exact path and query in the prehash", () => {
   const timestamp = "2026-08-03T12:34:56.789Z";
@@ -34,4 +34,13 @@ test("OKX DEX headers do not require a separate project ID", () => {
     OKX_SECRET_KEY: "secret",
     OKX_PASSPHRASE: "passphrase",
   }, new Date().toISOString(), "GET", "/api/v6/dex/aggregator/quote"));
+});
+
+test("DeFi products must contain the exact selected-chain execution token", () => {
+  const baseCbBtc = "0xcbb7c0000ab88b473b1f5afd9ef808440eed33bf";
+  const underlying = { tokenSymbol: "BTC", tokenAddress: baseCbBtc.toUpperCase() };
+
+  assert.equal(matchesUnderlyingToken(underlying, "cbBTC", baseCbBtc), true);
+  assert.equal(matchesUnderlyingToken(underlying, "BTC", "0x0000000000000000000000000000000000000001"), false);
+  assert.equal(matchesUnderlyingToken(underlying, "BTC"), true);
 });

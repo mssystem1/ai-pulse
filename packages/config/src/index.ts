@@ -95,16 +95,16 @@ const EnvSchema = z.object({
   X_LAYER_RPC: z.string().default("https://rpc.xlayer.tech"),
   X_LAYER_RPC_FALLBACK: z.string().default("https://xlayerrpc.okx.com"),
   BASE_RPC_URL: z.string().url().default("https://mainnet.base.org"),
-  BASE_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default(""),
+  BASE_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default("https://base-rpc.publicnode.com"),
   ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
-  ARBITRUM_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default(""),
+  ARBITRUM_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default("https://arbitrum-one-rpc.publicnode.com"),
   ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
   ARC_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default(""),
   PRICE_TOKEN_SCAN: z.coerce.number().default(0.10),
   PRICE_WALLET_SCAN: z.coerce.number().default(0.01),
   PRICE_MARKET_PULSE: z.coerce.number().default(0.01),
   PRICE_SWAP_QUOTE: z.coerce.number().default(0.02),
-  PRICE_PREFLIGHT: z.coerce.number().default(0.20),
+  PRICE_PREFLIGHT: z.coerce.number().default(0.05),
   PRICE_ANALYSIS_BASE: z.coerce.number().default(0.10),
   PRICE_ANALYSIS_PREMIUM: z.coerce.number().default(0.20),
   PRODUCT_LOGO_URL: z.string().optional().default(""),
@@ -112,6 +112,8 @@ const EnvSchema = z.object({
   PRODUCT_NAME: z.string().optional().default("PULSE"),
   TEST_WALLET_PRIVATE_KEY: z.string().optional().default(""),
   TEST_WALLET_ADDRESS: z.string().optional().default(""),
+  AUTOMATION_EXECUTOR_PRIVATE_KEY: z.string().optional().default(""),
+  CRON_SECRET: z.string().optional().default(""),
   ENABLE_SERVER_PAY: z
     .string()
     .optional()
@@ -271,6 +273,12 @@ export function loadConfig(): AppConfig {
       free: true,
       description: "Searchable X Layer token catalog from OKX Onchain OS with DexScreener enrichment when available.",
     },
+    "GET /v1/tokens": {
+      name: "Selected-network Token Catalog",
+      priceUsd: 0,
+      free: true,
+      description: "Searchable token contracts for X Layer, Base, Arbitrum and Arc Testnet; manual contract entry remains available.",
+    },
     "GET /v1/market/ticker": {
       name: "Spot Ticker",
       priceUsd: 0,
@@ -338,24 +346,24 @@ export function loadConfig(): AppConfig {
         "Grok-powered deep OKX spot analysis: multi-scenario targets, risk plan, and agent checklist from live OHLCV.",
     },
     "POST /v1/analysis/spot/standard": {
-      name: "Spot Analysis Standard",
+      name: "Global Market Quick Plan",
       priceUsd: parsed.PRICE_ANALYSIS_BASE,
-      description: "Standard Grok analysis from a server-fetched OKX spot snapshot.",
+      description: "A concise Global Market report with live OKX evidence, actionable levels, an Elliott candidate count, invalidation and a clear Buy-or-Wait conclusion.",
     },
     "POST /v1/analysis/spot/premium": {
-      name: "Spot Analysis Premium",
+      name: "Global Market Pro Strategy",
       priceUsd: parsed.PRICE_ANALYSIS_PREMIUM,
-      description: "Premium Grok analysis from a server-fetched OKX spot snapshot.",
+      description: "A trading-focused Global Market strategy with chart, Fibonacci and pivot levels, global Elliott wave paths, DeFi opportunities and report-linked Spot or Autopilot next actions.",
     },
     "POST /v1/analysis/prediction/standard": {
-      name: "Prediction Analysis Standard",
+      name: "Prediction Market Quick View",
       priceUsd: parsed.PRICE_ANALYSIS_PREDICTION_STANDARD,
-      description: "Readable standard analysis of one explicitly selected crypto Polymarket market, including probability, evidence quality, invalidation, limitations, and provenance.",
+      description: "A concise evidence-based view of one selected Polymarket question with probability, market quality, invalidation, limitations and provenance.",
     },
     "POST /v1/analysis/prediction/premium": {
-      name: "Prediction Analysis Premium",
+      name: "Prediction Market Pro Analysis",
       priceUsd: parsed.PRICE_ANALYSIS_PREDICTION_PREMIUM,
-      description: "Detailed readable analysis of one explicitly selected crypto Polymarket market, including probability, counter-case, evidence quality, invalidation, limitations, and provenance.",
+      description: "A detailed selected-question analysis with counter-case, execution risk and an independent 4H underlying-asset chart with Fibonacci, pivots and Elliott paths.",
     },
     "POST /v1/analysis/fused/standard": {
       name: "Fused Analysis Standard",
@@ -383,9 +391,9 @@ export function loadConfig(): AppConfig {
       description: "Safety: token risk score before you touch an asset.",
     },
     "POST /v1/preflight": {
-      name: "Pre-trade Safety Check",
+      name: "Onchain Pre-Trade Risk Guard",
       priceUsd: parsed.PRICE_PREFLIGHT,
-      description: "Safety: composite pre-trade PASS/WARN/FAIL checklist.",
+      description: "A deeper PASS/WARN/FAIL token, route, amount and counterparty risk review before an on-chain action. Basic in-product signature checks remain free.",
     },
     "POST /v1/wallet/scan": {
       name: "Wallet Risk Scan",
@@ -441,14 +449,14 @@ export function loadConfig(): AppConfig {
   return {
     ...parsed,
     enabledNetworks: parseEnabledNetworks(parsed.ENABLED_NETWORKS),
-    methodologyVersion: "pulse-v3.0.0",
+    methodologyVersion: "pulse-v6.0.0",
     productName: name,
-    productTagline: "Multichain spot and prediction-market intelligence. Pay per report on your selected network.",
-    productTaglineZh: "多链现货与预测市场智能。按所选网络按次付费。",
+    productTagline: "Analyze first. Spot trade or run a guarded Autopilot on your selected network.",
+    productTaglineZh: "先分析，再在所选网络进行现货交易或运行受保护的自动驾驶。",
     productShortDescription:
-      "PULSE combines live OKX Crypto Market evidence with one explicitly selected crypto Polymarket question and delivers readable, recoverable reports on X Layer, Base, Arbitrum One, and Arc Testnet.",
+      "PULSE turns live Global and selected Prediction Market evidence into readable, recoverable plans, then connects valid Global plans to owner-signed Spot execution or policy-bounded Autopilot.",
     productDescription:
-      "PULSE is independent market intelligence for humans and AI agents. One responsive workspace contains Crypto Market, Prediction Market, and Safety. Prediction Market filters Polymarket to active crypto price and direction questions, displays the selected market's live public evidence, and offers Base or Premium analysis in a readable report with probabilities, quality, invalidation, limitations, and provenance. Polymarket is read-only; PULSE never places orders. Browser wallets pay through network-aware x402 on X Layer, Base, Arbitrum One, or Circle Gateway on Arc Testnet.",
+      "PULSE is a focused Analyze → Spot or Autopilot workflow for humans and AI agents. Global Market includes live OKX crypto, xStocks and listed RWA instruments while separating broad analysis coverage from identity-safe on-chain execution. Prediction Market analyzes one explicitly selected Polymarket question read-only. Onchain Pre-Trade Risk Guard is the fifth public paid service. Spot and Autopilot independently verify the selected network's real token representation, settlement asset, live OKX route and wallet balance. Reports are durable and wallet-recoverable across X Layer, Base, Arbitrum One and Arc Testnet payment routes.",
     logoPath,
     logoUrl,
     hasOkxCredentials,
@@ -470,9 +478,16 @@ export function priceLabel(usd: number): string {
 
 export function buildAspMetadata(cfg: AppConfig) {
   const base = cfg.BASE_URL.replace(/\/$/, "");
+  const publicServicePaths = new Set([
+    "/v1/analysis/spot/standard",
+    "/v1/analysis/spot/premium",
+    "/v1/analysis/prediction/standard",
+    "/v1/analysis/prediction/premium",
+    "/v1/preflight",
+  ]);
   const isPublicProductRoute = (route: string) => {
     const path = route.split(" ")[1] || "";
-    if (path === "/v1/wallet/scan" || path === "/v1/market/pulse" || path === "/v1/swap/quote") return false;
+    if (!publicServicePaths.has(path)) return false;
     if (path.includes("/analysis/prediction/") && !cfg.FEATURE_PREDICTION_ANALYSIS) return false;
     if (path.includes("/analysis/fused/") && !cfg.FEATURE_FUSED_ANALYSIS) return false;
     if (path === "/v1/analysis/divergence" && !cfg.FEATURE_DIVERGENCE_ANALYSIS) return false;
@@ -500,7 +515,8 @@ export function buildAspMetadata(cfg: AppConfig) {
       };
     });
 
-  // Always include hero analysis + free market + safety
+  // Marketplace discovery deliberately exposes only the five customer-facing
+  // services. Trading and Autopilot are report actions, not extra paid SKUs.
   const hero = publicRoutes.map(([route, info]) => {
     const [method, path] = route.split(" ");
     return {
@@ -524,10 +540,7 @@ export function buildAspMetadata(cfg: AppConfig) {
     "/v1/analysis/spot/premium",
     "/v1/analysis/prediction/standard",
     "/v1/analysis/prediction/premium",
-    "/v1/analysis/fused/standard",
-    "/v1/analysis/fused/premium",
-    "/v1/analysis/divergence",
-    "/v1/preflight/event-risk",
+    "/v1/preflight",
   ]);
   const networkServices = cfg.enabledNetworks.filter(paymentNetworkEnabled).flatMap((key) => {
     const network = getNetwork(key);
@@ -552,7 +565,7 @@ export function buildAspMetadata(cfg: AppConfig) {
   return {
     asp: {
       name: cfg.productName,
-      version: "2.0.0",
+      version: "6.0.0",
       type: "A2MCP",
       category: cfg.PRODUCT_CATEGORY,
       tagline: cfg.productTagline,
@@ -611,7 +624,7 @@ export function buildAspMetadata(cfg: AppConfig) {
       fields: {
         name: cfg.productName,
         description: cfg.productDescription,
-        priceHint: "Free discovery · reports from $0.10 · multichain x402 settlement",
+        priceHint: "Risk Guard $0.05 · Quick reports $0.10 · Pro reports $0.20 · multichain x402 settlement",
         endpoint: `${base}/mcp`,
         logo: cfg.logoUrl,
       },

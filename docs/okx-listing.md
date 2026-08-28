@@ -9,11 +9,11 @@ Use this document as the single copy source when registering the A2MCP service. 
 | Name | **PULSE** |
 | Type | **A2MCP** |
 | Category | **Trading** |
-| Tagline | **OKX spot intelligence. Pay per signal on X Layer.** |
-| One-liner | Live OKX market context, Grok-powered trading scenarios, and pre-trade safety—available to humans and agents through x402. |
-| Network | X Layer · `eip155:196` |
-| Settlement | USDT0 / USD₮0 · `0x779ded0c9e1022225f8e0630b35a9b54be713736` |
-| Payment | x402 exact scheme · official OKX seller middleware |
+| Tagline | **Analyze first. Spot trade or run a guarded Autopilot.** |
+| One-liner | Global and Prediction Market intelligence connected to owner-signed Spot execution, guarded Autopilot, and Onchain Pre-Trade Risk Guard. |
+| Networks | X Layer · Base · Arbitrum One · Arc Testnet payments; Spot and Autopilot are hidden on Arc Testnet |
+| Settlement | USDT0 on X Layer · native USDC on Base/Arbitrum · test USDC on Arc Testnet |
+| Payment | Network-specific x402 settlement |
 | Languages | English, Simplified Chinese |
 | MCP endpoint | `https://<DOMAIN>/mcp` |
 | Metadata | `https://<DOMAIN>/v1/metadata` |
@@ -29,25 +29,23 @@ radar artwork or a rounded-corner export.
 
 ## Short description
 
-PULSE is pay-per-signal OKX spot intelligence for traders and AI agents. Search live OKX spot instruments, discover X Layer tokens, and preview tickers/candles for free; then buy structured Grok analysis or pre-trade safety with USDT0 on X Layer through x402.
+PULSE is an Analyze -> Spot or Autopilot workflow for traders and AI agents. Preview live OKX markets for free, buy one focused Global or Prediction report, then use its plan in connected-wallet Spot or a separately guarded Autopilot. Payments use USDT0 on X Layer or USDC on Base and Arbitrum through x402; Arc Testnet supports analysis payment testing.
 
 ## Full description
 
-PULSE turns market intelligence into an agent-native onchain service. It reads live OKX spot instruments, tickers, and OHLCV; provides a source-labeled X Layer token catalog and free market previews; and delivers structured Grok-powered base and premium reports with bias, confidence, levels, scenarios, invalidation, risk notes, and limitations. Free chart refreshes preserve the current report. PULSE also exposes explainable token-risk and composite pre-trade checks. Humans use the bilingual web console; AI agents use MCP, REST, or the TypeScript SDK. Paid calls settle per request in USDT0 on X Layer through x402 and the official OKX payment stack—no account or recurring subscription required.
+PULSE turns live OKX Global Market and explicitly selected Polymarket evidence into recoverable Quick or Pro reports. Global coverage includes crypto, xStocks, and RWA instruments. Pro reports add Fibonacci, pivots, global Elliott-wave paths, selected-network DeFi opportunities, and a Buy-or-Wait execution plan. A valid plan can prefill owner-signed Market or Limit Spot execution with optional TP/SL, or become the signal policy for a separate guarded Autopilot. Every onchain action independently verifies the selected network’s identity-safe token representation, settlement asset, live route, and wallet balance. Onchain Pre-Trade Risk Guard exposes PASS/WARN/FAIL evidence with explicit unknowns. Humans use the bilingual web console; agents use REST, MCP, or the TypeScript SDK. The five public paid services settle per request through multichain x402 with no subscription.
 
 ## Services submitted to the marketplace
 
-| Tool | Price | Input | Output |
+| Public service | Price | Input | Output / next action |
 | --- | ---: | --- | --- |
-| `spot_search` | Free | query | Live OKX spot instruments |
-| `spot_ticker` | Free | `instId` | Live ticker and 24h context |
-| `analysis_base` | $0.03 | pair, timeframe, language, optional focus | Structured Grok market signal |
-| `analysis_premium` | $0.06 | pair, timeframe, language, optional focus | Multi-scenario report and execution checklist |
-| `token_scan` | $0.01 | X Layer token address | Explainable deterministic risk heuristic |
-| `preflight` | $0.05 | intent and trade/counterparty context | Composite PASS/WARN/FAIL safety report |
-| `resolve` | Free | token query | Known token metadata |
+| Global Market Quick Plan | $0.10 | pair, timeframe, language, optional focus | Concise Buy-or-Wait analysis; Premium is the execution bridge |
+| Global Market Pro Strategy | $0.20 | pair, timeframe, language, optional focus | Chart, Elliott paths, DeFi and Market / Limit / Autopilot actions |
+| Prediction Market Quick View | $0.10 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
+| Prediction Market Pro Analysis | $0.20 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
+| Onchain Pre-Trade Risk Guard | $0.05 | network, intent, token/transaction context | PASS/WARN/FAIL with live RPC evidence and explicit unknowns |
 
-The REST API also exposes wallet, lightweight market-pulse, and heuristic swap-quality endpoints. They are useful advanced/demo capabilities but should not be presented as live indexer or executable quote data.
+Free discovery and report-linked Spot/Autopilot execution are product workflow capabilities, not separate marketplace services.
 
 The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery. It uses OKX Onchain OS as the primary catalog and DexScreener only as best-effort X Layer enrichment. Catalog presence is not a safety verdict, and manual address entry remains available.
 
@@ -60,7 +58,7 @@ The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery
 - Paid AI reports use a server-side xAI/Grok key.
 - Browser payments use the connected wallet; keys never enter the API.
 - A single header connection powers balances, x402 signing, and the native Exchange OS swap flow; disconnect remains effective across reloads.
-- Safety is scoped to X Layer chain 196: free contract evidence is live RPC data, while paid scores are explicitly labeled deterministic heuristics.
+- Risk Guard contract evidence and non-broadcast simulation are network-scoped on X Layer, Base, Arbitrum One, and Arc Testnet; legacy heuristic scores remain explicitly labeled and never become audits.
 - The web app checks USDT0 before requesting a signature.
 - The funding drawer shows OKB + USDT0 and uses the official OKX Exchange OS DEX API for live routes and unsigned transaction preparation.
 - MCP returns both text content and structured JSON.

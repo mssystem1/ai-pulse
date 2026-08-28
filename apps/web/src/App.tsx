@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet, apiPost } from "./api";
 import {
   ENABLED_WEB_NETWORKS,
@@ -14,12 +14,17 @@ import {
 } from "./networks";
 import { t, type Lang } from "./i18n";
 import { formatMarketPrice } from "./format";
-import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport } from "./Report";
-import { MarketPairPicker, XLayerTokenPicker } from "./Pickers";
+import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport, type ReportTradeIntent } from "./Report";
+import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
 import { SwapPanel } from "./SwapPanel";
 import { PredictionWorkspace } from "./PredictionWorkspace";
+import { AutopilotWorkspace, DocsWorkspace, OpportunityRadar, SpotWorkspace, TelegramWorkspace } from "./V6Workspaces";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { Tip } from "./Tip";
+import { NetworkLogo } from "./NetworkLogo";
+import { ReportHistory } from "./ReportHistory";
+import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
+import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import {
   clearWalletDisconnected,
   connectWallet,
@@ -29,10 +34,11 @@ import {
   shortAddr,
   walletProviderName,
   wasWalletDisconnected,
+  type WalletConnectionMethod,
 } from "./wallet";
 import { connectCircleWallet, isCircleWalletConnected, restoreCircleWallet } from "./circleWallet";
 
-type Tab = "analyze" | "prediction" | "safety";
+type Tab = PulseTab;
 type Candle = { ts: number; open: number; high: number; low: number; close: number; volume: number };
 
 function drawChart(canvas: HTMLCanvasElement | null, candles: Candle[]) {
@@ -95,7 +101,7 @@ function drawChart(canvas: HTMLCanvasElement | null, candles: Candle[]) {
 export function App() {
   const [lang, setLang] = useState<Lang>("en");
   const d = t(lang);
-  const [tab, setTab] = useState<Tab>("analyze");
+  const [tab, setTab] = useState<Tab>(() => tabFromHref(window.location.href));
   const [health, setHealth] = useState<"…" | "ONLINE" | "OFFLINE">("…");
   const [, setModel] = useState("");
   const [apiHint, setApiHint] = useState("");
@@ -116,6 +122,38 @@ export function App() {
   const [needUsdt, setNeedUsdt] = useState(false);
   const [neededUsdt, setNeededUsdt] = useState<number | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
+  const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    window.history.replaceState(window.history.state, "", hrefForTab(window.location.href, tab));
+  }, []);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const requested = tabFromHref(window.location.href);
+      const next = networkKey === "arc-testnet" && (requested === "spot" || requested === "autopilot") ? "analyze" : requested;
+      setTab(next);
+      setMobileNavOpen(false);
+      if (next !== requested) window.history.replaceState(window.history.state, "", hrefForTab(window.location.href, next));
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, [networkKey]);
+
+  useEffect(() => {
+    if (!mobileNavOpen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [mobileNavOpen]);
 
   const [instId, setInstId] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("1H");
@@ -129,6 +167,10 @@ export function App() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [paidMeta, setPaidMeta] = useState<string | null>(null);
   const [spotJob, setSpotJob] = useState<{ id: string; stage: string; startedAt: number } | null>(null);
+  const [paymentProgress, setPaymentProgress] = useState<string | null>(null);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [tradeIntent, setTradeIntent] = useState<ReportTradeIntent | null>(null);
+  const reportRequestRef = useRef(0);
 
   const [tokenAddr, setTokenAddr] = useState("0x779ded0c9e1022225f8e0630b35a9b54be713736");
   const [simulationData, setSimulationData] = useState("0x");
@@ -250,29 +292,38 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.pulseNetwork = networkKey;
     savePreferredNetwork(localStorage, networkKey);
+    if (networkKey === "arc-testnet" && (tab === "spot" || tab === "autopilot")) {
+      setTab("analyze");
+      window.history.replaceState(window.history.state, "", hrefForTab(window.location.href, "analyze"));
+    }
   }, [networkKey]);
 
   // A report belongs to the exact market selection that produced it. Never
   // leave a previous pair, timeframe, or network report visible after the
   // user changes context.
   useEffect(() => {
+    supersedeRequests(reportRequestRef);
+    setTokenAddr(WEB_NETWORKS[networkKey].payment.address);
     setResult(null);
     setPaidMeta(null);
     setSpotJob(null);
-  }, [networkKey, instId, timeframe]);
+    setPaymentProgress(null);
+    setLoading(false);
+    setBusyAction(null);
+  }, [networkKey]);
 
   useEffect(() => {
     const saved = readJobRecovery(localStorage, networkKey, "spot");
-    if (saved) void recoverSpotJob(saved.jobId, saved.recoveryToken, networkKey).catch(() => undefined);
+    if (saved) { const requestId = beginLatestRequest(reportRequestRef); void pollSpotJob(saved.jobId, saved.recoveryToken, networkKey, requestId).catch((failure) => { if (isLatestRequest(reportRequestRef, requestId)) setRecoveryError(failure instanceof Error ? failure.message : String(failure)); }); }
   }, [networkKey]);
 
   const change = Number(ticker?.change24hPct ?? 0);
   const service = String(result?.service || "");
 
-  async function onConnect() {
+  async function onConnect(method: WalletConnectionMethod = "auto") {
     setError(null);
     try {
-      const { address, providerName } = await connectWallet(networkKey);
+      const { address, providerName } = await connectWallet(networkKey, method);
       clearWalletDisconnected();
       setWallet(address);
       setWalletName(providerName);
@@ -347,22 +398,33 @@ export function App() {
   }
 
   /** Paid call: check the selected network's payment balance, then let the wallet sign x402. */
-  async function recoverSpotJob(jobId: string, recoveryToken: string, recoveryNetwork: WebNetworkKey) {
-    const status = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`, { headers: { "PULSE-RECOVERY-TOKEN": recoveryToken } });
+  async function recoverSpotJob(jobId: string, recoveryToken: string, recoveryNetwork: WebNetworkKey, requestId = reportRequestRef.current) {
+    setRecoveryError(null);
+    const status = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}?fresh=${Date.now()}`, {
+      headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" },
+      cache: "no-store",
+    });
     if (!status.ok) throw new Error(`Spot job recovery failed (${status.status})`);
     const payload = await status.json() as { job?: { stage?: string } };
     const stage = payload.job?.stage || "";
+    if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
     setSpotJob((current) => ({ id: jobId, stage, startedAt: current?.id === jobId ? current.startedAt : Date.now() }));
     if (stage === "completed" || stage === "completed_partial") {
-      const report = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report`, { headers: { "PULSE-RECOVERY-TOKEN": recoveryToken } });
-      if (!report.ok) throw new Error(`Spot report recovery failed (${report.status})`);
+      const report = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, {
+        headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" },
+        cache: "no-store",
+      });
+      if (!report.ok) {
+        const failure = await report.json().catch(() => ({})) as { error?: string; recoverable?: boolean };
+        throw new Error(`${failure.error || `Spot report recovery failed (${report.status})`}${failure.recoverable ? ". Your paid report is safe; retry recovery." : ""}`);
+      }
       const body = await report.json() as { report?: Record<string, unknown> };
-      if (body.report) {
+      if (body.report && isLatestRequest(reportRequestRef, requestId)) {
         const reportInstId = typeof body.report.instId === "string" ? body.report.instId : null;
         const reportTimeframe = typeof body.report.timeframe === "string" ? body.report.timeframe : null;
-        if ((!reportInstId || reportInstId === instId) && (!reportTimeframe || reportTimeframe === timeframe)) {
-          setResult(body.report);
-        }
+        if (reportInstId) setInstId(reportInstId);
+        if (reportTimeframe) setTimeframe(reportTimeframe);
+        setResult({ ...body.report, service: typeof body.report.service === "string" ? body.report.service : body.report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" });
       }
       clearJobRecovery(localStorage, recoveryNetwork, "spot");
       setSpotJob(null);
@@ -370,14 +432,88 @@ export function App() {
     return stage;
   }
 
+  async function pollSpotJob(jobId: string, recoveryToken: string, recoveryNetwork: WebNetworkKey, requestId: number) {
+    let lastTransientError: unknown = null;
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
+      try {
+        const stage = await recoverSpotJob(jobId, recoveryToken, recoveryNetwork, requestId);
+        if (stage === "superseded" || stage === "completed" || stage === "completed_partial") return stage;
+        if (["failed_retriable", "failed_terminal", "manual_reconciliation"].includes(stage)) {
+          throw new Error("The paid report job stopped before delivery. Press Recover report now; PULSE will regenerate it from the settled receipt without another payment.");
+        }
+        lastTransientError = null;
+      } catch (failure) {
+        const message = failure instanceof Error ? failure.message : String(failure);
+        if (message.includes("stopped before delivery")) throw failure;
+        lastTransientError = failure;
+        if (isLatestRequest(reportRequestRef, requestId)) {
+          setRecoveryError(`Connection interrupted; automatic recovery is still running. ${message}`);
+        }
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, Math.min(5_000, 2_000 + attempt * 100)));
+    }
+    throw new Error(lastTransientError
+      ? `The report is still safe but automatic recovery timed out: ${lastTransientError instanceof Error ? lastTransientError.message : String(lastTransientError)}`
+      : "The paid report is still processing. Press Recover report now to continue without paying again.");
+  }
+
+  async function retrySpotRecovery() {
+    const saved = readJobRecovery(localStorage, networkKey, "spot");
+    if (!saved) return setRecoveryError("No recoverable paid Global report is stored in this browser for the selected network.");
+    const requestId = beginLatestRequest(reportRequestRef);
+    try {
+      setRecoveryError(null);
+      const retry = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(saved.jobId)}/retry`, {
+        method: "POST",
+        headers: { "PULSE-RECOVERY-TOKEN": saved.recoveryToken, "Cache-Control": "no-cache" },
+        cache: "no-store",
+      });
+      if (!retry.ok) {
+        const body = await retry.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error || `Report recovery restart failed (${retry.status})`);
+      }
+      await pollSpotJob(saved.jobId, saved.recoveryToken, networkKey, requestId);
+    }
+    catch (failure) { setRecoveryError(failure instanceof Error ? failure.message : String(failure)); }
+  }
+
+  function openTradeFromReport(intent: ReportTradeIntent) {
+    setTradeIntent(intent);
+    navigateTo("spot");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
+  }
+
+  function openAutopilotFromReport(intent: ReportTradeIntent) {
+    setTradeIntent(intent);
+    navigateTo("autopilot");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
+  }
+
+  function selectCandidateForAnalysis(candidatePair: string, candidateTimeframe: string) {
+    supersedeRequests(reportRequestRef);
+    setInstId(candidatePair);
+    setTimeframe(candidateTimeframe);
+    setResult(null);
+    setSpotJob(null);
+    setTradeIntent(null);
+    setLoading(false);
+    setBusyAction(null);
+    navigateTo("analyze");
+    window.requestAnimationFrame(() => window.scrollTo({ top: 430, behavior: "smooth" }));
+  }
+
   async function paidPost(path: string, body: unknown, action: string) {
     if (!wallet) {
       setError(d.needWallet);
       return;
     }
+    const requestId = beginLatestRequest(reportRequestRef);
     setLoading(true);
     setBusyAction(action);
+    setPaymentProgress("Checking the selected network and payment balance…");
     setError(null);
+    setResult(null);
     setPaidMeta(null);
     setNeedUsdt(false);
     setNeededUsdt(null);
@@ -402,13 +538,16 @@ export function App() {
         throw balanceError;
       }
 
+      setPaymentProgress("Open your wallet and sign the x402 payment. A report job exists only after the signature is accepted.");
       const paidFetch = await createWalletPaidFetch(wallet, networkKey);
+      const telegramDelivery = new URLSearchParams(window.location.search).get("tg");
       const res = await paidFetch(`${API_BASE}${path}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...(telegramDelivery ? { "PULSE-TELEGRAM-DELIVERY": telegramDelivery } : {}) },
         body: JSON.stringify(body),
       });
       const data = await res.json().catch(() => ({}));
+      setPaymentProgress("Payment accepted. Creating your recoverable report job…");
       if (!res.ok) {
         throw new Error(
           typeof data === "object" && data
@@ -419,17 +558,17 @@ export function App() {
       if (res.status === 202) {
         const accepted = data as { job?: { id?: string; stage?: string }; recoveryToken?: string };
         if (!accepted.job?.id || !accepted.recoveryToken) throw new Error("Paid job response is missing its recovery capability");
-        saveJobRecovery(localStorage, networkKey, { jobId: accepted.job.id, recoveryToken: accepted.recoveryToken }, "spot");
+        const request = body as { instId?: string; timeframe?: string };
+        saveJobRecovery(localStorage, networkKey, { jobId: accepted.job.id, recoveryToken: accepted.recoveryToken, createdAt: new Date().toISOString(), label: `${request.instId || instId} · ${request.timeframe || timeframe}`, tier: action }, "spot");
         setSpotJob({ id: accepted.job.id, stage: accepted.job.stage || "payment_settled", startedAt: Date.now() });
-        for (let attempt = 0; attempt < 60; attempt += 1) {
-          const stage = await recoverSpotJob(accepted.job.id, accepted.recoveryToken, networkKey);
-          if (["completed", "completed_partial", "failed_retriable", "failed_terminal", "manual_reconciliation"].includes(stage)) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 2_000));
-        }
+        setPaymentProgress(null);
+        await pollSpotJob(accepted.job.id, accepted.recoveryToken, networkKey, requestId);
+        if (!isLatestRequest(reportRequestRef, requestId)) return;
         setPaidMeta(`paid by ${shortAddr(wallet)} via x402`);
         await refreshBalances(wallet);
         return;
       }
+      if (!isLatestRequest(reportRequestRef, requestId)) return;
       setResult(data as Record<string, unknown>);
       setPaidMeta(`paid by ${shortAddr(wallet)} via x402`);
       await refreshBalances(wallet);
@@ -439,17 +578,18 @@ export function App() {
       if (msg.toLowerCase().includes("usdt") || msg.includes("USD₮0") || msg.includes("不足")) {
         setNeedUsdt(true);
       }
-      setError(msg);
+      if (isLatestRequest(reportRequestRef, requestId)) setError(msg);
     } finally {
-      setLoading(false);
-      setBusyAction(null);
+      if (isLatestRequest(reportRequestRef, requestId)) {
+        setLoading(false);
+        setBusyAction(null);
+        setPaymentProgress(null);
+      }
     }
   }
 
   async function runAnalysis(tier: "base" | "premium") {
-    const path = networkKey === "xlayer"
-      ? (tier === "base" ? "/v1/analysis/base" : "/v1/analysis/premium")
-      : `/${network.route}/v1/analysis/spot/${tier === "base" ? "standard" : "premium"}`;
+    const path = `/${network.route}/v1/analysis/spot/${tier === "base" ? "standard" : "premium"}`;
     await paidPost(
       path,
       { instId, timeframe, lang, userNote: note || undefined },
@@ -522,11 +662,41 @@ export function App() {
     }
   }
 
+  const analysisReady = Boolean(result) && ["analysis_base", "analysis_premium", "spot_analysis_standard", "spot_analysis_premium"].includes(service);
   const experience = tab === "analyze"
-    ? { title: "Crypto market intelligence", lead: "Explore live OKX spot data, then choose base or premium analysis for your selected pair and timeframe." }
+    ? { title: "Global market intelligence", lead: "Explore every live OKX spot instrument—including crypto, xStocks and RWA—then choose Base or Premium analysis." }
     : tab === "prediction"
-      ? { title: "Crypto prediction intelligence", lead: "Choose one live Polymarket crypto question, inspect its executable market evidence, then request base or premium analysis." }
-      : { title: "Onchain safety checks", lead: `Inspect contracts and simulate transactions on ${network.label}. Missing evidence remains unknown; checks never broadcast.` };
+      ? { title: "Prediction market intelligence", lead: "Choose one live Polymarket question, inspect its executable evidence, then request Base or Premium analysis." }
+      : tab === "spot"
+        ? { title: "Execute a report with your wallet", lead: "Start with Global Market analysis, then review its prefilled Market or Limit buy, TP/SL and live on-chain route here." }
+        : tab === "autopilot"
+          ? { title: "Guarded autonomous execution", lead: "Allocate capital to an isolated vault and constrain the trading agent with an owner-signed on-chain policy." }
+          : tab === "telegram"
+            ? { title: "PULSE in Telegram", lead: "Deliver paid Global and Prediction reports in chat without giving the bot custody." }
+            : tab === "docs"
+              ? { title: "Product documentation", lead: "Understand every workflow, safety boundary, network and production test." }
+              : { title: "Risk Guard", lead: `Discover tokens, verify contract evidence and simulate an exact transaction on ${network.label} before signing.` };
+  const navigationTabs: Array<{ id: Tab; label: string; hint: string }> = [
+    { id: "analyze", label: "Global Market", hint: "Research and reports" },
+    { id: "prediction", label: "Prediction Market", hint: "Evidence and probabilities" },
+    { id: "safety", label: "Risk Guard", hint: "Inspect before signing" },
+    ...(networkKey === "arc-testnet" ? [] : [
+      { id: "spot" as Tab, label: "Spot Trading", hint: "Trade from a report" },
+      { id: "autopilot" as Tab, label: "Autopilot", hint: "Automate with guardrails" },
+    ]),
+    { id: "telegram", label: "Telegram", hint: "Reports in chat" },
+    { id: "docs", label: "Docs", hint: "Guides and examples" },
+  ];
+  const activeNavigationTab = navigationTabs.find((item) => item.id === tab) || navigationTabs[0];
+
+  function navigateTo(nextTab: Tab) {
+    const safeTab = networkKey === "arc-testnet" && (nextTab === "spot" || nextTab === "autopilot") ? "analyze" : nextTab;
+    setTab(safeTab);
+    setMobileNavOpen(false);
+    const nextHref = hrefForTab(window.location.href, safeTab);
+    const currentHref = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (nextHref !== currentHref) window.history.pushState(null, "", nextHref);
+  }
 
   return (
     <div className={`app theme-${networkKey}`}>
@@ -550,12 +720,17 @@ export function App() {
           </div>
         </div>
         <div className="nav-right">
-          <label className="network-picker" aria-label="Payment network">
-            <span className="network-dot" /><span className="network-picker-copy"><small>Pay on</small><b>{network.label}</b></span>
-            <select value={networkKey} onChange={(event) => void onNetworkChange(event.target.value as WebNetworkKey)}>
-              {ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => <option key={key} value={key}>{WEB_NETWORKS[key].label}</option>)}
-            </select>
-          </label>
+          <div className="network-popover">
+            <button type="button" className="network-picker" title={`Network & payment · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)}>
+              <span className={`network-symbol ${networkKey}`}><NetworkLogo network={networkKey} /></span>
+              <span className="network-picker-copy"><small>Network & payment</small><b>{network.label}</b></span><span className="network-picker-state"><i />{network.payment.symbol}</span><span className="chevron">⌄</span>
+            </button>
+            {networkMenuOpen && <div className="network-menu" role="listbox" aria-label="Choose payment network">
+              <div className="network-menu-head"><span className="eyebrow">EXECUTION CONTEXT</span><strong>Choose network</strong><p>The choice sets payment asset, wallet chain, on-chain liquidity and product theme.</p></div>
+              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} via {item.provider}</small><em>{mainnet ? "Analysis · Spot · Autopilot" : "Analysis · payment test"}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
+              <div className="network-menu-foot"><span><i /> Selected theme updates instantly</span><span>{networkKey === "arc-testnet" ? "Trading hidden on Arc Testnet" : "Mainnet execution available"}</span></div>
+            </div>}
+          </div>
           <div className="lang-switch" aria-label="Language">
             <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
             <button type="button" className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中文</button>
@@ -605,17 +780,50 @@ export function App() {
         </div>
       </section>
 
-      <div className="tabs">
-        <button type="button" className={`tab ${tab === "analyze" ? "active" : ""}`} onClick={() => setTab("analyze")}>
-          Crypto Market
-        </button>
-        <button type="button" className={`tab ${tab === "prediction" ? "active" : ""}`} onClick={() => setTab("prediction")}>Prediction Market</button>
-        <button type="button" className={`tab ${tab === "safety" ? "active" : ""}`} onClick={() => setTab("safety")}>
-          {d.tabSafety}
-        </button>
+      <div className="tabs desktop-service-tabs" role="tablist" aria-label="PULSE services">
+        {navigationTabs.map((item) => (
+          <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`tab ${tab === item.id ? "active" : ""}`} onClick={() => navigateTo(item.id)}>
+            {item.label}
+          </button>
+        ))}
       </div>
 
-      {tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className="grid">
+      <div className="mobile-service-nav">
+        <button type="button" className="mobile-service-trigger" aria-haspopup="dialog" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
+          <span><small>CURRENT SERVICE</small><strong>{activeNavigationTab.label}</strong></span>
+          <span className="mobile-service-trigger-action">Switch <i aria-hidden>⌄</i></span>
+        </button>
+        {mobileNavOpen && <div className="mobile-service-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setMobileNavOpen(false)}>
+          <section className="mobile-service-sheet" role="dialog" aria-modal="true" aria-label="Choose a PULSE service">
+            <header><div><small>PULSE NAVIGATION</small><h2>Where do you want to go?</h2></div><button type="button" aria-label="Close service navigation" onClick={() => setMobileNavOpen(false)}>×</button></header>
+            <div className="mobile-service-grid" role="tablist" aria-label="PULSE services">
+              {navigationTabs.map((item, index) => (
+                <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => navigateTo(item.id)}>
+                  <i aria-hidden>{String(index + 1).padStart(2, "0")}</i><span><strong>{item.label}</strong><small>{item.hint}</small></span><b aria-hidden>{tab === item.id ? "✓" : "→"}</b>
+                </button>
+              ))}
+            </div>
+            <p>Analysis creates the plan. Spot Trading executes it once, while Autopilot follows your signed rules.</p>
+          </section>
+        </div>}
+      </div>
+
+      {networkKey !== "arc-testnet" && (["analyze", "spot", "autopilot"] as Tab[]).includes(tab) && <section className="product-journey" aria-label="Analyze, trade and automate workflow">
+        <div className="journey-copy"><span className="eyebrow">YOUR PATH</span><strong>{analysisReady ? "Analysis ready — choose how to act" : "Start with evidence, then execute"}</strong><small>{analysisReady ? `${instId} · ${timeframe} is linked to the next step.` : "A report is what carries pair, timeframe, entry, TP and SL into execution."}</small></div>
+        <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Analyze</b><small>{analysisReady ? "Report ready" : "Start here"}</small></span></button>
+        <span className="journey-arrow">→</span>
+        <button type="button" className={tab === "spot" ? "active" : ""} onClick={() => navigateTo("spot")}><i>2</i><span><b>Spot trade</b><small>Review and sign</small></span></button>
+        <span className="journey-or">or</span>
+        <button type="button" className={tab === "autopilot" ? "active" : ""} onClick={() => navigateTo("autopilot")}><i>3</i><span><b>Autopilot</b><small>Set rules and capital</small></span></button>
+      </section>}
+
+      {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
+
+      {tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "telegram" ? <TelegramWorkspace />
+        : tab === "docs" ? <DocsWorkspace />
+        : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>
         <div className="card">
           {tab === "analyze" ? (
             <>
@@ -629,20 +837,14 @@ export function App() {
                     id="market-pair"
                     lang={lang}
                     value={instId}
-                    onSelect={(instrument) => setInstId(instrument.instId)}
+                    onSelect={(instrument) => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}
                   />
                 </div>
                 <div className="field">
                   <label htmlFor="market-timeframe">
                     {d.timeframe} <Tip text={d.tfTip} />
                   </label>
-                  <select id="market-timeframe" value={timeframe} onChange={(e) => setTimeframe(e.target.value)}>
-                    {["15m", "1H", "4H", "1D", "1W"].map((tf) => (
-                      <option key={tf} value={tf}>
-                        {tf}
-                      </option>
-                    ))}
-                  </select>
+                  <TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={(next) => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }} />
                 </div>
               </div>
               <div className="field">
@@ -711,14 +913,14 @@ export function App() {
             </>
           ) : (
             <>
-              <div className="section">{d.safetyTitle}</div>
+              <div className="section">RISK GUARD · {network.label}</div>
               <p className="lead" style={{ marginTop: 0 }}>
-                {d.safetyLead}
+                Check the exact network token and transaction before your wallet asks for a signature.
               </p>
               <div className="safety-scope">
-                <div><span className="scope-dot" />Live RPC evidence · {network.label}</div>
-                <strong>{d.safetyMethod}</strong>
-                <p>Contract and ERC-20 evidence is network-aware. Missing observations stay unknown. Legacy paid heuristic scores remain X Layer-only and are never presented as live audits.</p>
+                <div><span className="scope-dot" />Selected chain · {network.label}</div>
+                <strong>Identity → contract evidence → exact transaction simulation</strong>
+                <p>Risk Guard reads the selected chain directly. Missing ownership, audit or liquidity evidence remains unknown instead of becoming a fabricated score.</p>
               </div>
               {!wallet && <p className="wallet-guidance">↑ {d.headerWalletHint}</p>}
               <div className="field" style={{ marginTop: 12 }}>
@@ -727,11 +929,12 @@ export function App() {
                 </label>
                 <div className="contract-entry">
                   <input id="contract-address" value={tokenAddr} onChange={(e) => setTokenAddr(e.target.value)} />
-                  {networkKey === "xlayer" && <XLayerTokenPicker
+                  <NetworkTokenPicker
                     lang={lang}
+                    networkKey={networkKey}
                     selectedAddress={tokenAddr}
                     onSelect={(token) => setTokenAddr(token.address)}
-                  />}
+                  />
                 </div>
               </div>
               <div className="actions stack">
@@ -741,7 +944,7 @@ export function App() {
                   disabled={loading || health !== "ONLINE"}
                   onClick={() => void inspectContract()}
                 >
-                  {busyAction === "contract" ? d.loading : d.contractInspect}
+                  {busyAction === "contract" ? d.loading : "Inspect token & contract evidence · Free"}
                 </button>
                 <details className="raw-details">
                   <summary>Exact transaction simulation · Free</summary>
@@ -750,22 +953,7 @@ export function App() {
                   <button type="button" className="btn btn-soft full" disabled={loading || health !== "ONLINE" || !wallet} onClick={() => void simulateTransaction()}>{busyAction === "simulate" ? d.loading : "Simulate without broadcasting"}</button>
                   <p className="hint">Uses the connected address as sender and the contract field as recipient. Success proves executability only—not safety or future inclusion.</p>
                 </details>
-                <button
-                  type="button"
-                  className="btn btn-primary full"
-                  disabled={loading || health !== "ONLINE" || networkKey !== "xlayer"}
-                  onClick={() => void runSafety("token")}
-                >
-                  {busyAction === "token" ? d.loading : d.tokenScan}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-soft full"
-                  disabled={loading || health !== "ONLINE" || networkKey !== "xlayer"}
-                  onClick={() => void runSafety("preflight")}
-                >
-                  {busyAction === "preflight" ? d.loading : d.preflight}
-                </button>
+                <div className="risk-guard-guide"><article><b>1 · Choose</b><span>Browse contracts available on {network.label}, or paste a verified address.</span></article><article><b>2 · Inspect</b><span>Read bytecode, ERC-20 identity, proxy observations and explicit unknowns.</span></article><article><b>3 · Simulate</b><span>Open Exact transaction simulation and test the real calldata without broadcasting.</span></article></div>
               </div>
             </>
           )}
@@ -781,13 +969,13 @@ export function App() {
 
         <div className="card report-card">
           <div className="section">{d.report}</div>
-          {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{spotJob ? spotJob.stage.replaceAll("_", " ") : d.emptyTitle}</h3><p>{spotJob ? `Persisted spot job ${spotJob.id.slice(0, 8)}… · ${Math.floor((Date.now() - spotJob.startedAt) / 1000)}s elapsed. You may refresh or close PULSE and recover without paying again.` : d.emptyReport}</p></div>}
+          {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{spotJob ? spotJob.stage.replaceAll("_", " ") : paymentProgress ? "Complete the wallet step" : d.emptyTitle}</h3><p>{spotJob ? `Paid report ${spotJob.id.slice(0, 8)}… is stored with a recovery capability. PULSE polls it automatically and does not charge again.` : paymentProgress || d.emptyReport}</p>{spotJob && <div className="recovery-actions"><button type="button" className="btn btn-primary" onClick={() => void retrySpotRecovery()}>Recover report now</button><details><summary>How recovery works</summary><p>PULSE keeps the job ID and an opaque recovery key only in this browser, separated by network. It resumes polling automatically; Recover restarts a stopped job from its settled receipt without another payment.</p></details></div>}{recoveryError && <div className="recovery-error"><strong>Recovery status</strong><span>{recoveryError}</span><button type="button" onClick={() => void retrySpotRecovery()}>Retry without paying</button></div>}</div>}
 
           {result && service === "token_scan" && <SafetyTokenReport data={result} />}
           {result && service === "preflight" && <SafetyPreflightReport data={result} />}
           {result && (service === "contract_inspect" || service === "live_contract_evidence") && <ContractEvidenceReport data={result} />}
           {result && (service === "analysis_base" || service === "analysis_premium" || service === "spot_analysis_standard" || service === "spot_analysis_premium") && (
-            <AnalysisReport data={result} nfa={d.nfa} />
+            <AnalysisReport data={result} nfa={d.nfa} onTrade={networkKey === "arc-testnet" ? undefined : openTradeFromReport} onAutopilot={networkKey === "arc-testnet" ? undefined : openAutopilotFromReport} />
           )}
           {result &&
             service !== "token_scan" &&
@@ -807,6 +995,7 @@ export function App() {
               <pre className="raw">{JSON.stringify(result, null, 2)}</pre>
             </details>
           )}
+          <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={(report) => { const reportInstId = typeof report.instId === "string" ? report.instId : null; const reportTimeframe = typeof report.timeframe === "string" ? report.timeframe : null; if (reportInstId) setInstId(reportInstId); if (reportTimeframe) setTimeframe(reportTimeframe); setResult({ ...report, service: typeof report.service === "string" ? report.service : report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" }); }} />
         </div>
       </div>}
       </main>
@@ -827,7 +1016,8 @@ export function App() {
         onClose={() => setWalletOpen(false)}
         onDisconnect={onDisconnect}
         onRefresh={() => void refreshBalances()}
-        onBrowserConnect={() => void onConnect()}
+        onOkxConnect={() => void onConnect("okx")}
+        onOtherWalletConnect={() => void onConnect("other")}
         onCircleConnect={onCircleConnect}
         emphasize={needUsdt}
       />

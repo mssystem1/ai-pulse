@@ -2,6 +2,20 @@ const X_LAYER_ID = 196;
 const X_LAYER_HEX = "0xc4"; // 196
 const WALLET_DISCONNECTED_KEY = "pulse.wallet.disconnected";
 
+async function waitForWalletSignature<T>(operation: Promise<T>): Promise<T> {
+  let timer = 0;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timer = window.setTimeout(() => reject(new Error("The wallet did not return the x402 signature within 120 seconds. No report job was created; reopen the wallet and retry.")), 120_000);
+      }),
+    ]);
+  } finally {
+    if (timer) window.clearTimeout(timer);
+  }
+}
+
 export type InjectedProvider = {
   request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
   on?: (event: string, handler: (...args: unknown[]) => void) => void;
@@ -13,15 +27,51 @@ export type InjectedProvider = {
   isMetaMask?: boolean;
   isRabby?: boolean;
   isCoinbaseWallet?: boolean;
+  providers?: InjectedProvider[];
 };
+
+export type WalletConnectionMethod = "auto" | "okx" | "other";
+
+type Eip6963ProviderDetail = {
+  info?: { name?: string; rdns?: string };
+  provider?: InjectedProvider;
+};
+
+type WalletWindow = Window & {
+  ethereum?: InjectedProvider;
+  okxwallet?: InjectedProvider;
+  __pulseCircleProvider?: InjectedProvider;
+  __pulseAppKitProvider?: InjectedProvider;
+  __pulseDirectProvider?: InjectedProvider;
+};
+
+const announcedProviders: Eip6963ProviderDetail[] = [];
+
+function isProvider(value: unknown): value is InjectedProvider {
+  return Boolean(value && typeof (value as InjectedProvider).request === "function");
+}
+
+function isOkxDetail(detail: Eip6963ProviderDetail): boolean {
+  const identity = `${detail.info?.name || ""} ${detail.info?.rdns || ""}`.toLowerCase();
+  return Boolean(detail.provider?.isOkxWallet || /\bokx\b|okex/.test(identity));
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("eip6963:announceProvider", ((event: CustomEvent<Eip6963ProviderDetail>) => {
+    const detail = event.detail;
+    if (!isProvider(detail?.provider)) return;
+    if (!announcedProviders.some((item) => item.provider === detail.provider)) announcedProviders.push(detail);
+  }) as EventListener);
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+}
 
 type PaymentRequirementLike = { scheme?: unknown; network?: unknown; asset?: unknown; amount?: unknown; payTo?: unknown };
 type PaymentRequiredLike = { x402Version?: unknown; resource?: unknown; accepts?: PaymentRequirementLike[] };
 
 const EXPECTED_ROUTE_AMOUNTS: Readonly<Record<string, string>> = Object.freeze({
-  "/v1/analysis/base": "30000", "/v1/analysis/premium": "60000",
-  "/v1/analysis/spot/standard": "30000", "/v1/analysis/spot/premium": "60000",
-  "/v1/analysis/prediction/standard": "30000", "/v1/analysis/prediction/premium": "60000",
+  "/v1/analysis/base": "100000", "/v1/analysis/premium": "200000",
+  "/v1/analysis/spot/standard": "100000", "/v1/analysis/spot/premium": "200000",
+  "/v1/analysis/prediction/standard": "100000", "/v1/analysis/prediction/premium": "200000",
   "/v1/analysis/fused/standard": "50000", "/v1/analysis/fused/premium": "100000",
   "/v1/analysis/divergence": "40000", "/v1/preflight/event-risk": "70000",
   "/v1/token/scan": "10000", "/v1/wallet/scan": "10000", "/v1/market/pulse": "10000",
@@ -81,15 +131,36 @@ export const xLayer = {
   rpcUrls: { default: { http: ["https://rpc.xlayer.tech"] } },
 } as const;
 
+/** Resolve OKX even when another extension owns window.ethereum. */
+export function findOkxProvider(scope?: { okxwallet?: InjectedProvider; ethereum?: InjectedProvider }, eip6963: readonly Eip6963ProviderDetail[] = announcedProviders): InjectedProvider | null {
+  const host = scope || (typeof window === "undefined" ? undefined : window as WalletWindow);
+  if (!host) return null;
+  if (isProvider(host.okxwallet)) return host.okxwallet;
+  if (isProvider(host.ethereum) && host.ethereum.isOkxWallet) return host.ethereum;
+  const multiplexed = host.ethereum?.providers?.find((provider) => isProvider(provider) && provider.isOkxWallet);
+  if (multiplexed) return multiplexed;
+  return eip6963.find(isOkxDetail)?.provider || null;
+}
+
+async function discoverOkxProvider(): Promise<InjectedProvider | null> {
+  const immediate = findOkxProvider();
+  if (immediate || typeof window === "undefined") return immediate;
+  window.dispatchEvent(new Event("eip6963:requestProvider"));
+  await new Promise((resolve) => window.setTimeout(resolve, 100));
+  return findOkxProvider();
+}
+
 export function getInjectedProvider(): InjectedProvider | null {
   if (typeof window === "undefined") return null;
-  const circleProvider = (window as Window & { __pulseCircleProvider?: InjectedProvider }).__pulseCircleProvider;
+  const target = window as WalletWindow;
+  const circleProvider = target.__pulseCircleProvider;
   if (circleProvider) return circleProvider;
-  const appKitProvider = (window as Window & { __pulseAppKitProvider?: InjectedProvider }).__pulseAppKitProvider;
+  if (target.__pulseDirectProvider) return target.__pulseDirectProvider;
+  const appKitProvider = target.__pulseAppKitProvider;
   if (appKitProvider) return appKitProvider;
-  // Prefer OKX Wallet when available
-  if (window.okxwallet) return window.okxwallet;
-  if (window.ethereum) return window.ethereum as unknown as InjectedProvider;
+  const okxProvider = findOkxProvider(target);
+  if (okxProvider) return okxProvider;
+  if (isProvider(target.ethereum)) return target.ethereum;
   return null;
 }
 
@@ -127,34 +198,54 @@ export async function disconnectWallet(): Promise<void> {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(WALLET_DISCONNECTED_KEY, "1");
   }
+  const provider = getInjectedProvider();
   const { appKitEnabled, disconnectAppKit } = await import("./appkit");
   if (appKitEnabled) await disconnectAppKit();
-  const provider = getInjectedProvider();
-  if (!provider) return;
 
-  try {
-    await provider.request({
-      method: "wallet_revokePermissions",
-      params: [{ eth_accounts: {} }],
-    });
-  } catch {
-    // Not every injected wallet implements EIP-2255 permission revocation.
-  }
+  if (provider) {
+    try {
+      await provider.request({
+        method: "wallet_revokePermissions",
+        params: [{ eth_accounts: {} }],
+      });
+    } catch {
+      // Not every injected wallet implements EIP-2255 permission revocation.
+    }
 
-  try {
-    await provider.disconnect?.();
-  } catch {
-    // App-level disconnect above remains authoritative.
+    try {
+      await provider.disconnect?.();
+    } catch {
+      // App-level disconnect above remains authoritative.
+    }
   }
-  delete (window as Window & { __pulseCircleProvider?: InjectedProvider }).__pulseCircleProvider;
+  const target = window as WalletWindow;
+  delete target.__pulseCircleProvider;
+  delete target.__pulseDirectProvider;
+  delete target.__pulseAppKitProvider;
 }
 
-export async function connectWallet(networkKey: import("./networks").WebNetworkKey = "xlayer"): Promise<{ address: string; providerName: string }> {
+async function connectInjectedProvider(provider: InjectedProvider, networkKey: import("./networks").WebNetworkKey): Promise<{ address: string; providerName: string }> {
+  const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
+  const address = accounts?.[0];
+  if (!address) throw new Error("Wallet returned no account");
+  const { switchWalletNetwork } = await import("./networks");
+  await switchWalletNetwork(provider, networkKey);
+  (window as WalletWindow).__pulseDirectProvider = provider;
+  return { address, providerName: walletProviderName(provider) };
+}
+
+export async function connectWallet(networkKey: import("./networks").WebNetworkKey = "xlayer", method: WalletConnectionMethod = "auto"): Promise<{ address: string; providerName: string }> {
   const appkit = await import("./appkit");
+  const okxProvider = method === "other" ? null : await discoverOkxProvider();
+  if (okxProvider) return connectInjectedProvider(okxProvider, networkKey);
+  if (method === "okx") {
+    throw new Error("OKX Wallet was not detected. Install or enable the OKX Wallet extension, or open PULSE in the OKX Wallet DApp browser, then retry.");
+  }
   if (appkit.appKitEnabled) {
+    delete (window as WalletWindow).__pulseDirectProvider;
     const connected = await appkit.connectAppKit();
     const provider = appkit.getAppKitProvider();
-    if (provider) (window as Window & { __pulseAppKitProvider?: InjectedProvider }).__pulseAppKitProvider = provider;
+    if (provider) (window as WalletWindow).__pulseAppKitProvider = provider;
     await selectWalletNetwork(networkKey);
     return connected;
   }
@@ -165,48 +256,7 @@ export async function connectWallet(networkKey: import("./networks").WebNetworkK
     );
   }
 
-  const accounts = (await provider.request({
-    method: "eth_requestAccounts",
-  })) as string[];
-  const address = accounts?.[0];
-  if (!address) throw new Error("Wallet returned no account");
-
-  // Preserve the existing X Layer fallback, while allowing an explicit V5 network.
-  if (networkKey !== "xlayer") {
-    const { switchWalletNetwork } = await import("./networks");
-    await switchWalletNetwork(provider, networkKey);
-    return { address, providerName: walletProviderName(provider) };
-  }
-  // Switch / add X Layer (eip155:196)
-  try {
-    await provider.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: X_LAYER_HEX }],
-    });
-  } catch (e: unknown) {
-    const code = (e as { code?: number })?.code;
-    if (code === 4902 || code === -32603) {
-      await provider.request({
-        method: "wallet_addEthereumChain",
-        params: [
-          {
-            chainId: X_LAYER_HEX,
-            chainName: "X Layer",
-            nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 },
-            rpcUrls: ["https://rpc.xlayer.tech"],
-            blockExplorerUrls: ["https://www.okx.com/web3/explorer/xlayer"],
-          },
-        ],
-      });
-    } else {
-      // Surface rejection and provider failures; never continue toward signing on the wrong chain.
-      throw e;
-    }
-  }
-
-  const providerName = walletProviderName(provider);
-
-  return { address, providerName };
+  return connectInjectedProvider(provider, networkKey);
 }
 
 export async function selectWalletNetwork(key: import("./networks").WebNetworkKey): Promise<void> {
@@ -247,7 +297,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       primaryType: string;
       message: Record<string, unknown>;
     }) {
-      return (walletClient as unknown as {
+      return waitForWalletSignature((walletClient as unknown as {
         signTypedData: (a: unknown) => Promise<`0x${string}`>;
       }).signTypedData({
         account,
@@ -255,7 +305,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
         types: params.types,
         primaryType: params.primaryType,
         message: params.message,
-      });
+      }));
     },
   };
 

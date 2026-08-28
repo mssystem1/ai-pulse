@@ -1,0 +1,253 @@
+{
+  "contractName": "PulseRegistryV1",
+  "sourceName": "PulseRegistryV1.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "guardian_",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "adapter",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "AdapterSet",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "paused",
+          "type": "bool"
+        }
+      ],
+      "name": "AutomationPaused",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "bytes32",
+          "name": "role",
+          "type": "bytes32"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "RoleSet",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "admin",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "approvedAdapters",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "automationPaused",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "autopilotExecutors",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "guardian",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bool",
+          "name": "paused",
+          "type": "bool"
+        }
+      ],
+      "name": "pauseAutomation",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "adapter",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setAdapter",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setAutopilotExecutor",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "next",
+          "type": "address"
+        }
+      ],
+      "name": "setGuardian",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setSpotKeeper",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "spotKeepers",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60a03460ce57601f61070238819003918201601f19168301916001600160401b0383118484101760d25780849260209460405283398101031260ce57516001600160a01b0381169081900360ce57801560a357336080525f80546001600160a01b03191691909117905560405161061b90816100e7823960805181818160b1015281816101610152818161025d015281816102f80152818161045f01526104fb0152f35b606460405162461bcd60e51b81526020600482015260046024820152635a45524f60e01b6044820152fd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe60806040526004361015610011575f80fd5b5f3560e01c8063332f6465146104a85780633647cffc146103eb578063452a9320146103c65780635abbc712146103895780635b8c8c111461034c5780636b159ad71461028457806376916301146101a75780638a0dac4a1461013a578063ae5bbbc4146100fd578063e6921bc6146100d95763f851a44014610092575f80fd5b346100d5575f3660031901126100d55760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b5f80fd5b346100d5575f3660031901126100d557602060ff5f5460a01c166040519015158152f35b346100d55760203660031901126100d5576001600160a01b0361011e61055a565b165f526003602052602060ff60405f2054166040519015158152f35b346100d55760203660031901126100d5576001600160a01b0361015b61055a565b610188827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b166101948115156105b3565b6001600160a01b03195f5416175f555f80f35b346100d55760203660031901126100d5576004358015158091036100d5575f546001600160a01b03811633148015610252575b156102225760ff60a01b191660a082901b60ff60a01b16175f556040519081527fe2d16e9eef1e73779b5871f838055878616aea7b1d1d2e9dd593bb2d256e05b090602090a1005b60405162461bcd60e51b815260206004820152600860248201526723aaa0a92224a0a760c11b6044820152606490fd5b506001600160a01b037f00000000000000000000000000000000000000000000000000000000000000001633146101da565b346100d55760403660031901126100d55761029d61055a565b7f32808c22ea7c2a68ca8cd9b921b944cbb5159f0b6def4b33b28b8bc7d707d0bd7f4de723edd2f6a791f2bd19eb7176f9f88e2ea289ae63cd2637f9e28a8f94f64560206001600160a01b036102f1610570565b9461031f827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b1693845f52600282526103418160405f209060ff801983541691151516179055565b6040519015158152a3005b346100d55760203660031901126100d5576001600160a01b0361036d61055a565b165f526002602052602060ff60405f2054166040519015158152f35b346100d55760203660031901126100d5576001600160a01b036103aa61055a565b165f526001602052602060ff60405f2054166040519015158152f35b346100d5575f3660031901126100d55760206001600160a01b035f5416604051908152f35b346100d55760403660031901126100d55761040461055a565b7f44275b325ddc5718b9f59492cb42920ba78ce30824ec889de97855178d48b1ed7f4de723edd2f6a791f2bd19eb7176f9f88e2ea289ae63cd2637f9e28a8f94f64560206001600160a01b03610458610570565b94610486827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b1693845f52600382526103418160405f209060ff801983541691151516179055565b346100d55760403660031901126100d5576104c161055a565b7f85ff5d10aa202e69f691155a2050fed648b2d67f85e35d1279510cc43402373660206001600160a01b036104f4610570565b93610522827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b169261052f8415156105b3565b835f526001825261054f8160405f209060ff801983541691151516179055565b6040519015158152a2005b600435906001600160a01b03821682036100d557565b6024359081151582036100d557565b1561058657565b60405162461bcd60e51b815260206004820152600560248201526420a226a4a760d91b6044820152606490fd5b156105ba57565b606460405162461bcd60e51b81526020600482015260046024820152635a45524f60e01b6044820152fdfea2646970667358221220244df45f2028f3bc3f00261d1085eac304440707a323bd877c0967d55abb360664736f6c634300081a0033",
+  "deployedBytecode": "0x60806040526004361015610011575f80fd5b5f3560e01c8063332f6465146104a85780633647cffc146103eb578063452a9320146103c65780635abbc712146103895780635b8c8c111461034c5780636b159ad71461028457806376916301146101a75780638a0dac4a1461013a578063ae5bbbc4146100fd578063e6921bc6146100d95763f851a44014610092575f80fd5b346100d5575f3660031901126100d55760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b5f80fd5b346100d5575f3660031901126100d557602060ff5f5460a01c166040519015158152f35b346100d55760203660031901126100d5576001600160a01b0361011e61055a565b165f526003602052602060ff60405f2054166040519015158152f35b346100d55760203660031901126100d5576001600160a01b0361015b61055a565b610188827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b166101948115156105b3565b6001600160a01b03195f5416175f555f80f35b346100d55760203660031901126100d5576004358015158091036100d5575f546001600160a01b03811633148015610252575b156102225760ff60a01b191660a082901b60ff60a01b16175f556040519081527fe2d16e9eef1e73779b5871f838055878616aea7b1d1d2e9dd593bb2d256e05b090602090a1005b60405162461bcd60e51b815260206004820152600860248201526723aaa0a92224a0a760c11b6044820152606490fd5b506001600160a01b037f00000000000000000000000000000000000000000000000000000000000000001633146101da565b346100d55760403660031901126100d55761029d61055a565b7f32808c22ea7c2a68ca8cd9b921b944cbb5159f0b6def4b33b28b8bc7d707d0bd7f4de723edd2f6a791f2bd19eb7176f9f88e2ea289ae63cd2637f9e28a8f94f64560206001600160a01b036102f1610570565b9461031f827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b1693845f52600282526103418160405f209060ff801983541691151516179055565b6040519015158152a3005b346100d55760203660031901126100d5576001600160a01b0361036d61055a565b165f526002602052602060ff60405f2054166040519015158152f35b346100d55760203660031901126100d5576001600160a01b036103aa61055a565b165f526001602052602060ff60405f2054166040519015158152f35b346100d5575f3660031901126100d55760206001600160a01b035f5416604051908152f35b346100d55760403660031901126100d55761040461055a565b7f44275b325ddc5718b9f59492cb42920ba78ce30824ec889de97855178d48b1ed7f4de723edd2f6a791f2bd19eb7176f9f88e2ea289ae63cd2637f9e28a8f94f64560206001600160a01b03610458610570565b94610486827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b1693845f52600382526103418160405f209060ff801983541691151516179055565b346100d55760403660031901126100d5576104c161055a565b7f85ff5d10aa202e69f691155a2050fed648b2d67f85e35d1279510cc43402373660206001600160a01b036104f4610570565b93610522827f000000000000000000000000000000000000000000000000000000000000000016331461057f565b169261052f8415156105b3565b835f526001825261054f8160405f209060ff801983541691151516179055565b6040519015158152a2005b600435906001600160a01b03821682036100d557565b6024359081151582036100d557565b1561058657565b60405162461bcd60e51b815260206004820152600560248201526420a226a4a760d91b6044820152606490fd5b156105ba57565b606460405162461bcd60e51b81526020600482015260046024820152635a45524f60e01b6044820152fdfea2646970667358221220244df45f2028f3bc3f00261d1085eac304440707a323bd877c0967d55abb360664736f6c634300081a0033",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.26+commit.8a97fa7a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"guardian_\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"adapter\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"AdapterSet\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"paused\",\"type\":\"bool\"}],\"name\":\"AutomationPaused\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"bytes32\",\"name\":\"role\",\"type\":\"bytes32\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"RoleSet\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"approvedAdapters\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"automationPaused\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"autopilotExecutors\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"guardian\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bool\",\"name\":\"paused\",\"type\":\"bool\"}],\"name\":\"pauseAutomation\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"adapter\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setAdapter\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setAutopilotExecutor\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"next\",\"type\":\"address\"}],\"name\":\"setGuardian\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"account\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setSpotKeeper\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"spotKeepers\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"PulseRegistryV1.sol\":\"PulseRegistryV1\"},\"evmVersion\":\"shanghai\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":500},\"remappings\":[],\"viaIR\":true},\"sources\":{\"PulseRegistryV1.sol\":{\"keccak256\":\"0xd443f5011078e696351064fd71456561ea2228af1147a4d9ff564bfd9bcc109a\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://a70ab79a5bee8215fd03bd363c44e53e8413b28736309cd37ac148c0a9892792\",\"dweb:/ipfs/QmcQQfjyQGc7xMkBTiphpxFR6ESRJZxpDCMScpEXNY6TkJ\"]}},\"version\":1}"
+}

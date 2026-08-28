@@ -1,0 +1,346 @@
+{
+  "release": "pulse-v6.2.0",
+  "network": "xlayer",
+  "chainId": 196,
+  "deployer": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "deployedAt": "2026-08-20T10:23:43.926Z",
+  "contracts": {
+    "registry": {
+      "address": "0x814469ebed3a8466266a9fa9cdf78c381c16a146",
+      "txHash": "0x1ceed33d03edbf23b0e715b82f9b0a97323afe80610913dd2e196371f2b6d09d",
+      "blockNumber": "68452334"
+    },
+    "oracleRouter": {
+      "address": "0x3df7a41d0b07ffcd25ecba43e9b4620c627ba8b0",
+      "txHash": "0x7966bf72193581ed97964fb56c20e55590c38cd1a5ba7dcc111b242fc5c73fda",
+      "blockNumber": "68452343"
+    },
+    "executionAdapter": {
+      "address": "0x36080c7ef9b793dea9d821e8ee8447226ccf329a",
+      "txHash": "0xa042d5ff52354033675e66d0a5b78b15ff549a6a0a8ac08c2b7e797b8b752633",
+      "blockNumber": "68891508",
+      "version": "v2"
+    },
+    "spotFactory": {
+      "address": "0x3f53ed46e18152ac6903e49450e7b227b5236098",
+      "txHash": "0xf0e57e01b3de154394cebcbd4165cf41d705d930e3e351b7bf25a5b8f4e8f9fd",
+      "blockNumber": "68454422"
+    },
+    "autopilotFactory": {
+      "address": "0xd0fc9d162adde054479d7550a1b9a38f4a2ddc96",
+      "txHash": "0xf7da35a8f797ecb510dede13d0ddc18b278694d1888131e26c3d3f6c982038d5",
+      "blockNumber": "68454432"
+    },
+    "spotBracketFactory": {
+      "address": "0x073784ac4aaadf755a887880280519535c584bfb",
+      "txHash": "0x49c289f4cb5e9bb8500e583628c8e0ff5b519ebb807ef39bfcddd6d89378674d",
+      "blockNumber": "68624125"
+    }
+  },
+  "configurationTransactions": {
+    "allowAdapter": "0x2457bca5820b0261bb3ee30244ec1e5ddf460e520e1f5a510935f256edc22290"
+  },
+  "verification": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T10:26:51.463Z",
+    "results": {
+      "registry": {
+        "status": "verified",
+        "address": "0x814469ebed3a8466266a9fa9cdf78c381c16a146",
+        "verificationId": "f761729b-3109-4d1f-9c55-c6219f8fb7b6",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "f761729b-3109-4d1f-9c55-c6219f8fb7b6",
+          "jobStartTime": "2026-08-20T10:26:37Z",
+          "jobFinishTime": "2026-08-20T10:26:38Z",
+          "compilationTime": "129",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x814469Ebed3a8466266A9fa9CDF78c381C16a146",
+            "verifiedAt": "2026-08-20T10:26:38Z",
+            "matchId": "43870752"
+          }
+        }
+      },
+      "oracleRouter": {
+        "status": "verified",
+        "address": "0x3df7a41d0b07ffcd25ecba43e9b4620c627ba8b0",
+        "verificationId": "657d8d33-bee2-49f3-9b55-4e1691f3a738",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "657d8d33-bee2-49f3-9b55-4e1691f3a738",
+          "jobStartTime": "2026-08-20T10:26:40Z",
+          "jobFinishTime": "2026-08-20T10:26:40Z",
+          "compilationTime": "115",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x3df7A41D0b07ffCD25ecBa43e9b4620C627Ba8B0",
+            "verifiedAt": "2026-08-20T10:26:40Z",
+            "matchId": "43870754"
+          }
+        }
+      },
+      "executionAdapter": {
+        "status": "verified",
+        "address": "0x76141df7f9055d7ad7ab3d1417f1a4245b19936f",
+        "verificationId": "b12ed862-22e4-4654-bbee-9d09051b6c80",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "b12ed862-22e4-4654-bbee-9d09051b6c80",
+          "jobStartTime": "2026-08-20T10:26:42Z",
+          "jobFinishTime": "2026-08-20T10:26:42Z",
+          "compilationTime": "140",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x76141df7F9055D7aD7AB3d1417F1A4245b19936f",
+            "verifiedAt": "2026-08-20T10:26:42Z",
+            "matchId": "43870762"
+          }
+        }
+      },
+      "spotFactory": {
+        "status": "verified",
+        "address": "0x68faa8b82f9d305a193ba3640de9526479b66c54",
+        "verificationId": "70c01d3d-2e29-42ef-bff2-aa1c72fe1ef7",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "70c01d3d-2e29-42ef-bff2-aa1c72fe1ef7",
+          "jobStartTime": "2026-08-20T10:26:44Z",
+          "jobFinishTime": "2026-08-20T10:26:45Z",
+          "compilationTime": "228",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x68fAa8B82f9d305A193Ba3640De9526479b66c54",
+            "verifiedAt": "2026-08-20T10:26:45Z",
+            "matchId": "43870764"
+          }
+        }
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0x0a96d42184b4331cdb7bf180dac0a78494638489",
+        "verificationId": "27805d8d-391f-4353-a083-f6df74fafc4e",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "27805d8d-391f-4353-a083-f6df74fafc4e",
+          "jobStartTime": "2026-08-20T10:26:47Z",
+          "jobFinishTime": "2026-08-20T10:26:47Z",
+          "compilationTime": "211",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x0a96D42184b4331cDb7bF180DAC0a78494638489",
+            "verifiedAt": "2026-08-20T10:26:47Z",
+            "matchId": "43870765"
+          }
+        }
+      }
+    }
+  },
+  "certification": {
+    "certifiedAt": "2026-08-20T12:22:37.296Z",
+    "rpc": "https://rpc.xlayer.tech",
+    "blockNumber": "68459519",
+    "adapterApproved": true,
+    "keeperApproved": true,
+    "executorApproved": true,
+    "routerApproved": true,
+    "immutableWiring": true,
+    "codeHashes": {
+      "registry": "0xebc0fd24abea41ba1cafcb3fd23e396c9ff46e8d7a156aa15d0cf3dcb2567cc4",
+      "oracleRouter": "0x82d6923e468eb80d5e7e86e2257da9abe8dc71d0d1cc4644452d1ab6b7456c6e",
+      "executionAdapter": "0xb5c488c1c1f68eb2b90b2c5d0ac86abb71924963953f8194383e35418bc3dd84",
+      "spotFactory": "0xa58d88adb93954d96ca285b11c1afd8e12f4665d710084cc78ee99b5b1fb307d",
+      "autopilotFactory": "0xacd86cd346f691449c296e13a62ddd897dd73028d51f59e92be180c76e483623"
+    }
+  },
+  "configuration": {
+    "configuredAt": "2026-08-20T10:35:15.021Z",
+    "keeper": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "executor": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "approvedRouter": "0x722db4f285F8bD91ef7AF6DA397e83f7fA4E80a7",
+    "transactions": [
+      "0xa8ae708b626eaba8dfbaf2910e5da9a01ba43e3470661f89338e60f5056d35ed",
+      "0x6814ef15adbc0b3f8989e3cf964ec8546795f39268d2c6ae8032cb30d1f6c68d",
+      "0x01fb5bb92153076ab6e843f1397562f07882e89d785a9aaf3fd49517056c1ad1"
+    ]
+  },
+  "previousFactories": [
+    {
+      "version": "pulse-v6.0.0",
+      "spotFactory": {
+        "address": "0x68faa8b82f9d305a193ba3640de9526479b66c54",
+        "txHash": "0x539cae0d55787794b96aca4e7bb5cb0b5bb16c56b6f7e748d77f7e97af3ff6c3",
+        "blockNumber": "68452362"
+      },
+      "autopilotFactory": {
+        "address": "0x0a96d42184b4331cdb7bf180dac0a78494638489",
+        "txHash": "0x976d8d6b556ef630c29333d2c1bc20506b05d5ada20571c2ca1fbf702aea0451",
+        "blockNumber": "68452371"
+      },
+      "replacedAt": "2026-08-20T10:57:54.661Z"
+    }
+  ],
+  "v2": {
+    "guardrails": [
+      "asset allowlist",
+      "oracle-valued trade and exposure caps",
+      "slippage and daily-loss bounds",
+      "cooldown and expiry",
+      "nonce and policy version",
+      "owner-only recovery"
+    ],
+    "conditionalSpot": [
+      "buy/sell trigger direction",
+      "minimum output",
+      "batch cancel"
+    ]
+  },
+  "verificationV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T10:59:57.307Z",
+    "results": {
+      "spotFactory": {
+        "status": "verified",
+        "address": "0x3f53ed46e18152ac6903e49450e7b227b5236098",
+        "verificationId": "e57ececc-4813-43b3-b04b-e8a3fc0b8b9a",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "e57ececc-4813-43b3-b04b-e8a3fc0b8b9a",
+          "jobStartTime": "2026-08-20T10:59:39Z",
+          "jobFinishTime": "2026-08-20T10:59:45Z",
+          "compilationTime": "2906",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0x3F53Ed46E18152Ac6903e49450E7b227B5236098",
+            "verifiedAt": "2026-08-20T10:59:45Z",
+            "matchId": "43871802"
+          }
+        }
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0xd0fc9d162adde054479d7550a1b9a38f4a2ddc96",
+        "verificationId": "00c95fc4-acb7-48fa-a0e3-5a40fb62ab66",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "00c95fc4-acb7-48fa-a0e3-5a40fb62ab66",
+          "jobStartTime": "2026-08-20T10:59:46Z",
+          "jobFinishTime": "2026-08-20T10:59:54Z",
+          "compilationTime": "3833",
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "196",
+            "address": "0xD0FC9D162AdDE054479d7550a1b9A38F4a2dDC96",
+            "verifiedAt": "2026-08-20T10:59:54Z",
+            "matchId": "43871804"
+          }
+        }
+      }
+    }
+  },
+  "bracket": {
+    "model": "OTOCO",
+    "phases": [
+      "pending entry",
+      "protected TP/SL",
+      "executed or owner-cancelled"
+    ],
+    "ownerRecovery": true,
+    "keeperMayNotChangePolicy": true
+  },
+  "verificationBracket": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-22T10:06:54.196Z",
+    "result": {
+      "status": "verified",
+      "address": "0x073784ac4aaadf755a887880280519535c584bfb",
+      "verificationId": "efadf13b-6f6d-4d51-857f-e02d9fb01d13",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "efadf13b-6f6d-4d51-857f-e02d9fb01d13",
+        "jobStartTime": "2026-08-22T10:06:42Z",
+        "jobFinishTime": "2026-08-22T10:06:49Z",
+        "compilationTime": "3049",
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "196",
+          "address": "0x073784ac4aAaDF755A887880280519535c584bfB",
+          "verifiedAt": "2026-08-22T10:06:49Z",
+          "matchId": "45310143"
+        }
+      }
+    }
+  },
+  "routerUpgrade": {
+    "configuredAt": "2026-08-25T12:14:56.292Z",
+    "router": "0x7c5bee2a8091c3ef39072f64f18fac913060aeaf",
+    "adapter": "0x76141df7f9055d7ad7ab3d1417f1a4245b19936f",
+    "transaction": null,
+    "verifiedOnchain": true
+  },
+  "previousExecutionAdapters": [
+    {
+      "address": "0x76141df7f9055d7ad7ab3d1417f1a4245b19936f",
+      "txHash": "0xae4a0560fa9b5e10f8cbbf28495325d82636463956e7669c83c7cd7cfec1b528",
+      "blockNumber": "68452353"
+    }
+  ],
+  "executionAdapterV2": {
+    "deployedAt": "2026-08-25T12:22:36.094Z",
+    "router": "0x7c5bee2a8091c3ef39072f64f18fac913060aeaf",
+    "spender": "0x8b773D83bc66Be128c60e07E17C8901f7a64F000",
+    "allowAdapterTx": "0xc3178a2a347c90fe4241f713b430fd3f4bcbf271b5db0ae0f1b312f128587c97",
+    "routerTx": "0xefb8d35603033e8e6fe7ed2c1abaef4ec7889fcbe4fe5d632beb44a5eb559815",
+    "spenderTx": "0x2a3af962fa2c2390f317b1b1a6b5efdba66f3d43b3e0a37ca86151ebcfe61753",
+    "verifiedOnchain": true
+  },
+  "verificationAdapterV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-25T12:23:23.937Z",
+    "result": {
+      "status": "verified",
+      "address": "0x36080c7ef9b793dea9d821e8ee8447226ccf329a",
+      "verificationId": "9f739583-9852-4cc6-83e6-52dff032df36",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "9f739583-9852-4cc6-83e6-52dff032df36",
+        "jobStartTime": "2026-08-25T12:23:17Z",
+        "jobFinishTime": "2026-08-25T12:23:18Z",
+        "compilationTime": "651",
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "196",
+          "address": "0x36080C7EF9b793DEa9d821E8Ee8447226ccf329A",
+          "verifiedAt": "2026-08-25T12:23:18Z",
+          "matchId": "46816522"
+        }
+      }
+    }
+  }
+}

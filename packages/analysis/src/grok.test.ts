@@ -27,11 +27,14 @@ const validAnalysis = {
   keyLevels: { support: [98], resistance: [102] },
   targets: [{ label: "continuation", price: 102, rationale: "Observed range high" }],
   invalidation: { price: 97, condition: "Break below the supplied range low" },
-  scenarios: [
-    { name: "bull", thesis: "Continuation", target: 102, invalidation: 98 },
-    { name: "base", thesis: "Consolidation", target: 100, invalidation: 97 },
-    { name: "bear", thesis: "Range failure", target: 97, invalidation: 102 },
-  ],
+  elliottWave: {
+    degree: "minor", structure: "impulse", direction: "up", currentWave: "3", confidence: 68,
+    rationale: "The supplied range supports a candidate wave 3 continuation.", invalidation: 97,
+    paths: [
+      { type: "wave_3_continuation", label: "Wave 3 continuation", thesis: "Continuation", trigger: 101, target: 102, invalidation: 97, sequence: ["Wave 2 holds", "Wave 3 extends"] },
+      { type: "abc_correction", label: "A-B-C correction", thesis: "Range failure", trigger: 98, target: 97, invalidation: 102, sequence: ["Wave A breaks support", "Waves B and C develop"] },
+    ],
+  },
   chartNotes: "Based only on supplied OHLCV.", agentAction: "Wait for confirmation.",
   agentChecklist: ["Check spread"], riskNotes: ["Single-candle fixture"],
   limitations: ["Limited history"], disclaimer: "Decision support only; not financial advice.",
@@ -47,12 +50,13 @@ describe("context-first Grok analysis", () => {
         model: "grok-4.3",
         fetchImpl: async (_input, init) => {
           calls += 1;
-          const request = JSON.parse(String(init?.body)) as { max_tokens?: number; reasoning_effort?: string; response_format?: { type?: string; json_schema?: { strict?: boolean } }; messages: Array<{ content: string }> };
+          const request = JSON.parse(String(init?.body)) as { max_tokens?: number; reasoning_effort?: string; response_format?: { type?: string; json_schema?: { name?: string; strict?: boolean } }; messages: Array<{ content: string }> };
           assert.match(request.messages[1].content, /BTC-USDT/);
           assert.equal(request.max_tokens, 700);
           assert.equal(request.reasoning_effort, "none");
           assert.equal(request.response_format?.type, "json_schema");
           assert.equal(request.response_format?.json_schema?.strict, true);
+          assert.equal(request.response_format?.json_schema?.name, "pulse_spot_base_v6_elliott");
           return new Response(JSON.stringify({
             choices: [{ message: { content: JSON.stringify(validAnalysis) } }],
             usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
@@ -88,5 +92,20 @@ describe("context-first Grok analysis", () => {
         choices: [{ message: { content: JSON.stringify({ headline: "Incomplete", invented: true }) } }],
       }), { status: 200 }),
     }, { instId: "BTC-USDT", tier: "base" }, market), /structured output failed validation/);
+  });
+
+  it("repairs only the obsolete pre-Elliott provider shape instead of losing a paid report", async () => {
+    const legacy = { ...validAnalysis, scenarios: [{ name: "bull", target: 102 }], elliottWave: undefined };
+    const result = await runPreparedSpotAnalysis({
+      apiKey: "test", baseUrl: "https://xai.invalid/v1", model: "grok-4.3",
+      fetchImpl: async () => new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(legacy) } }],
+      }), { status: 200 }),
+    }, { instId: "BTC-USDT", tier: "base" }, market);
+
+    const analysis = result.analysis as { elliottWave?: { currentWave?: string; paths?: unknown[] }; scenarios?: unknown };
+    assert.ok(analysis.elliottWave);
+    assert.ok((analysis.elliottWave?.paths?.length || 0) >= 1);
+    assert.equal(analysis.scenarios, undefined);
   });
 });

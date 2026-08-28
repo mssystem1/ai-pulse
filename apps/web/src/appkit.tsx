@@ -23,7 +23,7 @@ const adapter = new WagmiAdapter({ projectId: projectId || "disabled", networks:
 const queryClient = new QueryClient();
 export const appKit = createAppKit({
   adapters: [adapter], networks: appKitNetworks, defaultNetwork: appKitNetworks[0], projectId: projectId || "disabled",
-  metadata: { name: "PULSE", description: "Multichain spot and prediction intelligence", url: window.location.origin, icons: [`${window.location.origin}/brand/logo.png`] },
+  metadata: { name: "PULSE", description: "Analyze Global and Prediction Markets, then Spot trade or run a guarded Autopilot.", url: window.location.origin, icons: [`${window.location.origin}/brand/logo.png`] },
   features: { analytics: false }, enableWallets: appKitEnabled,
 });
 if (appKitEnabled) {

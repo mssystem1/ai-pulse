@@ -1,6 +1,6 @@
 # PULSE
 
-PULSE is multichain crypto-market and prediction-market intelligence for humans and AI agents. One responsive workspace provides Crypto Market, Prediction Market, and Safety. It combines live OKX spot data with one explicitly selected, active crypto-focused Polymarket question and offers readable, recoverable Base or Premium reports on X Layer, Base, Arbitrum, and Arc Testnet. Polymarket is public read-only evidence; PULSE never places prediction-market orders.
+PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and AI agents. One responsive workspace provides Global Market, Prediction Market, Risk Guard, Spot Trading, Autopilot, Telegram, and Docs. Five public paid services keep discovery clear: Global Market Quick Plan ($0.10), Global Market Pro Strategy ($0.20), Prediction Market Quick View ($0.10), Prediction Market Pro Analysis ($0.20), and Onchain Pre-Trade Risk Guard ($0.05). Global Market includes OKX-listed crypto, xStocks and RWA assets. Execution separately verifies the selected network's identity-safe token, settlement asset, live route and wallet balance. Polymarket remains read-only.
 
 - [Product documentation](/)
 - [Machine-readable service metadata](/v1/metadata)

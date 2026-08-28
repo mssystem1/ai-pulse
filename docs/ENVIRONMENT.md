@@ -148,12 +148,17 @@ This table is the operational checklist for variables that require a choice. Fix
 | `OKX_XLAYER_API_*` | Server secrets | Required for X Layer | Required | Existing OKX x402/DEX compatibility credentials. |
 | `STORAGE_PROVIDER` | `memory` or `vercel_blob` | `memory` for isolated testing, or configured Blob for recovery E2E | `vercel_blob` | Report-body persistence. Blob requires its token and KV metadata. |
 | `QUEUE_PROVIDER` | `memory` or `upstash_kv` | `memory` for one process, or Upstash for durability E2E | `upstash_kv` | Jobs, locks, receipts, idempotency, and shared budgets. |
-| `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates local and production keys. Never reuse production for localhost tests. |
+| `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates jobs, reports, history, budgets and cron keys. V6 trading keys use a stable prefix, so never reuse the production KV database for localhost tests. |
 | `BLOB_ACCESS` | `private` or `public` | Match store | Prefer `private` | Public Blob requires a valid `REPORT_ENCRYPTION_KEY`. |
 | `REPORT_ENCRYPTION_KEY` | Base64url 32-byte key or empty | Required only for public Blob | Same | Encrypts report bodies stored in public Blob. |
 | `REPORT_DEFAULT_VISIBILITY` | `private` | `private` | `private` | Default paid-report access policy. |
 | `REPORT_SHARE_LINK_ENABLED` | `0` or `1` | Product choice | Product choice | Allows explicit revocable sharing; it never makes reports public by default. |
-| `TEST_WALLET_ADDRESS` / `TEST_WALLET_PRIVATE_KEY` | Ignored operator secrets | Scripts only | Never deploy | Funded checkout automation. The web application does not read these values. |
+| `AUTOMATION_WORKER_ENABLED` | `0` or `1` | `1` only during live acceptance | `1` on the single Railway worker | Enables guarded Spot reconciliation and Autopilot evaluation. Do not also run a Vercel cron. |
+| `AUTOMATION_EXECUTOR_PRIVATE_KEY` | 32-byte server secret | Optional; TEST wallet is the acceptance fallback | Required only on the automation host (Railway in the recommended split) | Dedicated signer whose address currently needs Registry Spot keeper + Autopilot executor roles and the OracleRouter updater role. It cannot call owner-only vault withdrawal. Never use an owner, seller, treasury or test key. |
+| `CRON_SECRET` | Long random server secret | Optional | Unset for Railway; required only for an all-in-one Vercel serverless API/cron | Authenticates `GET /v1/internal/automation/tick`; it is a scheduler secret, not an on-chain signer. |
+| `AUTOPILOT_ANALYSIS_INTERVAL_MS` | Milliseconds, at least `60000` | `900000` | `900000` | Interval for Premium analysis and strategy/structure decisions. |
+| `AUTOPILOT_RISK_INTERVAL_MS` | Milliseconds, at least `30000` | `60000` | `60000` | Independent live TP/SL and latched partial-exit monitor. It does not call xAI, continues during an AI outage, and still uses the vault cooldown, oracle, route, simulation and nonce safeguards. |
+| `TEST_WALLET_ADDRESS` / `TEST_WALLET_PRIVATE_KEY` | Ignored operator secrets | Scripts and bounded acceptance only | Never deploy | Funded checkout automation. The browser never reads these values. |
 
 ## Pricing: preserve current services, add V5 services
 
@@ -280,7 +285,7 @@ Use `ARC_AI_MODE=fixture` only for a pre-release plumbing canary that is explici
 
 Fused, divergence, and event-risk flags remain documented for backward-compatible API operation, but the current product strategy keeps all three disabled. The web product exposes only base and premium prediction analysis.
 
-AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. `GROK_MAX_OUTPUT_STANDARD` / `GROK_MAX_OUTPUT_PREMIUM` remain the hard `max_tokens` values for Crypto Market reports. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
+AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. `GROK_MAX_OUTPUT_STANDARD` / `GROK_MAX_OUTPUT_PREMIUM` remain the hard `max_tokens` values for Global Market reports. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
 
 Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=upstash_kv`, these counters are shared across instances and survive deployments; `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
 
@@ -363,7 +368,7 @@ DATABASE_URL=
 
 `DATABASE_URL` remains empty for this design. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Upstash job complete with the Blob URL and checksum.
 
-`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, and Arc-budget keys when local, canary, and production deployments use the same Upstash database. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires.
+`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain stable `pulse:v6:*` keys to preserve existing mainnet continuity. Therefore local, canary, and production deployments must use separate Upstash databases; a different namespace alone is not sufficient isolation for V6 trading tests.
 
 For a native-private Vercel Blob store, keep `BLOB_ACCESS=private` and leave `REPORT_ENCRYPTION_KEY` empty. If the existing store is public, set `BLOB_ACCESS=public` and provide a server-only base64url encoding of 32 random bytes in `REPORT_ENCRYPTION_KEY`; PULSE then stores only AES-256-GCM ciphertext publicly and verifies the decrypted plaintext checksum. The current supplied Blob token was probed as a public store, so it requires this encrypted mode or replacement with a private-store token.
 
@@ -394,8 +399,8 @@ Environment settings:
 
 | Location | Variables |
 |---|---|
-| Vercel web | `VITE_API_URL`, `VITE_REOWN_PROJECT_ID`, `VITE_ENABLED_NETWORKS` |
-| Railway API/worker | CDP, OKX, xAI, Circle Gateway, Blob, Upstash, RPC and server feature flags |
+| Vercel web | Public `VITE_API_URL`, `VITE_REOWN_PROJECT_ID`, `VITE_CIRCLE_APP_ID`, `VITE_ENABLED_NETWORKS`, public seller addresses and browser feature flags only |
+| Railway API/worker | Automation executor, CDP, OKX, xAI, Circle, Telegram, Blob, Upstash, RPC, contracts and server feature flags |
 | Local `.env` | development copies only; file remains gitignored |
 
 Any credential pasted into chat, logs, screenshots, or tickets must be rotated before production use.

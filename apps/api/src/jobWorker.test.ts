@@ -41,3 +41,29 @@ test("expired leases are recoverable by a replacement worker", async () => {
   await new Promise((resolve) => setTimeout(resolve, 10));
   assert.equal(recovered, true);
 });
+
+test("temporary persistence loss does not stop the worker from recovering", async () => {
+  const store = new MemoryJobStore();
+  const acquired = await store.acquire(input("worker-persistence-recovery"));
+  await store.enqueue(acquired.job.id);
+  const recoverExpired = store.recoverExpired.bind(store);
+  let connected = false;
+  store.recoverExpired = async () => {
+    if (!connected) throw new TypeError("fetch failed");
+    return recoverExpired();
+  };
+  let executions = 0;
+  const worker = new DurableJobWorker(store, 1, async (job) => {
+    executions += 1;
+    await store.transition(job.id, "completed");
+  });
+
+  await worker.start();
+  assert.equal(executions, 0);
+
+  connected = true;
+  await worker.notify();
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  assert.equal(executions, 1);
+  assert.equal((await store.get(acquired.job.id))?.stage, "completed");
+});

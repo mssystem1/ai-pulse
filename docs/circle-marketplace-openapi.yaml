@@ -1,11 +1,11 @@
 openapi: 3.1.0
 info:
   title: PULSE Circle Agent Marketplace API
-  version: 2.0.0
+  version: 6.0.0
   description: >-
-    Four x402-paid market-intelligence resources on Arc Testnet. Payments use
-    test USDC through Circle Gateway. PULSE provides decision support and does
-    not execute trades or place Polymarket orders.
+    Five focused x402 services on Arc Testnet: two Global Market reports, two
+    Prediction Market reports and one Onchain Pre-Trade Risk Guard. Payments
+    use test USDC through Circle Gateway. Arc Testnet is analysis/payment only.
   contact:
     url: https://www.ai-pulse.tech
   license:
@@ -18,14 +18,15 @@ servers:
   - url: https://pulse-api-production-7aae.up.railway.app
     description: Production API origin; Arc routes use Arc Testnet payments
 tags:
-  - name: Spot analysis
+  - name: Global Market
   - name: Prediction analysis
+  - name: Risk Guard
 paths:
   /arc/v1/analysis/spot/standard:
     post:
       operationId: createArcSpotStandardReport
-      summary: Create a standard OKX spot analysis report
-      tags: [Spot analysis]
+      summary: Global Market Quick Plan
+      tags: [Global Market]
       x-pulse-price-usd: 0.10
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
@@ -42,8 +43,8 @@ paths:
   /arc/v1/analysis/spot/premium:
     post:
       operationId: createArcSpotPremiumReport
-      summary: Create a premium OKX spot analysis report
-      tags: [Spot analysis]
+      summary: Global Market Pro Strategy
+      tags: [Global Market]
       x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
@@ -60,7 +61,7 @@ paths:
   /arc/v1/analysis/prediction/standard:
     post:
       operationId: createArcPredictionStandardReport
-      summary: Analyze one explicitly selected crypto Polymarket market
+      summary: Prediction Market Quick View
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.10
       x-x402-network: eip155:5042002
@@ -78,7 +79,7 @@ paths:
   /arc/v1/analysis/prediction/premium:
     post:
       operationId: createArcPredictionPremiumReport
-      summary: Produce detailed analysis of one selected crypto Polymarket market
+      summary: Prediction Market Pro Analysis
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
@@ -89,6 +90,30 @@ paths:
       responses:
         "202":
           $ref: "#/components/responses/JobAccepted"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "402":
+          $ref: "#/components/responses/PaymentRequired"
+  /arc/v1/preflight:
+    post:
+      operationId: createArcOnchainRiskGuard
+      summary: Onchain Pre-Trade Risk Guard
+      description: Deeper PASS/WARN/FAIL review of a token, route, amount or counterparty before an on-chain action.
+      tags: [Risk Guard]
+      x-pulse-price-usd: 0.05
+      x-x402-network: eip155:5042002
+      x-x402-asset: "0x3600000000000000000000000000000000000000"
+      x-x402-provider: circle-gateway
+      requestBody:
+        $ref: "#/components/requestBodies/RiskGuardRequest"
+      responses:
+        "200":
+          description: Risk Guard report
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
         "400":
           $ref: "#/components/responses/BadRequest"
         "402":
@@ -119,6 +144,18 @@ components:
                 primaryMarketId: "POLYMARKET_MARKET_ID"
                 additionalMarketIds: []
                 lang: en
+    RiskGuardRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/RiskGuardRequest"
+          examples:
+            tokenBeforeTrade:
+              value:
+                intent: swap
+                tokenAddress: "0x0000000000000000000000000000000000000001"
+                amount: "1"
   schemas:
     SpotRequest:
       type: object
@@ -163,6 +200,34 @@ components:
           enum: [en, zh]
           default: en
         userNote:
+          type: string
+          maxLength: 500
+    RiskGuardRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        intent:
+          type: string
+          enum: [swap, transfer, approve, hire_agent, generic]
+          default: generic
+        tokenAddress:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        walletAddress:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        counterparty:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        fromToken:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        toToken:
+          type: string
+          pattern: "^0x[a-fA-F0-9]{40}$"
+        amount:
+          type: string
+        notes:
           type: string
           maxLength: 500
     JobAccepted:

@@ -1,4 +1,4 @@
-# PULSE V2 marketplace and discovery guide
+# PULSE V6 marketplace and discovery guide
 
 This is an operator guide. It does not authorize a deployment, listing submission, or on-chain agent mutation. Complete localhost testing first, deploy the final public HTTPS origins second, validate those origins third, and request explicit approval immediately before each external write.
 
@@ -7,7 +7,7 @@ This is an operator guide. It does not authorize a deployment, listing submissio
 Prepare one versioned package from the deployed product:
 
 - Name: PULSE.
-- Version: 2.0.0.
+- Version: 6.0.0.
 - OKX.AI ASP category: Trading. Circle positioning remains Financial analysis / market intelligence.
 - Square PNG logo and SVG brand asset served over public HTTPS.
 - Short and long descriptions from `/v1/metadata`.
@@ -50,20 +50,17 @@ Base paid services use the `/base` aliases, Base mainnet `eip155:8453`, and nati
 5. Query the current CDP Bazaar discovery surface and confirm the final HTTPS resource appears with the correct method, price, Base chain, native-USDC address, and output schema.
 6. Remove or disable any stale resource URL before advertising the new one.
 
-Recommended Base V2 paid resources:
+Recommended Base V6 paid resources (the complete public catalog):
 
 - `/base/v1/analysis/spot/standard`
 - `/base/v1/analysis/spot/premium`
 - `/base/v1/analysis/prediction/standard`
 - `/base/v1/analysis/prediction/premium`
-- `/base/v1/analysis/fused/standard`
-- `/base/v1/analysis/fused/premium`
-- `/base/v1/analysis/divergence`
-- `/base/v1/preflight/event-risk`
+- `/base/v1/preflight`
 
 ## Arbitrum API discovery
 
-PULSE exposes the same approved V2 business routes under `/arbitrum`, using `eip155:42161` and native USDC `0xaf88d065e77c8cc2239327c5edb3a432268e5831`.
+PULSE exposes the same approved five-service V6 catalog under `/arbitrum`, using `eip155:42161` and native USDC `0xaf88d065e77c8cc2239327c5edb3a432268e5831`.
 
 1. Keep Arbitrum disabled until the Base CDP path has passed production canary gates.
 2. Enable `FEATURE_ARBITRUM_PAYMENTS=1` and retain Bazaar discovery only after verifying CDP currently advertises Arbitrum resources in the target environment.
@@ -106,7 +103,7 @@ Agent #8355 is an existing X Layer ASP identity. Update it; do not create a repl
 
 1. Ask the operator’s Onchain OS-enabled agent to show details and services for agent #8355.
 2. Compare ownership, role, active state, name, logo, description, and every service with the approved publication package.
-3. Prepare the updated ASP description using the additive V2 metadata. Preserve the original OKX/X Layer capabilities; add multichain web/API context without implying that OKX settles Base, Arbitrum, or Arc payments.
+3. Prepare the updated ASP description using the focused V6 metadata. Preserve the original OKX/X Layer identity; describe Base, Arbitrum and Arc as separate network/provider aliases without implying that OKX settles their payments.
 4. Add services one at a time. For each service provide name, concise description, exact per-call price, method, input, and final production endpoint. After every service, explicitly choose whether to add another; finish the service list only when all intended rows are reviewed.
 5. Run the marketplace validator against every paid endpoint with a valid body. A GET input-discovery probe may return `input_required`; the valid POST must return a compliant challenge.
 6. Review the complete mutation card. Confirm that the target is #8355, not a new agent; verify all endpoints and prices character-for-character.
@@ -116,15 +113,13 @@ Agent #8355 is an existing X Layer ASP identity. Update it; do not create a repl
 
 Recommended OKX.AI service rows should use X Layer URLs because OKX’s x402 facilitator and marketplace payment validation are X Layer-focused:
 
-- Spot Standard — `/xlayer/v1/analysis/spot/standard` — $0.10.
-- Spot Premium — `/xlayer/v1/analysis/spot/premium` — $0.20.
-- Prediction Standard — `/xlayer/v1/analysis/prediction/standard` — $0.10.
-- Prediction Premium — `/xlayer/v1/analysis/prediction/premium` — $0.20.
-- Fused Standard — `/xlayer/v1/analysis/fused/standard` — $0.15.
-- Fused Premium — `/xlayer/v1/analysis/fused/premium` — $0.30.
-- Divergence — `/xlayer/v1/analysis/divergence` — $0.10.
-- Event-risk Preflight — `/xlayer/v1/preflight/event-risk` — $0.20.
-- Preserve legacy token-scan/preflight rows only if their current public contract and prices are intentionally retained.
+- Global Market Quick Plan — `/xlayer/v1/analysis/spot/standard` — $0.10.
+- Global Market Pro Strategy — `/xlayer/v1/analysis/spot/premium` — $0.20.
+- Prediction Market Quick View — `/xlayer/v1/analysis/prediction/standard` — $0.10.
+- Prediction Market Pro Analysis — `/xlayer/v1/analysis/prediction/premium` — $0.20.
+- Onchain Pre-Trade Risk Guard — `/xlayer/v1/preflight` — $0.05.
+
+Do not publish Fused, Divergence, Event-risk, route tickets, Market/Limit execution or Autopilot evaluation as extra marketplace services. They are internal capabilities or next actions inside the Analyze → Act workflow.
 
 Do not place Base, Arbitrum, or Arc payment endpoints under an OKX-settled service description. Those networks use their own providers and discovery channels.
 

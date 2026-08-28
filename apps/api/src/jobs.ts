@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { Redis } from "@upstash/redis";
+import { kvClientResilienceOptions } from "./resilientKv.js";
 import { get as getBlob, put as putBlob } from "@vercel/blob";
 
 export const JOB_STAGES = [
@@ -85,6 +86,7 @@ export type JobCreateInput = JobCreateRequired & Partial<Pick<AnalysisJob, "inpu
 export interface JobStore {
   acquire(input: JobCreateInput): Promise<{ job: AnalysisJob; created: boolean; recoveryToken?: string }>;
   get(jobId: string): Promise<AnalysisJob | null>;
+  listByPayer(payer: string, networkKey: AnalysisJob["networkKey"], limit?: number): Promise<AnalysisJob[]>;
   transition(jobId: string, stage: JobStage, detail?: string): Promise<AnalysisJob>;
   bindReceipt(jobId: string, receipt: PaymentReceipt): Promise<AnalysisJob>;
   bindReceiptAndEnqueue(jobId: string, receipt: PaymentReceipt): Promise<AnalysisJob>;
@@ -205,6 +207,11 @@ export class MemoryJobStore implements JobStore {
 
   async get(jobId: string) { return this.jobs.get(jobId) || null; }
 
+  async listByPayer(payer: string, networkKey: AnalysisJob["networkKey"], limit = 30) {
+    return [...this.jobs.values()].filter((job) => job.payer.toLowerCase() === payer.toLowerCase() && job.networkKey === networkKey)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, limit);
+  }
+
   async transition(jobId: string, stage: JobStage, detail?: string) {
     const current = this.jobs.get(jobId);
     if (!current) throw new Error("Job not found");
@@ -309,10 +316,11 @@ export class MemoryJobStore implements JobStore {
 export class UpstashJobStore implements JobStore {
   private redis: Redis;
   constructor(url: string, token: string, private retentionSeconds = 15_552_000, private namespace = "pulse") {
-    this.redis = new Redis({ url, token });
+    this.redis = new Redis({ url, token, ...kvClientResilienceOptions() });
   }
   private jobKey(id: string) { return `${this.namespace}:job:${id}`; }
   private idemKey(id: string) { return `${this.namespace}:idem:${id}`; }
+  private payerJobsKey(payer: string) { return `${this.namespace}:payer-jobs:${createHash("sha256").update(payer.toLowerCase()).digest("hex").slice(0, 32)}`; }
   private get readyKey() { return `${this.namespace}:jobs:ready`; }
   private get leasedKey() { return `${this.namespace}:jobs:leased`; }
   private leaseOwnerKey(id: string) { return `${this.namespace}:job-lease:${id}`; }
@@ -327,13 +335,43 @@ export class UpstashJobStore implements JobStore {
     if (result !== job.id) {
       const existing = await this.get(result);
       if (!existing) throw new Error("Idempotency record references a missing job");
+      await this.indexPayerJob(existing);
       return { job: existing, created: false };
     }
+    await this.indexPayerJob(job);
     return { job, created: true, recoveryToken };
   }
 
   async get(jobId: string) {
     return await this.redis.get<AnalysisJob>(this.jobKey(jobId));
+  }
+
+  private async indexPayerJob(job: AnalysisJob) {
+    const key = this.payerJobsKey(job.payer);
+    await this.redis.zadd(key, { score: Date.parse(job.createdAt), member: job.id });
+    await this.redis.expire(key, this.retentionSeconds);
+  }
+
+  async listByPayer(payer: string, networkKey: AnalysisJob["networkKey"], limit = 30) {
+    const indexKey = this.payerJobsKey(payer);
+    const indexedIds = await this.redis.zrange<string[]>(indexKey, 0, Math.max(limit * 3, 60) - 1, { rev: true });
+    let jobs = (await Promise.all(indexedIds.map((id) => this.get(id)))).filter((job): job is AnalysisJob => Boolean(job));
+    if (!jobs.length) {
+      let cursor = "0";
+      const discovered: AnalysisJob[] = [];
+      for (let page = 0; page < 25; page += 1) {
+        const scanResult: [string, string[]] = await this.redis.scan(cursor, { match: `${this.namespace}:job:*`, count: 200 });
+        const nextCursor: string = scanResult[0];
+        const keys: string[] = scanResult[1];
+        const rows = (await Promise.all(keys.map((key) => this.redis.get<AnalysisJob>(key)))).filter((item): item is AnalysisJob => Boolean(item));
+        for (const item of rows) if (item.payer.toLowerCase() === payer.toLowerCase()) { discovered.push(item); await this.indexPayerJob(item); }
+        cursor = nextCursor;
+        if (String(cursor) === "0") break;
+      }
+      jobs = discovered;
+    }
+    return jobs.filter((job) => job.payer.toLowerCase() === payer.toLowerCase() && job.networkKey === networkKey)
+      .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, limit);
   }
 
   private async save(job: AnalysisJob) {
@@ -497,7 +535,7 @@ export class VercelBlobReportStore implements ReportStore {
     private namespace = "pulse",
     private access: "private" | "public" = "private",
     private encryptionKey = "",
-  ) { this.redis = new Redis({ url: redisUrl, token: redisToken }); }
+  ) { this.redis = new Redis({ url: redisUrl, token: redisToken, ...kvClientResilienceOptions() }); }
   private recordKey(id: string) { return `${this.namespace}:report:${id}`; }
   private shareRecordKey(token: string) { return `${this.namespace}:report-share:${shareKey(token)}`; }
   async save(ownerWallet: string, report: unknown) {
@@ -520,7 +558,7 @@ export class VercelBlobReportStore implements ReportStore {
   async get(reportId: string) { return this.redis.get<StoredReport>(this.recordKey(reportId)); }
   async read(record: StoredReport) {
     const payload = this.access === "public"
-      ? decryptReport(await (await fetch(record.blobPath)).text(), this.encryptionKey)
+      ? decryptReport(await this.readPublicBlob(record.blobPath), this.encryptionKey)
       : await (async () => {
           const result = await getBlob(record.blobPath, { access: "private", token: this.token, useCache: false });
           if (!result?.stream) return "";
@@ -530,6 +568,20 @@ export class VercelBlobReportStore implements ReportStore {
     const checksum = createHash("sha256").update(payload).digest("hex");
     if (checksum !== record.checksum) throw new Error("Stored report checksum mismatch");
     return JSON.parse(payload) as unknown;
+  }
+  private async readPublicBlob(url: string) {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+        if (!response.ok) throw new Error(`Blob HTTP ${response.status}`);
+        return await response.text();
+      } catch (error) {
+        lastError = error;
+        if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+      }
+    }
+    throw new Error(`Report storage temporarily unavailable: ${lastError instanceof Error ? lastError.message : String(lastError)}`);
   }
   async createShare(reportId: string) {
     if (!await this.get(reportId)) throw new Error("Report not found");

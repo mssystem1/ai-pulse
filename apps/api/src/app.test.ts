@@ -80,6 +80,21 @@ describe("PULSE API", () => {
     });
   });
 
+  it("never accepts client-declared confirmed trading activity", async () => {
+    const { res } = await jfetch("/v1/trading/activity", {
+      method: "POST",
+      body: JSON.stringify({
+        owner: ADDRESS,
+        network: "base",
+        source: "wallet",
+        kind: "market_buy",
+        status: "confirmed",
+        txHash: `0x${"a".repeat(64)}`,
+      }),
+    });
+    assert.equal(res.status, 400);
+  });
+
   it("healthz", async () => {
     const { res, json } = await jfetch("/healthz");
     assert.equal(res.status, 200);
@@ -109,18 +124,29 @@ describe("PULSE API", () => {
     assert.ok(route);
     assert.equal(route.free, true);
     assert.equal(route.priceUsd, 0);
+    const multichainRoute = json.routes.find((item: { route: string }) => item.route === "GET /v1/tokens");
+    assert.ok(multichainRoute);
+    assert.equal(multichainRoute.free, true);
+    assert.equal(multichainRoute.priceUsd, 0);
   });
 
-  it("publishes the token scan POST body contract in ASP metadata", async () => {
+  it("serves the selected-network token catalog without native pseudo-contracts", async () => {
+    const { res, json } = await jfetch("/arc/v1/tokens?q=USDC&limit=5");
+    assert.equal(res.status, 200);
+    assert.equal(json.network, "arc-testnet");
+    assert.equal(json.tokens[0].symbol, "USDC");
+    assert.equal(json.tokens.some((token: { address: string }) => /^0x[eE]{40}$/.test(token.address)), false);
+  });
+
+  it("publishes the Risk Guard POST body contract in focused ASP metadata", async () => {
     const { res, json } = await jfetch("/v1/metadata");
     assert.equal(res.status, 200);
     const service = json.asp.services.find(
-      (item: { path: string }) => item.path === "/v1/token/scan",
+      (item: { path: string }) => item.path === "/v1/preflight",
     );
     assert.ok(service);
     assert.equal(service.outputSchema.method, "POST");
-    assert.equal(service.outputSchema.input.address.carrier, "body");
-    assert.equal(service.outputSchema.input.address.required, true);
+    assert.equal(service.outputSchema.input.intent.carrier, "body");
   });
 
   it("publishes provider-specific multichain payment aliases", async () => {
@@ -131,7 +157,7 @@ describe("PULSE API", () => {
     assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
     assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));
     assert.equal(services.some((item) => item.path === "/base/v1/token/scan"), false);
-    assert.equal(json.asp.version, "2.0.0");
+    assert.equal(json.asp.version, "6.0.0");
     assert.ok(json.asp.tags.includes("polymarket"));
     assert.ok(json.asp.tags.includes("multichain"));
     const publicPaths = (json.asp.services as Array<{ path: string }>).map((item) => item.path);
@@ -140,6 +166,7 @@ describe("PULSE API", () => {
     }
     assert.ok(publicPaths.includes("/v1/analysis/prediction/standard"));
     assert.ok(publicPaths.includes("/v1/analysis/prediction/premium"));
+    assert.deepEqual(new Set(publicPaths), new Set(["/v1/analysis/spot/standard", "/v1/analysis/spot/premium", "/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium", "/v1/preflight"]));
   });
 
   it("returns 402 without payment", async () => {
@@ -362,19 +389,15 @@ describe("PULSE API", () => {
     });
     const listed = await list.json() as { result?: { tools?: Array<{ name: string }> } };
     const names = listed.result?.tools?.map((tool) => tool.name) || [];
-    assert.deepEqual(names.slice(0, 7), [
-      "spot_search",
-      "spot_ticker",
-      "analysis_base",
-      "analysis_premium",
-      "token_scan",
+    assert.deepEqual(names, [
       "preflight",
-      "resolve",
+      "spot_analysis_standard",
+      "prediction_analysis_standard",
+      "spot_analysis_premium",
+      "prediction_analysis_premium",
+      "job_status",
+      "job_report",
     ]);
-    for (const additive of ["spot_analysis_standard", "prediction_analysis_standard", "prediction_analysis_premium", "job_status", "job_report"]) {
-      assert.ok(names.includes(additive), additive);
-    }
-    for (const hidden of ["fused_analysis_premium", "divergence_analysis", "event_risk_preflight"]) assert.equal(names.includes(hidden), false, hidden);
   });
 
   it("publishes the configured V5 MCP payment challenge", async () => {

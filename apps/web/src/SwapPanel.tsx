@@ -9,7 +9,7 @@ type Props = {
   networkKey: WebNetworkKey; balances: { native: number; payment: number } | null;
   gatewayBalance: number | null; loadingBal: boolean; emphasize?: boolean;
   onClose: () => void; onDisconnect: () => void; onRefresh: () => void;
-  onBrowserConnect: () => void; onCircleConnect: (email: string) => Promise<void>;
+  onOkxConnect: () => void; onOtherWalletConnect: () => void; onCircleConnect: (email: string) => Promise<void>;
 };
 
 type DexQuote = {
@@ -51,7 +51,7 @@ function apiError(data: unknown, fallback: string): string {
   return fallback;
 }
 
-export function SwapPanel({ lang, open, address, walletName, networkKey, balances, gatewayBalance, loadingBal, emphasize, onClose, onDisconnect, onRefresh, onBrowserConnect, onCircleConnect }: Props) {
+export function SwapPanel({ lang, open, address, walletName, networkKey, balances, gatewayBalance, loadingBal, emphasize, onClose, onDisconnect, onRefresh, onOkxConnect, onOtherWalletConnect, onCircleConnect }: Props) {
   const [amount, setAmount] = useState("0.001");
   const [quote, setQuote] = useState<DexQuote | null>(null);
   const [swapBusy, setSwapBusy] = useState<"quote" | "swap" | null>(null);
@@ -251,8 +251,17 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
         <header className="drawer-header"><div><span className="eyebrow">{network.label} wallet</span><h2>{copy.title}</h2><p>Balances and payment readiness for {network.provider}.</p></div><button className="icon-button" type="button" onClick={onClose} aria-label={copy.close}>×</button></header>
         {!address ? (
           <div className="wallet-empty wallet-connect-options">
-            <div className="wallet-orb" aria-hidden>↗</div><p>Choose how to connect. PULSE never receives your private key.</p>
-            <button type="button" className="btn btn-soft full" onClick={onBrowserConnect}>Browser wallet / WalletConnect</button>
+            <div className="wallet-orb" aria-hidden>↗</div><div className="wallet-connect-heading"><strong>Connect your wallet</strong><p>Choose the wallet that will sign payments and trades. PULSE never receives your private key.</p></div>
+            <button type="button" className="wallet-connect-choice okx" onClick={onOkxConnect}>
+              <span className="wallet-choice-logo okx" aria-hidden><i /><i /><i /><i /></span>
+              <span><strong>OKX Wallet</strong><small>Recommended · extension or OKX DApp browser</small></span>
+              <b aria-hidden>→</b>
+            </button>
+            <button type="button" className="wallet-connect-choice" onClick={onOtherWalletConnect}>
+              <span className="wallet-choice-logo walletconnect" aria-hidden>◫</span>
+              <span><strong>Other wallets</strong><small>WalletConnect, MetaMask, Trust Wallet and Base-compatible wallets</small></span>
+              <b aria-hidden>→</b>
+            </button>
             {networkKey === "arc-testnet" && <>
               <div className="connect-divider"><span>or</span></div>
               <div className="circle-network-notice"><strong>Circle email wallet · Arc Testnet only</strong><span>This test wallet automatically switches PULSE to Arc Testnet. Base, Arbitrum, and X Layer are hidden until you disconnect it.</span></div>

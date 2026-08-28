@@ -9,7 +9,25 @@ export type SpotInstrument = {
   baseCcy: string;
   quoteCcy: string;
   state: string;
+  assetClass: GlobalAssetClass;
 };
+
+export type GlobalAssetClass = "crypto" | "tokenized_stock" | "tokenized_etf" | "rwa";
+
+const TOKENIZED_ETF_TICKERS = new Set(["ARKK", "DIA", "GLD", "IBIT", "IWM", "QQQ", "SLV", "SPY", "TLT", "VOO"]);
+const NON_EQUITY_RWA = new Set(["PAXG", "XAUT"]);
+const CRYPTO_X_TICKERS = new Set(["XEC", "XEM", "XLM", "XMR", "XNO", "XRP", "XTZ"]);
+
+/** Classify a live OKX instrument without implying an on-chain execution route. */
+export function classifyGlobalInstrument(baseCcy: string): GlobalAssetClass {
+  const symbol = baseCcy.trim().toUpperCase();
+  if (NON_EQUITY_RWA.has(symbol)) return "rwa";
+  if (!CRYPTO_X_TICKERS.has(symbol) && /^X[A-Z0-9]{1,10}$/.test(symbol)) {
+    const underlying = symbol.slice(1);
+    return TOKENIZED_ETF_TICKERS.has(underlying) ? "tokenized_etf" : "tokenized_stock";
+  }
+  return "crypto";
+}
 
 export type SpotTicker = {
   instId: string;
@@ -94,6 +112,7 @@ export async function listSpotInstruments(limit = 200): Promise<SpotInstrument[]
       baseCcy: i.baseCcy,
       quoteCcy: i.quoteCcy,
       state: i.state,
+      assetClass: classifyGlobalInstrument(i.baseCcy),
     }));
 }
 
@@ -133,6 +152,7 @@ export async function searchSpotInstruments(q: string, limit = 30): Promise<Spot
       baseCcy: i.baseCcy,
       quoteCcy: i.quoteCcy,
       state: i.state,
+      assetClass: classifyGlobalInstrument(i.baseCcy),
     }));
 }
 

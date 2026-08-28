@@ -6,7 +6,9 @@ The layout is designed for desktop and mobile. The main two-column workspace col
 
 ## User flow
 
-1. Connect OKX Wallet (preferred) or another injected EIP-1193 wallet from the header.
+1. Open **Connect wallet** in the header and choose **OKX Wallet** (preferred) or **Other wallets**.
+   - **OKX Wallet** calls the injected OKX EIP-1193 provider directly. PULSE also discovers OKX through EIP-6963 and multi-provider injection, so MetaMask owning `window.ethereum` cannot hide it.
+   - **Other wallets** opens Reown AppKit for WalletConnect, MetaMask, Trust Wallet and Base-compatible connectors. AppKit is a fallback; enabling it must never replace the direct OKX path.
 2. PULSE switches or adds X Layer (`eip155:196`) and reads native OKB plus USDT0.
 3. Open **Wallet & funding** to see both balances and payment readiness.
 4. Enter native OKB and request a live OKX Exchange OS quote for USDT0.
@@ -22,13 +24,15 @@ The layout is designed for desktop and mobile. The main two-column workspace col
 | OKB | X Layer native asset | 18 | Network gas and funding input |
 | USDT0 (USD₮0) | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | 6 | x402 settlement |
 
-Browser prices live in `apps/web/src/balances.ts`: base $0.03, premium $0.06, token score $0.01, and pre-trade check $0.05. The browser guard is UX protection; seller middleware and the facilitator remain authoritative.
+Browser prices live in `apps/web/src/balances.ts`: Global/Prediction Base $0.10, Global/Prediction Premium $0.20, and Onchain Pre-Trade Risk Guard $0.05. The browser guard is UX protection; seller middleware and the facilitator remain authoritative.
 
 Balance reads use the configured X Layer RPC with `eth_getBalance` and ERC-20 `balanceOf`. A paid action always performs a fresh read, so a stale header value cannot authorize an underfunded attempt.
 
 ## Connection and disconnect semantics
 
 EIP-1193 has no universal disconnect operation. PULSE therefore makes app-level disconnect authoritative: it clears account/balance/payment state immediately, closes the drawer, persists the choice across reloads, and attempts `wallet_revokePermissions` plus provider-native disconnect when available. An explicit header Connect clears that marker.
+
+PULSE retains the exact selected provider for all later chain switching, x402 typed-data signing, swaps, Spot orders and Autopilot approvals. It does not silently change from OKX to an AppKit wallet after connection.
 
 `accountsChanged` keeps the interface synchronized. An empty list disconnects the app; an allowed new account refreshes both balances.
 
@@ -77,6 +81,8 @@ Paid token and pre-trade scores remain deterministic heuristics. Liquidity, hold
 ## Acceptance test
 
 1. Connect once and verify header account plus USDT0.
+   - With OKX and MetaMask installed together, choose **OKX Wallet** and confirm the OKX popup opens directly—not the generic Reown selector.
+   - Disconnect, choose **Other wallets**, and confirm Reown opens only for that explicit choice.
 2. Open the drawer and compare OKB/USDT0 with public X Layer RPC/explorer values.
 3. Request a live OKB → USDT0 quote; verify route, output, and price impact.
 4. Review a prepared transaction and confirm the wallet receives the connected account, exact input value, X Layer target, and calldata.

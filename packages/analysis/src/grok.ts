@@ -54,11 +54,90 @@ const SPOT_ANALYSIS_JSON_SCHEMA = {
     keyLevels: { type: "object", additionalProperties: false, properties: { support: { type: "array", items: { type: "number" } }, resistance: { type: "array", items: { type: "number" } } }, required: ["support", "resistance"] },
     targets: { type: "array", items: { type: "object", additionalProperties: false, properties: { label: { type: "string" }, price: { type: "number" }, rationale: { type: "string" } }, required: ["label", "price", "rationale"] } },
     invalidation: { type: "object", additionalProperties: false, properties: { price: { type: ["number", "null"] }, condition: { type: "string" } }, required: ["price", "condition"] },
-    scenarios: { type: "array", items: { type: "object", additionalProperties: false, properties: { name: { type: "string", enum: ["bull", "base", "bear"] }, thesis: { type: "string" }, target: { type: ["number", "null"] }, invalidation: { type: ["number", "null"] } }, required: ["name", "thesis", "target", "invalidation"] } },
+    elliottWave: {
+      type: "object", additionalProperties: false,
+      properties: {
+        degree: { type: "string", enum: ["primary", "intermediate", "minor", "unclear"] },
+        structure: { type: "string", enum: ["impulse", "diagonal", "abc_correction", "complex_correction", "unclear"] },
+        direction: { type: "string", enum: ["up", "down", "unclear"] },
+        currentWave: { type: "string", enum: ["1", "2", "3", "4", "5", "A", "B", "C", "unclear"] },
+        confidence: { type: "number", minimum: 0, maximum: 100 },
+        rationale: { type: "string" },
+        invalidation: { type: ["number", "null"] },
+        paths: {
+          type: "array", minItems: 1, maxItems: 3,
+          items: {
+            type: "object", additionalProperties: false,
+            properties: {
+              type: { type: "string", enum: ["wave_3_continuation", "wave_5_continuation", "abc_correction", "wave_c_continuation", "count_invalidation", "recount"] },
+              label: { type: "string" }, thesis: { type: "string" },
+              trigger: { type: ["number", "null"] }, target: { type: ["number", "null"] }, invalidation: { type: ["number", "null"] },
+              sequence: { type: "array", items: { type: "string" } },
+            },
+            required: ["type", "label", "thesis", "trigger", "target", "invalidation", "sequence"],
+          },
+        },
+      },
+      required: ["degree", "structure", "direction", "currentWave", "confidence", "rationale", "invalidation", "paths"],
+    },
     chartNotes: { type: "string" }, agentAction: { type: "string" }, agentChecklist: { type: "array", items: { type: "string" } }, riskNotes: { type: "array", items: { type: "string" } }, limitations: { type: "array", items: { type: "string" } }, disclaimer: { type: "string" },
   },
-  required: ["headline", "regime", "bias", "confidence", "summary", "keyLevels", "targets", "invalidation", "scenarios", "chartNotes", "agentAction", "agentChecklist", "riskNotes", "limitations", "disclaimer"],
+  required: ["headline", "regime", "bias", "confidence", "summary", "keyLevels", "targets", "invalidation", "elliottWave", "chartNotes", "agentAction", "agentChecklist", "riskNotes", "limitations", "disclaimer"],
 } as const;
+
+/**
+ * A paid report must not become unrecoverable merely because a provider still
+ * serves an older cached structured-output grammar.  Keep the narrative model
+ * output, but supply a conservative, explicitly labelled Elliott hypothesis
+ * from the exact OHLCV window when only that newly-required field is absent or
+ * malformed.
+ */
+function deterministicElliottFallback(market: SpotMarketContext) {
+  const candles = market.candles;
+  const first = candles[0];
+  const last = candles.at(-1);
+  const values = candles.flatMap((candle) => [candle.high, candle.low]).filter(Number.isFinite);
+  const high = values.length ? Math.max(...values) : Number(market.ticker.high24h) || Number(last?.close) || 0;
+  const low = values.length ? Math.min(...values) : Number(market.ticker.low24h) || Number(last?.close) || 0;
+  const close = Number(last?.close) || Number(market.ticker.last) || 0;
+  const opening = Number(first?.open) || close;
+  const up = close >= opening;
+  const range = Math.max(Math.abs(high - low), Math.abs(close) * 0.01, 1e-9);
+  const currentWave = candles.length >= 80 ? "5" as const : "3" as const;
+  const continuationType = currentWave === "5" ? "wave_5_continuation" as const : "wave_3_continuation" as const;
+  const continuationTarget = up ? high + range * 0.272 : Math.max(0, low - range * 0.272);
+  const correctionTarget = up ? high - range * 0.5 : low + range * 0.5;
+  const round = (value: number) => Number(value.toPrecision(10));
+  return {
+    degree: "minor" as const,
+    structure: "impulse" as const,
+    direction: up ? "up" as const : "down" as const,
+    currentWave,
+    confidence: 45,
+    rationale: "The provider omitted a valid Elliott object, so PULSE derived this conservative candidate count deterministically from the complete supplied OHLCV window. Treat it as a hypothesis until its trigger holds.",
+    invalidation: round(up ? low : high),
+    paths: [
+      {
+        type: continuationType,
+        label: `Wave ${currentWave} continuation`,
+        thesis: `The candidate impulse continues only after price confirms beyond the observed ${up ? "high" : "low"}.`,
+        trigger: round(up ? high : low),
+        target: round(continuationTarget),
+        invalidation: round(correctionTarget),
+        sequence: [`Wave ${currentWave === "3" ? "2" : "4"} structure holds`, `Wave ${currentWave} confirms through the prior extreme`, "Reassess the count at the extension target"],
+      },
+      {
+        type: "abc_correction" as const,
+        label: "A-B-C correction / alternate count",
+        thesis: "Failure of the continuation structure activates a corrective A-B-C hypothesis, not a short recommendation.",
+        trigger: round(correctionTarget),
+        target: round(up ? high - range * 0.618 : low + range * 0.618),
+        invalidation: round(up ? high : low),
+        sequence: ["Wave A breaks the continuation structure", "Wave B retraces part of A", "Wave C tests the deeper Fibonacci zone"],
+      },
+    ],
+  };
+}
 
 function extractJson(text: string): Record<string, unknown> {
   const cleaned = text.replace(/```json\s*/gi, "").replace(/```/g, "").trim();
@@ -153,7 +232,10 @@ export async function runPreparedSpotAnalysis(
     model: cfg.model,
     temperature: 0.3,
     reasoning_effort: req.reasoningEffort || (req.tier === "premium" ? "low" : "none"),
-    response_format: { type: "json_schema", json_schema: { name: `pulse_spot_${req.tier}`, strict: true, schema: SPOT_ANALYSIS_JSON_SCHEMA } },
+    // Version the grammar name as well as its body. Some providers cache the
+    // compiled schema by name and otherwise keep returning the pre-Elliott V5
+    // object even after the schema body changes.
+    response_format: { type: "json_schema", json_schema: { name: `pulse_spot_${req.tier}_v6_elliott`, strict: true, schema: SPOT_ANALYSIS_JSON_SCHEMA } },
     ...(req.maxOutputTokens ? { max_tokens: req.maxOutputTokens } : {}),
     messages: [
       { role: "system", content: sys },
@@ -168,6 +250,7 @@ export async function runPreparedSpotAnalysis(
       Authorization: `Bearer ${cfg.apiKey}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(90_000),
   });
 
   const raw = await res.text();
@@ -193,7 +276,17 @@ export async function runPreparedSpotAnalysis(
   }
 
   const candidate = extractJson(text);
-  const validated = SpotGeneratedAnalysisSchema.safeParse(candidate);
+  // `scenarios` was part of the previous grammar. It is intentionally dropped:
+  // V6 next moves are Elliott paths, never renamed bull/base/bear branches.
+  const normalized = { ...candidate };
+  delete normalized.scenarios;
+  let validated = SpotGeneratedAnalysisSchema.safeParse(normalized);
+  if (!validated.success && validated.error.issues.some((issue) => issue.path[0] === "elliottWave")) {
+    validated = SpotGeneratedAnalysisSchema.safeParse({
+      ...normalized,
+      elliottWave: deterministicElliottFallback(market),
+    });
+  }
   if (!validated.success) {
     const issue = validated.error.issues[0];
     throw new Error(`Grok structured output failed validation at ${issue?.path.join(".") || "root"}: ${issue?.message || "invalid output"}`);

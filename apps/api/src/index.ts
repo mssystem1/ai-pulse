@@ -1,10 +1,16 @@
 import { loadConfig } from "@pulse/config";
 import { createApp } from "./app.js";
+import { startTradeAutomation } from "./tradeAutomation.js";
+import { startAutopilotAutomation } from "./autopilotAutomation.js";
+import { startTelegramDeliveryWorker } from "./telegram.js";
 
 const cfg = loadConfig();
 const app = createApp(cfg);
 
 if (process.env.NODE_ENV !== "test") {
+  startTradeAutomation(cfg);
+  startAutopilotAutomation(cfg);
+  startTelegramDeliveryWorker();
   app.listen(cfg.PORT, cfg.HOST, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════╗

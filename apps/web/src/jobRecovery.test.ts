@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery.js";
+import { clearJobRecovery, forgetJobRecovery, listJobRecoveries, readJobRecovery, saveJobRecovery } from "./jobRecovery.js";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -38,4 +38,16 @@ test("removes malformed recovery data instead of issuing an unauthenticated requ
   storage.setItem("pulse:last-job:prediction:xlayer", JSON.stringify({ jobId: "bad", recoveryToken: "short" }));
   assert.equal(readJobRecovery(storage, "xlayer"), null);
   assert.equal(storage.length, 0);
+});
+
+test("keeps a device-local report history after the latest-job pointer clears", () => {
+  const storage = memoryStorage();
+  const first = { jobId: "12345678-1234-1234-1234-123456789abc", recoveryToken: "x".repeat(43), label: "ETH-USDT · 4H", tier: "premium" };
+  const second = { jobId: "abcdefab-1234-1234-1234-abcdefabcdef", recoveryToken: "y".repeat(43), label: "BTC-USDT · 1D", tier: "base" };
+  saveJobRecovery(storage, "base", first, "spot");
+  saveJobRecovery(storage, "base", second, "spot");
+  clearJobRecovery(storage, "base", "spot");
+  assert.equal(listJobRecoveries(storage, "base", "spot").length, 2);
+  forgetJobRecovery(storage, "base", "spot", first.jobId);
+  assert.deepEqual(listJobRecoveries(storage, "base", "spot").map((item) => item.jobId), [second.jobId]);
 });

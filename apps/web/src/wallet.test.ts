@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertPaymentBalance, networkKeyForChainId, readPreferredNetwork, savePreferredNetwork, WEB_NETWORKS, switchWalletNetwork } from "./networks.js";
-import { validatePaymentChallenge, walletProviderName, type InjectedProvider } from "./wallet.js";
+import { findOkxProvider, validatePaymentChallenge, walletProviderName, type InjectedProvider } from "./wallet.js";
 
 test("persists the selected network across application starts", () => {
   const values = new Map<string, string>();
@@ -54,6 +54,22 @@ test("does not hide wallet rejection or provider-specific failures", async () =>
   assert.equal(walletProviderName({ isMetaMask: true } as InjectedProvider), "MetaMask");
   assert.equal(walletProviderName({ isRabby: true } as InjectedProvider), "Rabby");
   assert.equal(walletProviderName({ isCoinbaseWallet: true } as InjectedProvider), "Base Account / Coinbase Wallet");
+});
+
+test("finds OKX Wallet before another extension in a multiplexed injected provider", () => {
+  const metamask = { request: async () => null, isMetaMask: true } as InjectedProvider;
+  const okx = { request: async () => null, isOkxWallet: true } as InjectedProvider;
+  const ethereum = { request: async () => null, providers: [metamask, okx] } as InjectedProvider;
+  assert.equal(findOkxProvider({ ethereum }), okx);
+});
+
+test("finds OKX Wallet through EIP-6963 without relying on window.ethereum ownership", () => {
+  const metamask = { request: async () => null, isMetaMask: true } as InjectedProvider;
+  const okx = { request: async () => null } as InjectedProvider;
+  assert.equal(findOkxProvider({ ethereum: metamask }, [
+    { info: { name: "MetaMask", rdns: "io.metamask" }, provider: metamask },
+    { info: { name: "OKX Wallet", rdns: "com.okex.wallet" }, provider: okx },
+  ]), okx);
 });
 
 test("reconciles wallet chain events with every supported PULSE network", () => {

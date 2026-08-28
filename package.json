@@ -3,26 +3,28 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "PULSE — multichain spot and prediction-market intelligence with x402 payments for humans and AI agents.",
+  "description": "PULSE — Global and Prediction Market intelligence connected to owner-signed Spot execution, guarded Autopilot, Risk Guard, and multichain x402 payments.",
   "workspaces": [
     "packages/*",
     "apps/*"
   ],
   "scripts": {
     "dev": "node scripts/dev.mjs",
-    "build": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
+    "build": "npm run build -w @pulse/contracts && npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
     "build:vercel": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
     "e2e:paid": "node scripts/e2e-paid.mjs",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:web:safe": "scripts\\dev-web.cmd",
     "start:api": "npm run start -w @pulse/api",
-    "test": "npm run test -w @pulse/config && npm run test -w @pulse/domain && npm run test -w @pulse/market && npm run test -w @pulse/analysis && npm run test -w @pulse/payments && npm run test -w @pulse/sdk && npm run test -w @pulse/api && npm run test -w @pulse/web",
+    "test": "npm run test -w @pulse/contracts && npm run test -w @pulse/config && npm run test -w @pulse/domain && npm run test -w @pulse/market && npm run test -w @pulse/analysis && npm run test -w @pulse/payments && npm run test -w @pulse/sdk && npm run test -w @pulse/api && npm run test -w @pulse/web",
     "smoke": "npm run smoke -w @pulse/api"
     ,"validate:alerts": "node scripts/validate-alert-rules.mjs"
     ,"readiness:upstash": "npm run build && node scripts/upstash-queue-readiness.mjs"
     ,"readiness:blob": "npm run build && node scripts/blob-storage-readiness.mjs"
     ,"readiness:okx": "npm run build && node scripts/okx-auth-readiness.mjs"
+    ,"audit:autopilot": "npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/api && node scripts/autopilot-readonly-audit.mjs"
+    ,"scan:autopilot": "npm run build -w @pulse/market && npm run build -w @pulse/api && node scripts/autopilot-candidate-scan.mjs"
     ,"env:cloud:export": "node scripts/export-new-cloud-env.mjs"
   },
   "engines": {
@@ -36,6 +38,11 @@
     "arc",
     "polymarket",
     "prediction-markets",
+    "xstocks",
+    "rwa",
+    "spot-trading",
+    "autopilot",
+    "risk-guard",
     "multichain",
     "a2mcp",
     "asp",

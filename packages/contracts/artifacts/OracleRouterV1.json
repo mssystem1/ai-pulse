@@ -1,0 +1,212 @@
+{
+  "contractName": "OracleRouterV1",
+  "sourceName": "OracleRouterV1.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "updater",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "base",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "quote",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "updatedAt",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "maxAge",
+          "type": "uint256"
+        }
+      ],
+      "name": "PriceUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "updater",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "UpdaterSet",
+      "type": "event"
+    },
+    {
+      "inputs": [],
+      "name": "admin",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "",
+          "type": "bytes32"
+        }
+      ],
+      "name": "observations",
+      "outputs": [
+        {
+          "internalType": "uint192",
+          "name": "price",
+          "type": "uint192"
+        },
+        {
+          "internalType": "uint64",
+          "name": "updatedAt",
+          "type": "uint64"
+        },
+        {
+          "internalType": "uint64",
+          "name": "maxAge",
+          "type": "uint64"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "base",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "quote",
+          "type": "address"
+        }
+      ],
+      "name": "readPrice",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "price",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint256",
+          "name": "updatedAt",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "base",
+          "type": "address"
+        },
+        {
+          "internalType": "address",
+          "name": "quote",
+          "type": "address"
+        },
+        {
+          "internalType": "uint192",
+          "name": "price",
+          "type": "uint192"
+        },
+        {
+          "internalType": "uint64",
+          "name": "maxAge",
+          "type": "uint64"
+        }
+      ],
+      "name": "setPrice",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "updater",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "approved",
+          "type": "bool"
+        }
+      ],
+      "name": "setUpdater",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "updaters",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x60a03460b457601f6106a238819003918201601f19168301916001600160401b0383118484101760b85780849260209460405283398101031260b457516001600160a01b0381169081900360b4578015608957336080525f525f60205260405f20600160ff198254161790556040516105d590816100cd8239608051818181607d015261034f0152f35b606460405162461bcd60e51b81526020600482015260046024820152635a45524f60e01b6044820152fd5b5f80fd5b634e487b7160e01b5f52604160045260245ffdfe6080806040526004361015610012575f80fd5b5f3560e01c9081630de2811a146103f0575080631a1533911461031e57806354a055c1146102e2578063562dcf4a146100f65780637e74709c146100a55763f851a4401461005e575f80fd5b346100a1575f3660031901126100a15760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b5f80fd5b346100a15760203660031901126100a1576004355f526001602052606060405f2067ffffffffffffffff6001825492015416604051916001600160c01b038116835260c01c60208301526040820152f35b346100a15760803660031901126100a15761010f610521565b610117610537565b90604435916001600160c01b0383168093036100a15760643567ffffffffffffffff81168091036100a157335f525f60205260ff60405f205416156102b3576001600160a01b03831692831515806102a1575b80610298575b8061028d575b15610260577f9a3f414f907ddb77231900d221b663199d0a42096ca010e25f0bb7292c409b4e926060926001600160a01b039267ffffffffffffffff60016040516101c08161054d565b8a81526020810183421681526040820194868652604051610210816102028b6020830195869092916001600160a01b0360209181604085019616845216910152565b03601f19810183528261057d565b5190205f52826020526001600160c01b0360405f20925116908460c01b905160c01b161781550191511667ffffffffffffffff1982541617905560405196875242602088015260408701521693a3005b60405162461bcd60e51b8152602060048201526005602482015264125394155560da1b6044820152606490fd5b50601e821015610176565b50841515610170565b506001600160a01b038316151561016a565b60405162461bcd60e51b81526020600482015260076024820152662aa82220aa22a960c91b6044820152606490fd5b346100a15760203660031901126100a1576001600160a01b03610303610521565b165f525f602052602060ff60405f2054166040519015158152f35b346100a15760403660031901126100a157610337610521565b602435908115158092036100a1576001600160a01b037f00000000000000000000000000000000000000000000000000000000000000001633036103c35760206001600160a01b037f9e0f3fc17a5f47bd46f3cab56d4d8a9ea9f32ad817657c3ea8e5dff28da3e3e7921692835f525f825260405f2060ff1981541660ff8316179055604051908152a2005b60405162461bcd60e51b815260206004820152600560248201526420a226a4a760d91b6044820152606490fd5b346100a15760403660031901126100a157610409610521565b9061043981610202610419610537565b6001600160a01b0395861660208401908152951660408301526060820190565b5190205f52600160205260405f20604051906104548261054d565b80546001600160c01b0381169081845260c01c9067ffffffffffffffff6001602086019484865201541690816040860152151591826104e7575b5050156104ba5767ffffffffffffffff6001600160c01b03604093511691511682519182526020820152f35b60405162461bcd60e51b81526020600482015260056024820152645354414c4560d81b6044820152606490fd5b01905067ffffffffffffffff811161050d5767ffffffffffffffff16421115838061048e565b634e487b7160e01b5f52601160045260245ffd5b600435906001600160a01b03821682036100a157565b602435906001600160a01b03821682036100a157565b6060810190811067ffffffffffffffff82111761056957604052565b634e487b7160e01b5f52604160045260245ffd5b90601f8019910116810190811067ffffffffffffffff8211176105695760405256fea2646970667358221220cdb12d4817e531215736b2f8785a016a916ec6c85006efc88b176c3b5428a52964736f6c634300081a0033",
+  "deployedBytecode": "0x6080806040526004361015610012575f80fd5b5f3560e01c9081630de2811a146103f0575080631a1533911461031e57806354a055c1146102e2578063562dcf4a146100f65780637e74709c146100a55763f851a4401461005e575f80fd5b346100a1575f3660031901126100a15760206040516001600160a01b037f0000000000000000000000000000000000000000000000000000000000000000168152f35b5f80fd5b346100a15760203660031901126100a1576004355f526001602052606060405f2067ffffffffffffffff6001825492015416604051916001600160c01b038116835260c01c60208301526040820152f35b346100a15760803660031901126100a15761010f610521565b610117610537565b90604435916001600160c01b0383168093036100a15760643567ffffffffffffffff81168091036100a157335f525f60205260ff60405f205416156102b3576001600160a01b03831692831515806102a1575b80610298575b8061028d575b15610260577f9a3f414f907ddb77231900d221b663199d0a42096ca010e25f0bb7292c409b4e926060926001600160a01b039267ffffffffffffffff60016040516101c08161054d565b8a81526020810183421681526040820194868652604051610210816102028b6020830195869092916001600160a01b0360209181604085019616845216910152565b03601f19810183528261057d565b5190205f52826020526001600160c01b0360405f20925116908460c01b905160c01b161781550191511667ffffffffffffffff1982541617905560405196875242602088015260408701521693a3005b60405162461bcd60e51b8152602060048201526005602482015264125394155560da1b6044820152606490fd5b50601e821015610176565b50841515610170565b506001600160a01b038316151561016a565b60405162461bcd60e51b81526020600482015260076024820152662aa82220aa22a960c91b6044820152606490fd5b346100a15760203660031901126100a1576001600160a01b03610303610521565b165f525f602052602060ff60405f2054166040519015158152f35b346100a15760403660031901126100a157610337610521565b602435908115158092036100a1576001600160a01b037f00000000000000000000000000000000000000000000000000000000000000001633036103c35760206001600160a01b037f9e0f3fc17a5f47bd46f3cab56d4d8a9ea9f32ad817657c3ea8e5dff28da3e3e7921692835f525f825260405f2060ff1981541660ff8316179055604051908152a2005b60405162461bcd60e51b815260206004820152600560248201526420a226a4a760d91b6044820152606490fd5b346100a15760403660031901126100a157610409610521565b9061043981610202610419610537565b6001600160a01b0395861660208401908152951660408301526060820190565b5190205f52600160205260405f20604051906104548261054d565b80546001600160c01b0381169081845260c01c9067ffffffffffffffff6001602086019484865201541690816040860152151591826104e7575b5050156104ba5767ffffffffffffffff6001600160c01b03604093511691511682519182526020820152f35b60405162461bcd60e51b81526020600482015260056024820152645354414c4560d81b6044820152606490fd5b01905067ffffffffffffffff811161050d5767ffffffffffffffff16421115838061048e565b634e487b7160e01b5f52601160045260245ffd5b600435906001600160a01b03821682036100a157565b602435906001600160a01b03821682036100a157565b6060810190811067ffffffffffffffff82111761056957604052565b634e487b7160e01b5f52604160045260245ffd5b90601f8019910116810190811067ffffffffffffffff8211176105695760405256fea2646970667358221220cdb12d4817e531215736b2f8785a016a916ec6c85006efc88b176c3b5428a52964736f6c634300081a0033",
+  "metadata": "{\"compiler\":{\"version\":\"0.8.26+commit.8a97fa7a\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"updater\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"base\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"quote\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"updatedAt\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"maxAge\",\"type\":\"uint256\"}],\"name\":\"PriceUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"updater\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"UpdaterSet\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"bytes32\",\"name\":\"\",\"type\":\"bytes32\"}],\"name\":\"observations\",\"outputs\":[{\"internalType\":\"uint192\",\"name\":\"price\",\"type\":\"uint192\"},{\"internalType\":\"uint64\",\"name\":\"updatedAt\",\"type\":\"uint64\"},{\"internalType\":\"uint64\",\"name\":\"maxAge\",\"type\":\"uint64\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"base\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"quote\",\"type\":\"address\"}],\"name\":\"readPrice\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"price\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"updatedAt\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"base\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"quote\",\"type\":\"address\"},{\"internalType\":\"uint192\",\"name\":\"price\",\"type\":\"uint192\"},{\"internalType\":\"uint64\",\"name\":\"maxAge\",\"type\":\"uint64\"}],\"name\":\"setPrice\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"updater\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"approved\",\"type\":\"bool\"}],\"name\":\"setUpdater\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"updaters\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"stateMutability\":\"view\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"OracleRouterV1.sol\":\"OracleRouterV1\"},\"evmVersion\":\"shanghai\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":true,\"runs\":500},\"remappings\":[],\"viaIR\":true},\"sources\":{\"OracleRouterV1.sol\":{\"keccak256\":\"0x152f4d16624ed2ad69e2a1a91b3349ea0451748a4a1c9d71c1ec6bd97b1ea544\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://cd92cb2c4b3d330258e49fcf69a281f57d4f74e0172a93f51faaab7e43c4eab5\",\"dweb:/ipfs/QmeRB3rdue5NAUkwgSWJHdmD5pDEHuCbqAj4obERHVT29N\"]}},\"version\":1}"
+}

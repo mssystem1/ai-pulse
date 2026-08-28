@@ -1,0 +1,20 @@
+{
+  "name": "PULSE — Analyze, Spot Trade or Autopilot",
+  "short_name": "PULSE",
+  "description": "Multichain Global and Prediction Market intelligence connected to owner-signed Spot execution, guarded Autopilot, and Risk Guard.",
+  "start_url": "/global",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#06131f",
+  "theme_color": "#06131f",
+  "categories": ["finance", "business", "utilities"],
+  "lang": "en",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

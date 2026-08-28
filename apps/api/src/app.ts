@@ -5,6 +5,8 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { createCircleWalletRouter } from "./circleWallet.js";
+import { createTradeAutomationRouter } from "./tradeAutomation.js";
+import { createAutopilotAutomationRouter } from "./autopilotAutomation.js";
 import type { AppConfig } from "@pulse/config";
 import { buildAspMetadata, getNetwork, priceLabel, type NetworkKey } from "@pulse/config";
 
@@ -26,7 +28,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runPreparedSpotAnalysis, runPreparedV5Analysis } from "@pulse/analysis";
+import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runPreparedSpotAnalysis, runPreparedV5Analysis } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -64,7 +66,7 @@ import { z } from "zod";
 import { createPaidFetch, buyerAddress } from "@pulse/buyer";
 import { createMcpHandler } from "./mcp.js";
 import { getReport, listReports, saveReport } from "./store.js";
-import { getOkbUsdt0Quote, getOkbUsdt0Swap } from "./okxDex.js";
+import { executionAssetAliases, getOkbUsdt0Quote, getOkbUsdt0Swap, getOkxTradeTokens, searchOkxDefiOpportunities } from "./okxDex.js";
 import { collectLiveContractEvidence, inspectEvmAddress, simulateEvmTransaction } from "./contractInspect.js";
 import { getCdpNativeUsdcSwap } from "./cdpSwap.js";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
@@ -72,6 +74,11 @@ import { createPersistence, paymentIdempotencyKey, requestHash, runReceiptBoundO
 import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
 import { ArcBudgetExceededError, createArcBudgetStore, paymentPayer, type ArcBudgetStore } from "./arcBudget.js";
+import { createV6Router } from "./v6Routes.js";
+import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability } from "./telegram.js";
+import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } from "./resilientKv.js";
+import { ReportHistoryAuth } from "./reportHistoryAuth.js";
+import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
 
 const AnalysisBodySchema = z.object({
   instId: z.string().min(3).max(32),
@@ -113,11 +120,18 @@ function findBrandDir(): string {
   return resolve(process.cwd(), "assets");
 }
 
+function findDocsDir(): string {
+  const candidates = [resolve(process.cwd(), "docs"), resolve(process.cwd(), "../../docs")];
+  try { candidates.push(resolve(dirname(fileURLToPath(import.meta.url)), "../../../docs")); } catch { /* ignore */ }
+  return candidates.find((candidate) => existsSync(resolve(candidate, "PRODUCT_TESTING_GUIDE.md"))) || resolve(process.cwd(), "docs");
+}
+
 export function createApp(cfg: AppConfig, dependencies: {
   polymarket?: PolymarketClient;
   persistence?: ReturnType<typeof createPersistence>;
   arcBudget?: ArcBudgetStore;
   spotContext?: typeof buildMarketContext;
+  automationTick?: Partial<AutomationTickDependencies>;
 } = {}) {
   const app = express();
   const polymarket = dependencies.polymarket || new PolymarketClient({
@@ -127,6 +141,11 @@ export function createApp(cfg: AppConfig, dependencies: {
     observer: recordProvider,
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
+  let durableWorker: DurableJobWorker | undefined;
+  const wakeWorker = () => {
+    void durableWorker?.notify();
+  };
+  const reportHistoryAuth = new ReportHistoryAuth(cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || buildMarketContext;
   const arcBudget = dependencies.arcBudget || createArcBudgetStore({
     QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
@@ -138,6 +157,11 @@ export function createApp(cfg: AppConfig, dependencies: {
     
   app.use(cors({ exposedHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE"] }));
   app.use(express.json({ limit: "12mb" }));
+  app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
+  app.use(createV6Router(cfg));
+  app.use(createTradeAutomationRouter());
+  app.use(createAutopilotAutomationRouter());
+  app.use(createTelegramRouter(cfg));
   app.use(telemetryMiddleware);
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));
   // Authentication and challenge creation must not pass through a payment-network route.
@@ -172,6 +196,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const brandDir = findBrandDir();
   app.use("/brand", express.static(brandDir, { maxAge: "1d" }));
+  app.use("/guides", express.static(findDocsDir(), { maxAge: "5m", fallthrough: false }));
 
   app.get("/", (_req, res) => {
     res.json({
@@ -203,6 +228,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       grokModel: cfg.GROK_MODEL,
       network: cfg.X402_NETWORK,
       logo: cfg.logoUrl,
+      dependencies: { kv: kvCircuitStatus() },
     });
   });
 
@@ -708,57 +734,202 @@ export function createApp(cfg: AppConfig, dependencies: {
     const token = String(req.header("PULSE-RECOVERY-TOKEN") || req.query.recoveryToken || "");
     return verifyRecoveryToken(job, token) ? job : false;
   };
+  const asyncRoute = (handler: (req: express.Request, res: express.Response) => Promise<unknown>): express.RequestHandler =>
+    (req, res, next) => { void handler(req, res).catch(next); };
 
-  app.get("/v1/jobs/:jobId", async (req, res) => {
+  const HistoryIdentitySchema = z.object({
+    wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    networkKey: z.enum(["xlayer", "base", "arbitrum", "arc-testnet"]),
+  });
+
+  app.get("/v1/tokens", async (req, res) => {
+    try {
+      const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+      const network = getNetwork(key);
+      const q = String(req.query.q || "").trim().slice(0, 100);
+      const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 60);
+      if (key === "xlayer") {
+        const tokens = await observeProvider("okx_dex", "token_catalog", () => getXLayerTokenCatalog(cfg, q, limit));
+        return res.json({ service: "network_token_catalog", network: key, chainId: String(network.chainId), query: q, count: tokens.length, sources: ["OKX Onchain OS", "DexScreener when available"], tokens });
+      }
+
+      const configured = network.paymentAsset.address ? [{
+        symbol: network.paymentAsset.symbol,
+        name: network.paymentAsset.name,
+        address: network.paymentAsset.address,
+        decimals: network.paymentAsset.decimals,
+        logoUrl: null,
+        provider: key === "arc-testnet" ? "Arc Testnet configuration" : "PULSE network registry",
+      }] : [];
+      const routed = key === "arc-testnet" ? [] : await observeProvider("okx_dex", "token_catalog", () => getOkxTradeTokens(cfg, String(network.chainId), q, limit)).catch(() => []);
+      const normalizedQuery = q.toLowerCase();
+      const relevance = (item: { symbol: string; name: string }) => {
+        const symbol = item.symbol.toLowerCase();
+        const name = item.name.toLowerCase();
+        if (!normalizedQuery) return 0;
+        if (symbol === normalizedQuery) return 4;
+        if (symbol === `w${normalizedQuery}` || symbol === `cb${normalizedQuery}` || symbol === `x${normalizedQuery}`) return 3;
+        if (symbol.startsWith(normalizedQuery)) return 2;
+        if (name.startsWith(normalizedQuery)) return 1;
+        return 0;
+      };
+      const tokens = [...configured, ...routed]
+        .filter((item) => !/^0x[eE]{40}$/.test(item.address) && !/^0x0{40}$/.test(item.address))
+        .filter((item, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === item.address.toLowerCase()) === index)
+        .filter((item) => !normalizedQuery || [item.symbol, item.name, item.address].some((value) => value.toLowerCase().includes(normalizedQuery)))
+        .sort((a, b) => relevance(b) - relevance(a))
+        .slice(0, limit)
+        .map((item) => ({
+          address: item.address,
+          symbol: item.symbol,
+          name: item.name,
+          logoUrl: item.logoUrl || null,
+          priceUsd: null,
+          change24h: null,
+          liquidityUsd: null,
+          marketCapUsd: null,
+          holders: null,
+          communityRecognized: false,
+          dexUrl: null,
+          sources: [item.provider || "OKX Onchain OS"],
+        }));
+      return res.json({ service: "network_token_catalog", network: key, chainId: String(network.chainId), query: q, count: tokens.length, sources: key === "arc-testnet" ? ["Arc Testnet network registry"] : ["OKX Onchain OS"], tokens, manualAddressSupported: true });
+    } catch (e) {
+      return res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
+  const historySession = async (req: express.Request) => {
+    const header = String(req.header("Authorization") || "");
+    return reportHistoryAuth.authenticate(header.startsWith("Bearer ") ? header.slice(7) : "");
+  };
+  const historyLabel = (job: AnalysisJob) => {
+    const input = job.input && typeof job.input === "object" ? job.input as Record<string, unknown> : {};
+    if (job.mode === "spot") return `${String(input.instId || "Global market")} · ${String(input.timeframe || "report")}`;
+    if (job.mode === "prediction") return `Prediction · ${String(input.primaryMarketId || "selected market").slice(0, 42)}`;
+    return `${job.mode.replaceAll("-", " ")} report`;
+  };
+
+  app.use("/v1/report-history", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store, no-cache, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    next();
+  });
+
+  app.post("/v1/report-history/challenge", asyncRoute(async (req, res) => {
+    const identity = HistoryIdentitySchema.parse(req.body);
+    return res.json(await reportHistoryAuth.issue(identity.wallet, identity.networkKey));
+  }));
+  app.post("/v1/report-history/session", asyncRoute(async (req, res) => {
+    const body = HistoryIdentitySchema.extend({ nonce: z.string().min(20).max(100), signature: z.string().regex(/^0x[a-fA-F0-9]{130}$/) }).parse(req.body);
+    try { return res.json(await reportHistoryAuth.authorize(body.wallet, body.networkKey, body.nonce, body.signature as `0x${string}`)); }
+    catch (error) { return res.status(401).json({ error: error instanceof Error ? error.message : String(error) }); }
+  }));
+  app.get("/v1/report-history", asyncRoute(async (req, res) => {
+    const session = await historySession(req);
+    if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
+    const jobs = await persistence.jobs.listByPayer(session.wallet, session.networkKey, 30);
+    return res.json({ wallet: session.wallet, networkKey: session.networkKey, reports: jobs.map((job) => ({ id: job.id, mode: job.mode, tier: job.tier, stage: job.stage, label: historyLabel(job), createdAt: job.createdAt, updatedAt: job.updatedAt, ready: Boolean(job.reportId) })) });
+  }));
+  app.get("/v1/report-history/:jobId/report", asyncRoute(async (req, res) => {
+    const session = await historySession(req);
+    if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
+    const job = await persistence.jobs.get(String(req.params.jobId));
+    if (!job) return res.status(404).json({ error: "Report job not found" });
+    if (job.payer.toLowerCase() !== session.wallet || job.networkKey !== session.networkKey) return res.status(403).json({ error: "This report does not belong to the authenticated wallet and network" });
+    if (!job.reportId) return res.status(409).json({ error: "Report is not ready", stage: job.stage });
+    const record = await persistence.reports.get(job.reportId);
+    if (!record || record.ownerWallet !== session.wallet) return res.status(404).json({ error: "Stored report not found" });
+    return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record), job: publicJobView(job) });
+  }));
+
+  // Job state is a live coordination resource. Browser ETags caused Safari to
+  // keep replaying a stale 304 while the worker was progressing in KV, so no
+  // job/status/report response may be cached by a browser or intermediary.
+  app.use("/v1/jobs", (_req, res, next) => {
+    res.setHeader("Cache-Control", "private, no-store, no-cache, max-age=0, must-revalidate");
+    res.setHeader("Pragma", "no-cache");
+    res.removeHeader("ETag");
+    next();
+  });
+
+  app.get("/v1/jobs/:jobId", asyncRoute(async (req, res) => {
     const job = await authorizedJob(req);
     if (job === null) return res.status(404).json({ error: "Job not found" });
     if (job === false) return res.status(403).json({ error: "Valid PULSE-RECOVERY-TOKEN required" });
     const report = job.reportId ? await persistence.reports.get(job.reportId) : null;
     return res.json({ job: publicJobView(job), ...(report ? { storedReport: privateRecordView(report) } : {}) });
-  });
+  }));
 
-  app.get("/v1/jobs/:jobId/report", async (req, res) => {
+  app.get("/v1/jobs/:jobId/report", asyncRoute(async (req, res) => {
     const job = await authorizedJob(req);
     if (job === null) return res.status(404).json({ error: "Job not found" });
     if (job === false) return res.status(403).json({ error: "Valid PULSE-RECOVERY-TOKEN required" });
     if (!job.reportId) return res.status(409).json({ error: "Report is not ready", stage: job.stage });
     const record = await persistence.reports.get(job.reportId);
     if (!record) return res.status(404).json({ error: "Stored report not found" });
-    return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record), job: publicJobView(job) });
-  });
+    try {
+      return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record), job: publicJobView(job) });
+    } catch (error) {
+      res.setHeader("Retry-After", "5");
+      return res.status(503).json({ error: "Report storage is temporarily unavailable", recoverable: true, retryAfterSeconds: 5, detail: error instanceof Error ? error.message : String(error) });
+    }
+  }));
 
-  app.get("/v1/private/reports/:reportId", async (req, res) => {
-    const record = await persistence.reports.get(req.params.reportId);
+  app.post("/v1/jobs/:jobId/retry", asyncRoute(async (req, res) => {
+    const job = await authorizedJob(req);
+    if (job === null) return res.status(404).json({ error: "Job not found" });
+    if (job === false) return res.status(403).json({ error: "Valid PULSE-RECOVERY-TOKEN required" });
+    if (job.reportId || job.stage === "completed" || job.stage === "completed_partial") {
+      return res.json({ job: publicJobView(job), reportReady: true });
+    }
+    if (!job.receiptId || job.receipt?.settlementResult !== "settled") {
+      return res.status(409).json({ error: "A settled receipt is required before report regeneration" });
+    }
+    const retryable = job.stage === "failed_retriable" || job.stage === "failed_terminal" || job.stage === "manual_reconciliation";
+    if (!retryable) {
+      // The job is already owned by the durable worker. Wake maintenance, but
+      // never enqueue a duplicate concurrent model call.
+      wakeWorker();
+      return res.status(202).json({ job: publicJobView(job), alreadyProcessing: true });
+    }
+    const queued = await persistence.jobs.transition(job.id, "fetching_context", "owner-requested receipt-bound recovery; no new payment");
+    await persistence.jobs.enqueue(job.id);
+    wakeWorker();
+    return res.status(202).json({ job: publicJobView(queued), retriedWithoutPayment: true });
+  }));
+
+  app.get("/v1/private/reports/:reportId", asyncRoute(async (req, res) => {
+    const record = await persistence.reports.get(String(req.params.reportId));
     if (!record) return res.status(404).json({ error: "Report not found" });
     if (!reportOwner(req) || reportOwner(req) !== record.ownerWallet) return res.status(403).json({ error: "Report owner authorization required" });
     return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record) });
-  });
+  }));
 
-  app.post("/v1/private/reports/:reportId/shares", async (req, res) => {
+  app.post("/v1/private/reports/:reportId/shares", asyncRoute(async (req, res) => {
     if (!cfg.REPORT_SHARE_LINK_ENABLED) return res.status(404).json({ error: "Report sharing disabled" });
-    const record = await persistence.reports.get(req.params.reportId);
+    const record = await persistence.reports.get(String(req.params.reportId));
     if (!record) return res.status(404).json({ error: "Report not found" });
     if (!reportOwner(req) || reportOwner(req) !== record.ownerWallet) return res.status(403).json({ error: "Report owner authorization required" });
     const share = await persistence.reports.createShare(record.id);
     return res.status(201).json({ reportId: record.id, shareToken: share.token, shareUrl: `${cfg.BASE_URL.replace(/\/$/, "")}/v1/shared/reports/${share.token}` });
-  });
+  }));
 
-  app.delete("/v1/private/reports/:reportId/shares/:shareToken", async (req, res) => {
-    const record = await persistence.reports.get(req.params.reportId);
+  app.delete("/v1/private/reports/:reportId/shares/:shareToken", asyncRoute(async (req, res) => {
+    const record = await persistence.reports.get(String(req.params.reportId));
     if (!record) return res.status(404).json({ error: "Report not found" });
     if (!reportOwner(req) || reportOwner(req) !== record.ownerWallet) return res.status(403).json({ error: "Report owner authorization required" });
-    const sharedRecord = await persistence.reports.resolveShare(req.params.shareToken);
+    const sharedRecord = await persistence.reports.resolveShare(String(req.params.shareToken));
     if (!sharedRecord || sharedRecord.id !== record.id) return res.status(404).json({ error: "Share not found" });
-    await persistence.reports.revokeShare(req.params.shareToken);
+    await persistence.reports.revokeShare(String(req.params.shareToken));
     return res.status(204).end();
-  });
+  }));
 
-  app.get("/v1/shared/reports/:shareToken", async (req, res) => {
+  app.get("/v1/shared/reports/:shareToken", asyncRoute(async (req, res) => {
     if (!cfg.REPORT_SHARE_LINK_ENABLED) return res.status(404).json({ error: "Report sharing disabled" });
-    const record = await persistence.reports.resolveShare(req.params.shareToken);
+    const record = await persistence.reports.resolveShare(String(req.params.shareToken));
     if (!record) return res.status(404).json({ error: "Share not found or revoked" });
     return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record) });
-  });
+  }));
 
   // OKX.AI task clients probe paid endpoints with GET before they know the
   // business parameters. Return a machine-readable contract that the client
@@ -800,6 +971,14 @@ export function createApp(cfg: AppConfig, dependencies: {
       );
     }
     req.body = parsed.data;
+    next();
+  });
+  app.post("/v1/preflight", (req, res, next) => {
+    const parsed = PreflightRequestSchema.safeParse(req.body);
+    if (!parsed.success)
+      return res.status(400).json(buildX402InputRequired("/v1/preflight", parsed.error.issues));
+    const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+    req.body = { ...parsed.data, chainId: String(getNetwork(key).chainId) };
     next();
   });
 
@@ -943,11 +1122,50 @@ export function createApp(cfg: AppConfig, dependencies: {
         const cost = estimateAiCostUsd(cfg, result.usage);
         recordAiUsage(result.usage.promptTokens, result.usage.completionTokens, cost, result.usage.cachedTokens, result.usage.reasoningTokens);
       }
-      return canonical ? {
+      const selectedNetwork = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+      const defiChainId = selectedNetwork === "xlayer" ? "196" : selectedNetwork === "base" ? "8453" : selectedNetwork === "arbitrum" ? "42161" : null;
+      const assetSymbol = body.instId.split("-")[0]?.trim().toUpperCase() || "";
+      // Reuse the same identity-preserving chain aliases as Spot and
+      // Autopilot. This makes BTC -> cbBTC and DOGE -> cbDOGE on Base visible
+      // in DeFi without ever substituting an unrelated derivative.
+      const defiAliases = defiChainId
+        ? executionAssetAliases(assetSymbol, defiChainId)
+        : [assetSymbol];
+      let defiAsset = defiAliases[0] || assetSymbol;
+      let defiTokenAddress = "";
+      let opportunities: Awaited<ReturnType<typeof searchOkxDefiOpportunities>> = [];
+      if (defiChainId && assetSymbol) {
+        const tokenCandidates = await getOkxTradeTokens(cfg, defiChainId, assetSymbol, 100).catch(() => []);
+        const bySymbol = new Map(tokenCandidates.map((token) => [token.symbol.toUpperCase(), token]));
+        const executionToken = defiAliases.map((alias) => bySymbol.get(alias.toUpperCase())).find(Boolean);
+        if (executionToken) {
+          defiAsset = executionToken.symbol;
+          defiTokenAddress = executionToken.address;
+          opportunities = await searchOkxDefiOpportunities(cfg, executionToken.symbol, defiChainId, executionToken.address).catch(() => []);
+        }
+      }
+      const technical = buildTechnicalStructure(market.candles);
+      const executionPlan = buildSpotExecutionPlan({
+        instId: body.instId,
+        timeframe: market.bar,
+        tier: normalizedTier,
+        lastPrice: Number((market.ticker as { last?: unknown }).last || market.candles.at(-1)?.close || 0),
+        analysis: result.analysis,
+        technical,
+      });
+      const enhanced = {
         ...result,
+        chart: { source: market.source, timeframe: market.bar, candles: market.candles },
+        technical,
+        executionPlan,
+        defi: { network: selectedNetwork, chainId: defiChainId, requestedAsset: assetSymbol, asset: defiAsset, tokenAddress: defiTokenAddress || null, aliasesChecked: [...new Set(defiAliases.filter(Boolean))], status: opportunities.length ? "live_verified_contract" : defiTokenAddress ? "no_verified_opportunity" : "no_identity_safe_chain_asset", observedAt: new Date().toISOString(), opportunities, explanation: opportunities.length ? `${assetSymbol} is represented by ${defiAsset} (${defiTokenAddress}) on ${selectedNetwork}. Every product below was matched to that exact underlying token contract and ranked using execution availability, exit support, TVL, risk flags and observed APY—not APY alone.` : defiTokenAddress ? `PULSE verified ${defiAsset} (${defiTokenAddress}) as the selected-chain representation, but no DeFi product with that exact underlying contract passed verification. No APY is fabricated.` : `No identity-safe ${assetSymbol} representation was verified after checking ${[...new Set(defiAliases.filter(Boolean))].join(", ")}. PULSE will not substitute a liquid-staking token or unrelated derivative.` },
+        reportVersion: "pulse-v6.0.0",
+      };
+      return canonical ? {
+        ...enhanced,
         service: `spot_analysis_${tier === "base" ? "standard" : "premium"}`,
         tier: tier === "base" ? "standard" : "premium",
-      } : result;
+      } : enhanced;
   };
 
   const runSpot = async (req: express.Request, res: express.Response, tier: "base" | "premium") => {
@@ -975,8 +1193,10 @@ export function createApp(cfg: AppConfig, dependencies: {
     const payee = network.key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
     // Canonical V5 analysis uses server-fetched evidence only. Never persist a
     // deprecated browser screenshot in Redis merely because an old client sent it.
-    const { chartImageBase64: _chart, chartImageMime: _chartMime, ...durableInput } =
+    const { chartImageBase64: _chart, chartImageMime: _chartMime, ...durableBody } =
       (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
+    const telegramDelivery = String(req.header("PULSE-TELEGRAM-DELIVERY") || "").slice(0, 100);
+    const durableInput = { ...durableBody, ...(telegramDelivery && isTelegramDeliveryCapability(telegramDelivery) ? { _telegramDelivery: telegramDelivery } : {}) };
     return persistence.jobs.acquire({
       idempotencyKey: paymentIdempotencyKey({
         network: network.caip2, provider: cfg.X402_MOCK ? "mock" : network.paymentProvider,
@@ -1046,9 +1266,37 @@ export function createApp(cfg: AppConfig, dependencies: {
     recordAiUsage(usage.promptTokens, usage.completionTokens, estimatedCostUsd, usage.cachedTokens || 0, usage.reasoningTokens || 0);
     return { ...usage, cachedTokens: usage.cachedTokens || 0, reasoningTokens: usage.reasoningTokens || 0, estimatedCostUsd, pricingConfigured: configured };
   };
-  let durableWorker: DurableJobWorker;
-  const wakeWorker = () => {
-    void durableWorker?.notify();
+  const respondToQueuedJobFailure = async (
+    res: express.Response,
+    error: unknown,
+    jobId: string,
+  ) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    const connectivityFailure = isKvUnavailableError(error) || isTransientConnectivityError(error);
+    if (jobId) {
+      try {
+        await persistence.jobs.transition(jobId, "failed_retriable", detail);
+        recordReport("failed");
+      } catch (persistenceError) {
+        // The durable record remains recoverable by its idempotency key. Do not
+        // let a second KV failure escape an Express 4 async request and kill Node.
+        console.warn("[jobs] failure state will reconcile after persistence reconnects", {
+          jobId,
+          reason: persistenceError instanceof Error ? persistenceError.message : String(persistenceError),
+        });
+      }
+    }
+    if (res.headersSent) return;
+    if (connectivityFailure) res.setHeader("Retry-After", "5");
+    return res.status(error instanceof z.ZodError ? 400 : connectivityFailure ? 503 : 502).json({
+      error: detail,
+      ...(jobId ? { jobId, paymentReplaySafe: true } : {}),
+      ...(connectivityFailure ? {
+        code: "DEPENDENCY_CONNECTIVITY_LOSS",
+        recoverable: true,
+        retryAfterSeconds: 5,
+      } : {}),
+    });
   };
 
   const runSpotJob = async (req: express.Request, res: express.Response, tier: "standard" | "premium") => {
@@ -1066,9 +1314,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       wakeWorker();
       return;
     } catch (error) {
-      if (jobId) { await persistence.jobs.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error)); recordReport("failed"); }
-      if (!res.headersSent) return res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof Error ? error.message : String(error), ...(jobId ? { jobId } : {}) });
-      return;
+      return respondToQueuedJobFailure(res, error, jobId);
     }
   };
 
@@ -1090,9 +1336,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       wakeWorker();
       return;
     } catch (error) {
-      if (jobId) { await persistence.jobs.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error)); recordReport("failed"); }
-      if (!res.headersSent) return res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof Error ? error.message : String(error), ...(jobId ? { jobId } : {}) });
-      return;
+      return respondToQueuedJobFailure(res, error, jobId);
     }
   };
 
@@ -1135,9 +1379,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       wakeWorker();
       return;
     } catch (error) {
-      if (jobId) { await persistence.jobs.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error)); recordReport("failed"); }
-      if (!res.headersSent) return res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof Error ? error.message : String(error), ...(jobId ? { jobId } : {}) });
-      return;
+      return respondToQueuedJobFailure(res, error, jobId);
     }
   };
 
@@ -1162,9 +1404,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         wakeWorker();
         return;
       } catch (error) {
-        if (jobId) { await persistence.jobs.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error)); recordReport("failed"); }
-        if (!res.headersSent) return res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof Error ? error.message : String(error), ...(jobId ? { jobId } : {}) });
-        return;
+        return respondToQueuedJobFailure(res, error, jobId);
       }
     });
   }
@@ -1185,9 +1425,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         wakeWorker();
         return;
       } catch (error) {
-        if (jobId) { await persistence.jobs.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error)); recordReport("failed"); }
-        if (!res.headersSent) return res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof Error ? error.message : String(error), ...(jobId ? { jobId } : {}) });
-        return;
+        return respondToQueuedJobFailure(res, error, jobId);
       }
     });
   }
@@ -1239,11 +1477,19 @@ export function createApp(cfg: AppConfig, dependencies: {
             fixture: isArc(req) && cfg.ARC_AI_MODE === "fixture", ...limits,
           }));
         });
-        report = PredictionAnalysisResponseSchema.parse({
+        const predictionReport = PredictionAnalysisResponseSchema.parse({
           service: `prediction_analysis_${tier}`, tier, predictionContext: context, analysis, aiCost: aiCost(analysis),
           analysisProfile: { mode: isArc(req) && cfg.ARC_AI_MODE === "fixture" ? "fixture" : "live", model: isArc(req) && cfg.ARC_AI_MODE === "fixture" ? "fixture" : cfg.GROK_MODEL, reasoningEffort: predictionModelLimits(tier).reasoningEffort },
           methodology_version: "pulse-v3.0.0", generatedAt: new Date().toISOString(),
         });
+        if (tier === "premium") {
+          const searchable = JSON.stringify(context).toUpperCase();
+          const symbol = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"].find((candidate) => new RegExp(`\\b${candidate}\\b`).test(searchable));
+          if (symbol) {
+            const underlying = await observeProvider("okx", "prediction_underlying_4h", () => loadSpotContext({ instId: `${symbol}-USDT`, timeframe: "4H", candleLimit: 120 }));
+            report = { ...predictionReport, underlyingSpot: { instId: `${symbol}-USDT`, timeframe: "4H", chart: { source: underlying.source, candles: underlying.candles }, technical: buildTechnicalStructure(underlying.candles), explanation: "Independent 4H OKX spot structure for the asset referenced by the prediction question. It provides market context and does not replace prediction-market probability evidence." } };
+          } else report = { ...predictionReport, underlyingSpot: { status: "unmapped", explanation: "No supported underlying asset could be mapped confidently; PULSE did not attach an unrelated chart." } };
+        } else report = predictionReport;
         partial = context.partial;
       } else if (current.mode === "fused") {
         const body = FusedAnalysisRequestSchema.parse(current.input);
@@ -1303,6 +1549,11 @@ export function createApp(cfg: AppConfig, dependencies: {
 
       await persistence.jobs.transition(current.id, "validating_report");
       const stored = await persistence.reports.save(current.payer, report);
+      const telegramDelivery = typeof (current.input as Record<string, unknown>)._telegramDelivery === "string" ? String((current.input as Record<string, unknown>)._telegramDelivery) : "";
+      if (telegramDelivery && cfg.REPORT_SHARE_LINK_ENABLED) {
+        try { const share=await persistence.reports.createShare(stored.id);const reportRecord=report as {analysis?:{headline?:unknown;summary?:unknown};service?:unknown};const headline=String(reportRecord.analysis?.headline||reportRecord.service||"PULSE report ready");const summary=String(reportRecord.analysis?.summary||"Your paid report completed successfully.");await deliverTelegramReportDurably(current.id,telegramDelivery,`${headline}\n\n${summary}`,`${cfg.BASE_URL.replace(/\/$/,"")}/v1/shared/reports/${share.token}`); }
+        catch(error){console.error("Telegram report delivery failed",error);}
+      }
       const completed = await persistence.jobs.attachReport(current.id, stored.id, partial);
       recordJob(completed.stage, completed.network);
       recordReport(partial ? "partial" : "completed");
@@ -1364,12 +1615,20 @@ export function createApp(cfg: AppConfig, dependencies: {
     }
   });
 
-  app.post("/v1/preflight", (req, res) => {
+  app.post("/v1/preflight", async (req, res) => {
     try {
       const body = PreflightRequestSchema.parse(req.body);
       const report = runPreflight(body, mv);
-      saveReport(report);
-      res.json(report);
+      const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+      const network = getNetwork(key);
+      const inspectedAddress = body.tokenAddress || body.toToken || body.fromToken;
+      const liveEvidence = inspectedAddress
+        ? await collectLiveContractEvidence({ rpcUrl: configuredRpcUrls(key), address: inspectedAddress, expectedChainHex: `0x${network.chainId.toString(16)}`, chainId: String(network.chainId), network: `${network.label} ${network.environment}` })
+            .catch((error) => ({ evidenceStatus: "unavailable", safetyVerdict: "unknown", error: error instanceof Error ? error.message : String(error) }))
+        : { evidenceStatus: "not-requested", safetyVerdict: "unknown" };
+      const guardedReport = { ...report, serviceName: "Onchain Pre-Trade Risk Guard", networkKey: key, network: network.caip2, evidenceMethod: "live RPC evidence plus deterministic bounded heuristics", liveEvidence };
+      saveReport(guardedReport);
+      res.json(guardedReport);
     } catch (e) {
       res.status(400).json({ error: String(e) });
     }
@@ -1381,8 +1640,13 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   app.use(
     (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      if (isKvUnavailableError(err) || isTransientConnectivityError(err)) {
+        const retryAfterSeconds = isKvUnavailableError(err) ? err.retryAfterSeconds : 5;
+        res.setHeader("Retry-After", String(retryAfterSeconds));
+        return res.status(503).json({ error: "A remote dependency is temporarily unavailable", code: isKvUnavailableError(err) ? err.code : "DEPENDENCY_CONNECTIVITY_LOSS", recoverable: true, retryAfterSeconds });
+      }
       console.error(err);
-      res.status(500).json({ error: "Internal server error" });
+      return res.status(500).json({ error: "Internal server error" });
     },
   );
 

@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet } from "./api";
 import { assertPaymentBalance, fetchArcGatewayBalance, fetchNetworkBalances, WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { createWalletPaidFetch } from "./wallet";
 import { PredictionAnalysisReport } from "./Report";
 import { Tip } from "./Tip";
+import { ReportHistory } from "./ReportHistory";
+import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 
 type Market = {
   id: string; question: string; description: string | null; resolutionSource: string | null;
@@ -41,6 +43,7 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
   const [error, setError] = useState("");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [jobStage, setJobStage] = useState("");
+  const reportRequestRef = useRef(0);
 
   async function loadMarkets(search = "") {
     setBusy("markets"); setError("");
@@ -57,6 +60,7 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
   }
 
   async function chooseMarket(market: Market) {
+    supersedeRequests(reportRequestRef);
     setPickerOpen(false); setSelected(market); setContext(null); setResult(null); setError(""); setBusy("context");
     try {
       const response = await apiGet(`/v1/polymarket/markets/${encodeURIComponent(market.id)}/context`);
@@ -67,53 +71,88 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
     finally { setBusy(""); }
   }
 
-  async function recover(jobId: string, recoveryToken: string) {
-    const response = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}`, { headers: { "PULSE-RECOVERY-TOKEN": recoveryToken } });
+  async function recover(jobId: string, recoveryToken: string, requestId = reportRequestRef.current) {
+    const response = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}?fresh=${Date.now()}`, {
+      headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" }, cache: "no-store",
+    });
     if (!response.ok) throw new Error(`Prediction recovery failed (${response.status})`);
     const payload = await response.json() as { job?: { stage?: string } };
-    const stage = payload.job?.stage || ""; setJobStage(stage);
+    const stage = payload.job?.stage || "";
+    if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
+    setJobStage(stage);
     if (stage === "completed" || stage === "completed_partial") {
-      const report = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report`, { headers: { "PULSE-RECOVERY-TOKEN": recoveryToken } });
+      const report = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, {
+        headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" }, cache: "no-store",
+      });
       if (!report.ok) throw new Error(`Prediction report recovery failed (${report.status})`);
       const body = await report.json() as { report?: Record<string, unknown> };
-      if (body.report) setResult(body.report);
+      if (body.report && isLatestRequest(reportRequestRef, requestId)) setResult(body.report);
       clearJobRecovery(localStorage, networkKey, "prediction"); setJobStage("");
     }
     return stage;
   }
 
+  async function poll(jobId: string, recoveryToken: string, requestId: number) {
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
+      try {
+        const stage = await recover(jobId, recoveryToken, requestId);
+        if (["superseded", "completed", "completed_partial"].includes(stage)) return stage;
+        if (["failed_retriable", "failed_terminal", "manual_reconciliation"].includes(stage)) throw new Error("The paid prediction report stopped before delivery. Retry it from the settled receipt; no new payment is required.");
+      } catch (cause) {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        if (message.includes("stopped before delivery")) throw cause;
+        if (isLatestRequest(reportRequestRef, requestId)) setError(`Connection interrupted; automatic report recovery is continuing. ${message}`);
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, Math.min(5_000, 2_000 + attempt * 100)));
+    }
+    throw new Error("The paid prediction report is still processing. Retry recovery without paying again.");
+  }
+
+  async function retryPredictionRecovery() {
+    const saved = readJobRecovery(localStorage, networkKey, "prediction");
+    if (!saved) return setError("No recoverable paid Prediction report was found for this network.");
+    const requestId = beginLatestRequest(reportRequestRef);
+    setError("");
+    try {
+      const response = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(saved.jobId)}/retry`, {
+        method: "POST", headers: { "PULSE-RECOVERY-TOKEN": saved.recoveryToken, "Cache-Control": "no-cache" }, cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`Prediction recovery restart failed (${response.status})`);
+      await poll(saved.jobId, saved.recoveryToken, requestId);
+    } catch (cause) { if (isLatestRequest(reportRequestRef, requestId)) setError(cause instanceof Error ? cause.message : String(cause)); }
+  }
+
   useEffect(() => {
     const saved = readJobRecovery(localStorage, networkKey, "prediction");
-    if (saved) void recover(saved.jobId, saved.recoveryToken).catch(() => undefined);
+    if (saved) { const requestId = beginLatestRequest(reportRequestRef); void poll(saved.jobId, saved.recoveryToken, requestId).catch((cause) => { if (isLatestRequest(reportRequestRef, requestId)) setError(cause instanceof Error ? cause.message : String(cause)); }); }
   }, [networkKey]);
 
   async function analyze(tier: "standard" | "premium") {
     if (!selected || !context) return setError("Select a prediction and load its live context first.");
     if (!wallet) { onNeedWallet(); return; }
+    const requestId = beginLatestRequest(reportRequestRef);
     const route = `/v1/analysis/prediction/${tier}`;
     setBusy(tier); setError(""); setResult(null);
     try {
       const [balances, gateway] = await Promise.all([fetchNetworkBalances(wallet, networkKey), networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null)]);
       assertPaymentBalance(networkKey === "arc-testnet" ? gateway : balances.payment, prices[route], network.payment.symbol, network.label);
       const paidFetch = await createWalletPaidFetch(wallet, networkKey);
+      const telegramDelivery = new URLSearchParams(window.location.search).get("tg");
       const response = await paidFetch(`${API_BASE}/${network.route}${route}`, {
-        method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json", ...(telegramDelivery ? { "PULSE-TELEGRAM-DELIVERY": telegramDelivery } : {}) },
         body: JSON.stringify({ primaryMarketId: selected.id, additionalMarketIds: [], lang, userNote: note || undefined }),
       });
       const data = await response.json().catch(() => ({})) as { job?: { id?: string; stage?: string }; recoveryToken?: string } & Record<string, unknown>;
       if (!response.ok) throw new Error(JSON.stringify(data).slice(0, 500));
       if (response.status === 202 && data.job?.id && data.recoveryToken) {
-        saveJobRecovery(localStorage, networkKey, { jobId: data.job.id, recoveryToken: data.recoveryToken }, "prediction");
+        saveJobRecovery(localStorage, networkKey, { jobId: data.job.id, recoveryToken: data.recoveryToken, createdAt: new Date().toISOString(), label: selected.question.slice(0, 86), tier }, "prediction");
         setJobStage(data.job.stage || "payment_settled");
-        for (let attempt = 0; attempt < 60; attempt += 1) {
-          const stage = await recover(data.job.id, data.recoveryToken);
-          if (["completed", "completed_partial", "failed_retriable", "failed_terminal", "manual_reconciliation"].includes(stage)) break;
-          await new Promise((resolve) => window.setTimeout(resolve, 2_000));
-        }
-      } else setResult(data);
-      onBalancesChanged();
-    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
-    finally { setBusy(""); }
+        await poll(data.job.id, data.recoveryToken, requestId);
+      } else if (isLatestRequest(reportRequestRef, requestId)) setResult(data);
+      if (isLatestRequest(reportRequestRef, requestId)) onBalancesChanged();
+    } catch (cause) { if (isLatestRequest(reportRequestRef, requestId)) setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { if (isLatestRequest(reportRequestRef, requestId)) setBusy(""); }
   }
 
   return <>
@@ -147,8 +186,9 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
       {error && <div className="err">{error}</div>}
     </div>
     <div className="card report-card"><div className="section">Prediction report</div>
-      {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{jobStage ? jobStage.replaceAll("_", " ") : "Your prediction report lands here"}</h3><p>Select one crypto prediction, review its live evidence, then choose base or premium analysis.</p></div>}
+      {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{jobStage ? jobStage.replaceAll("_", " ") : "Your prediction report lands here"}</h3><p>{jobStage ? "PULSE is polling this paid report automatically. Refreshing does not charge again." : "Select one crypto prediction, review its live evidence, then choose base or premium analysis."}</p>{jobStage && <button type="button" className="btn btn-primary" onClick={() => void retryPredictionRecovery()}>Recover without paying again</button>}</div>}
       {result && <PredictionAnalysisReport data={result} />}
+      <ReportHistory networkKey={networkKey} scope="prediction" wallet={wallet} onOpen={setResult} />
     </div>
     {pickerOpen && <div className="picker-layer" role="dialog" aria-modal="true" aria-label="Choose crypto prediction"><button className="picker-backdrop" type="button" onClick={() => setPickerOpen(false)} aria-label="Close" /><div className="picker-dialog"><div className="picker-head"><div><span className="eyebrow">Crypto prediction markets</span><h3>Choose one question</h3></div><button type="button" onClick={() => setPickerOpen(false)}>×</button></div><div className="picker-search-wrap"><input className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, SOL…" /><button className="btn btn-soft" type="button" onClick={() => void loadMarkets(query)}>Search</button></div><div className="prediction-picker-list">{markets.map((market) => <button type="button" key={market.id} onClick={() => void chooseMarket(market)}><span>{market.question}</span><small>{money(market.volumeUsd)} volume · {market.endDate ? new Date(market.endDate).toLocaleDateString() : "No end date"}</small></button>)}{!markets.length && <div className="picker-state">{busy === "markets" ? "Loading live crypto markets…" : "No matching live crypto price or direction markets."}</div>}</div></div></div>}
   </>;

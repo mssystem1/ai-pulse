@@ -1,0 +1,424 @@
+{
+  "release": "pulse-v6.2.0",
+  "network": "base",
+  "chainId": 8453,
+  "deployer": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "deployedAt": "2026-08-20T10:28:29.263Z",
+  "contracts": {
+    "registry": {
+      "address": "0xa1fef7c527c0e039cb4724bd3a86ccfe49d4c169",
+      "txHash": "0x2e2a6759eb613aa91370cb4c4b8dbce6ca9e61c8178416bb5291a51315f33a8f",
+      "blockNumber": "50216141"
+    },
+    "oracleRouter": {
+      "address": "0x1448df2bda5f9bd4a53c8e3fdb123d15e4e6e33d",
+      "txHash": "0xf000e33b512b119e663f02aa7ecff5a49a09c9afa4aa97ca483d52028eff9780",
+      "blockNumber": "50216148"
+    },
+    "executionAdapter": {
+      "address": "0x7bd683fee53b3370cde105288180c5b66fb53c8f",
+      "txHash": "0x4e6abd1cad96938fbc6843d5c03a8c6b67b24f561c428b1d932d277be4413eed",
+      "blockNumber": "50435579",
+      "version": "v2"
+    },
+    "spotFactory": {
+      "address": "0x6d63ac4e6845298d7a79c69f63531695cdc5aaa7",
+      "txHash": "0x9e0f5e93da7e5abf54503edadc14a2e9bdcb2b4a6860d6badfe6270f150913d5",
+      "blockNumber": "50217075"
+    },
+    "autopilotFactory": {
+      "address": "0x8eb18bdce830a7ec6e342c50d9f693f6d7b03cc2",
+      "txHash": "0x86f92e16badbb6519024dd6bc347e7d1f5512fbec5b44e82f0486b63b3148d05",
+      "blockNumber": "50217082"
+    },
+    "spotBracketFactory": {
+      "address": "0x9fb833745c28d0a91a0afb58e6ae64dc0637b4c1",
+      "txHash": "0xc97bb6b689e4944acefb3ca700ba1ef1a06951c1889cfe762b87c10a33c897db",
+      "blockNumber": "50301916"
+    }
+  },
+  "configurationTransactions": {
+    "allowAdapter": "0xcfca1cd01dc107853c444c6dbcf12c16292d31e4d9b0949e80ed3035aa462c6d"
+  },
+  "verification": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T10:29:04.554Z",
+    "results": {
+      "registry": {
+        "status": "verified",
+        "address": "0xa1fef7c527c0e039cb4724bd3a86ccfe49d4c169",
+        "verificationId": "0118b3c8-81c6-4150-960f-b35bc8052ab6",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "0118b3c8-81c6-4150-960f-b35bc8052ab6",
+          "jobStartTime": "2026-08-20T10:28:50Z",
+          "jobFinishTime": "2026-08-20T10:28:51Z",
+          "compilationTime": "254",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0xa1FEf7c527C0E039CB4724bD3A86cCFe49d4C169",
+            "verifiedAt": "2026-08-20T10:28:51Z",
+            "matchId": "43870838"
+          }
+        }
+      },
+      "oracleRouter": {
+        "status": "verified",
+        "address": "0x1448df2bda5f9bd4a53c8e3fdb123d15e4e6e33d",
+        "verificationId": "a9bb23d0-88e0-403a-923b-97a3e9d30daf",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "a9bb23d0-88e0-403a-923b-97a3e9d30daf",
+          "jobStartTime": "2026-08-20T10:28:53Z",
+          "jobFinishTime": "2026-08-20T10:28:53Z",
+          "compilationTime": "113",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0x1448df2bDA5f9bD4A53c8E3fdb123d15E4e6e33d",
+            "verifiedAt": "2026-08-20T10:28:53Z",
+            "matchId": "43870839"
+          }
+        }
+      },
+      "executionAdapter": {
+        "status": "verified",
+        "address": "0x498dc8580b0e5639285fce5c571160e3fd515b55",
+        "verificationId": "3cea8540-5424-49b6-96c0-3a9d56a6dd2a",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "3cea8540-5424-49b6-96c0-3a9d56a6dd2a",
+          "jobStartTime": "2026-08-20T10:28:55Z",
+          "jobFinishTime": "2026-08-20T10:28:56Z",
+          "compilationTime": "248",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0x498dc8580B0e5639285FcE5c571160e3fd515B55",
+            "verifiedAt": "2026-08-20T10:28:56Z",
+            "matchId": "43870840"
+          }
+        }
+      },
+      "spotFactory": {
+        "status": "verified",
+        "address": "0x70c8fe8080e43e9e11e61cbaf1ce17b2754183b3",
+        "verificationId": "c267fa37-6685-4672-b0fc-9f8569314fb6",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "c267fa37-6685-4672-b0fc-9f8569314fb6",
+          "jobStartTime": "2026-08-20T10:28:58Z",
+          "jobFinishTime": "2026-08-20T10:28:58Z",
+          "compilationTime": "235",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0x70C8fe8080E43e9e11e61cBAf1CE17B2754183B3",
+            "verifiedAt": "2026-08-20T10:28:58Z",
+            "matchId": "43870841"
+          }
+        }
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0xe56e7ff0c9ccaa795ccdf05cd18116e7079f8b34",
+        "verificationId": "3eefe563-78c6-4eb0-af79-58043305eb46",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "3eefe563-78c6-4eb0-af79-58043305eb46",
+          "jobStartTime": "2026-08-20T10:29:00Z",
+          "jobFinishTime": "2026-08-20T10:29:00Z",
+          "compilationTime": "221",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (429): {\"message\":\"Too many requests. Increase limits now at https://dev.blockscout.com\",\"result\":null,\"status\":\"0\"}"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0xe56E7FF0c9Ccaa795ccDf05Cd18116E7079f8B34",
+            "verifiedAt": "2026-08-20T10:29:00Z",
+            "matchId": "43870842"
+          }
+        }
+      }
+    }
+  },
+  "certification": {
+    "certifiedAt": "2026-08-20T12:22:41.824Z",
+    "rpc": "https://base-rpc.publicnode.com",
+    "blockNumber": "50219606",
+    "adapterApproved": true,
+    "keeperApproved": true,
+    "executorApproved": true,
+    "routerApproved": true,
+    "immutableWiring": true,
+    "codeHashes": {
+      "registry": "0xebc0fd24abea41ba1cafcb3fd23e396c9ff46e8d7a156aa15d0cf3dcb2567cc4",
+      "oracleRouter": "0x82d6923e468eb80d5e7e86e2257da9abe8dc71d0d1cc4644452d1ab6b7456c6e",
+      "executionAdapter": "0xb5c488c1c1f68eb2b90b2c5d0ac86abb71924963953f8194383e35418bc3dd84",
+      "spotFactory": "0x48c13903bc036cfb5c5e605e5212ffbd47ea179881a8090797b9c9ddee9c5c8d",
+      "autopilotFactory": "0x8d1db7421af49a7e1fb34a4252f9e2fb9cbc1a6d74c88ff09f8e1e9218d8a3a6"
+    }
+  },
+  "configuration": {
+    "configuredAt": "2026-08-20T10:35:57.923Z",
+    "keeper": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "executor": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "approvedRouter": "0xC8F6b8Ba0DC0f175B568B99440B0867F69A29265",
+    "transactions": [
+      "0xc6b0129a7932951a768ddc3701eb468a08a73a626e4d14483d7cd94e81d82d4e",
+      "0xce8a87fca53cfe5f0067a23e7e93f97d4fd9e2608b0de30497ca8f290b7d7979",
+      "0x6c9703befdd57e0197c8b400532d6451d7d8de20321dfdab7f373c677faea523"
+    ]
+  },
+  "previousFactories": [
+    {
+      "version": "pulse-v6.0.0",
+      "spotFactory": {
+        "address": "0x70c8fe8080e43e9e11e61cbaf1ce17b2754183b3",
+        "txHash": "0xd0f2ef91b68a249562bb42daa1e6aca4a7fdc66747017512c024a5b44476c198",
+        "blockNumber": "50216162"
+      },
+      "autopilotFactory": {
+        "address": "0xe56e7ff0c9ccaa795ccdf05cd18116e7079f8b34",
+        "txHash": "0x225b3f590fcc8179536dee1e4de45d19e216bb1e1ea1971c81fac27969045844",
+        "blockNumber": "50216167"
+      },
+      "replacedAt": "2026-08-20T10:58:41.189Z"
+    }
+  ],
+  "v2": {
+    "guardrails": [
+      "asset allowlist",
+      "oracle-valued trade and exposure caps",
+      "slippage and daily-loss bounds",
+      "cooldown and expiry",
+      "nonce and policy version",
+      "owner-only recovery"
+    ],
+    "conditionalSpot": [
+      "buy/sell trigger direction",
+      "minimum output",
+      "batch cancel"
+    ]
+  },
+  "verificationV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-20T11:00:18.401Z",
+    "results": {
+      "spotFactory": {
+        "status": "verified",
+        "address": "0x6d63ac4e6845298d7a79c69f63531695cdc5aaa7",
+        "verificationId": "a7593376-3535-4255-a9f6-6edcf54819c3",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "a7593376-3535-4255-a9f6-6edcf54819c3",
+          "jobStartTime": "2026-08-20T10:59:56Z",
+          "jobFinishTime": "2026-08-20T11:00:03Z",
+          "compilationTime": "3418",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "6d63ac4e6845298d7a79c69f63531695cdc5aaa76a86de33",
+              "statusUrl": "https://base.blockscout.com/api?module=contract&action=checkverifystatus&chainid=8453&guid=6d63ac4e6845298d7a79c69f63531695cdc5aaa76a86de33",
+              "explorerUrl": "https://base.blockscout.com//address/0x6D63Ac4E6845298D7a79C69F63531695cdc5AAa7",
+              "contractApiUrl": "https://base.blockscout.com/api?module=contract&action=getabi&chainid=8453&address=0x6D63Ac4E6845298D7a79C69F63531695cdc5AAa7"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0x6D63Ac4E6845298D7a79C69F63531695cdc5AAa7",
+            "verifiedAt": "2026-08-20T11:00:03Z",
+            "matchId": "43871807"
+          }
+        }
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0x8eb18bdce830a7ec6e342c50d9f693f6d7b03cc2",
+        "verificationId": "9fe58766-bb16-4737-b302-cd68a23526a6",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "9fe58766-bb16-4737-b302-cd68a23526a6",
+          "jobStartTime": "2026-08-20T11:00:05Z",
+          "jobFinishTime": "2026-08-20T11:00:14Z",
+          "compilationTime": "4702",
+          "externalVerifications": {
+            "etherscan": {
+              "error": "Daily limit of 500 source code submissions reached"
+            },
+            "blockscout": {
+              "verificationId": "8eb18bdce830a7ec6e342c50d9f693f6d7b03cc26a86de3e",
+              "statusUrl": "https://base.blockscout.com/api?module=contract&action=checkverifystatus&chainid=8453&guid=8eb18bdce830a7ec6e342c50d9f693f6d7b03cc26a86de3e",
+              "explorerUrl": "https://base.blockscout.com//address/0x8eb18BdcE830A7EC6e342C50D9F693F6d7b03cc2",
+              "contractApiUrl": "https://base.blockscout.com/api?module=contract&action=getabi&chainid=8453&address=0x8eb18BdcE830A7EC6e342C50D9F693F6d7b03cc2"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "8453",
+            "address": "0x8eb18BdcE830A7EC6e342C50D9F693F6d7b03cc2",
+            "verifiedAt": "2026-08-20T11:00:14Z",
+            "matchId": "43871819"
+          }
+        }
+      }
+    }
+  },
+  "bracket": {
+    "model": "OTOCO",
+    "phases": [
+      "pending entry",
+      "protected TP/SL",
+      "executed or owner-cancelled"
+    ],
+    "ownerRecovery": true,
+    "keeperMayNotChangePolicy": true
+  },
+  "verificationBracket": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-22T10:07:07.603Z",
+    "result": {
+      "status": "verified",
+      "address": "0x9fb833745c28d0a91a0afb58e6ae64dc0637b4c1",
+      "verificationId": "4162d2b6-4676-477c-97c6-7c6428c3ede6",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "4162d2b6-4676-477c-97c6-7c6428c3ede6",
+        "jobStartTime": "2026-08-22T10:06:52Z",
+        "jobFinishTime": "2026-08-22T10:07:03Z",
+        "compilationTime": "5279",
+        "externalVerifications": {
+          "etherscan": {
+            "verificationId": "kbyve83ug2ccyp6pdibuih3xgspnbxh28e51tf7clkiaucl1px",
+            "statusUrl": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=checkverifystatus&guid=kbyve83ug2ccyp6pdibuih3xgspnbxh28e51tf7clkiaucl1px",
+            "explorerUrl": "https://basescan.org//address/0x9Fb833745C28d0a91A0AFB58e6ae64dC0637b4C1",
+            "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getabi&address=0x9Fb833745C28d0a91A0AFB58e6ae64dC0637b4C1"
+          }
+        },
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "8453",
+          "address": "0x9Fb833745C28d0a91A0AFB58e6ae64dC0637b4C1",
+          "verifiedAt": "2026-08-22T10:07:03Z",
+          "matchId": "45310227"
+        }
+      }
+    }
+  },
+  "routerUpgrade": {
+    "configuredAt": "2026-08-25T12:14:57.943Z",
+    "router": "0x67d03631fe51b741c0c00c4e16eb662ac84381df",
+    "adapter": "0x498dc8580b0e5639285fce5c571160e3fd515b55",
+    "transaction": null,
+    "verifiedOnchain": true
+  },
+  "previousExecutionAdapters": [
+    {
+      "address": "0x498dc8580b0e5639285fce5c571160e3fd515b55",
+      "txHash": "0xb14196d559f9025acb56cb2557e8d7a597cb6a2e84f2eb8bc7427c648dd97c35",
+      "blockNumber": "50216155"
+    }
+  ],
+  "executionAdapterV2": {
+    "deployedAt": "2026-08-25T12:21:54.251Z",
+    "router": "0x67d03631fe51b741c0c00c4e16eb662ac84381df",
+    "spender": "0x57df6092665eb6058DE53939612413ff4B09114E",
+    "allowAdapterTx": "0x7825509074173dc0ea691e88f4a1b9f31c9d2caad8e363ef4576d1bc9fe3c4e4",
+    "routerTx": "0x2861d6c64643fcb19995eaa00aaaec1f6244e9a865434234fe435d82945834cf",
+    "spenderTx": "0x61bc356cc4c9e743997c5692c77757a76cf132eb9f8497e111b4f413b1584235",
+    "verifiedOnchain": true
+  },
+  "verificationAdapterV2": {
+    "provider": "Sourcify v2",
+    "verifiedAt": "2026-08-25T12:23:13.694Z",
+    "result": {
+      "status": "verified",
+      "address": "0x7bd683fee53b3370cde105288180c5b66fb53c8f",
+      "verificationId": "dcc4a9a2-e258-46ae-9863-f83c802c5b2d",
+      "result": {
+        "isJobCompleted": true,
+        "verificationId": "dcc4a9a2-e258-46ae-9863-f83c802c5b2d",
+        "jobStartTime": "2026-08-25T12:23:08Z",
+        "jobFinishTime": "2026-08-25T12:23:09Z",
+        "compilationTime": "884",
+        "externalVerifications": {
+          "etherscan": {
+            "verificationId": "zqnzr3nhfp7hijjc2jfenfrjvhnzpscvvtjbdk9syyym9hm78s",
+            "statusUrl": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=checkverifystatus&guid=zqnzr3nhfp7hijjc2jfenfrjvhnzpscvvtjbdk9syyym9hm78s",
+            "explorerUrl": "https://basescan.org//address/0x7bD683FEe53b3370cDe105288180C5B66fb53C8f",
+            "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=8453&module=contract&action=getabi&address=0x7bD683FEe53b3370cDe105288180C5B66fb53C8f"
+          }
+        },
+        "contract": {
+          "match": "exact_match",
+          "creationMatch": "exact_match",
+          "runtimeMatch": "exact_match",
+          "chainId": "8453",
+          "address": "0x7bD683FEe53b3370cDe105288180C5B66fb53C8f",
+          "verifiedAt": "2026-08-25T12:23:09Z",
+          "matchId": "46816520"
+        }
+      }
+    }
+  }
+}

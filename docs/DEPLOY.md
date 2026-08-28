@@ -1,187 +1,315 @@
 # PULSE · Production deployment guide
 
-PULSE needs a stable public HTTPS origin that serves the web app, REST, MCP, brand assets, and x402 payment headers. The current same-origin Vercel deployment is valid for the web product, but do not submit its `*.vercel.app` hostname to OKX.AI: moderator security tooling has blocked that literal host. Use a custom domain or a separate non-Vercel API origin.
+This is the release runbook for the checked-in production topology:
 
-## Production requirements
+```text
+Browser / wallet
+      |
+      v
+Vercel web (static Vite application)
+      |
+      | HTTPS via VITE_API_URL
+      v
+Railway API + durable worker (one long-lived Node service)
+      |-- REST, MCP, x402 and Telegram webhooks
+      |-- report jobs and recovery
+      |-- Spot order reconciliation
+      |-- Autopilot analysis, risk monitoring and execution
+      |
+      +--> Upstash KV (state, queues, leases and indexes)
+      +--> Vercel Blob (private report/evidence bodies)
+      +--> OKX, xAI, CDP, Circle and chain RPCs
+      +--> deployed PULSE contracts
+```
 
-- Final HTTPS origin
-- Non-zero X Layer `PAY_TO_ADDRESS`
-- xAI key for Grok analysis
-- OKX credentials authorized for live x402, Exchange OS DEX, and X Layer token-catalog calls
-- `X402_MOCK=0`
-- `ENABLE_SERVER_PAY=0`
-- Node 22.x, pinned by the root `package.json`
+Do not run the Railway worker and a Vercel automation cron at the same time. Shared KV leases reduce accidental overlap, but two intentionally active production schedulers remain an avoidable operational risk.
 
-The application also forces the operator-only server-funded checkout off when
-`NODE_ENV=production`. Remove `TEST_WALLET_PRIVATE_KEY` from public environments
-anyway; defense in depth is not a reason to keep a signing key on the server.
+## What belongs on each host
 
-## Option A · Existing Vercel project plus custom domain (recommended)
+| Host | Responsibility | Secrets |
+| --- | --- | --- |
+| Vercel | Static web application only | None. Set only the public browser variables listed below. |
+| Railway | API, MCP, x402, report jobs, Telegram and the automation worker | OKX, xAI, CDP, Circle, Blob, KV, RPC and automation secrets. |
+| Chain contracts | Owner-controlled Spot accounts and Autopilot vaults | No off-chain secret is stored in a contract. |
 
-The root [`vercel.json`](../vercel.json) builds the monorepo and routes API traffic to [`api/index.ts`](../api/index.ts). The web project configuration handles the Vite output.
+`AUTOMATION_EXECUTOR_PRIVATE_KEY` is not a Vercel requirement and it is not a user wallet. It is the private key of the restricted server signer used by the Railway worker for contract-authorized Spot keeper calls, bounded Autopilot execution and current oracle updates. Never expose it through a `VITE_*` variable and never put it in the Vercel web project.
 
-1. Import the repository into Vercel.
-2. Use repository root as the project root.
-3. Install command: `npm install`.
-4. Build command: `npm run build:vercel`.
-5. Set the environment variables below for Production.
-6. In Project Settings → Domains, add a domain you own and apply the exact DNS record Vercel displays.
-7. Wait for verification and TLS, then set `BASE_URL` to the custom HTTPS origin.
-8. Do not create `VITE_API_URL`; browser calls use the same origin.
-9. Redeploy after changing `BASE_URL`.
+The corresponding public address must be authorized on every enabled mainnet as all three roles currently used by the worker:
 
-This mode gives the cleanest wallet/CORS story and removes `vercel.app` from the submitted service URL. Confirm the platform timeout supports the configured Grok response time.
+- `PulseRegistryV1.spotKeepers(address) == true`;
+- `PulseRegistryV1.autopilotExecutors(address) == true`;
+- `OracleRouterV1.updaters(address) == true`.
 
-The root package must remain ESM (`"type": "module"`). The serverless entrypoint imports ESM-only `@pulse/*` workspace packages; removing that setting makes the function load as CommonJS and fail before `/healthz` can respond.
+The signer needs only enough native gas on each enabled chain: OKB on X Layer and ETH on Base and Arbitrum. It must not be the seller wallet, test wallet, treasury, user wallet or contract owner. User capital remains in owner-controlled accounts and vaults; the executor cannot use the vault owner's withdrawal function, and contract policy limits every automated action.
 
-## Option B · Node API plus Vercel web
+`CRON_SECRET` has a different purpose: it authenticates `GET /v1/internal/automation/tick` when a serverless scheduler invokes that route. It is not an on-chain key. The recommended Railway topology uses in-process timers, so leave `CRON_SECRET` unset there and do not add it to Vercel.
 
-Deploy the API to Railway, Render, Cloud Run, Fly.io, or a VPS:
+## Before committing
+
+Run these checks from the repository root:
 
 ```bash
 npm install
+npm test
 npm run build
-npm run start:api
+git status --short
 ```
 
-Then deploy `apps/web` to Vercel with:
+Review the diff before committing. Do not commit `.env`, private keys, API credentials, Blob/KV tokens, Telegram secrets, payment signatures, wallet exports or HAR files containing authorization headers.
+
+The repository pins Node `22.x`. Use Node 22 locally, in Railway and for the Vercel build.
+
+## 1. Prepare production resources
+
+Before either deployment, prepare:
+
+- a Railway project connected to the intended GitHub repository and production branch;
+- a Vercel project connected to the same repository and branch;
+- a stable HTTPS API hostname, initially a Railway-generated domain or preferably a custom API domain;
+- a stable HTTPS web hostname, preferably a custom web domain;
+- an Upstash database dedicated to production;
+- a private Vercel Blob store, or the documented encrypted-public-store fallback;
+- production OKX, xAI, CDP/Circle and Telegram credentials required by enabled features;
+- the already deployed and verified PULSE contract addresses for each enabled chain;
+- a dedicated automation signer whose address has the required on-chain roles and native gas.
+
+Do not share the Upstash database used by local mainnet tests with production. Several trading and Autopilot keys intentionally use stable `pulse:v6:*` namespaces for continuity; a different `PERSISTENCE_NAMESPACE` alone is not full isolation.
+
+## 2. Deploy Railway API and worker first
+
+The checked-in [`railway.toml`](../railway.toml) selects the root [`Dockerfile`](../Dockerfile), builds the API workspace and starts `@pulse/api`.
+
+1. Create a Railway service from the repository and production branch.
+2. Keep the repository root as the service root.
+3. Keep the Dockerfile builder selected.
+4. Add the Railway variables described below. Add values in Railway's variable UI; do not upload `.env`.
+5. Keep exactly one production replica for the initial release.
+6. Disable Railway Serverless/app sleeping for this service. Spot and Autopilot use continuous timers and must not wait for an incoming HTTP request to wake the process.
+7. Deploy, then generate a Railway domain under **Service → Settings → Networking**.
+8. Set `BASE_URL` to that exact HTTPS API origin, without a trailing slash, and redeploy.
+9. Confirm `/healthz` before deploying the web app.
+
+Recommended core Railway values:
 
 ```dotenv
-VITE_API_URL=https://api.your-domain.example
+NODE_ENV=production
+HOST=0.0.0.0
+PORT=4000
+BASE_URL=https://api.example.com
+
+X402_MOCK=0
+ENABLE_SERVER_PAY=0
+AUTOMATION_WORKER_ENABLED=1
+AUTOMATION_EXECUTOR_PRIVATE_KEY=<dedicated-restricted-executor-key>
+
+STORAGE_PROVIDER=vercel_blob
+BLOB_ACCESS=private
+QUEUE_PROVIDER=upstash_kv
+PERSISTENCE_NAMESPACE=pulse:production
 ```
 
-Set API `BASE_URL` to that same API origin. The Express CORS configuration exposes `PAYMENT-REQUIRED` and `PAYMENT-RESPONSE`.
+Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
 
-### Railway path without buying a domain
+Important Railway rules:
 
-The repository's `railway.toml` selects the root `Dockerfile`, which builds and starts only the API:
+- Do not set any private value with a `VITE_` prefix.
+- Do not deploy `TEST_WALLET_PRIVATE_KEY`, even when the test wallet was used for local mainnet acceptance.
+- Keep `ENABLE_SERVER_PAY=0`; production users sign payment and trading transactions in their own wallets.
+- Keep `X402_MOCK=0`.
+- `PAY_TO_ADDRESS` must be a deliberately verified non-zero seller address.
+- `REPORT_ENCRYPTION_KEY` stays empty with a native private Blob store. If a public Blob store is intentionally retained, use the encrypted-public-store configuration documented in [`ENVIRONMENT.md`](ENVIRONMENT.md).
+- `DATABASE_URL` remains empty. PULSE uses KV and Blob, not PostgreSQL.
+- Leave `CRON_SECRET` empty in this Railway topology.
 
-1. In Railway, create a project from the GitHub repository and branch `main`.
-2. Keep the repository root as the service root.
-3. Add the production variables from the matrix below. Do not upload `.env` itself.
-4. Deploy, then open Service → Settings → Networking → **Generate Domain**.
-5. Set `BASE_URL=https://<GENERATED>.up.railway.app` and redeploy.
-6. Run the non-spending checks against that Railway origin.
-7. In Vercel Production, set `VITE_API_URL` to the Railway origin and redeploy the web project.
-8. Update agent #8355's token-scan service endpoint to `https://<GENERATED>.up.railway.app/v1/token/scan`.
+### Automation activation gate
 
-Railway's generated hostname avoids the moderator's literal `vercel` filter. A custom domain on Railway is stronger for a final public identity; Railway requires both the displayed CNAME and TXT verification records before it routes the custom hostname.
+Do not set `AUTOMATION_WORKER_ENABLED=1` merely because a syntactically valid private key exists. Before activation, verify all of the following:
 
-## Option C · Docker
+- the derived executor address is the expected dedicated address;
+- the address is an approved Spot keeper, Autopilot executor and oracle updater on X Layer, Base and Arbitrum if those chains are enabled;
+- every configured factory, registry, router, adapter and oracle address belongs to the selected chain;
+- the executor has a small native gas balance on every enabled chain;
+- Upstash is reachable and uses the production database;
+- `AUTOPILOT_KILL_SWITCH=0` only after the above checks pass;
+- the API starts with no missing-role, missing-contract or storage-readiness warning.
 
-```bash
-docker build -t pulse-api .
-docker run --env-file .env -p 4000:4000 pulse-api
+If the gate is not complete, deploy safely with:
+
+```dotenv
+AUTOMATION_WORKER_ENABLED=0
+FEATURE_TRADING=0
+FEATURE_AUTOPILOT=0
 ```
 
-Terminate TLS at the platform/load balancer and set `BASE_URL` to the external HTTPS origin.
+Analysis and other non-automation services can be verified first. Enable trading and Autopilot only after the on-chain authority checks pass.
 
-## Environment matrix
+## 3. Deploy the Vercel web application
 
-| Variable | Local | Production |
-| --- | --- | --- |
-| `BASE_URL` | `http://localhost:4000` | Final HTTPS API origin |
-| `NODE_ENV` | `development` | `production` |
-| `PRODUCT_NAME` | `PULSE` | `PULSE` |
-| `X402_NETWORK` | `eip155:196` | `eip155:196` |
-| `X402_ASSET` | USDT0 contract | USDT0 contract |
-| `PAY_TO_ADDRESS` | zero allowed in mock | Real non-zero recipient |
-| `X402_MOCK` | `1` | `0` |
-| `OKX_API_KEY` | optional | required |
-| `OKX_SECRET_KEY` | optional | required |
-| `OKX_PASSPHRASE` | optional | required |
-| `XAI_API_KEY` | optional | required for paid analysis |
-| `ENABLE_SERVER_PAY` | `0` | `0` |
-| `VITE_API_URL` | empty or localhost API | unset for same origin; API origin only if split |
+The checked-in [`vercel.json`](../vercel.json) is intentionally web-only for the recommended split deployment. It builds the Vite app and provides the SPA fallback; it does not deploy `api/index.ts` and it does not schedule automation.
 
-The `OKX_XLAYER_API_*` aliases remain supported. Exchange OS DEX funding uses the same API key, secret, and passphrase with the documented signed headers; it does not require a separate project-ID variable. The x402 facilitator URL remains independently configurable. Keep all credentials server-side.
+1. Import the repository into Vercel.
+2. Use the repository root as the project root.
+3. Keep the checked-in install/build/output settings.
+4. Add only the browser-safe variables below.
+5. Set `VITE_API_URL` to the working Railway API origin, without a trailing slash.
+6. Add the Vercel preview and production web origins to the Reown project allowlist.
+7. Deploy and confirm the application reports **API live**.
+8. Add the final web custom domain, update the Reown allowlist and redeploy if any `VITE_*` value changed.
 
-Run `npm run readiness:okx` in the final API runtime. It performs only authenticated read-only token-catalog and quote requests; it never signs a wallet transaction or broadcasts on-chain. Run it from the deployed region as well as localhost because OKX service access may differ by source region. A provider business code such as `50125` means the request reached OKX and should be investigated as service/region access—not rewritten as a missing or malformed credential.
+Vercel Production variables:
 
-For Railway, set `HOST=0.0.0.0` or omit `HOST` and use the application default. Do not use URL-form IPv6 notation such as `HOST=[::]`; Node interprets the brackets as a hostname. PULSE also normalizes `[::]` defensively in case a platform supplies it.
+```dotenv
+VITE_API_URL=https://api.example.com
+VITE_REOWN_PROJECT_ID=<public-reown-project-id>
+VITE_CIRCLE_APP_ID=<public-circle-app-id>
+VITE_FEATURE_WALLET_APPKIT=1
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+VITE_PAY_TO_ADDRESS=<public-seller-address>
+VITE_CIRCLE_GATEWAY_SELLER_ADDRESS=<public-seller-address>
+VITE_USE_PROXY=0
+```
 
-## Post-deploy verification
+Only include networks and public integration IDs actually enabled by the Railway API. `VITE_*` values are compiled into browser JavaScript and are not secrets. A change requires a new Vercel build.
 
-Set a shell variable to the final API origin and run:
+Never add these to the Vercel web project:
+
+- `AUTOMATION_EXECUTOR_PRIVATE_KEY`;
+- `TEST_WALLET_PRIVATE_KEY`;
+- `CRON_SECRET` in the recommended split topology;
+- OKX, xAI, CDP or Circle API secrets;
+- Blob or Upstash tokens;
+- Telegram bot/webhook secrets;
+- report encryption keys.
+
+## 4. Verify Railway before enabling user traffic
+
+Use the final API origin in the following commands:
 
 ```bash
-curl -i https://YOUR_DOMAIN/healthz
-curl -i https://YOUR_DOMAIN/v1/metadata
-curl -i https://YOUR_DOMAIN/brand/logo.png
-curl -i https://YOUR_DOMAIN/brand/logo.svg
-curl -i "https://YOUR_DOMAIN/v1/market/instruments?q=ETH&limit=10"
-curl -i "https://YOUR_DOMAIN/v1/xlayer/tokens?q=USDT0&limit=10"
-curl -i https://YOUR_DOMAIN/v1/token/scan
-curl -i -X POST https://YOUR_DOMAIN/v1/token/scan \
+curl -i https://API_DOMAIN/healthz
+curl -i https://API_DOMAIN/v1/metadata
+curl -i https://API_DOMAIN/brand/logo.png
+curl -i https://API_DOMAIN/brand/logo.svg
+curl -i "https://API_DOMAIN/v1/market/instruments?q=ETH&limit=10"
+curl -i "https://API_DOMAIN/v1/xlayer/tokens?q=USDT0&limit=10"
+curl -i https://API_DOMAIN/v1/token/scan
+curl -i -X POST https://API_DOMAIN/v1/token/scan \
   -H "content-type: application/json" \
   -d '{"address":"0x779ded0c9e1022225f8e0630b35a9b54be713736","chainId":"196"}'
-curl -i -X POST https://YOUR_DOMAIN/v1/analysis/base \
+curl -i -X POST https://API_DOMAIN/v1/analysis/base \
   -H "content-type: application/json" \
   -d '{"instId":"BTC-USDT","timeframe":"1H"}'
 ```
 
-The token-scan GET must return HTTP 400 with `status: "input_required"`. Both valid unpaid POST calls must return HTTP 402. Decode `PAYMENT-REQUIRED` and verify:
+Expected results:
 
-- scheme `exact`;
-- network `eip155:196`;
-- USDT0 contract `0x779ded0c9e1022225f8e0630b35a9b54be713736`;
-- correct route amount;
-- intended `payTo` address.
-- `outputSchema.method` is `POST` and required inputs use the `body` carrier.
+- `/healthz`, `/v1/metadata` and brand assets return successfully;
+- token-scan `GET` returns HTTP 400 with `status: "input_required"`;
+- valid unpaid paid-service `POST` requests return HTTP 402;
+- `PAYMENT-REQUIRED` decodes to the intended service, network, asset, amount and `payTo` address;
+- no response or log contains a private key, provider secret, recovery capability or payment signature.
 
-Then run:
+For the X Layer token-scan challenge, verify scheme `exact`, network `eip155:196`, USDT0 `0x779ded0c9e1022225f8e0630b35a9b54be713736`, the route price, intended `payTo`, `outputSchema.method=POST`, and body-carried required inputs.
+
+Then run the read-only checks from a trusted operator machine:
 
 ```bash
-node scripts/asp-compliance.mjs https://YOUR_DOMAIN
+npm run readiness:okx
+node scripts/asp-compliance.mjs https://API_DOMAIN
 ```
 
-This checks all non-spending surfaces and clearly reports that live settlement was not executed. Enable `RUN_LIVE_PAY=1` only for the final controlled run after verifying the wallet, recipient, and `$0.01` token-scan price. The script performs one paid token scan.
+`readiness:okx` performs authenticated read-only catalog/quote checks and does not sign or broadcast a wallet transaction. Provider access can differ by deployment region, so verify it from the Railway environment as well. A business code such as `50125` means OKX received the request; investigate account/service/region authorization instead of rewriting it as a missing credential.
 
-## Browser release check
+Keep `RUN_LIVE_PAY=0` for non-spending checks. Set it to `1` only for a deliberate, low-value final payment acceptance run after independently checking the seller, network, token and price.
 
-- Header and hero are usable at 375px, 768px, and desktop widths.
-- Market pair control opens a searchable live OKX list, selects only returned instruments, and has no arbitrary pair text input.
-- X Layer token browser returns chain 196 addresses with source disclosure; selection fills the input and manual contract entry still works.
-- Token and market dialogs cover the viewport, scroll internally, close by Escape/backdrop, and have no horizontal overflow at 390px.
-- Loading ticker/candles updates the market preview without clearing the current report.
-- Wallet connection requests X Layer.
-- Header wallet control shows USDT0 and opens the drawer.
-- Header is the only wallet connection entry point; the connected control is labeled **Wallet & funding**.
-- Drawer shows OKB and USDT0 without clipping.
-- A live OKX Exchange OS quote loads for X Layer OKB → USDT0 and the existing header wallet receives the prepared transaction without a second connect step.
-- Direct OKX DEX fallback is visible.
-- Insufficient USDT0 blocks before signature and opens the drawer.
-- Disconnect survives a reload and explicit reconnect works from the header.
-- Free contract inspection reports current X Layer RPC evidence; paid heuristic scores remain visibly separate and do not claim to be audits.
-- Successful payment returns a report and refreshes balances.
+## 5. Verify the complete browser workflow
+
+Test production at desktop widths and at 390 px mobile width:
+
+- header, network selector and mobile navigation have no browser-level horizontal scrollbar;
+- OKX Wallet is visible through AppKit and can connect, disconnect and reconnect;
+- wallet balance and selected network update without reloading the app;
+- Global Market loads live instruments, candles, Base/Premium reports and cross-device report history;
+- report charts fit their card and click to zoom in/out;
+- a Premium report clearly offers Market, Limit and Autopilot next actions;
+- Spot accepts direct pair selection and report-prefilled selection, validates chain mapping and balances, and preserves pending/active/executed/cancelled activity across tabs and devices;
+- Autopilot shows the strategy account's real capital, the connected wallet's available settlement balance, separate Add/Withdraw flows and Max controls;
+- Prediction Market, Telegram, Docs and Risk Guard load without stale API state;
+- changing X Layer, Base, Arbitrum and Arc themes keeps every pop-up readable;
+- paid report recovery works after refresh and on another signed device;
+- insufficient settlement balance blocks before signature and explains the remedy;
 - English and Chinese copy render without encoding corruption.
 
-If you add a Content Security Policy, allow API `connect-src` access for the final same-origin/split origin and the configured X Layer RPC. Token discovery calls OKX and DexScreener from the API, not directly from the browser; token logos may require an explicit `img-src https: data:` policy. No third-party DEX iframe is required. Validate the exact production policy in a real wallet-enabled browser.
+Complete at least one deliberately bounded real-user flow on each production-enabled mainnet before announcing support. Do not use the automation executor or test wallet as the browser user.
 
-## Production safety check
+## 6. Observability and rollback
 
+Before launch:
+
+- confirm Railway deploy logs show one API process and one enabled automation worker;
+- confirm there is no Vercel automation cron and no second API receiving production automation ticks;
+- check `/metrics` from the monitoring system without publishing it as a user-facing page;
+- alert on API health, worker-cycle failures, KV/Blob errors, provider errors, executor gas and repeated transaction reverts;
+- record the last known-good Railway and Vercel deployments;
+- know how to set `AUTOPILOT_KILL_SWITCH=1` and redeploy/restart Railway;
+- preserve the previous Upstash/Blob data while rolling application code back.
+
+Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` variables requires a new web build. Treat both as release changes.
+
+## Production safety checklist
+
+- [ ] `NODE_ENV=production`
 - [ ] `X402_MOCK=0`
 - [ ] `ENABLE_SERVER_PAY=0`
-- [ ] Test private-key variables removed
+- [ ] no test private key on either host
+- [ ] no server secret on Vercel web
+- [ ] one Railway API/worker replica and no competing Vercel cron
+- [ ] Railway service sleeping/serverless mode disabled
 - [ ] `PAY_TO_ADDRESS` independently verified
-- [ ] Secrets exist only in the platform secret store
-- [ ] Logs do not emit credentials or signatures
-- [ ] Dependency advisories reviewed
-- [ ] `/v1/xlayer/tokens` and `/v1/market/instruments` work from the production region and respect upstream quotas
-- [ ] One low-value live payment completed
-- [ ] Paid token scan returned `service: "token_scan"` inline with `PAYMENT-RESPONSE`
-- [ ] OKX task replay produced `replaySuccess: true` and `deliverableSavedPath`
-- [ ] Rollback deployment identified
-- [ ] Custom domain and DNS stable before recording
+- [ ] production Upstash database is isolated from local testing
+- [ ] Blob privacy/encryption mode verified
+- [ ] executor address and all three on-chain roles verified per enabled chain
+- [ ] executor native gas checked per enabled chain
+- [ ] configured contract addresses checked against chain IDs
+- [ ] API, storage, provider and automation readiness checks pass
+- [ ] one controlled low-value payment passes
+- [ ] one bounded Spot and Autopilot lifecycle passes per advertised mainnet
+- [ ] logs contain no credentials, signatures or recovery secrets
+- [ ] web/API custom domains and TLS are stable
+- [ ] rollback deployments identified
 
 ## Railway troubleshooting
 
-| Symptom | Cause | Fix |
+| Symptom | Likely cause | Fix |
 | --- | --- | --- |
-| `getaddrinfo ENOTFOUND [::]` | `HOST` contains URL-style IPv6 brackets | Set `HOST=0.0.0.0` or remove the variable, then redeploy |
-| `/healthz` never becomes ready | Container crashed before binding | Read Deploy Logs; confirm the startup banner reports the Railway port |
-| Logs say `Using mock x402 gate` | `X402_MOCK` is enabled or one of the three OKX credentials is missing | Set `X402_MOCK=0` and all key/secret/passphrase variables, then redeploy |
+| `getaddrinfo ENOTFOUND [::]` | `HOST` contains URL-style IPv6 brackets | Set `HOST=0.0.0.0` or remove it, then redeploy. |
+| `/healthz` never becomes ready | Container crashed before binding | Inspect Deploy Logs and confirm the process binds Railway's `PORT`. |
+| Product becomes stale after inactivity | Railway Serverless/app sleeping is enabled or the service restarted | Disable sleeping, inspect restart logs and verify KV recovery. |
+| Logs say `Using mock x402 gate` | Mock mode is enabled or required OKX credentials are absent | Set `X402_MOCK=0`, supply the complete credentials and redeploy. |
+| Analysis works but automation does not | Worker disabled, role missing, contract mismatch, no native gas or kill switch active | Check the automation activation gate and logs before retrying. |
+| Browser says API offline | Wrong build-time `VITE_API_URL`, failed Railway health or TLS/CORS issue | Open Railway `/healthz`, compare the exact API origin, then rebuild Vercel. |
+| Reports or dashboards disappear | Vercel and Railway point to different KV/Blob resources or namespaces | Verify Railway storage variables; Vercel web must not own authoritative storage. |
 
-## OKX.AI handoff
+## Alternative: all-in-one Vercel serverless
 
-Use the canonical copy in [`okx-listing.md`](okx-listing.md) and the review runbook in [`OKX_AI_MODERATION.md`](OKX_AI_MODERATION.md). Update and resubmit existing agent #8355. Register only the final custom/non-Vercel origin. Preview deployments, localhost metadata, mock-payment footage, and stale `asp.live.json` exports must not be submitted.
+This is supported by the API entrypoint but is not the checked-in production default. Use it only instead of Railway, not alongside Railway automation.
+
+An all-in-one setup requires restoring the API rewrites/function and an authenticated cron in `vercel.json`, placing server secrets (including the executor key) in the Vercel server environment, setting a long random `CRON_SECRET`, and using shared KV leases and idempotent workers. Vercel Cron invokes production routes with HTTP GET; when `CRON_SECRET` is configured it sends `Authorization: Bearer <CRON_SECRET>`. Function duration limits still apply, failed cron invocations are not automatically retried and invocations can overlap. The every-minute schedule used by PULSE is not available on the Vercel Hobby plan.
+
+For these reasons, the Railway long-lived worker is the recommended topology for production Spot and Autopilot.
+
+## Marketplace and public metadata handoff
+
+Use the canonical listing copy in [`okx-listing.md`](okx-listing.md) and the review runbook in [`OKX_AI_MODERATION.md`](OKX_AI_MODERATION.md). Update the existing PULSE registration only after the final public API origin passes this runbook. Do not submit localhost, preview URLs, mock-payment footage or stale metadata exports.
+
+Use the final web URL for social/search previews and user entry. Use the final API URL for REST, MCP, OpenAPI, brand assets and marketplace service endpoints. Verify both URLs in `/v1/metadata` and the repository metadata before submission.
+
+## Platform references
+
+- [Vercel project configuration and SPA rewrites](https://vercel.com/docs/project-configuration/vercel-json)
+- [Vercel Cron behavior and `CRON_SECRET`](https://vercel.com/docs/cron-jobs/manage-cron-jobs)
+- [Vercel function runtime limits](https://vercel.com/docs/functions/runtimes)
+- [Railway service variables](https://docs.railway.com/variables)
+- [Railway monorepo deployment](https://docs.railway.com/guides/deploying-a-monorepo)
+- [Railway Serverless/app sleeping behavior](https://docs.railway.com/deployments/serverless)
+- [Railway restart policies](https://docs.railway.com/deployments/restart-policy)

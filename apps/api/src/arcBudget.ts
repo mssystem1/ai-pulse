@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Redis } from "@upstash/redis";
+import { kvClientResilienceOptions } from "./resilientKv.js";
 
 export type ArcBudgetLimits = Readonly<{
   walletHourly: number;
@@ -64,7 +65,7 @@ export class MemoryArcBudgetStore implements ArcBudgetStore {
 
 export class UpstashArcBudgetStore implements ArcBudgetStore {
   private redis: Redis;
-  constructor(url: string, token: string, private limits: ArcBudgetLimits, private namespace = "pulse") { this.redis = new Redis({ url, token }); }
+  constructor(url: string, token: string, private limits: ArcBudgetLimits, private namespace = "pulse") { this.redis = new Redis({ url, token, ...kvClientResilienceOptions() }); }
   async checkIp(ip: string, now = new Date()) {
     const { hour } = buckets(now);
     const count = Number(await this.redis.get<number>(`${this.namespace}:arc:ih:${hour}:${digest(ip)}`) || 0);

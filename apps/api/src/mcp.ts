@@ -128,19 +128,28 @@ const AnalysisArgs = z.object({
 });
 
 function availableTools(cfg: AppConfig) {
+  const published = new Set([
+    "spot_analysis_standard",
+    "spot_analysis_premium",
+    "prediction_analysis_standard",
+    "prediction_analysis_premium",
+    "preflight",
+    "job_status",
+    "job_report",
+  ]);
   return TOOLS.filter((tool) => {
+    if (!published.has(tool.name)) return false;
     if (tool.name.startsWith("prediction_analysis_")) return cfg.FEATURE_PREDICTION_ANALYSIS;
     if (tool.name.startsWith("fused_analysis_")) return cfg.FEATURE_FUSED_ANALYSIS;
     if (tool.name === "divergence_analysis") return cfg.FEATURE_DIVERGENCE_ANALYSIS;
     if (tool.name === "event_risk_preflight") return cfg.FEATURE_EVENT_RISK_ANALYSIS;
     return true;
   }).map((tool) => {
-    if (tool.name === "analysis_base") {
-      return { ...tool, description: `Paid ${priceLabel(cfg.PRICE_ANALYSIS_BASE)}: Grok base analysis grounded in live OKX spot OHLCV` };
-    }
-    if (tool.name === "analysis_premium") {
-      return { ...tool, description: `Paid ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)}: Grok premium multi-scenario OKX spot analysis` };
-    }
+    if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Market Quick Plan · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise OKX-grounded Buy-or-Wait plan with Elliott candidate paths` };
+    if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Market Pro Strategy · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots, Elliott paths, DeFi and report-linked execution actions` };
+    if (tool.name === "prediction_analysis_standard") return { ...tool, description: `Prediction Market Quick View · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_STANDARD)} · concise evidence, probability and invalidation` };
+    if (tool.name === "prediction_analysis_premium") return { ...tool, description: `Prediction Market Pro Analysis · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_PREMIUM)} · detailed counter-case plus independent 4H underlying chart` };
+    if (tool.name === "preflight") return { ...tool, description: `Onchain Pre-Trade Risk Guard · ${priceLabel(cfg.PRICE_PREFLIGHT)} · deeper token, route, amount and counterparty PASS/WARN/FAIL review` };
     return tool;
   });
 }

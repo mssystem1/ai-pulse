@@ -1,5 +1,5 @@
 export const WEB_NETWORKS = {
-  xlayer: { key: "xlayer", route: "xlayer", label: "X Layer", chainId: 196, chainHex: "0xc4", caip2: "eip155:196", rpc: "https://rpc.xlayer.tech", explorer: "https://www.okx.com/web3/explorer/xlayer", native: { name: "OKB", symbol: "OKB", decimals: 18 }, payment: { symbol: "USD®0", decimals: 6, address: "0x779ded0c9e1022225f8e0630b35a9b54be713736" }, provider: "OKX x402", fundingUrl: "https://web3.okx.com/dex-swap", fundingLabel: "Swap OKB to USD®0", fundingNote: "Keep a small OKB balance for network gas." },
+  xlayer: { key: "xlayer", route: "xlayer", label: "X Layer", chainId: 196, chainHex: "0xc4", caip2: "eip155:196", rpc: "https://rpc.xlayer.tech", explorer: "https://www.okx.com/web3/explorer/xlayer", native: { name: "OKB", symbol: "OKB", decimals: 18 }, payment: { symbol: "USDT0", decimals: 6, address: "0x779ded0c9e1022225f8e0630b35a9b54be713736" }, provider: "OKX x402", fundingUrl: "https://web3.okx.com/dex-swap", fundingLabel: "Swap OKB to USDT0", fundingNote: "Use native USDT0 and keep a small OKB balance for network gas." },
   base: { key: "base", route: "base", label: "Base", chainId: 8453, chainHex: "0x2105", caip2: "eip155:8453", rpc: "https://mainnet.base.org", explorer: "https://basescan.org", native: { name: "Ether", symbol: "ETH", decimals: 18 }, payment: { symbol: "USDC", decimals: 6, address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" }, provider: "CDP x402", fundingUrl: "https://bridge.base.org/deposit", fundingLabel: "Bridge or fund USDC", fundingNote: "Use native Base USDC; bridged USDbC is not the payment asset." },
   arbitrum: { key: "arbitrum", route: "arbitrum", label: "Arbitrum One", chainId: 42161, chainHex: "0xa4b1", caip2: "eip155:42161", rpc: "https://arb1.arbitrum.io/rpc", explorer: "https://arbiscan.io", native: { name: "Ether", symbol: "ETH", decimals: 18 }, payment: { symbol: "USDC", decimals: 6, address: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831" }, provider: "CDP x402", fundingUrl: "https://bridge.arbitrum.io", fundingLabel: "Bridge native USDC", fundingNote: "Use native Arbitrum USDC, not USDC.e." },
   "arc-testnet": { key: "arc-testnet", route: "arc", label: "Arc Testnet", chainId: 5042002, chainHex: "0x4cef52", caip2: "eip155:5042002", rpc: "https://rpc.testnet.arc.network", explorer: "https://testnet.arcscan.app", native: { name: "Test USDC", symbol: "USDC", decimals: 18 }, payment: { symbol: "USDC", decimals: 6, address: "0x3600000000000000000000000000000000000000" }, provider: "Circle Gateway", fundingUrl: "https://faucet.circle.com", fundingLabel: "Get testnet USDC", fundingNote: "Gateway nanopayments require test USDC deposited into Gateway before signing." },
@@ -45,6 +45,14 @@ export async function switchWalletNetwork(provider: { request(args: { method: st
 
 function units(raw: bigint, decimals: number) { return Number(raw) / 10 ** decimals; }
 function balanceData(address: string) { return `0x70a08231${address.replace(/^0x/, "").padStart(64, "0")}`; }
+
+export async function fetchTokenBalance(owner: string, token: string, decimals: number, key: WebNetworkKey): Promise<number> {
+  if (!/^0x[a-fA-F0-9]{40}$/.test(owner) || !/^0x[a-fA-F0-9]{40}$/.test(token)) throw new Error("Invalid balance lookup address");
+  const response = await fetch(WEB_NETWORKS[key].rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: token, data: balanceData(owner) }, "latest"] }) });
+  const body = await response.json() as { result?: string; error?: { message?: string } };
+  if (!response.ok || body.error) throw new Error(body.error?.message || `Token balance request failed (${response.status})`);
+  return units(BigInt(body.result || "0x0"), decimals);
+}
 
 export async function fetchNetworkBalances(address: string, key: WebNetworkKey) {
   const network = WEB_NETWORKS[key];

@@ -1,12 +1,12 @@
 {
   "name": "PULSE",
-  "version": "2.0.0",
+  "version": "6.0.0",
   "type": "A2MCP",
   "category": "Trading",
-  "tagline": "Multichain spot and prediction-market intelligence. Pay per report on your selected network.",
-  "taglineZh": "多链现货与预测市场智能研报 · 按所选网络按次付费",
-  "shortDescription": "PULSE delivers separate OKX Crypto Market and crypto-focused Polymarket analysis with readable, recoverable reports on X Layer, Base, Arbitrum One, and Arc Testnet.",
-  "description": "PULSE is an independent intelligence product for humans and AI agents. One responsive web workspace contains Crypto Market, Prediction Market, and Safety. Prediction Market filters Polymarket to active crypto price and direction questions, lets the user explicitly select one market in a popup, displays its live public evidence, and offers Base or Premium structured analysis. Reports present confidence, probabilities, market quality, invalidation, limitations, provenance, and disclaimers instead of raw provider JSON. Polymarket remains read-only; PULSE never places orders. Network-aware x402 payments settle through OKX on X Layer, CDP on Base and Arbitrum One, and Circle Gateway on Arc Testnet.",
+  "tagline": "Analyze first. Spot trade or run a guarded Autopilot on your selected network.",
+  "taglineZh": "先分析，再在所选网络进行现货交易或运行受保护的自动驾驶。",
+  "shortDescription": "PULSE turns live OKX Global Market and selected Polymarket evidence into recoverable Quick or Pro reports, then connects valid Global Market plans to owner-signed Spot Trading or guarded Autopilot.",
+  "description": "PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and agents. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. Five public paid services keep discovery clear: two Global Market tiers, two Prediction Market tiers and one Onchain Pre-Trade Risk Guard. Reports are durable and wallet-recoverable. Arc Testnet remains analysis/payment only until Arc mainnet execution support is released.",
   "website": "https://www.ai-pulse.tech",
   "repository": "https://github.com/mssystem1/ai-pulse",
   "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
@@ -19,7 +19,7 @@
     "pngServedAt": "/brand/logo.png",
     "alt": "PULSE waveform logo"
   },
-  "methodologyVersion": "pulse-v3.0.0",
+  "methodologyVersion": "pulse-v6.0.0",
   "languages": ["en", "zh"],
   "network": "eip155:196",
   "settlementAsset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
@@ -72,14 +72,14 @@
     "predictionStandard": 0.10,
     "predictionPremium": 0.20,
     "tokenScan": 0.10,
-    "preflight": 0.20
+    "preflight": 0.05
   },
   "pricing": {
     "freeTeaser": 0,
     "analysisBase": 0.10,
     "analysisPremium": 0.20,
     "tokenScan": 0.10,
-    "preflight": 0.20,
+    "preflight": 0.05,
     "predictionStandard": 0.10,
     "predictionPremium": 0.20
   },
@@ -121,16 +121,23 @@
     "networkSelection": "Last selected enabled network persists across reloads; DEFAULT_NETWORK applies only when no saved choice exists"
   },
   "webExperience": {
-    "navigation": ["Crypto Market", "Prediction Market", "Safety"],
+    "navigation": ["Global Market", "Prediction Market", "Risk Guard", "Spot Trading", "Autopilot", "Telegram", "Docs"],
     "predictionSelection": "Single active crypto price/direction market selected from an in-page popup; no separate predictions page",
     "predictionReport": "Readable confidence, summary, outcome probabilities, bid/ask, evidence quality, market metrics, invalidation, limitations, provenance, and disclaimer; technical JSON is collapsed",
-    "focusNote": "Optional report emphasis such as outcome case, counter-case, catalysts, liquidity, resolution risk, or invalidation; never an order",
+    "focusNote": "A valid Global Market Buy setup can prefill a Market, Limit or Autopilot action; every Spot signature remains owner-controlled and Autopilot remains policy-bounded",
     "themes": "Network-aware Base, Arbitrum, and Arc themes with the original X Layer design preserved"
   },
   "arcAi": {
     "live": "Real xAI market analysis with Arc budget and rate controls",
     "fixture": "Deterministic payment/job plumbing validation only; no market inference"
   },
+  "publicServices": [
+    { "name": "Global Market Quick Plan", "path": "/v1/analysis/spot/standard", "priceUsd": 0.10 },
+    { "name": "Global Market Pro Strategy", "path": "/v1/analysis/spot/premium", "priceUsd": 0.20 },
+    { "name": "Prediction Market Quick View", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.10 },
+    { "name": "Prediction Market Pro Analysis", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.20 },
+    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.05 }
+  ],
   "dataPolicy": {
     "polymarket": "Public read-only evidence only; no order placement",
     "selection": "User-selected markets only; no silent substitution",
@@ -151,6 +158,11 @@
     "crypto-predictions",
     "grok",
     "market-intelligence",
+    "spot-trading",
+    "guarded-autopilot",
+    "risk-guard",
+    "xstocks",
+    "rwa",
     "recoverable-reports"
   ]
 }

@@ -14,7 +14,7 @@ This file is the canonical, copy-ready submission package for Circle's Agent Mar
 | OpenAPI specification | https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml |
 | Logo | https://pulse-api-production-7aae.up.railway.app/brand/logo.png |
 
-The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the four marketplace endpoints.
+The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the five marketplace services.
 
 ## Form answers
 
@@ -23,14 +23,14 @@ The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a compleme
 | Service Name | PULSE |
 | Website | https://www.ai-pulse.tech |
 | Primary Service Category | Financial analysis / market intelligence; if unavailable, choose Data & Analytics |
-| Number of Endpoints | 4 |
-| Pricing Model | Usage-based, pay per report through x402. Standard analysis costs $0.10 in Arc Testnet USDC; Premium analysis costs $0.20. Public discovery and metadata are free. |
+| Number of Endpoints | 5 |
+| Pricing Model | Usage-based through x402: Onchain Pre-Trade Risk Guard $0.05, Quick reports $0.10, Pro reports $0.20 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
 | Contact Name | Enter the legal or operational contact responsible for PULSE. |
 | Endpoints Documentation URL | https://github.com/mssystem1/ai-pulse/blob/main/docs/circle-marketplace-openapi.yaml |
 
 ### Description
 
-PULSE is independent market intelligence for humans and AI agents. It combines live OKX spot-market evidence with one explicitly selected, read-only crypto Polymarket question and produces structured, recoverable reports. Reports disclose confidence, probabilities, market quality, invalidation conditions, limitations, source freshness, and provenance. For this listing, callers pay per report in test USDC through Circle Gateway on Arc Testnet. PULSE provides decision support only and never places trades or Polymarket orders.
+PULSE is a focused Analyze → Act intelligence workflow for humans and AI agents. Global Market turns live OKX evidence into Quick or Pro Buy-or-Wait plans; Pro adds Fibonacci, pivots, global Elliott wave paths, DeFi extraction and report-linked Spot/Autopilot actions on supported mainnets. Prediction Market analyzes one explicitly selected Polymarket question read-only. Onchain Pre-Trade Risk Guard adds a separate PASS/WARN/FAIL review. Reports are durable and recoverable. Arc Testnet remains analysis/payment only, so this Circle listing never executes trades.
 
 ### Anything else?
 
@@ -42,8 +42,9 @@ PULSE is submitted as an Arc Testnet service using test USDC through Circle Gate
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/premium` — $0.20
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/standard` — $0.10
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/premium` — $0.20
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/preflight` — $0.05
 
-All four declare Arc Testnet `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, the `exact` x402 scheme, and Circle Gateway in public metadata. Fused, divergence, and event-risk routes are intentionally excluded because they are disabled in the public product.
+All five declare Arc Testnet `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, the `exact` x402 scheme, and Circle Gateway in public metadata. Fused, divergence, event-risk and execution internals are intentionally excluded from the public service catalog.
 
 ## MCP verification
 
@@ -52,7 +53,7 @@ All four declare Arc Testnet `eip155:5042002`, test USDC `0x36000000000000000000
 ## Submission gate
 
 - Confirm the website, health endpoint, metadata, MCP initialization, and MCP `tools/list` return HTTP 200.
-- Confirm the four Arc resources and prices appear under `asp.networkServices` in `/v1/metadata`.
+- Confirm the five Arc resources and prices appear under `asp.networkServices` in `/v1/metadata`.
 - Send a valid unpaid request to each Arc endpoint and confirm its HTTP 402 challenge declares the exact network, asset, amount, seller, and resource URL.
 - Complete one controlled test-USDC payment for each distinct price/payment contract and recover the private report without repaying.
 - Confirm the receipt identifies Circle Gateway batch settlement and does not fabricate an immediate on-chain transaction.
