@@ -11,6 +11,7 @@ type Activity = {
   txHash?: string;
   account?: string;
   pair?: string;
+  executionPair?: string;
   amount?: string;
   createdAt: string;
   updatedAt: string;

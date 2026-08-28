@@ -65,6 +65,7 @@ export function createV6Router(cfg: AppConfig) {
   });
 
   router.get("/v1/trading/accounts", asyncRoute(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const owner = String(req.query.owner || "");
     const network = String(req.query.network || "");
     if (!ADDRESS.test(owner) || !(network in NETWORKS))
@@ -107,32 +108,44 @@ export function createV6Router(cfg: AppConfig) {
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     const query = String(req.query.q || "").trim().toUpperCase().slice(0, 40);
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 250);
+    const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
     if (!chain) return res.status(400).json({ error: "Select X Layer, Base or Arbitrum" });
     const settlementSymbol = network === "xlayer" ? "USDT0" : "USDC";
     const excluded = new Set(["USDC", "USDT", "USDT0", "USDBC", "DAI", "USDS", "USD+", "USD₮0"]);
     try {
       const tokens = await getOkxTradeTokens(cfg, chain.chainId, "", 1_000);
-      const pairs = [...new Map(tokens.flatMap((token) => {
+      const ranked = tokens.flatMap((token) => {
+        if (erc20Custody && token.address.toLowerCase() === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") return [];
         const analysisBase = analysisSymbolForExecutionToken(token.symbol, chain.chainId);
         if (!analysisBase || excluded.has(analysisBase.toUpperCase())) return [];
         const analysisPair = `${analysisBase}-USDT`;
         if (query && ![analysisPair, analysisBase, token.symbol, token.name].some((value) => String(value).toUpperCase().includes(query))) return [];
-        return [[analysisPair, {
+        const aliases = executionAssetAliases(analysisBase, chain.chainId);
+        const aliasRank = aliases.indexOf(token.symbol.toUpperCase());
+        return [{
           pair: analysisPair,
           analysisBase,
           executionPair: `${token.symbol}/${settlementSymbol}`,
           token,
           routeStatus: "checked-when-selected",
-        }] as const];
-      })).values()].slice(0, limit);
+          rank: aliasRank < 0 ? Number.MAX_SAFE_INTEGER : aliasRank,
+        }];
+      });
+      const preferred = new Map<string, (typeof ranked)[number]>();
+      for (const candidate of ranked) {
+        const current = preferred.get(candidate.pair);
+        if (!current || candidate.rank < current.rank) preferred.set(candidate.pair, candidate);
+      }
+      const pairs = [...preferred.values()].slice(0, limit).map(({ rank: _rank, ...pair }) => pair);
       res.setHeader("Cache-Control", "public, max-age=120, stale-while-revalidate=300");
-      return res.json({ network, chainId: chain.chainId, settlementSymbol, provider: "OKX Onchain OS token catalog", pairs });
+      return res.json({ network, chainId: chain.chainId, settlementSymbol, custody: erc20Custody ? "erc20" : "wallet", provider: "OKX Onchain OS token catalog", pairs });
     } catch (error) {
       return res.status(502).json({ error: error instanceof Error ? error.message : String(error), retryable: true });
     }
   }));
 
   router.get("/v1/trading/resolve-pair", asyncRoute(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const network = String(req.query.network || "");
     const pair = String(req.query.pair || "").trim().toUpperCase();
     const chain = NETWORKS[network as keyof typeof NETWORKS];
@@ -140,6 +153,7 @@ export function createV6Router(cfg: AppConfig) {
     if (!chain || !baseSymbol || !quoteSymbol || extra)
       return res.status(400).json({ error: "Valid execution network and BASE-QUOTE pair are required" });
     const settlementSymbol = network === "xlayer" ? "USDT0" : "USDC";
+    const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
     const aliases = executionAssetAliases(baseSymbol, chain.chainId);
     try {
       const [baseCandidates, quoteCandidates] = await Promise.all([
@@ -147,6 +161,7 @@ export function createV6Router(cfg: AppConfig) {
         getOkxTradeTokens(cfg, chain.chainId, settlementSymbol, 100),
       ]);
       const baseOptions = aliases.flatMap((alias) => baseCandidates.filter((token) => token.symbol.toUpperCase() === alias))
+        .filter((token) => !erc20Custody || token.address.toLowerCase() !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
         .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
       const base = baseOptions[0] || null;
       const quote = quoteCandidates.find((token) => token.address.toLowerCase() === (network === "xlayer"
@@ -155,7 +170,7 @@ export function createV6Router(cfg: AppConfig) {
           ? "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
           : "0xaf88d065e77c8cC2239327C5EDb3A432268e5831").toLowerCase()) || null;
       if (!base || !quote)
-        return res.json({ network, pair, available: false, aliasesChecked: aliases, reason: `No verified ${baseSymbol} representation and ${settlementSymbol} settlement pair were found on this chain.` });
+        return res.json({ network, pair, available: false, aliasesChecked: aliases, custody: erc20Custody ? "erc20" : "wallet", reason: `No verified ${baseSymbol} representation and ${settlementSymbol} settlement pair were found on this chain.` });
       const routeErrors: string[] = [];
       for (const option of baseOptions) {
         try {
@@ -166,7 +181,7 @@ export function createV6Router(cfg: AppConfig) {
             amount: String(10 ** Math.min(quote.decimals, 15)),
             slippagePercent: "1",
           });
-          return res.json({ network, pair, available: true, base: option, quote, aliasesChecked: aliases, representationsChecked: baseOptions.map((item) => ({ symbol: item.symbol, address: item.address })), mapping: option.symbol.toUpperCase() === baseSymbol ? "native-symbol" : "verified-wrapper", explanation: `${pair} analysis executes as ${option.symbol}/${quote.symbol} on ${network}.` });
+          return res.json({ network, pair, available: true, base: option, quote, aliasesChecked: aliases, custody: erc20Custody ? "erc20" : "wallet", representationsChecked: baseOptions.map((item) => ({ symbol: item.symbol, address: item.address })), mapping: option.symbol.toUpperCase() === baseSymbol ? "native-symbol" : "verified-wrapper", explanation: `${pair} analysis executes as ${option.symbol}/${quote.symbol} on ${network}.` });
         } catch (error) {
           routeErrors.push(`${option.symbol} ${option.address}: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -227,6 +242,7 @@ export function createV6Router(cfg: AppConfig) {
   }));
 
   router.get("/v1/trading/activity", asyncRoute(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const owner = String(req.query.address || ""); const network = String(req.query.network || "");
     if (!ADDRESS.test(owner) || !NETWORKS[network as keyof typeof NETWORKS]) return res.status(400).json({ error: "Valid address and mainnet network are required" });
     const activity = await reconcileV6Activity(owner, network, NETWORKS[network as keyof typeof NETWORKS].rpc());
@@ -236,7 +252,7 @@ export function createV6Router(cfg: AppConfig) {
   router.post("/v1/trading/activity", asyncRoute(async (req, res) => {
     // Browser activity is only an announcement. Confirmation is derived from the
     // chain receipt by reconcileV6Activity; clients cannot assert settlement.
-    const schema = z.object({ owner: z.string().regex(ADDRESS), network: z.enum(["xlayer", "base", "arbitrum"]), source: z.enum(["wallet", "spot", "autopilot", "limit"]), kind: z.string().min(1).max(64), status: z.literal("pending"), txHash: z.string().regex(HASH), account: z.string().regex(ADDRESS).optional(), pair: z.string().max(64).optional(), amount: z.string().regex(/^\d{1,78}$/).optional() });
+    const schema = z.object({ owner: z.string().regex(ADDRESS), network: z.enum(["xlayer", "base", "arbitrum"]), source: z.enum(["wallet", "spot", "autopilot", "limit"]), kind: z.string().min(1).max(64), status: z.literal("pending"), txHash: z.string().regex(HASH), account: z.string().regex(ADDRESS).optional(), pair: z.string().max(64).optional(), executionPair: z.string().max(64).optional(), amount: z.string().regex(/^\d{1,78}$/).optional() });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const activity = await recordV6Activity(parsed.data);

@@ -28,6 +28,7 @@ type RegisteredOrder = {
   orderId: string;
   version: "oco-v1" | "limit-v2" | "bracket-v1";
   instId: string;
+  executionPair?: string;
   sellToken: string;
   buyToken: string;
   txHash?: string;
@@ -37,6 +38,7 @@ type RegisteredOrder = {
   updatedAt: string;
   lastError?: string;
   executionTxHash?: string;
+  lastAction?: "entry_protected" | "take_profit" | "stop_loss" | "fill";
   entryPrice?: number;
   onchainState?: number;
   phase?: "entry" | "protected" | "complete";
@@ -139,6 +141,69 @@ export function onchainOrderStatus(state: number): RegisteredOrder["status"] {
 }
 export function bracketOrderStatus(state: number): RegisteredOrder["status"] {
   return state === 1 || state === 3 ? "active" : state === 2 || state === 4 ? "paused" : state === 5 ? "filled" : state === 6 ? "cancelled" : "failed";
+}
+
+type OrderLifecycle = Pick<RegisteredOrder, "status" | "phase" | "onchainState">;
+
+function observedOrderLifecycle(
+  version: RegisteredOrder["version"],
+  state: number,
+): OrderLifecycle {
+  const status = version === "bracket-v1"
+    ? bracketOrderStatus(state)
+    : onchainOrderStatus(state);
+  const phase: RegisteredOrder["phase"] = version === "bracket-v1"
+    ? state === 1 || state === 2
+      ? "entry"
+      : state === 3 || state === 4
+        ? "protected"
+        : "complete"
+    : version === "oco-v1"
+      ? state === 1 || state === 2 ? "protected" : "complete"
+      : state === 1 || state === 2 ? "entry" : "complete";
+  return { status, phase, onchainState: state };
+}
+
+function terminalState(
+  version: RegisteredOrder["version"],
+  status: "filled" | "cancelled",
+) {
+  if (version === "bracket-v1") return status === "filled" ? 5 : 6;
+  return status === "filled" ? 3 : 4;
+}
+
+/**
+ * Contract order states only move forward. Public RPC fallbacks can briefly
+ * return an older block, so a terminal/protected state already proved by a
+ * receipt must never regress to entry in the UI or durable order ledger.
+ */
+export function reconcileOrderLifecycle(
+  version: RegisteredOrder["version"],
+  observedState: number,
+  previous?: Pick<RegisteredOrder, "status" | "phase" | "onchainState">,
+): OrderLifecycle {
+  const observed = observedOrderLifecycle(version, observedState);
+  const observedTerminal = observed.status === "filled" || observed.status === "cancelled";
+  if (observedTerminal) return observed;
+
+  const previousTerminal = previous?.status === "filled" || previous?.status === "cancelled";
+  if (previous && previousTerminal) {
+    const status = previous.status as "filled" | "cancelled";
+    return {
+      status,
+      phase: "complete",
+      onchainState: terminalState(version, status),
+    };
+  }
+
+  if (version === "bracket-v1" && previous?.phase === "protected" && observed.phase === "entry") {
+    return {
+      status: previous.status,
+      phase: "protected",
+      onchainState: previous.status === "paused" ? 4 : 3,
+    };
+  }
+  return observed;
 }
 function transientRpcFailure(error: unknown) {
   return /rate limit|429|timeout|timed out|fetch failed|network|rpc request failed|temporarily unavailable/i.test(error instanceof Error ? error.message : String(error));
@@ -299,7 +364,10 @@ async function verifyRegistration(input: z.infer<typeof schema>) {
   const normalizeForChain = (symbol: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(networks[input.network].id)));
   if (normalizeForChain(sellSymbol) !== normaliseRouteSymbol(expected[0]) || normalizeForChain(buySymbol) !== normaliseRouteSymbol(expected[1]))
     throw new Error(`On-chain tokens ${sellSymbol}/${buySymbol} do not match ${input.instId}`);
-  return { entryPrice: await verifiedFillPrice(input, publicClient) };
+  const executionPair = input.version === "oco-v1" || triggerAbove
+    ? `${sellSymbol}-${buySymbol}`
+    : `${buySymbol}-${sellSymbol}`;
+  return { entryPrice: await verifiedFillPrice(input, publicClient), executionPair };
 }
 
 const nextIdAbi = [
@@ -358,10 +426,7 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
         const key = `${network}:${account.toLowerCase()}:${id}`;
         const previous = existing.find((item) => item.id === key);
         const incomingState = Number(record.at(-1));
-        const incomingPhase = configuration.version === "bracket-v1" ? incomingState === 1 || incomingState === 2 ? "entry" : incomingState === 3 || incomingState === 4 ? "protected" : "complete" : configuration.version === "oco-v1" ? "protected" : incomingState >= 3 ? "complete" : "entry";
-        const terminalPrevious = previous?.status === "filled" || previous?.status === "cancelled";
-        const protectedPrevious = previous?.phase === "protected";
-        const keepPreviousState = terminalPrevious || (protectedPrevious && incomingPhase === "entry");
+        const lifecycle = reconcileOrderLifecycle(configuration.version, incomingState, previous);
         found.push({
           ...previous,
           id: key,
@@ -371,11 +436,10 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
           orderId: String(id),
           version: configuration.version,
           instId: `${reportSymbol(baseSymbol, network)}-${reportSymbol(quoteSymbol, network)}`,
+          executionPair: `${baseSymbol}-${quoteSymbol}`,
           sellToken,
           buyToken,
-          status: keepPreviousState && previous ? previous.status : configuration.version === "bracket-v1" ? bracketOrderStatus(incomingState) : onchainOrderStatus(incomingState),
-          onchainState: keepPreviousState && previous ? previous.onchainState : incomingState,
-          phase: keepPreviousState && previous ? previous.phase : incomingPhase,
+          ...lifecycle,
           createdAt: previous?.createdAt || now,
           updatedAt: now,
           lastError: previous?.lastError,
@@ -414,6 +478,7 @@ async function discoverOwnerOrders(owner: string, network: Network, existing: Re
 export function createTradeAutomationRouter() {
   const router = Router();
   router.get("/v1/automation/orders", asyncRoute(async (req, res) => {
+    res.setHeader("Cache-Control", "no-store");
     const owner = String(req.query.owner || "");
     const requestedNetwork = String(req.query.network || "");
     if (!address.test(owner))
@@ -441,12 +506,7 @@ export function createTradeAutomationRouter() {
             ? await publicClient.readContract({ address: order.account as `0x${string}`, abi: bracketAbi, functionName: "orders", args: [BigInt(order.orderId)] })
             : await publicClient.readContract({ address: order.account as `0x${string}`, abi: limitAbi, functionName: "orders", args: [BigInt(order.orderId)] });
         const state = Number(record.at(-1));
-        const observedStatus = order.version === "bracket-v1" ? bracketOrderStatus(state) : onchainOrderStatus(state);
-        const observedPhase = order.version === "bracket-v1" ? state === 1 || state === 2 ? "entry" : state === 3 || state === 4 ? "protected" : "complete" : order.version === "oco-v1" ? "protected" : state >= 3 ? "complete" : "entry";
-        const terminalPrevious = order.status === "filled" || order.status === "cancelled";
-        const regressivePhase = order.phase === "protected" && observedPhase === "entry";
-        const status = terminalPrevious || regressivePhase ? order.status : observedStatus;
-        const phase = terminalPrevious || regressivePhase ? order.phase || "complete" : observedPhase;
+        const lifecycle = reconcileOrderLifecycle(order.version, state, order);
         const ticker = await getTicker(order.instId);
         const currentPrice = ticker.last;
         let entryPrice = order.entryPrice;
@@ -461,17 +521,15 @@ export function createTradeAutomationRouter() {
         }
         const view: RegisteredOrder = {
           ...order,
-          status,
-          phase,
-          onchainState: state,
+          ...lifecycle,
           lastError: order.lastError,
           currentPrice,
           ...(entryPrice ? { entryPrice } : {}),
           estimatedPnlPct: (order.version === "oco-v1" || (order.version === "bracket-v1" && (state === 3 || state === 4))) && Boolean(entryPrice && entryPrice > 0)
             ? ((currentPrice - entryPrice!) / entryPrice!) * 100
             : null,
-          triggerPrice: Number(record[order.version === "oco-v1" ? 3 : order.version === "bracket-v1" ? state === 3 || state === 4 ? 7 : 6 : 5]) / 1e18,
-          secondaryTriggerPrice: order.version === "oco-v1" ? Number(record[4]) / 1e18 : order.version === "bracket-v1" && (state === 3 || state === 4) ? Number(record[8]) / 1e18 : null,
+          triggerPrice: Number(record[order.version === "oco-v1" ? 3 : order.version === "bracket-v1" ? lifecycle.phase === "entry" ? 6 : 7 : 5]) / 1e18,
+          secondaryTriggerPrice: order.version === "oco-v1" ? Number(record[4]) / 1e18 : order.version === "bracket-v1" && lifecycle.phase !== "entry" ? Number(record[8]) / 1e18 : null,
           takeProfit: order.version === "bracket-v1" ? Number(record[7]) / 1e18 : order.version === "oco-v1" ? Number(record[3]) / 1e18 : null,
           stopLoss: order.version === "bracket-v1" ? Number(record[8]) / 1e18 : order.version === "oco-v1" ? Number(record[4]) / 1e18 : null,
           triggerAbove: order.version === "limit-v2" ? Boolean(record[9]) : order.version === "bracket-v1" ? Boolean(record[12]) : null,
@@ -509,8 +567,12 @@ export function createTradeAutomationRouter() {
         createdAt: now,
         updatedAt: now,
         ...(verified.entryPrice ? { entryPrice: verified.entryPrice } : {}),
+        executionPair: verified.executionPair,
       };
       await save([...items.filter((o) => o.id !== id), item]);
+      // The next owner refresh must not receive the account snapshot from just
+      // before this order was created.
+      discoveryCache.delete(`${parsed.data.network}:${parsed.data.owner.toLowerCase()}`);
       res.status(201).json({ order: item });
     } catch (error) {
       if (isKvUnavailableError(error)) throw error;
@@ -678,15 +740,14 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
                   functionName: "orders",
                   args: [BigInt(item.orderId)],
                 });
-        const state = record.at(-1) as number;
+        const state = Number(record.at(-1));
         const bracketProtected = item.version === "bracket-v1" && state === 3;
+        Object.assign(item, reconcileOrderLifecycle(item.version, state, item));
         if (state === 2 || (item.version === "bracket-v1" && state === 4)) {
-          item.status = "paused";
           item.updatedAt = new Date().toISOString();
           continue;
         }
         if (state !== 1 && !bracketProtected) {
-          item.status = item.version === "bracket-v1" ? bracketOrderStatus(state) : onchainOrderStatus(state);
           item.updatedAt = new Date().toISOString();
           continue;
         }
@@ -791,17 +852,37 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
         });
         if (receipt.status !== "success")
           throw new Error("Automation execution reverted");
-        item.status = item.version === "bracket-v1" && !bracketProtected && Boolean(record[13]) ? "active" : "filled";
+        const entryBecomesProtected = item.version === "bracket-v1" && !bracketProtected && Boolean(record[13]);
+        const exitsProtectedPosition = item.version === "oco-v1" || bracketProtected;
+        const takeProfitReached = exitsProtectedPosition && price >= (record[item.version === "oco-v1" ? 3 : 7] as bigint);
+        const executionKind = entryBecomesProtected
+          ? "automatic_entry_protected"
+          : exitsProtectedPosition
+            ? takeProfitReached ? "automatic_take_profit" : "automatic_stop_loss"
+            : "automatic_fill";
+        if (entryBecomesProtected) {
+          item.status = "active";
+          item.phase = "protected";
+          item.onchainState = 3;
+          item.lastAction = "entry_protected";
+        } else {
+          item.status = "filled";
+          item.phase = "complete";
+          item.onchainState = item.version === "bracket-v1" ? 5 : 3;
+          item.lastAction = takeProfitReached ? "take_profit" : exitsProtectedPosition ? "stop_loss" : "fill";
+        }
         item.executionTxHash = executionHash;
+        item.lastError = undefined;
         item.updatedAt = new Date().toISOString();
         await recordV6Activity({
           owner: item.owner,
           network: item.network,
           source: item.version === "oco-v1" || item.version === "bracket-v1" ? "spot" : "limit",
-          kind: item.version === "bracket-v1" && !bracketProtected && Boolean(record[13]) ? "automatic_entry_protected" : "automatic_fill",
+          kind: executionKind,
           status: "confirmed",
           txHash: executionHash,
           pair: item.instId,
+          executionPair: item.executionPair,
           amount: String(amount),
         });
       } catch (error) {

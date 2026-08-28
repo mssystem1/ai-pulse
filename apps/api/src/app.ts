@@ -162,7 +162,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
   app.use(createV6Router(cfg));
   app.use(createTradeAutomationRouter());
-  app.use(createAutopilotAutomationRouter());
+  app.use(createAutopilotAutomationRouter(cfg));
   app.use(createTelegramRouter(cfg));
   app.use(telemetryMiddleware);
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));

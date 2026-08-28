@@ -17,13 +17,13 @@ import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedSpotAnalysi
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
-import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
+import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
 import { listV6Activity, recordV6Activity } from "./v6Store.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
-import { AUTOPILOT_STRATEGY_HASH_KEY, decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 
 type StrategyEvaluation = {
   id: string;
@@ -80,6 +80,8 @@ type Strategy = {
   evaluations?: StrategyEvaluation[];
 };
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+const NATIVE_TOKEN = /^0x[eE]{40}$/;
+const Erc20AddressSchema = z.string().regex(ADDRESS).refine((value) => !NATIVE_TOKEN.test(value), "Autopilot assets must be ERC-20 contracts; use the wrapped native asset");
 const configs = {
   xlayer: {
     id: 196,
@@ -116,8 +118,8 @@ const StrategySchema = z.object({
   owner: z.string().regex(ADDRESS),
   network: z.enum(["xlayer", "base", "arbitrum"]),
   vault: z.string().regex(ADDRESS),
-  settlementAsset: z.string().regex(ADDRESS),
-  targetAsset: z.string().regex(ADDRESS),
+  settlementAsset: Erc20AddressSchema,
+  targetAsset: Erc20AddressSchema,
   pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
   timeframe: z.enum(["15m", "1H", "4H", "1D"]),
   strategyType: z.enum(["trend_following", "breakout", "mean_reversion"]).optional(),
@@ -141,6 +143,13 @@ const StrategySchema = z.object({
     expiresAt: z.number().int().positive(),
     signature: z.string().regex(/^0x[a-fA-F0-9]{130}$/),
   }),
+});
+const StrategyPreflightSchema = z.object({
+  network: z.enum(["xlayer", "base", "arbitrum"]),
+  settlementAsset: Erc20AddressSchema,
+  targetAsset: Erc20AddressSchema,
+  pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
+  amountAtomic: z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n),
 });
 async function kv(command: unknown[]) {
   return runKvCommand(command, "Autopilot");
@@ -526,7 +535,7 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
       "Strategy policy does not match the owner-committed on-chain policy hash",
     );
 }
-export function createAutopilotAutomationRouter() {
+export function createAutopilotAutomationRouter(cfg: AppConfig) {
   const router = Router();
   const potentialGainersHandler = asyncRoute(async (req, res) => {
     const parsed = z.enum(["15m", "1H", "4H", "1D"]).safeParse(String(req.query.timeframe || "1H"));
@@ -539,6 +548,33 @@ export function createAutopilotAutomationRouter() {
   // alias for open clients and external integrations.
   router.get("/v1/opportunities", potentialGainersHandler);
   router.get("/v1/autopilot/potential-gainers", potentialGainersHandler);
+  router.post("/v1/autopilot/preflight", asyncRoute(async (req, res) => {
+    const parsed = StrategyPreflightSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    try {
+      const { network, settlementAsset, targetAsset, pair, amountAtomic } = parsed.data;
+      const { publicClient } = clients(network);
+      const [settlementCode, targetCode, metadata] = await Promise.all([
+        publicClient.getCode({ address: settlementAsset as `0x${string}` }),
+        publicClient.getCode({ address: targetAsset as `0x${string}` }),
+        publicClient.multicall({ allowFailure: false, contracts: [
+          { address: targetAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
+          { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
+        ] }),
+      ]);
+      if (!settlementCode || settlementCode === "0x" || !targetCode || targetCode === "0x")
+        throw new Error("The selected Autopilot route contains a non-contract token representation");
+      const [targetSymbol, settlementSymbol] = metadata.map(String);
+      const [base, quote, extra] = pair.toUpperCase().split("-");
+      const normalizeForChain = (symbol: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[network].id)));
+      if (!base || !quote || extra || normalizeForChain(targetSymbol) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol) !== normaliseRouteSymbol(quote))
+        throw new Error(`Contract route ${targetSymbol}/${settlementSymbol} does not represent ${pair}`);
+      await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic, slippagePercent: "1.5" });
+      res.json({ ready: true, pair, executionPair: `${targetSymbol}/${settlementSymbol}`, targetAsset, settlementAsset });
+    } catch (error) {
+      res.status(422).json({ error: error instanceof Error ? error.message : String(error), walletTransactionsSent: false });
+    }
+  }));
   router.get("/v1/autopilot/strategies", asyncRoute(async (req, res) => {
     const owner = String(req.query.owner || "");
     const requestedNetwork = String(req.query.network || "");
@@ -573,13 +609,11 @@ export function createAutopilotAutomationRouter() {
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const portfolioValueAtomic = settlementBalance + targetBalance * price * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
-        const cashFlowAtomic = (activityByNetwork.get(strategy.network) || [])
+        const strategyCashFlows = (activityByNetwork.get(strategy.network) || [])
           .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
-          .reduce((sum, item) => sum + (item.kind === "vault_fund" ? 1n : -1n) * BigInt(item.amount || "0"), 0n);
-        const capitalBasis = baseline + cashFlowAtomic;
-        const pnl = portfolioValueAtomic - capitalBasis;
+        const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
         const reconciled = reconcileStrategyExecution(strategy, activityByNetwork.get(strategy.network) || [], targetBalance);
-        return { ...reconciled, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, netCashFlowAtomic: String(cashFlowAtomic), pnlAtomic: capitalBasis > 0n ? String(pnl) : null, pnlPct: capitalBasis > 0n ? Number(pnl * 1_000_000n / capitalBasis) / 10_000 : null };
+        return { ...reconciled, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
         return { ...strategy, telemetryError: error instanceof Error ? error.message : String(error) };
       }

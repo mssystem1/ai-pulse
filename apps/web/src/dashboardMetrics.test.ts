@@ -59,6 +59,17 @@ test("multi-agent Autopilot totals aggregate capital and cash-flow-adjusted PnL"
   });
 });
 
+test("aggregate PnL uses gross contributed capital, not the post-withdrawal remainder", () => {
+  assert.deepEqual(aggregateAutopilotMetrics([
+    { status: "active", portfolioValueAtomic: "0", baselineValueAtomic: "500000", pnlBasisAtomic: "500000", pnlAtomic: "-44" },
+    { status: "active", portfolioValueAtomic: "500000", baselineValueAtomic: "1000000", pnlBasisAtomic: "1000000", pnlAtomic: "-93542" },
+  ]), {
+    portfolioValueAtomic: "500000",
+    pnlAtomic: "-93586",
+    pnlPct: -6.239,
+  });
+});
+
 test("malformed strategy telemetry does not stale the multi-agent dashboard", () => {
   assert.deepEqual(aggregateAutopilotMetrics([
     { status: "active", portfolioValueAtomic: "not-a-number", baselineValueAtomic: "500000", pnlAtomic: null },

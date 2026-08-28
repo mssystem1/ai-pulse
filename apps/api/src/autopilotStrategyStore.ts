@@ -8,7 +8,39 @@ type ExecutionActivity = {
   account?: string;
   txHash?: string;
   createdAt?: string;
+  amount?: string;
 };
+
+export function cashFlowAdjustedPnl(
+  portfolioValueAtomic: bigint,
+  baselineValueAtomic: bigint,
+  activity: readonly ExecutionActivity[],
+) {
+  let contributionsAtomic = 0n;
+  let withdrawalsAtomic = 0n;
+  for (const item of activity) {
+    if (item.status !== "confirmed" || !/^\d+$/.test(item.amount || "")) continue;
+    if (item.kind === "vault_fund") contributionsAtomic += BigInt(item.amount!);
+    if (item.kind === "vault_withdraw") withdrawalsAtomic += BigInt(item.amount!);
+  }
+  const netCashFlowAtomic = contributionsAtomic - withdrawalsAtomic;
+  const pnlAtomic = portfolioValueAtomic - baselineValueAtomic - netCashFlowAtomic;
+  // Withdrawals reduce capital still at risk, but they are not losses. Return
+  // is measured against gross owner contributions so a nearly/full withdrawn
+  // vault cannot turn harmless token dust into a misleading -100% reading.
+  const pnlBasisAtomic = baselineValueAtomic + contributionsAtomic;
+  return {
+    contributionsAtomic,
+    withdrawalsAtomic,
+    netCashFlowAtomic,
+    pnlAtomic: pnlBasisAtomic > 0n ? pnlAtomic : null,
+    pnlBasisAtomic,
+    pnlPct:
+      pnlBasisAtomic > 0n
+        ? Number((pnlAtomic * 1_000_000n) / pnlBasisAtomic) / 10_000
+        : null,
+  };
+}
 
 const RUNTIME_FIELDS = [
   "lastRunAt",

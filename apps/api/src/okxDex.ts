@@ -365,6 +365,7 @@ const tradeTokenCache = new Map<string, { expiresAt: number; tokens: Record<stri
 const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
   "196": [
     { tokenSymbol: "USDT0", tokenName: "Tether USD0", tokenContractAddress: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, tokenSource: "X Layer official token list" },
+    { tokenSymbol: "WOKB", tokenName: "Wrapped OKB", tokenContractAddress: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", decimals: 18, tokenSource: "X Layer official token list" },
     { tokenSymbol: "WETH", tokenName: "Wrapped Ether", tokenContractAddress: "0x5A77f1443D16ee5761d310e38b62f77f726bC71c", decimals: 18, tokenSource: "X Layer official token list" },
   ],
   "8453": [
@@ -397,6 +398,10 @@ const EXECUTION_ASSET_ALIASES: Record<string, Record<string, string[]>> = {
     // OKX catalogs the canonical bridged token as SOL while its ERC-20
     // metadata reports xSOL at the same contract address.
     SOL: ["SOL", "XSOL"],
+    // Autopilot and protected-order vaults are ERC-20 accounts. Native OKB is
+    // routable for a direct wallet swap, while WOKB is the contract-safe
+    // representation for capital that must remain inside a vault.
+    OKB: ["WOKB", "OKB"],
   },
   "8453": {
     BTC: ["CBBTC", "WBTC", "BTC"],

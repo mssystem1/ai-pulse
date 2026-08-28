@@ -4,6 +4,7 @@ type StrategyMetric = {
   targetBalance?: string;
   portfolioValueAtomic?: string;
   baselineValueAtomic?: string;
+  pnlBasisAtomic?: string;
   pnlAtomic?: string | null;
   activeTakeProfit?: number;
   activeStopLoss?: number;
@@ -28,8 +29,9 @@ export function aggregateAutopilotMetrics(strategies: StrategyMetric[]) {
         portfolioValueAtomic += BigInt(strategy.portfolioValueAtomic);
         hasPortfolio = true;
       }
-      if (strategy.baselineValueAtomic && /^\d+$/.test(strategy.baselineValueAtomic)) {
-        baselineValueAtomic += BigInt(strategy.baselineValueAtomic);
+      const basis = strategy.pnlBasisAtomic || strategy.baselineValueAtomic;
+      if (basis && /^\d+$/.test(basis)) {
+        baselineValueAtomic += BigInt(basis);
       }
       if (strategy.pnlAtomic && /^-?\d+$/.test(strategy.pnlAtomic)) {
         pnlAtomic += BigInt(strategy.pnlAtomic);

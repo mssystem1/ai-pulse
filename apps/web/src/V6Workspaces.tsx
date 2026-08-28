@@ -55,6 +55,7 @@ type Activity = {
   txHash?: string;
   account?: string;
   pair?: string;
+  executionPair?: string;
   amount?: string;
   createdAt: string;
 };
@@ -64,9 +65,10 @@ const EXECUTION_NETWORKS: WebNetworkKey[] = ["xlayer", "base", "arbitrum"];
 async function probePairRoute(
   pair: string,
   network: WebNetworkKey,
+  erc20Custody = false,
 ): Promise<{ base: TradeToken; quote: TradeToken } | null> {
   const response = await apiGet(
-    `/v1/trading/resolve-pair?network=${network}&pair=${encodeURIComponent(pair)}`,
+    `/v1/trading/resolve-pair?network=${network}&pair=${encodeURIComponent(pair)}${erc20Custody ? "&custody=erc20" : ""}`,
   );
   if (!response.ok) return null;
   const result = response.data as {
@@ -107,6 +109,7 @@ type AutomationOrder = {
   orderId: string;
   version: "oco-v1" | "limit-v2" | "bracket-v1";
   instId: string;
+  executionPair?: string;
   status: string;
   amount?: string;
   triggerPrice?: number;
@@ -118,6 +121,7 @@ type AutomationOrder = {
   expiry?: string;
   lastError?: string;
   executionTxHash?: string;
+  lastAction?: "entry_protected" | "take_profit" | "stop_loss" | "fill";
   phase?: "entry" | "protected" | "complete";
   takeProfit?: number | null;
   stopLoss?: number | null;
@@ -145,6 +149,10 @@ type AutopilotStrategyView = {
   targetSymbol?: string;
   portfolioValueAtomic?: string;
   baselineValueAtomic?: string;
+  contributionsAtomic?: string;
+  withdrawalsAtomic?: string;
+  netCashFlowAtomic?: string;
+  pnlBasisAtomic?: string;
   pnlAtomic?: string | null;
   pnlPct?: number | null;
   markPrice?: number;
@@ -237,24 +245,37 @@ async function registerOrRecoverAutomationOrder(input: {
   fillTxHash?: string;
 }) {
   const registration = await apiPost("/v1/automation/orders", input);
-  if (registration.ok) return { monitored: true, recovered: false };
+  if (registration.ok)
+    return {
+      monitored: true,
+      recovered: false,
+      order: (registration.data as { order?: AutomationOrder }).order || null,
+    };
   const recovered = await apiGet(
     `/v1/automation/orders?owner=${input.owner}&network=${input.network}&fresh=1`,
   ).catch(() => null);
   const orders = recovered?.ok
     ? (recovered.data as { orders?: AutomationOrder[] }).orders || []
     : [];
-  const found = orders.some(
+  const found = orders.find(
     (order) =>
       order.account.toLowerCase() === input.account.toLowerCase() &&
       order.orderId === input.orderId &&
       order.version === input.version,
   );
   return {
-    monitored: found,
-    recovered: found,
+    monitored: Boolean(found),
+    recovered: Boolean(found),
+    order: found || null,
     error: errorText(registration.data),
   };
+}
+
+function upsertAutomationOrder(
+  current: AutomationOrder[],
+  incoming: AutomationOrder,
+) {
+  return [incoming, ...current.filter((item) => item.id !== incoming.id)];
 }
 
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
@@ -1019,6 +1040,7 @@ export function SpotWorkspace({
   );
   const [baseToken, setBaseToken] = useState<TradeToken | null>(null);
   const [quoteToken, setQuoteToken] = useState<TradeToken | null>(null);
+  const [mappingScope, setMappingScope] = useState("");
   const [tokenStatus, setTokenStatus] = useState(
     "Resolving report pair on this network…",
   );
@@ -1085,12 +1107,14 @@ export function SpotWorkspace({
     side === "buy" ? tokenBalances.quote : tokenBalances.base;
   const insufficientBalance =
     spendBalance !== null && Number(amountHuman || 0) > spendBalance;
+  const expectedMappingScope = `${networkKey}:${pair}`;
 
   useEffect(() => {
     if (networkKey === "arc-testnet") return;
     let cancelled = false;
     setBaseToken(null);
     setQuoteToken(null);
+    setMappingScope("");
     setFromToken("");
     setToToken("");
     setProtectedAsset("");
@@ -1122,6 +1146,7 @@ export function SpotWorkspace({
         const resolvedQuote = response.ok ? result.quote || null : null;
         setBaseToken(resolvedBase);
         setQuoteToken(resolvedQuote);
+        setMappingScope(`${networkKey}:${pair}`);
         setTokenStatus(
           resolvedBase && resolvedQuote
             ? `${resolvedBase.symbol}/${resolvedQuote.symbol} is the required ${WEB_NETWORKS[networkKey].label} settlement pair. Verifying a live OKX route…`
@@ -1151,6 +1176,11 @@ export function SpotWorkspace({
   useEffect(() => {
     if (networkKey === "arc-testnet") {
       setRouteAvailable(false);
+      return;
+    }
+    if (mappingScope !== expectedMappingScope) {
+      setRouteAvailable(false);
+      setRouteStatus("Mapping the selected pair on this network…");
       return;
     }
     if (!baseToken || !quoteToken) {
@@ -1207,10 +1237,10 @@ export function SpotWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [baseToken, quoteToken, networkKey, pair]);
+  }, [baseToken, quoteToken, mappingScope, expectedMappingScope, networkKey, pair]);
 
   useEffect(() => {
-    if (!wallet || !baseToken || !quoteToken || networkKey === "arc-testnet") {
+    if (!wallet || mappingScope !== expectedMappingScope || !baseToken || !quoteToken || networkKey === "arc-testnet") {
       setTokenBalances({ base: null, quote: null });
       return;
     }
@@ -1238,9 +1268,10 @@ export function SpotWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [wallet, baseToken, quoteToken, networkKey]);
+  }, [wallet, baseToken, quoteToken, mappingScope, expectedMappingScope, networkKey]);
 
   useEffect(() => {
+    if (mappingScope !== expectedMappingScope) return;
     const sell = side === "buy" ? quoteToken : baseToken;
     const buy = side === "buy" ? baseToken : quoteToken;
     if (sell) setFromToken(sell.address);
@@ -1272,6 +1303,8 @@ export function SpotWorkspace({
     side,
     baseToken,
     quoteToken,
+    mappingScope,
+    expectedMappingScope,
     amountHuman,
     protectedAmountHuman,
     limitMinOutHuman,
@@ -1315,7 +1348,7 @@ export function SpotWorkspace({
     setLimitAbove(initialTrade.side === "sell");
   }, [initialTrade]);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (freshOrders = false) => {
     lastRefreshAtRef.current = Date.now();
     // Establish the active chain/wallet scope before the first await. Without
     // this guard, a slower request from the previous tab/network can overwrite
@@ -1360,7 +1393,7 @@ export function SpotWorkspace({
           "Cloud activity storage is temporarily unreachable. Existing activity remains visible; PULSE will reconnect automatically.";
       }
       const registered = await apiGet(
-        `/v1/automation/orders?owner=${wallet}&network=${networkKey}`,
+        `/v1/automation/orders?owner=${wallet}&network=${networkKey}${freshOrders ? "&fresh=1" : ""}`,
       );
       if (!isCurrentScope()) return;
       if (registered.ok)
@@ -1491,6 +1524,19 @@ export function SpotWorkspace({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+  const needsLiveReconciliation =
+    activity.some((item) => item.status === "pending") ||
+    orders.some(
+      (order) => order.status === "active" || order.status === "paused",
+    );
+  useEffect(() => {
+    if (!wallet || !needsLiveReconciliation || networkKey === "arc-testnet")
+      return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 20_000);
+    return () => window.clearInterval(timer);
+  }, [wallet, networkKey, needsLiveReconciliation, refresh]);
   useEffect(() => {
     const refreshWhenVisible = () => {
       if (
@@ -1618,6 +1664,7 @@ export function SpotWorkspace({
         status: "pending",
         txHash: hash,
         pair,
+        executionPair: `${baseToken?.symbol || pair.split("-")[0]}-${quoteToken?.symbol || pair.split("-")[1]}`,
         amount,
       });
       await waitForWalletReceipt(provider, hash);
@@ -1910,6 +1957,8 @@ export function SpotWorkspace({
         toTokenAddress: toToken,
         amount,
         slippagePercent: Number(slippage),
+        slippageMode,
+        maxAutoSlippagePercent: Number(slippage),
       });
       if (!route.ok)
         throw new Error(
@@ -1999,6 +2048,7 @@ export function SpotWorkspace({
         status: "pending",
         txHash: hash,
         pair,
+        executionPair: `${baseToken?.symbol || pair.split("-")[0]}-${quoteToken?.symbol || pair.split("-")[1]}`,
         amount,
       });
       const registration = await registerOrRecoverAutomationOrder({
@@ -2012,12 +2062,18 @@ export function SpotWorkspace({
         buyToken: toToken,
         txHash: hash,
       });
+      if (registration.order)
+        setOrders((current) =>
+          upsertAutomationOrder(current, registration.order!),
+        );
       setMessage(
         registration.monitored
           ? `${useBracket ? "Limit entry with automatic TP/SL" : "Limit order"} submitted and monitored ${hash}`
           : `Order confirmed on-chain ${hash}. Monitoring is reconnecting and will discover it automatically; your owner account remains in control.`,
       );
-      await refresh();
+      // The verified POST result makes the row visible immediately; the fresh
+      // read then reconciles the account's authoritative on-chain phase.
+      await refresh(true);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -2156,6 +2212,10 @@ export function SpotWorkspace({
       txHash: hash,
       fillTxHash,
     });
+    if (registration.order)
+      setOrders((current) =>
+        upsertAutomationOrder(current, registration.order!),
+      );
     if (!registration.monitored)
       setMessage(
         `Protection is active on-chain ${hash}. Monitoring is reconnecting and will discover it automatically.`,
@@ -2433,7 +2493,8 @@ export function SpotWorkspace({
   const sellAsset = side === "buy" ? quoteToken : baseToken;
   const buyAsset = side === "buy" ? baseToken : quoteToken;
   const mappingReady = Boolean(
-    baseToken &&
+    mappingScope === expectedMappingScope &&
+      baseToken &&
       quoteToken &&
       ADDRESS.test(fromToken) &&
       ADDRESS.test(toToken) &&
@@ -3038,6 +3099,50 @@ export function SpotWorkspace({
                   </span>
                 </label>
               )}
+              <div className="slippage-control limit-slippage-control">
+                <span>Limit fill protection</span>
+                <div
+                  className="mini-segmented"
+                  aria-label="Limit slippage mode"
+                >
+                  <button
+                    type="button"
+                    className={slippageMode === "auto" ? "active" : ""}
+                    aria-pressed={slippageMode === "auto"}
+                    onClick={() => setSlippageMode("auto")}
+                  >
+                    Auto
+                  </button>
+                  <button
+                    type="button"
+                    className={slippageMode === "manual" ? "active" : ""}
+                    aria-pressed={slippageMode === "manual"}
+                    onClick={() => setSlippageMode("manual")}
+                  >
+                    Manual
+                  </button>
+                </div>
+                <label>
+                  <span>
+                    {slippageMode === "auto"
+                      ? "Maximum auto slippage"
+                      : "Manual slippage"}
+                  </span>
+                  <div className="unit-input">
+                    <input
+                      inputMode="decimal"
+                      value={slippage}
+                      onChange={(event) => setSlippage(event.target.value)}
+                    />
+                    <b>%</b>
+                  </div>
+                </label>
+                <small>
+                  {slippageMode === "auto"
+                    ? `Auto is on. The order stores a minimum received amount protected by this ${slippage || "0"}% cap.`
+                    : `Manual is on. The order uses this fixed ${slippage || "0"}% tolerance.`}
+                </small>
+              </div>
               <div className="step-title">
                 <span>1</span>
                 <div>
@@ -3141,7 +3246,11 @@ export function SpotWorkspace({
                     />
                     <b>{buyAsset?.symbol || "token"}</b>
                   </div>
-                  <small>Auto-calculated with slippage; editable.</small>
+                  <small>
+                    {slippageMode === "auto"
+                      ? `Auto minimum after the ${slippage || "0"}% cap; editable.`
+                      : `Minimum after the fixed ${slippage || "0"}% tolerance; editable.`}
+                  </small>
                 </label>
               </div>
               {bracketSelected && (
@@ -3858,6 +3967,7 @@ export function AutopilotWorkspace({
     [],
   );
   const [selectedVault, setSelectedVault] = useState("");
+  const createNewVaultRef = useRef(false);
   const [vaultStatus, setVaultStatus] = useState<
     "idle" | "checking" | "found" | "absent" | "error"
   >("idle");
@@ -3884,6 +3994,7 @@ export function AutopilotWorkspace({
   );
   const [minConfidence, setMinConfidence] = useState("70");
   const [busy, setBusy] = useState(false);
+  const [closeConfirming, setCloseConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const settlementDecimals = WEB_NETWORKS[networkKey].payment.decimals;
   const activeStrategy = selectedAutopilotStrategy(strategies, selectedVault);
@@ -4082,7 +4193,9 @@ export function AutopilotWorkspace({
           if (remembered.length) {
             setVaults(remembered);
             setSelectedVault((current) =>
-              remembered.includes(current) ? current : remembered.at(-1) || "",
+              createNewVaultRef.current
+                ? ""
+                : remembered.includes(current) ? current : remembered.at(-1) || "",
             );
           }
           try {
@@ -4092,7 +4205,9 @@ export function AutopilotWorkspace({
             setVaultDetails(snapshot.vaults);
             setVaults(found);
             setSelectedVault((current) =>
-              found.includes(current) ? current : found.at(-1) || "",
+              createNewVaultRef.current
+                ? ""
+                : found.includes(current) ? current : found.at(-1) || "",
             );
             setVaultStatus(found.length ? "found" : "absent");
             if (found.length)
@@ -4132,6 +4247,7 @@ export function AutopilotWorkspace({
   useEffect(() => {
     vaultLookupRef.current = `${networkKey}:${wallet || "disconnected"}:changing`;
     setVaults([]);
+    createNewVaultRef.current = false;
     setSelectedVault("");
     setVaultStatus(wallet ? "checking" : "idle");
     setVaultLookupError("");
@@ -4149,7 +4265,7 @@ export function AutopilotWorkspace({
     let cancelled = false;
     setAutopilotRouteAvailable(false);
     setAutopilotRouteStatus("Checking token contracts and live OKX route…");
-    void probePairRoute(pair, networkKey)
+    void probePairRoute(pair, networkKey, true)
       .then((route) => {
         if (cancelled) return;
         if (route) {
@@ -4433,6 +4549,16 @@ export function AutopilotWorkspace({
     setMessage("Preparing your guarded strategy…");
     let safelyPaused = false;
     try {
+      setMessage("Checking token contracts and the live route before any wallet transaction...");
+      const preflight = await apiPost("/v1/autopilot/preflight", {
+        network: networkKey,
+        settlementAsset: settlement,
+        targetAsset,
+        pair,
+        amountAtomic: buyAmountAtomic,
+      });
+      if (!preflight.ok)
+        throw new Error(`${errorText(preflight.data)} No wallet transaction was sent.`);
       const policy = {
         pair,
         timeframe,
@@ -4512,6 +4638,7 @@ export function AutopilotWorkspace({
           );
         setVaults(found);
         setVaultDetails(accountSnapshot.vaults);
+        createNewVaultRef.current = false;
         setSelectedVault(vault);
         setVaultStatus("found");
         localStorage.setItem(
@@ -4557,17 +4684,20 @@ export function AutopilotWorkspace({
       setMessage(
         "Step 2 of 5 · Confirm the selected asset and maximum exposure.",
       );
-      if (
-        activeStrategy?.targetAsset &&
-        ADDRESS.test(activeStrategy.targetAsset) &&
-        activeStrategy.targetAsset.toLowerCase() !== targetAsset.toLowerCase()
-      ) {
+      const staleAssets = [
+        activeStrategy?.targetAsset,
+        networkKey === "xlayer" ? NATIVE_TOKEN : undefined,
+      ]
+        .filter((asset): asset is string => Boolean(asset && ADDRESS.test(asset)))
+        .filter((asset) => asset.toLowerCase() !== targetAsset.toLowerCase())
+        .filter((asset, index, all) => all.findIndex((item) => item.toLowerCase() === asset.toLowerCase()) === index);
+      for (const staleAsset of staleAssets) {
         const removeHash = await sendPrepared(networkKey, wallet, {
           to: vault,
           data: encodeFunctionData({
             abi: vaultAbi,
             functionName: "configureAsset",
-            args: [activeStrategy.targetAsset as `0x${string}`, false, 0n],
+            args: [staleAsset as `0x${string}`, false, 0n],
           }),
           value: "0",
         });
@@ -4849,6 +4979,64 @@ export function AutopilotWorkspace({
     }
   }
 
+  async function closeAndWithdrawAutopilot() {
+    if (!wallet || !ADDRESS.test(selectedVault))
+      return setMessage("Select an existing Autopilot first");
+    const provider = getInjectedProvider();
+    if (!provider) return setMessage("Connect the owner wallet first");
+    setBusy(true);
+    setMessage("Closing the selected Autopilot...");
+    try {
+      const recordClose = async (kind: string, txHash: string, amount?: string) => {
+        await apiPost("/v1/trading/activity", {
+          owner: wallet,
+          network: networkKey,
+          source: "autopilot",
+          kind,
+          status: "pending",
+          txHash,
+          account: selectedVault,
+          pair: activeStrategy?.pair || pair,
+          amount,
+        });
+      };
+      if (!(activeStrategy?.paused ?? activeVault?.paused ?? true)) {
+        setMessage("Step 1 - Pause the strategy before owner recovery.");
+        const pauseHash = await sendPrepared(networkKey, wallet, {
+          to: selectedVault,
+          data: encodeFunctionData({ abi: vaultAbi, functionName: "setPaused", args: [true] }),
+          value: "0",
+        });
+        await waitForWalletReceipt(provider, pauseHash);
+        await recordClose("vault_pause", pauseHash);
+      }
+      const assets = [activeSettlementAsset, activeStrategy?.targetAsset]
+        .filter((asset): asset is string => Boolean(asset && ADDRESS.test(asset)))
+        .filter((asset, index, all) => all.findIndex((item) => item.toLowerCase() === asset.toLowerCase()) === index);
+      for (let index = 0; index < assets.length; index += 1) {
+        const asset = assets[index];
+        const balance = await readTokenBalanceAtomic(provider, selectedVault, asset);
+        if (balance <= 0n) continue;
+        setMessage(`Step ${index + 2} - Withdraw the full ${asset.toLowerCase() === activeSettlementAsset.toLowerCase() ? activeSettlementSymbol : activeStrategy?.targetSymbol || "invested asset"} balance.`);
+        const withdrawHash = await sendPrepared(networkKey, wallet, {
+          to: selectedVault,
+          data: encodeFunctionData({ abi: vaultAbi, functionName: "withdraw", args: [asset as `0x${string}`, balance] }),
+          value: "0",
+        });
+        await waitForWalletReceipt(provider, withdrawHash);
+        await recordClose("vault_withdraw", withdrawHash, balance.toString());
+      }
+      setCapitalAction("withdraw");
+      setCloseConfirming(false);
+      setMessage("Autopilot closed and available balances returned to the owner. Its empty account remains in the selector as an auditable, reusable vault.");
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (networkKey === "arc-testnet") return <DisabledArc feature="Autopilot" />;
 
   const displayedCapitalAtomic =
@@ -4874,7 +5062,7 @@ export function AutopilotWorkspace({
       return "—";
     }
   };
-  const vaultPickerOptions: AutopilotAccountOption[] = vaults.map(
+  const existingVaultPickerOptions: AutopilotAccountOption[] = vaults.map(
     (vault, index) => {
       const strategyView = strategies.find(
         (item) => item.vault.toLowerCase() === vault.toLowerCase(),
@@ -4912,6 +5100,16 @@ export function AutopilotWorkspace({
       };
     },
   );
+  const vaultPickerOptions: AutopilotAccountOption[] = [
+    {
+      value: "",
+      label: "Create new Autopilot",
+      address: "New owner-controlled account",
+      status: "Not created",
+      capital: "Set capital on the left",
+    },
+    ...existingVaultPickerOptions,
+  ];
   const addMaximum =
     vaultWalletBalance === null
       ? ""
@@ -5012,8 +5210,10 @@ export function AutopilotWorkspace({
         : vaultStatus === "checking"
           ? "Checking existing Autopilot…"
           : activeStrategy
-            ? "Update and restart Autopilot"
-            : "Start monitoring";
+            ? "Save changes & restart selected"
+            : selectedVault
+              ? "Configure & start selected Autopilot"
+              : "Create & start new Autopilot";
 
   return (
     <div className="v6-workspace autopilot-simple">
@@ -5068,6 +5268,7 @@ export function AutopilotWorkspace({
                 id="autopilot-execution-pair"
                 networkKey={networkKey}
                 value={pair}
+                custody="erc20"
                 onSelect={(selected) => setPair(selected.pair)}
               />
               <small>Choose directly; Premium analysis remains the strategy signal engine.</small>
@@ -5437,6 +5638,8 @@ export function AutopilotWorkspace({
                   value={selectedVault}
                   options={vaultPickerOptions}
                   onChange={(vault) => {
+                    createNewVaultRef.current = !vault;
+                    setCloseConfirming(false);
                     setSelectedVault(vault);
                     const option = vaultPickerOptions.find(
                       (item) => item.value === vault,
@@ -5499,6 +5702,11 @@ export function AutopilotWorkspace({
                       ? `${activeStrategy.pnlPct >= 0 ? "+" : ""}${activeStrategy.pnlPct.toFixed(2)}%`
                       : "Not available until strategy starts"}
                   </dd>
+                  <small>
+                    {activeStrategy?.pnlBasisAtomic
+                      ? `Gross contributed ${formatAssetAtomic(activeStrategy.pnlBasisAtomic, activeSettlementDecimals)} · withdrawn ${formatAssetAtomic(activeStrategy.withdrawalsAtomic, activeSettlementDecimals)} ${activeSettlementSymbol}`
+                      : "Value plus withdrawals minus contributed capital"}
+                  </small>
                 </div>
               </dl>
               <div className="vault-balance-grid">
@@ -5595,6 +5803,26 @@ export function AutopilotWorkspace({
                   Resume
                 </button>
               </div>
+              {closeConfirming ? (
+                <div className="account-lookup-error">
+                  <span>Close this Autopilot?</span>
+                  <small>PULSE will pause it and ask the owner wallet to withdraw every available settlement and invested asset. The empty contract remains auditable and reusable.</small>
+                  <div className="manager-actions">
+                    <button type="button" className="btn btn-soft" disabled={busy} onClick={() => setCloseConfirming(false)}>Cancel</button>
+                    <button type="button" className="btn btn-danger" disabled={busy} onClick={() => void closeAndWithdrawAutopilot()}>Confirm close &amp; withdraw</button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-danger full"
+                  disabled={busy || !selectedVault}
+                  onClick={() => setCloseConfirming(true)}
+                >
+                  Close &amp; withdraw all
+                </button>
+              )}
+              <small className="capital-help">The contract is not deleted: it remains verifiable on-chain and can be configured again later.</small>
               <details className="advanced-panel contract-details">
                 <summary>Technical proof and addresses</summary>
                 <dl className="technical-facts">
@@ -5920,6 +6148,9 @@ function ActivityDashboard({
       item.status === "confirmed" &&
       (item.kind === "market_buy" || item.kind === "market_sell"),
   );
+  const isExecutedActivity = (item: Activity) =>
+    item.status === "confirmed" &&
+    /market_|fill|execute|take_profit|stop_loss/i.test(item.kind);
   const executedAutopilotCount = countExecutedAutopilotFills(activity, strategies);
   const pendingTransactions = activity.filter(
     (item) =>
@@ -5949,11 +6180,7 @@ function ActivityDashboard({
       : filter === "pending"
         ? activity.filter((item) => item.status === "pending")
         : filter === "executed"
-          ? activity.filter(
-              (item) =>
-                item.status === "confirmed" &&
-                /market_|filled|execute/i.test(item.kind),
-            )
+          ? activity.filter(isExecutedActivity)
           : filter === "cancelled"
             ? activity.filter((item) => /cancel|close/i.test(item.kind))
             : [];
@@ -6008,7 +6235,7 @@ function ActivityDashboard({
         <div>
           <span>Cancelled</span>
           <strong>{cancelledOrders.length}</strong>
-          <small>orders closed by their owner before completion</small>
+          <small>owner cancel-and-withdraw confirmed on-chain</small>
         </div>
         <div>
           <span>Activity</span>
@@ -6083,16 +6310,19 @@ function ActivityDashboard({
               <div>
                 <strong>{order.instId}</strong>
                 <small>
+                  {order.executionPair && order.executionPair !== order.instId
+                    ? `${order.executionPair} · `
+                    : ""}
                   {order.version === "oco-v1"
                     ? `OCO #${order.orderId}`
                     : order.version === "bracket-v1"
-                      ? `${order.phase === "protected" ? "Protected bracket" : order.triggerAbove ? "Bracket above" : "Bracket below"} #${order.orderId}`
+                      ? `${order.status === "cancelled" ? "Owner cancelled and withdrew" : order.lastAction === "take_profit" ? "Take-profit executed" : order.lastAction === "stop_loss" ? "Stop-loss executed" : order.status === "filled" ? "Protected exit executed" : order.phase === "protected" ? "Protected bracket" : order.triggerAbove ? "Bracket above" : "Bracket below"} #${order.orderId}`
                       : `${order.triggerAbove ? "Sell above" : "Buy below"} #${order.orderId}`}
                 </small>
               </div>
               <div>
                 <small>
-                  {order.phase === "protected" ? "TP / SL" : "Trigger"}
+                  {order.phase === "entry" ? "Trigger" : order.version === "bracket-v1" || order.version === "oco-v1" ? "TP / SL" : "Fill trigger"}
                 </small>
                 <strong>
                   {order.triggerPrice && order.triggerPrice > 0
@@ -6209,9 +6439,15 @@ function ActivityDashboard({
         <div className="activity-table">
           {visibleActivity.map((a) => (
             <div className="activity-row" key={a.id}>
-              <span className={`status-chip ${a.status}`}>{a.status}</span>
+              <span className={`status-chip ${isExecutedActivity(a) ? "filled" : a.status}`}>
+                {isExecutedActivity(a) ? "executed" : a.status}
+              </span>
               <strong>{a.kind.replaceAll("_", " ")}</strong>
-              <span>{a.pair || a.source}</span>
+              <span>
+                {a.executionPair && a.executionPair !== a.pair
+                  ? `${a.pair || "Analysis"} → ${a.executionPair}`
+                  : a.pair || a.source}
+              </span>
               <span>{new Date(a.createdAt).toLocaleString()}</span>
               {a.txHash ? (
                 <a
@@ -7398,6 +7634,15 @@ export function DocsWorkspace() {
                 browser tab or another wallet signature.
               </span>
             </div>
+            <div className="docs-callout">
+              <b>Close an Autopilot without losing custody</b>
+              <span>
+                Close &amp; withdraw all first pauses the selected account, then
+                asks the connected owner to withdraw its complete settlement
+                and invested-asset balances. The deployed vault is not deleted:
+                it stays auditable on-chain and can be configured again later.
+              </span>
+            </div>
           </section>
 
           <section id="docs-auto-example" className="docs-deep-dive">
@@ -7429,12 +7674,13 @@ export function DocsWorkspace() {
                 USDC daily-loss stop and 250 USDC maximum WETH exposure.
               </span>
               <i>→</i>
-              <b>4 · Press Start monitoring</b>
+              <b>4 · Create a new Autopilot</b>
               <span>
-                PULSE checks for an existing strategy account and guides any
-                necessary creation, policy, funding and activation
-                confirmations. Monitoring starts even when the first decision
-                is Hold; no address or atomic-unit entry is required.
+                Choose Create new Autopilot in the account selector, then press
+                Create &amp; start new Autopilot. Selecting an existing account
+                instead changes that account and the button says Save changes
+                &amp; restart selected. PULSE validates ERC-20 contracts and the
+                live route before the first wallet confirmation.
               </span>
               <i>→</i>
               <b>5 · Evaluate and execute</b>

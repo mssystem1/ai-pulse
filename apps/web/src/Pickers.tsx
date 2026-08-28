@@ -552,11 +552,13 @@ export function ExecutionPairPicker({
   id,
   networkKey,
   value,
+  custody = "wallet",
   onSelect,
 }: {
   id: string;
   networkKey: WebNetworkKey;
   value: string;
+  custody?: "wallet" | "erc20";
   onSelect: (pair: ExecutionPair) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -575,7 +577,7 @@ export function ExecutionPairPicker({
     const timeout = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
-      const response = await apiGet(`/v1/trading/pairs?network=${networkKey}&q=${encodeURIComponent(query)}&limit=160`);
+      const response = await apiGet(`/v1/trading/pairs?network=${networkKey}&q=${encodeURIComponent(query)}&limit=160${custody === "erc20" ? "&custody=erc20" : ""}`);
       if (!current) return;
       if (response.ok) {
         setItems(((response.data as { pairs?: ExecutionPair[] }).pairs || []));
@@ -586,7 +588,7 @@ export function ExecutionPairPicker({
       setLoading(false);
     }, query ? 200 : 0);
     return () => { current = false; window.clearTimeout(timeout); };
-  }, [open, networkKey, query, reload]);
+  }, [open, networkKey, query, reload, custody]);
 
   const [base, quote] = value.split("-");
   return <>
@@ -604,7 +606,7 @@ export function ExecutionPairPicker({
         {!loading && !error && !items.length && <div className="picker-state">No matching on-chain asset found on this network.</div>}
         {items.map((item) => { const unavailableReason = unavailable[item.pair]; const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair) || Boolean(unavailableReason)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""} ${unavailableReason ? "is-unavailable" : ""}`} key={`${item.pair}-${item.token.address}`} onClick={() => {
           setVerifyingPair(item.pair);
-          void apiGet(`/v1/trading/resolve-pair?network=${networkKey}&pair=${encodeURIComponent(item.pair)}`).then((response) => {
+          void apiGet(`/v1/trading/resolve-pair?network=${networkKey}&pair=${encodeURIComponent(item.pair)}${custody === "erc20" ? "&custody=erc20" : ""}`).then((response) => {
             const result = response.data as { available?: boolean; reason?: string; explanation?: string };
             if (response.ok && result.available) {
               onSelect(item);
