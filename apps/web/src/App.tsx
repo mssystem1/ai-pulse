@@ -13,6 +13,7 @@ import {
   type WebNetworkKey,
 } from "./networks";
 import { t, type Lang } from "./i18n";
+import { useDocumentLocale } from "./uiLocale";
 import { formatMarketPrice } from "./format";
 import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport, type ReportTradeIntent } from "./Report";
 import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
@@ -98,8 +99,15 @@ function drawChart(canvas: HTMLCanvasElement | null, candles: Candle[]) {
   ctx.fill();
 }
 
+function storedLanguage(): Lang {
+  try { return localStorage.getItem("pulse:language") === "zh" ? "zh" : "en"; }
+  catch { return "en"; }
+}
+
 export function App() {
-  const [lang, setLang] = useState<Lang>("en");
+  const [lang, setLang] = useState<Lang>(storedLanguage);
+  useDocumentLocale(lang);
+  useEffect(() => { try { localStorage.setItem("pulse:language", lang); } catch { /* storage is optional */ } }, [lang]);
   const d = t(lang);
   const [tab, setTab] = useState<Tab>(() => tabFromHref(window.location.href));
   const [health, setHealth] = useState<"…" | "ONLINE" | "OFFLINE">("…");

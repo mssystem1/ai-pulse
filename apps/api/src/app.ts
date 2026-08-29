@@ -1121,11 +1121,14 @@ export function createApp(cfg: AppConfig, dependencies: {
       }));
       await onContextReady?.();
       if (isArc(req) && cfg.ARC_AI_MODE === "fixture") {
+        const fixtureAnalysis = body.lang === "zh"
+          ? { headline: "Arc 测试现货分析", summary: "确定性测试输出用于验证 Arc 支付和报告交付链路，不调用 xAI。", confidence: 0, limitations: ["测试模式不进行市场推断。"], disclaimer: "测试数据 · 非财务建议 · 请自行研究" }
+          : { headline: "Arc fixture spot analysis", summary: "Deterministic fixture output validates the Arc payment and delivery path without calling xAI.", confidence: 0, limitations: ["Fixture mode does not make a market inference."], disclaimer: "TEST FIXTURE · NFA / DYOR" };
         const fixture = {
           service: tier === "premium" ? "analysis_premium" : "analysis_base", tier, instId: body.instId,
           timeframe: body.timeframe, model: "fixture", lang: body.lang,
           market: { ticker: market.ticker, summary: market.summary, bar: market.bar, candleCount: market.candles.length, source: market.source },
-          analysis: { headline: "Arc fixture spot analysis", summary: "Deterministic fixture output validates the Arc payment and delivery path without calling xAI.", confidence: 0, limitations: ["Fixture mode does not make a market inference."], disclaimer: "TEST FIXTURE · NFA / DYOR" },
+          analysis: fixtureAnalysis,
           generatedAt: new Date().toISOString(), methodology_version: cfg.methodologyVersion,
           analysisProfile: { mode: "fixture", model: "fixture", reasoningEffort: "none" },
           usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, fixture: true,
@@ -1176,7 +1179,13 @@ export function createApp(cfg: AppConfig, dependencies: {
         chart: { source: market.source, timeframe: market.bar, candles: market.candles },
         technical,
         executionPlan,
-        defi: { network: selectedNetwork, chainId: defiChainId, requestedAsset: assetSymbol, asset: defiAsset, tokenAddress: defiTokenAddress || null, aliasesChecked: [...new Set(defiAliases.filter(Boolean))], status: opportunities.length ? "live_verified_contract" : defiTokenAddress ? "no_verified_opportunity" : "no_identity_safe_chain_asset", observedAt: new Date().toISOString(), opportunities, explanation: opportunities.length ? `${assetSymbol} is represented by ${defiAsset} (${defiTokenAddress}) on ${selectedNetwork}. Every product below was matched to that exact underlying token contract and ranked using execution availability, exit support, TVL, risk flags and observed APY—not APY alone.` : defiTokenAddress ? `PULSE verified ${defiAsset} (${defiTokenAddress}) as the selected-chain representation, but no DeFi product with that exact underlying contract passed verification. No APY is fabricated.` : `No identity-safe ${assetSymbol} representation was verified after checking ${[...new Set(defiAliases.filter(Boolean))].join(", ")}. PULSE will not substitute a liquid-staking token or unrelated derivative.` },
+        defi: { network: selectedNetwork, chainId: defiChainId, requestedAsset: assetSymbol, asset: defiAsset, tokenAddress: defiTokenAddress || null, aliasesChecked: [...new Set(defiAliases.filter(Boolean))], status: opportunities.length ? "live_verified_contract" : defiTokenAddress ? "no_verified_opportunity" : "no_identity_safe_chain_asset", observedAt: new Date().toISOString(), opportunities, explanation: body.lang === "zh"
+          ? opportunities.length
+            ? `${assetSymbol} 在 ${selectedNetwork} 上由 ${defiAsset}（${defiTokenAddress}）表示。以下产品均与该标的代币合约精确匹配，并依据可执行性、退出支持、TVL、风险标记和已观测 APY 综合排序，而非仅按 APY 排序。`
+            : defiTokenAddress
+              ? `PULSE 已验证 ${defiAsset}（${defiTokenAddress}）是所选链上的对应资产，但没有使用该精确标的合约的 DeFi 产品通过验证。PULSE 不会虚构 APY。`
+              : `检查 ${[...new Set(defiAliases.filter(Boolean))].join(", ")} 后，仍未验证到身份安全的 ${assetSymbol} 链上表示。PULSE 不会用流动性质押代币或无关衍生品替代。`
+          : opportunities.length ? `${assetSymbol} is represented by ${defiAsset} (${defiTokenAddress}) on ${selectedNetwork}. Every product below was matched to that exact underlying token contract and ranked using execution availability, exit support, TVL, risk flags and observed APY—not APY alone.` : defiTokenAddress ? `PULSE verified ${defiAsset} (${defiTokenAddress}) as the selected-chain representation, but no DeFi product with that exact underlying contract passed verification. No APY is fabricated.` : `No identity-safe ${assetSymbol} representation was verified after checking ${[...new Set(defiAliases.filter(Boolean))].join(", ")}. PULSE will not substitute a liquid-staking token or unrelated derivative.` },
         reportVersion: "pulse-v6.0.0",
       };
       return canonical ? {
@@ -1505,8 +1514,8 @@ export function createApp(cfg: AppConfig, dependencies: {
           const symbol = ["BTC", "ETH", "SOL", "XRP", "BNB", "DOGE"].find((candidate) => new RegExp(`\\b${candidate}\\b`).test(searchable));
           if (symbol) {
             const underlying = await observeProvider("okx", "prediction_underlying_4h", () => loadSpotContext({ instId: `${symbol}-USDT`, timeframe: "4H", candleLimit: 120 }));
-            report = { ...predictionReport, underlyingSpot: { instId: `${symbol}-USDT`, timeframe: "4H", chart: { source: underlying.source, candles: underlying.candles }, technical: buildTechnicalStructure(underlying.candles), explanation: "Independent 4H OKX spot structure for the asset referenced by the prediction question. It provides market context and does not replace prediction-market probability evidence." } };
-          } else report = { ...predictionReport, underlyingSpot: { status: "unmapped", explanation: "No supported underlying asset could be mapped confidently; PULSE did not attach an unrelated chart." } };
+            report = { ...predictionReport, underlyingSpot: { instId: `${symbol}-USDT`, timeframe: "4H", chart: { source: underlying.source, candles: underlying.candles }, technical: buildTechnicalStructure(underlying.candles), explanation: body.lang === "zh" ? "与预测问题所指资产对应的独立 OKX 现货 4 小时结构。它提供市场背景，但不会取代预测市场的概率证据。" : "Independent 4H OKX spot structure for the asset referenced by the prediction question. It provides market context and does not replace prediction-market probability evidence." } };
+          } else report = { ...predictionReport, underlyingSpot: { status: "unmapped", explanation: body.lang === "zh" ? "无法可靠映射受支持的标的资产；PULSE 未附加无关图表。" : "No supported underlying asset could be mapped confidently; PULSE did not attach an unrelated chart." } };
         } else report = predictionReport;
         partial = context.partial;
       } else if (current.mode === "fused") {

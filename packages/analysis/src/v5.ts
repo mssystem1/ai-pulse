@@ -137,17 +137,19 @@ export async function runPreparedV5Analysis(
   input: { mode: V5Mode; tier: V5Tier; lang: "en" | "zh"; context: unknown; userNote?: string; fixture?: boolean; maxInputTokens?: number; maxOutputTokens?: number; reasoningEffort?: "none" | "low" },
 ): Promise<V5GeneratedAnalysis> {
   if (input.fixture) return Object.freeze({
-    headline: `Arc fixture ${input.mode} analysis`,
-    summary: "Deterministic fixture output validates payment, job, persistence, and UI delivery without incurring live model cost.",
+    headline: input.lang === "zh" ? `Arc 测试 ${input.mode} 分析` : `Arc fixture ${input.mode} analysis`,
+    summary: input.lang === "zh"
+      ? "确定性测试输出用于验证支付、任务、持久化和界面交付，不产生实时模型费用。"
+      : "Deterministic fixture output validates payment, job, persistence, and UI delivery without incurring live model cost.",
     confidence: 0,
     stance: "INSUFFICIENT_EVIDENCE", marketProbabilityPct: 50, fairProbabilityRange: Object.freeze({ low: 0, high: 100 }),
-    decision: Object.freeze({ action: "AVOID", rationale: "Fixture mode does not estimate an edge." }),
-    evidenceDrivers: Object.freeze(["Fixture validates delivery only."]), counterEvidence: Object.freeze(["No live inference was performed."]),
-    entryConditions: Object.freeze(["Enable live analysis first."]), noTradeConditions: Object.freeze(["Fixture mode is active."]),
-    catalystsForYes: Object.freeze(["Not evaluated in fixture mode."]), catalystsForNo: Object.freeze(["Not evaluated in fixture mode."]), executionRisks: Object.freeze(["Do not use fixture output for a market decision."]),
-    limitations: Object.freeze(["Fixture mode does not make a market inference."]),
-    invalidationConditions: Object.freeze(["Replace fixture mode with live only after the production AI cost gate is approved."]),
-    disclaimer: "TEST FIXTURE · NFA / DYOR · not financial advice",
+    decision: Object.freeze({ action: "AVOID", rationale: input.lang === "zh" ? "测试模式不评估交易优势。" : "Fixture mode does not estimate an edge." }),
+    evidenceDrivers: Object.freeze([input.lang === "zh" ? "测试仅验证交付链路。" : "Fixture validates delivery only."]), counterEvidence: Object.freeze([input.lang === "zh" ? "未执行实时推理。" : "No live inference was performed."]),
+    entryConditions: Object.freeze([input.lang === "zh" ? "请先启用实时分析。" : "Enable live analysis first."]), noTradeConditions: Object.freeze([input.lang === "zh" ? "当前为测试模式。" : "Fixture mode is active."]),
+    catalystsForYes: Object.freeze([input.lang === "zh" ? "测试模式下未评估。" : "Not evaluated in fixture mode."]), catalystsForNo: Object.freeze([input.lang === "zh" ? "测试模式下未评估。" : "Not evaluated in fixture mode."]), executionRisks: Object.freeze([input.lang === "zh" ? "请勿使用测试输出作出市场决策。" : "Do not use fixture output for a market decision."]),
+    limitations: Object.freeze([input.lang === "zh" ? "测试模式不进行市场推断。" : "Fixture mode does not make a market inference."]),
+    invalidationConditions: Object.freeze([input.lang === "zh" ? "仅在生产 AI 成本门控获批后切换为实时模式。" : "Replace fixture mode with live only after the production AI cost gate is approved."]),
+    disclaimer: input.lang === "zh" ? "测试数据 · 非财务建议 · 请自行研究" : "TEST FIXTURE · NFA / DYOR · not financial advice",
     fixture: true,
     usage: Object.freeze({ promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedTokens: 0, reasoningTokens: 0 }),
   });
@@ -166,7 +168,10 @@ export async function runPreparedV5Analysis(
     "Standard is concise; premium must give materially deeper evidence weighting, scenario catalysts, counter-case, timing, and execution analysis.",
     "Return exactly the fields required by the supplied JSON schema; no additional keys.",
   ];
-  const systemContent = `You are PULSE ${input.mode} analysis. ${rules.join(" ")} Respond in ${input.lang}.`;
+  const languageInstruction = input.lang === "zh"
+    ? "Write every human-readable field entirely in Simplified Chinese (简体中文). Keep only protocol names, tickers, addresses and numeric values unchanged."
+    : "Write every human-readable field entirely in clear professional English.";
+  const systemContent = `You are PULSE ${input.mode} analysis. ${rules.join(" ")} ${languageInstruction}`;
   const userContent = JSON.stringify({ tier: input.tier, userNote: input.userNote, context: input.context });
   // Conservative provider-independent bound. Exact tokenization is model-specific;
   // three UTF-16 characters per token errs toward rejecting oversized prompts.

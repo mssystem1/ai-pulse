@@ -2,6 +2,37 @@ import assert from "node:assert/strict";
 import { it } from "node:test";
 import { buildFusedAiContext, runPreparedV5Analysis } from "./v5.js";
 
+it("returns Chinese fixture reports when Chinese is selected", async () => {
+  const analysis = await runPreparedV5Analysis({
+    apiKey: "", baseUrl: "https://x.ai/v1", model: "fixture",
+  }, { mode: "prediction", tier: "standard", lang: "zh", context: {}, fixture: true });
+  assert.match(analysis.headline, /[\u4e00-\u9fff]/);
+  assert.match(analysis.summary, /[\u4e00-\u9fff]/);
+  assert.match(analysis.decision.rationale, /[\u4e00-\u9fff]/);
+  assert.doesNotMatch(analysis.summary, /Deterministic fixture output/);
+});
+
+it("gives xAI an explicit whole-report Chinese instruction", async () => {
+  let requestBody = "";
+  await runPreparedV5Analysis({
+    apiKey: "test", baseUrl: "https://x.ai/v1", model: "grok-test",
+    fetchImpl: async (_url, init) => {
+      requestBody = String(init?.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({
+        headline: "证据不足", summary: "当前证据不足。", confidence: 40,
+        stance: "NO_EDGE", marketProbabilityPct: 50, fairProbabilityRange: { low: 35, high: 65 },
+        decision: { action: "WAIT", rationale: "等待更多证据。" },
+        evidenceDrivers: ["已有证据"], counterEvidence: ["反方证据"],
+        entryConditions: ["等待价格改善"], noTradeConditions: ["流动性不足"],
+        catalystsForYes: ["支持证据增强"], catalystsForNo: ["反方证据增强"], executionRisks: ["检查点差"],
+        limitations: ["证据有限"], invalidationConditions: ["条件变化"], disclaimer: "非财务建议",
+      }) } }] }), { status: 200 });
+    },
+  }, { mode: "prediction", tier: "standard", lang: "zh", context: { usedMarketIds: ["pm:one"] } });
+  const messages = (JSON.parse(requestBody) as { messages: Array<{ content: string }> }).messages;
+  assert.match(messages[0].content, /entirely in Simplified Chinese/);
+});
+
 it("sends only prepared V5 context and enforces a structured response", async () => {
   let requestBody = "";
   const analysis = await runPreparedV5Analysis({

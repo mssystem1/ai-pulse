@@ -16,11 +16,13 @@ PULSE is an independent intelligence product. Polymarket is a public read-only e
 - [Networks, services and payments](#networks-and-payments)
 - [System architecture](#system-architecture)
 - [End-to-end workflows](#end-to-end-workflows)
+- [Trading prices, PnL and oracle evidence](#trading-prices-pnl-and-oracle-evidence)
 - [Data architecture: KV and Blob only](#data-architecture-kv-and-blob-only)
 - [On-chain execution architecture](#on-chain-execution-architecture)
 - [Repository and module architecture](#repository-and-module-architecture)
 - [Local development and configuration](#quick-start)
 - [Persistence and deployment](#persistence-and-operations)
+- [Trading troubleshooting](#trading-troubleshooting)
 - [Security, release discipline and status](#security-and-limitations)
 
 ## The product
@@ -77,16 +79,20 @@ Spot Trading works with or without a loaded report. The network-specific pair pi
 - Market orders expose Auto or Manual maximum slippage and can attach TP/SL after the confirmed fill.
 - Limit orders carry the trigger, minimum received amount, and optional OTOCO protection in one ticket.
 - Factory state is read from chain before account creation is offered; tab changes cannot erase an existing owner account.
-- The shared dashboard separates Pending, Active, Executed, Cancelled, and Activity, displays mark/trigger/P&L when provable, and supports selected or all-position closure.
+- The shared dashboard separates Pending, Active, Executed, Cancelled, and Activity, displays trigger, actual entry/exit, OKX mark and P&L when provable, and supports selected or all-position closure.
+- A trigger is only the owner-defined condition that permits execution. It is never presented as the fill. Contract balances and confirmed receipt transfers provide the actual entry/exit basis.
+- Refresh reconciles the KV projection against the selected network. A previously missing or stale row can recover from its confirmed receipt or authoritative account state without recreating the order.
 - If the pair is unavailable on the selected network, PULSE recommends a verified supported network; if none exists, it explains that the pair remains analysis-only and links to OKX Spot.
 
 ### Guarded Autopilot
 
-Autopilot is independent from manual Spot Trading. The trader chooses a market, timeframe, strategy preset, capital, and risk profile; technical contract addresses and atomic values remain under an optional proof section. **Create new Autopilot** always creates a separate owner-controlled vault, while **Save changes & restart selected** only edits the explicitly selected vault. Capital is the selected vault’s real USDC or USDT0 balance, not a browser estimate. The executor may act only through allowlisted ERC-20 assets/routes and owner-signed exposure, slippage, turnover, cooldown, daily-loss, confidence, and expiry limits; native assets use their official wrapped representation, such as WOKB on X Layer. The fast risk monitor handles TP/SL and completes bounded exits without waiting for another AI cycle. Pause, resume, add funds, individual withdrawal, and **Close & withdraw all** remain owner actions. Closing leaves the empty contract auditable and reusable because deployed smart contracts cannot be deleted.
+Autopilot is independent from manual Spot Trading. The trader chooses a market, timeframe, strategy preset, initial deposit, and risk profile; technical contract addresses and atomic values remain under an optional proof section. **Create new Autopilot** always creates a separate owner-controlled vault, while **Save changes & restart selected** only edits the explicitly selected vault. The creation form labels the connected wallet as the source and shows its spendable USDC or USDT0 balance. The target-token wallet balance is informational and is not required to start; a failed target-token read cannot replace a valid settlement balance with zero.
+
+After creation, **Add funds** means a later owner top-up into that selected vault. It does not silently widen the signed maximum-trade, exposure, turnover, or loss limits; use **Save changes & restart selected** when the policy should be resized around the larger capital base. **Withdraw** shows the selected vault’s withdrawable settlement balance, not the connected-wallet balance. The executor may act only through allowlisted ERC-20 assets/routes and owner-signed exposure, slippage, turnover, cooldown, daily-loss, confidence, and expiry limits; native assets use their official wrapped representation, such as WOKB on X Layer. The fast risk monitor handles TP/SL and completes bounded exits without waiting for another AI cycle. Pause, resume, add funds, individual withdrawal, and **Close & withdraw all** remain owner actions. Closing leaves the empty contract auditable and reusable because deployed smart contracts cannot be deleted.
 
 ### Private report recovery
 
-Paid reports are stored as private Blob objects and indexed by the paying wallet in KV. If a hosting configuration requires public Blob transport, PULSE encrypts the report body with authenticated AES-256-GCM before upload and refuses an unencrypted public configuration. A wallet signature creates a short-lived report-access session that may open reports or retry an already-settled failure; it cannot create a payment, trade, or authorize Autopilot. This makes report history available on desktop, iOS, Android, Mac, or another browser while retaining a same-device recovery fallback.
+Paid reports use the configured public Vercel Blob transport, but only as authenticated AES-256-GCM ciphertext. The paying-wallet index, plaintext checksum, Blob reference, and logical private visibility remain in KV; the API refuses a production Blob configuration without a valid server-only encryption key. A wallet signature creates a short-lived report-access session that may decrypt and open the owner’s report or retry an already-settled failure; it cannot create a payment, trade, or authorize Autopilot. This makes report history available on desktop, iOS, Android, Mac, or another browser while retaining a same-device recovery fallback. A public Blob URL therefore never contains a readable report body.
 
 ### Risk Guard
 
@@ -221,7 +227,7 @@ flowchart TB
 
   subgraph Data[KV and object persistence, no SQL]
     KV[Upstash KV<br/>jobs · receipts · indexes · sessions · leases · activity · strategies]
-    BLOB[Vercel Blob<br/>private reports · Autopilot evidence]
+    BLOB[Vercel Blob<br/>encrypted report ciphertext · compatible evidence objects]
   end
 
   subgraph Chains[Supported execution chains]
@@ -281,7 +287,7 @@ flowchart TB
 | Autopilot worker | strategy evaluation, evidence persistence, simulation, bounded executor calls, fast TP/SL monitoring | owner withdrawals, policy expansion, manual Spot orders |
 | Telegram worker | webhook deduplication, retry queue, report-link delivery | wallet custody, analysis generation, payment signing |
 | KV | current operational projections, indexes, queues, leases, idempotency, short-lived sessions and resilient outbox state | private keys, large report bodies, sole financial truth |
-| Blob | private report bodies and Autopilot decision evidence | mutable live order state, wallet balances, signing authority |
+| Blob | encrypted immutable report ciphertext and compatible immutable evidence objects | plaintext public reports, mutable live order state, wallet balances, signing authority |
 | Contracts | allocated-asset custody and enforcement of owner-approved execution limits | off-chain inference, market discovery, arbitrary router calls |
 
 ### Runtime modes
@@ -378,10 +384,10 @@ sequenceDiagram
   API-->>Web: 202 job plus opaque recovery capability
   Worker->>KV: Claim job with expiring lease
   Worker->>Sources: Fetch, calculate, generate and validate
-  Worker->>Blob: Store private report with checksum
+  Worker->>Blob: Store encrypted report ciphertext with checksum
   Worker->>KV: Attach report record and complete job
   Web->>API: Poll with recovery capability
-  API->>Blob: Read privately and verify checksum
+  API->>Blob: Fetch ciphertext, verify checksum and decrypt server-side
   API-->>Web: Report, stage history and normalized receipt
 ```
 
@@ -444,6 +450,39 @@ sequenceDiagram
 ```
 
 Autopilot capital is the vault’s actual settlement-token balance. It is separate from the connected wallet’s Spot capital and from every other Autopilot vault. A Hold does not disable a strategy: later evaluations may Buy; a held position may Hold, partially Sell, fully Sell, and later Buy again if the unchanged owner policy permits it. The one-minute deterministic risk path does not wait for xAI before enforcing an already configured TP/SL.
+
+For a new Autopilot, **Initial deposit** is the one-time amount transferred from the connected wallet during creation and used to calculate the first signed trade, exposure, turnover, and loss limits. **Add funds** is a later owner top-up to an existing vault; it changes the vault balance but does not silently widen an already signed policy. Save and restart the selected strategy when those limits should be recalculated from the larger capital base.
+
+Spot and Autopilot dashboards distinguish four prices. The owner-defined **trigger** only decides when execution may start. **Actual entry** and **actual exit** are reconstructed from confirmed contract amounts or transaction-receipt ERC-20 balance transfers. The displayed **mark** is the timestamped OKX public spot last price. Open P&L compares mark with actual entry; realized P&L compares actual exit with actual entry, and PULSE reports an unavailable basis instead of substituting the trigger. Before an automated transaction, the restricted worker publishes the fresh OKX observation to `OracleRouterV1` with a five-minute maximum age; the contract rejects missing/stale data and independently enforces the approved adapter and minimum output.
+
+### Trading prices, PnL and oracle evidence
+
+PULSE deliberately keeps order conditions, execution evidence, market observations, and accounting separate:
+
+| Value | Meaning | Authoritative source |
+| --- | --- | --- |
+| Trigger | Owner-selected price condition for a Limit entry, TP, or SL | Spot account or Autopilot policy contract |
+| Actual entry | Effective settlement paid divided by target asset received | Account contract amounts or confirmed transaction-receipt ERC-20 transfers |
+| Actual exit | Effective settlement received divided by target asset sold | Confirmed `PositionClosed` evidence or transaction-receipt ERC-20 transfers |
+| Mark | Latest observed public OKX spot price, with observation time | OKX public spot ticker used by the current dashboard/worker refresh |
+| Open P&L | `(mark - actual entry) / actual entry` for the currently held asset | Derived only after an actual entry is available |
+| Realized P&L | `(actual exit - actual entry) / actual entry` for a completed lifecycle | Derived only after both confirmed fills are available |
+| Portfolio P&L | Cash-flow-adjusted value of one Autopilot: current assets plus owner withdrawals minus gross owner contributions | Reconciled vault balances, confirmed owner cash flows, and current mark |
+
+This distinction explains why a Buy-below order with trigger `2430` can show positive P&L when the mark is `2428.7`: if the actual on-chain fill was `2424.25`, the position is above its real entry even though the mark remains below the trigger. PULSE displays the trigger and actual entry separately so the user never has to infer one from the other.
+
+For connected-wallet Market execution, PULSE accepts only a successful receipt whose sender is the connected owner and whose destination is the configured OKX router, then derives the fill from the owner’s ERC-20 transfers. For Spot account and Autopilot execution, the receipt must target the exact owner-controlled account or vault. This prevents a browser-announced hash or unrelated successful transaction from becoming a fabricated fill.
+
+The price path is near-real-time polling, not a continuously streaming Chainlink feed:
+
+- Spot condition checks default to every 30 seconds through `AUTOMATION_INTERVAL_MS`.
+- Autopilot’s deterministic open-position risk check defaults to every 60 seconds through `AUTOPILOT_RISK_INTERVAL_MS`.
+- Autopilot Premium-analysis evaluation defaults to every 15 minutes through `AUTOPILOT_ANALYSIS_INTERVAL_MS`.
+- Immediately before an automatic Spot or Autopilot execution, the restricted worker writes the current normalized OKX observation into `OracleRouterV1` with `maxAge = 300` seconds.
+- The contract rejects an absent, invalid, or stale oracle observation. It independently enforces the approved executor/keeper, adapter, token pair, amount, minimum output, policy version, nonce, and relevant risk limits.
+- The execution route and slippage quote remain separate from the oracle condition. Passing a trigger never waives minimum-output or adapter checks.
+
+When historical data cannot prove a fill basis, the dashboard displays **unavailable**. It does not use zero, a report recommendation, the trigger, or the current mark as a substitute entry.
 
 ### Telegram paid delivery
 
@@ -510,7 +549,7 @@ pulse:v6:activity:<network>:<wallet>     read-only legacy activity list used dur
 pulse:v6:automation:orders               current deterministic Spot automation projections
 pulse:v6:autopilot:strategy-map          one hash field per signed Autopilot strategy
 pulse:v6:autopilot:lease:<scope>:<id>    separate analysis and execution leases
-pulse:v6:autopilot:evidence:<...>        private evidence fallback when private Blob is unavailable
+pulse:v6:autopilot:evidence:<...>        private evidence fallback when a private Blob object is unsupported
 pulse:v6:autopilot:potential-gainers:<tf> five-minute opportunity-radar cache
 
 pulse:v6:telegram:delivery:<id>          retryable Telegram delivery task
@@ -527,11 +566,12 @@ Memory stores exist only for local/unit use. A production capability response la
 ### Implemented Blob model
 
 - Paid report bodies are written under a unique `reports/<namespace>/<reportId>.json` path with overwrite disabled.
-- The KV report record contains the paying wallet, Blob path, SHA-256 checksum, private visibility, and creation time.
-- Private Blob reads bypass caches and verify the body checksum before JSON parsing.
-- If a deployment must use public Blob access, the body is encrypted with authenticated AES-256-GCM before upload; unencrypted public reports are rejected by configuration.
-- A bounded private-KV report-body fallback protects already-paid delivery when Blob rejects a write or is temporarily unavailable. It uses the report retention TTL and the same SHA-256 verification; Blob remains the primary artifact store.
-- Autopilot stores the canonical decision payload before execution and binds its hash to the vault action. Private Blob is preferred; configured private KV is the fail-closed evidence fallback.
+- The enforced production mode is `BLOB_ACCESS=public`. Before upload, every paid report body is encrypted with authenticated AES-256-GCM using the server-only `REPORT_ENCRYPTION_KEY`.
+- The KV report record contains the paying wallet, Blob path, plaintext SHA-256 checksum, logical private visibility, and creation time.
+- Blob reads are performed by the API, bypass caches, authenticate and decrypt the AES-GCM envelope server-side, verify the plaintext checksum, and only then parse JSON.
+- Configuration rejects an unencrypted public report store. Do not set `BLOB_ACCESS=private`: the supplied PULSE Vercel Blob store and validated environment contract use public transport with encrypted payloads.
+- A bounded private-KV report-body fallback protects already-paid delivery when Blob rejects a write or is temporarily unavailable. It uses the report retention TTL and the same SHA-256 verification; encrypted Blob remains the primary report artifact store.
+- Autopilot stores the canonical decision payload before execution and binds its hash to the vault action. It attempts a private Blob evidence object only when the backing store supports one; with the supplied public store, the fail-closed private-KV evidence record is the expected path.
 - Blob never stores the only current copy of a balance, active order, vault policy, position status, or P&L projection.
 
 ### Consistency and crash recovery
@@ -755,7 +795,7 @@ The unpaid request returns a 402 response only after input and primary-market ev
 ## Persistence and operations
 
 - Upstash KV/Redis is the durable operational read model for payment idempotency, report queues and leases, receipt references, wallet-history authorization, Spot activity, automation projections, Autopilot strategies, worker leases, and Telegram delivery retries.
-- Vercel Blob holds immutable private report bodies and large Autopilot evidence. KV holds the small owner/index/checksum manifest; private Blob reads bypass caches and verify SHA-256 integrity. Public Blob mode is allowed only with authenticated report encryption.
+- Vercel Blob’s public transport holds immutable AES-256-GCM report ciphertext, never readable report JSON. KV holds the owner/index/checksum manifest, the bounded paid-report fallback, and the expected Autopilot evidence fallback when the public store rejects private evidence objects. API reads bypass caches, authenticate and decrypt reports server-side, and verify the plaintext checksum.
 - Confirmed chain receipts, contract state, wallet balances, and provider-owned order state remain stronger evidence than KV. Reconciliation heals stale projections and never upgrades browser-announced activity beyond Pending without receipt evidence.
 - `PERSISTENCE_NAMESPACE` scopes report/job/history/budget/cron data. Stable `pulse:v6:*` trading keys preserve existing mainnet accounts and activity, so development, staging, and production must use separate KV databases.
 - Correlation IDs connect payment, job, provider, xAI, report, automation, and delivery events. `/metrics` publishes payment, provider, queue, completion, recovery, token, and estimated AI-cost metrics without report bodies or secrets.
@@ -795,6 +835,36 @@ npm run validate:alerts
 
 `readiness:*` commands are release diagnostics, not requirements for ordinary `npm run dev` usage. Live settlement certification is separate from mocked automated tests and must be reported by exact network, service, transaction, receipt, and terminal job state.
 
+## Trading troubleshooting
+
+### Autopilot shows zero or unavailable connected-wallet balance
+
+1. Confirm the header wallet address and selected network are the intended account and chain.
+2. Confirm the balance is the network settlement asset: USDT0 on X Layer or native USDC on Base/Arbitrum. A target asset such as WETH, xBTC, or cbBTC is not creation capital.
+3. Use the Autopilot refresh/retry action. Settlement and target balances are read independently; an unavailable target-token read must not erase a valid settlement balance.
+4. Do not create or fund a vault while the settlement balance explicitly says unavailable. PULSE fails closed instead of treating an unknown value as zero or sufficient funds.
+
+### Initial deposit and Add funds look different
+
+- **Initial Autopilot deposit** appears while creating a new owner-controlled vault. It moves funds from the connected wallet and sizes the initial signed risk policy.
+- **Add funds** appears after selecting an existing vault. It transfers additional settlement tokens into that vault but preserves the currently signed risk limits.
+- To increase the limits after a top-up, review the new capital/risk values and choose **Save changes & restart selected**. The wallet must approve the changed policy.
+- **Withdraw** uses the selected vault’s available settlement balance. The connected-wallet balance is shown separately because it is the destination, not the withdrawal maximum.
+
+### An order is missing or changes state after refresh
+
+The dashboard is a KV projection, while the selected network’s receipt and account contract are authoritative. Refresh asks PULSE to reconcile them. A Limit entry remains **Pending** until the entry condition executes; a filled protected position becomes **Active**; a completed unprotected trade or closed lifecycle becomes **Executed**; and a contract-confirmed owner cancellation becomes **Cancelled**. Account-creation and approval transactions remain in **Activity** and never count as positions.
+
+If RPC/KV connectivity is temporarily unavailable, PULSE retains last-known information without upgrading it to confirmed. Recovery reads the existing account and transaction hashes; it must not propose account recreation merely because one read failed.
+
+### P&L appears surprising or unavailable
+
+Compare **Actual entry**, **Mark (OKX)**, and **Actual exit**, not the trigger. Open P&L can be positive below a Buy-below trigger when execution filled at a lower price. Executed orders show realized P&L only when both entry and exit are receipt/contract-backed. Old activity without a provable basis correctly remains unavailable.
+
+### Oracle or automatic execution is stale
+
+The dashboard mark is a timestamped OKX public spot observation. Automatic execution additionally requires a fresh on-chain `OracleRouterV1` observation no older than five minutes. Check the worker health, selected-network RPC, OKX provider availability, KV lease, configured keeper/executor, and transaction receipt. Never fix a stale-oracle rejection by increasing `maxAge` without reassessing the security model.
+
 ## Security and limitations
 
 - Browser keys remain in the wallet; server credentials remain server-side.
@@ -823,7 +893,7 @@ The exact Autopilot strategies, entry/exit rules, risk profiles, contract author
 | Prediction Market Quick and Pro services | Implemented |
 | Receipt-bound durable jobs and private recovery | Implemented |
 | Desktop/mobile V6 layouts and mobile service switcher | Locally reviewed |
-| Automated tests | 168/168 passing locally on 2026-08-27 |
+| Automated tests | 194/194 passing locally through the root `npm test` command on 2026-08-29 |
 | Production build | Passing locally |
 | Base dashboard verification tag | Implemented locally |
 | Marketplace publication and agent #8355 mutation | Not executed; requires explicit operator approval |

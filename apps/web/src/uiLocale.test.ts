@@ -1,0 +1,28 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { localizeUiText } from "./uiLocale.js";
+
+test("localizes shared PULSE workspaces and preserves technical identifiers", () => {
+  assert.equal(localizeUiText("zh", "Autopilot"), "自动驾驶");
+  assert.equal(localizeUiText("zh", "Spot Trading"), "现货交易");
+  assert.equal(localizeUiText("zh", "  Pending  "), "  待执行  ");
+  assert.equal(localizeUiText("zh", "BTC-USDT"), "BTC-USDT");
+  assert.equal(localizeUiText("en", "Autopilot"), "Autopilot");
+});
+
+test("localizes dynamic route and wallet copy", () => {
+  assert.equal(localizeUiText("zh", "Choose a live pair on Base"), "在 Base 上选择实时交易对");
+  assert.equal(localizeUiText("zh", "Live WETH/USDC route verified"), "WETH/USDC 实时路径已验证");
+  assert.equal(localizeUiText("zh", "Buy WETH"), "买入 WETH");
+});
+
+test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
+  assert.equal(localizeUiText("zh", "Elliott-wave next paths"), "艾略特波浪后续路径");
+  assert.equal(localizeUiText("zh", "Prediction report"), "预测市场报告");
+  assert.equal(localizeUiText("zh", "Paid report history"), "付费报告历史");
+  assert.equal(localizeUiText("zh", "How to read the trading report"), "如何阅读交易报告");
+  assert.equal(localizeUiText("zh", "Autopilot is running for BTC-USDT. You can pause it or withdraw funds at any time."), "自动驾驶已为 BTC-USDT 启动。您可随时暂停或提取资金。");
+  assert.equal(localizeUiText("zh", "Initial Autopilot deposit"), "自动驾驶初始存款");
+  assert.equal(localizeUiText("zh", "Actual entry / exit"), "实际入场价 / 出场价");
+  assert.equal(localizeUiText("zh", "is the timestamped OKX public spot last price."), "是带时间戳的 OKX 公共现货最新价。");
+});

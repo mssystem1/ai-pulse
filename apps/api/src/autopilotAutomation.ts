@@ -77,6 +77,10 @@ type Strategy = {
   exitPending?: boolean;
   activeTakeProfit?: number;
   activeStopLoss?: number;
+  positionEntryPrice?: number;
+  lastEntryPrice?: number;
+  lastExitPrice?: number;
+  realizedPositionPnlPct?: number;
   evaluations?: StrategyEvaluation[];
 };
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;

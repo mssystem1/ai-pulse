@@ -57,6 +57,12 @@ type Activity = {
   pair?: string;
   executionPair?: string;
   amount?: string;
+  fillPrice?: number;
+  fillInputAmount?: string;
+  fillOutputAmount?: string;
+  fillInputSymbol?: string;
+  fillOutputSymbol?: string;
+  fillObservedAt?: string;
   createdAt: string;
 };
 
@@ -117,7 +123,11 @@ type AutomationOrder = {
   triggerAbove?: boolean | null;
   currentPrice?: number | null;
   entryPrice?: number;
+  exitPrice?: number;
+  realizedPnlPct?: number | null;
   estimatedPnlPct?: number | null;
+  markObservedAt?: string;
+  markSource?: string;
   expiry?: string;
   lastError?: string;
   executionTxHash?: string;
@@ -159,6 +169,10 @@ type AutopilotStrategyView = {
   telemetryError?: string;
   activeTakeProfit?: number;
   activeStopLoss?: number;
+  positionEntryPrice?: number;
+  lastEntryPrice?: number;
+  lastExitPrice?: number;
+  realizedPositionPnlPct?: number;
   exitPending?: boolean;
   evaluations?: Array<{
     id: string;
@@ -4297,32 +4311,29 @@ export function AutopilotWorkspace({
   }, [pair, networkKey]);
 
   useEffect(() => {
-    if (!wallet || !targetToken || !ADDRESS.test(settlement)) {
+    if (!wallet || !ADDRESS.test(settlement)) {
       setAutopilotBalances({ settlement: null, target: null });
       return;
     }
     let cancelled = false;
-    void Promise.all([
+    setAutopilotBalances({ settlement: null, target: null });
+    void Promise.allSettled([
       fetchTokenBalance(
         wallet,
         settlement,
         WEB_NETWORKS[networkKey].payment.decimals,
         networkKey,
       ),
-      fetchTokenBalance(
-        wallet,
-        targetToken.address,
-        targetToken.decimals,
-        networkKey,
-      ),
+      targetToken
+        ? fetchTokenBalance(wallet, targetToken.address, targetToken.decimals, networkKey)
+        : Promise.resolve(null),
     ])
-      .then(([settlementBalance, target]) => {
-        if (!cancelled)
-          setAutopilotBalances({ settlement: settlementBalance, target });
-      })
-      .catch(() => {
-        if (!cancelled)
-          setAutopilotBalances({ settlement: null, target: null });
+      .then(([settlementResult, targetResult]) => {
+        if (cancelled) return;
+        setAutopilotBalances({
+          settlement: settlementResult.status === "fulfilled" ? settlementResult.value : null,
+          target: targetResult.status === "fulfilled" ? targetResult.value : null,
+        });
       });
     return () => {
       cancelled = true;
@@ -5288,15 +5299,15 @@ export function AutopilotWorkspace({
             className={`autopilot-route-card ${autopilotRouteAvailable ? "ready" : "warning"}`}
           >
             <div>
-              <span>Strategy capital</span>
+              <span>Connected-wallet funding asset</span>
               <strong>{WEB_NETWORKS[networkKey].payment.symbol}</strong>
-              <small>Wallet {settlementBalanceText}</small>
+              <small>Available to deposit · {settlementBalanceText}</small>
             </div>
             <i>→</i>
             <div>
               <span>Asset PULSE may trade</span>
               <strong>{targetToken?.symbol || "Not available"}</strong>
-              <small>Wallet {targetBalanceText}</small>
+              <small>Your wallet holds {targetBalanceText} · not required to start</small>
             </div>
             <p>{autopilotRouteStatus}</p>
           </div>
@@ -5368,11 +5379,17 @@ export function AutopilotWorkspace({
               </small>
             </div>
           ) : (
+            <div className="initial-capital-step">
+              <div className="capital-source-card">
+                <span>STEP 3 SOURCE · CONNECTED WALLET</span>
+                <strong>{settlementBalanceText} {WEB_NETWORKS[networkKey].payment.symbol} available</strong>
+                <small>Choose the amount to transfer into the new owner-controlled Autopilot. This initial deposit also sizes the risk limits below.</small>
+              </div>
             <label
               className={`capital-field ${autopilotInsufficientCapital ? "field-invalid" : ""}`}
             >
               <span>
-                Capital to allocate{" "}
+                Initial Autopilot deposit{" "}
                 <button
                   type="button"
                   className="amount-max"
@@ -5395,7 +5412,7 @@ export function AutopilotWorkspace({
                 <b>{WEB_NETWORKS[networkKey].payment.symbol}</b>
               </div>
               <small>
-                Available{" "}
+                Connected-wallet balance{" "}
                 {autopilotBalances.settlement == null
                   ? "—"
                   : autopilotBalances.settlement.toLocaleString("en-US", {
@@ -5403,7 +5420,9 @@ export function AutopilotWorkspace({
                     })}{" "}
                 {WEB_NETWORKS[networkKey].payment.symbol}
               </small>
+              <span className="capital-help">Start transfers only this amount. Later top-ups use Your Autopilot → Add funds; save the strategy again before expecting larger per-trade limits.</span>
             </label>
+            </div>
           )}
           {autopilotInsufficientCapital && (
             <div className="inline-warning balance-warning">
@@ -5696,7 +5715,15 @@ export function AutopilotWorkspace({
                   </dd>
                 </div>
                 <div>
-                  <dt>P&amp;L</dt>
+                  <dt>Actual entry</dt>
+                  <dd>{(activeStrategy?.positionEntryPrice || activeStrategy?.lastEntryPrice)?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No filled buy"}</dd>
+                </div>
+                <div>
+                  <dt>OKX mark</dt>
+                  <dd>{activeStrategy?.markPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "Refreshing…"}</dd>
+                </div>
+                <div>
+                  <dt>Portfolio P&amp;L</dt>
                   <dd>
                     {typeof activeStrategy?.pnlPct === "number"
                       ? `${activeStrategy.pnlPct >= 0 ? "+" : ""}${activeStrategy.pnlPct.toFixed(2)}%`
@@ -6289,7 +6316,7 @@ function ActivityDashboard({
         <div className="order-monitor">
           <div className="monitor-title">
             <strong>On-chain order monitor</strong>
-            <span>Live state and OKX mark price</span>
+            <span>Contract state · actual receipt fill · OKX spot mark</span>
           </div>
           {visibleOrders.map((order) => (
             <div className="order-monitor-row" key={order.id}>
@@ -6335,7 +6362,18 @@ function ActivityDashboard({
                 </strong>
               </div>
               <div>
-                <small>Mark</small>
+                <small>{order.exitPrice ? "Actual entry / exit" : "Actual entry"}</small>
+                <strong>
+                  {order.entryPrice && order.entryPrice > 0
+                    ? order.entryPrice.toLocaleString(undefined, { maximumFractionDigits: 8 })
+                    : order.phase === "entry" ? "Not filled" : "Unavailable"}
+                  {order.exitPrice && order.exitPrice > 0
+                    ? ` / ${order.exitPrice.toLocaleString(undefined, { maximumFractionDigits: 8 })}`
+                    : ""}
+                </strong>
+              </div>
+              <div>
+                <small>Mark (OKX)</small>
                 <strong>
                   {order.currentPrice && order.currentPrice > 0
                     ? order.currentPrice.toLocaleString()
@@ -6343,13 +6381,15 @@ function ActivityDashboard({
                 </strong>
               </div>
               <div>
-                <small>Est. P&L</small>
+                <small>{order.status === "filled" ? "Realized P&L" : "Est. P&L"}</small>
                 <strong
                   className={
-                    (order.estimatedPnlPct || 0) >= 0 ? "positive" : "negative"
+                    ((order.status === "filled" ? order.realizedPnlPct : order.estimatedPnlPct) || 0) >= 0 ? "positive" : "negative"
                   }
                 >
-                  {typeof order.estimatedPnlPct === "number"
+                  {order.status === "filled" && typeof order.realizedPnlPct === "number"
+                    ? `${order.realizedPnlPct >= 0 ? "+" : ""}${order.realizedPnlPct.toFixed(2)}%`
+                    : typeof order.estimatedPnlPct === "number"
                     ? `${order.estimatedPnlPct >= 0 ? "+" : ""}${order.estimatedPnlPct.toFixed(2)}%`
                     : order.phase === "entry"
                       ? "Not filled"
@@ -6386,7 +6426,7 @@ function ActivityDashboard({
         <div className="order-monitor">
           <div className="monitor-title">
             <strong>On-chain Autopilot monitor</strong>
-            <span>Vault capital and latest decision</span>
+            <span>Vault capital · actual entry · OKX spot mark</span>
           </div>
           {strategies
             .filter(
@@ -6417,13 +6457,19 @@ function ActivityDashboard({
                   </strong>
                 </div>
                 <div>
+                  <small>{item.positionEntryPrice ? "Position entry" : "Last entry"}</small>
+                  <strong>
+                    {(item.positionEntryPrice || item.lastEntryPrice)?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No filled buy"}
+                  </strong>
+                </div>
+                <div>
                   <small>Mark</small>
                   <strong>
                     {item.markPrice?.toLocaleString() || "Refreshing…"}
                   </strong>
                 </div>
                 <div>
-                  <small>P&amp;L</small>
+                  <small>Portfolio P&amp;L</small>
                   <strong>
                     {typeof item.pnlPct === "number"
                       ? `${item.pnlPct >= 0 ? "+" : ""}${item.pnlPct.toFixed(2)}%`
@@ -6448,7 +6494,12 @@ function ActivityDashboard({
                   ? `${a.pair || "Analysis"} → ${a.executionPair}`
                   : a.pair || a.source}
               </span>
-              <span>{new Date(a.createdAt).toLocaleString()}</span>
+              {a.fillPrice ? (
+                <span className="activity-execution-detail">
+                  <b>{/buy|entry_protected/i.test(a.kind) ? "Entry" : "Exit"} {a.fillPrice.toLocaleString(undefined, { maximumFractionDigits: 8 })}</b>
+                  <small>{a.fillInputSymbol && a.fillOutputSymbol ? `${a.fillInputSymbol} → ${a.fillOutputSymbol} · ` : ""}{new Date(a.fillObservedAt || a.createdAt).toLocaleString()}</small>
+                </span>
+              ) : <span>{new Date(a.createdAt).toLocaleString()}</span>}
               {a.txHash ? (
                 <a
                   href={`${WEB_NETWORKS[networkKey].explorer}/tx/${a.txHash}`}
@@ -6472,6 +6523,11 @@ function ActivityDashboard({
           </span>
         </div>
       ) : null}
+      <details className="price-methodology">
+        <summary>How trigger, entry, mark and P&amp;L are calculated</summary>
+        <p><b>Trigger</b> is the owner-set price condition; it is not the fill price. <b>Actual entry/exit</b> is calculated from confirmed on-chain token amounts in the contract or transaction receipt. <b>Mark</b> is the timestamped OKX public spot last price. Open P&amp;L compares Mark with Actual entry; realized P&amp;L compares Actual exit with Actual entry. PULSE shows &quot;unavailable&quot; instead of inventing a basis.</p>
+        <p>For automated execution, the keeper writes the fresh OKX observation to the PULSE oracle router with a five-minute maximum age. The contract rejects missing or stale observations. The OKX Onchain OS route is separately constrained by the signed slippage and minimum-output rules.</p>
+      </details>
     </section>
   );
 }
@@ -7405,18 +7461,22 @@ export function DocsWorkspace() {
                 <article>
                   <b>2 · Capital &amp; risk</b>
                   <span>
-                    Enter USDC on Base/Arbitrum or USDT0 on X Layer. Choose
-                    Conservative, Balanced or Active and review the calculated
-                    per-trade, loss and exposure amounts.
+                    For a new Autopilot, Initial deposit is the amount moved
+                    from the connected wallet when Start is confirmed. It also
+                    sizes the first per-trade, daily-loss and exposure limits.
+                    Choose Conservative, Balanced or Active and review those
+                    calculated limits before signing.
                   </span>
                 </article>
                 <article>
                   <b>3 · Start &amp; control</b>
                   <span>
                     Press Start once. Confirm the guided setup, then monitor
-                    decisions and P&amp;L. Add capital from the connected
-                    wallet; pause before withdrawing settlement or invested
-                    assets as the owner.
+                    decisions and P&amp;L. Add capital from the connected wallet
+                    later without recreating the vault. A top-up changes the
+                    vault balance, not the already signed limits; save the
+                    selected strategy again to resize those limits. Pause before
+                    withdrawing settlement or invested assets as the owner.
                   </span>
                 </article>
               </div>
@@ -7459,7 +7519,10 @@ export function DocsWorkspace() {
                   Open Add funds. PULSE reads the connected wallet’s USDC on
                   Base/Arbitrum or USDT0 on X Layer, shows the available amount,
                   and provides Max inside the amount field. An unknown or insufficient
-                  wallet balance blocks the transfer.
+                  wallet balance blocks the transfer. Add funds is a later top-up
+                  to an existing vault; it differs from the Initial deposit used
+                  during creation. Save the selected strategy again if the signed
+                  risk limits should use the larger capital base.
                 </span>
               </div>
               <div>

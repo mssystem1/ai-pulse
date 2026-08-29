@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import {
   createWalletClient,
+  decodeEventLog,
   encodeFunctionData,
   fallback,
   http,
@@ -40,11 +41,15 @@ type RegisteredOrder = {
   executionTxHash?: string;
   lastAction?: "entry_protected" | "take_profit" | "stop_loss" | "fill";
   entryPrice?: number;
+  exitPrice?: number;
+  realizedPnlPct?: number | null;
   onchainState?: number;
   phase?: "entry" | "protected" | "complete";
   triggerPrice?: number;
   secondaryTriggerPrice?: number | null;
   currentPrice?: number | null;
+  markObservedAt?: string;
+  markSource?: "OKX public spot ticker";
   estimatedPnlPct?: number | null;
   takeProfit?: number | null;
   stopLoss?: number | null;
@@ -117,6 +122,15 @@ const erc20MetadataAbi = [{
   outputs: [{ name: "", type: "string" }],
 }] as const;
 const erc20DecimalsAbi = [{ type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] }] as const;
+const positionClosedEventAbi = [{
+  type: "event", name: "PositionClosed",
+  inputs: [
+    { name: "id", type: "uint256", indexed: true },
+    { name: "adapter", type: "address", indexed: true },
+    { name: "amountIn", type: "uint256", indexed: false },
+    { name: "amountOut", type: "uint256", indexed: false },
+  ],
+}] as const;
 
 export function normaliseSymbol(value: string) {
   const symbol = value.trim().toUpperCase().replaceAll("₮", "T").replace(/\.E$/, "");
@@ -298,6 +312,57 @@ async function verifiedFillPrice(input: z.infer<typeof schema>, publicClient: Re
   return spent / received;
 }
 
+function humanPrice(quoteAtomic: bigint, quoteDecimals: number, baseAtomic: bigint, baseDecimals: number) {
+  const quote = Number(quoteAtomic) / 10 ** quoteDecimals;
+  const base = Number(baseAtomic) / 10 ** baseDecimals;
+  const price = quote / base;
+  return Number.isFinite(price) && price > 0 ? price : undefined;
+}
+
+async function bracketEntryPrice(
+  record: readonly unknown[],
+  publicClient: ReturnType<typeof clients>["publicClient"],
+) {
+  const entryAmount = BigInt(record[4] as bigint);
+  const positionAmount = BigInt(record[5] as bigint);
+  if (entryAmount <= 0n || positionAmount <= 0n) return undefined;
+  const sellToken = String(record[0]) as `0x${string}`;
+  const buyToken = String(record[1]) as `0x${string}`;
+  const [sellDecimals, buyDecimals] = await Promise.all([
+    publicClient.readContract({ address: sellToken, abi: erc20DecimalsAbi, functionName: "decimals" }),
+    publicClient.readContract({ address: buyToken, abi: erc20DecimalsAbi, functionName: "decimals" }),
+  ]);
+  return Boolean(record[12])
+    ? humanPrice(positionAmount, Number(buyDecimals), entryAmount, Number(sellDecimals))
+    : humanPrice(entryAmount, Number(sellDecimals), positionAmount, Number(buyDecimals));
+}
+
+async function verifiedExitPrice(
+  order: RegisteredOrder,
+  publicClient: ReturnType<typeof clients>["publicClient"],
+) {
+  if (!order.executionTxHash || (order.version !== "oco-v1" && order.version !== "bracket-v1")) return undefined;
+  const receipt = await publicClient.getTransactionReceipt({ hash: order.executionTxHash as `0x${string}` });
+  if (receipt.status !== "success") return undefined;
+  const closed = receipt.logs.flatMap((log) => {
+    if (log.address.toLowerCase() !== order.account.toLowerCase()) return [];
+    try {
+      const decoded = decodeEventLog({ abi: positionClosedEventAbi, data: log.data, topics: log.topics });
+      return decoded.eventName === "PositionClosed" && decoded.args.id === BigInt(order.orderId)
+        ? [decoded.args]
+        : [];
+    } catch { return []; }
+  })[0];
+  if (!closed) return undefined;
+  const asset = order.version === "oco-v1" || order.triggerAbove ? order.sellToken : order.buyToken;
+  const settlement = order.version === "oco-v1" || order.triggerAbove ? order.buyToken : order.sellToken;
+  const [assetDecimals, settlementDecimals] = await Promise.all([
+    publicClient.readContract({ address: asset as `0x${string}`, abi: erc20DecimalsAbi, functionName: "decimals" }),
+    publicClient.readContract({ address: settlement as `0x${string}`, abi: erc20DecimalsAbi, functionName: "decimals" }),
+  ]);
+  return humanPrice(closed.amountOut, Number(settlementDecimals), closed.amountIn, Number(assetDecimals));
+}
+
 async function verifyRegistration(input: z.infer<typeof schema>) {
   const { publicClient } = clients(input.network);
   const [receipt, tx] = await Promise.all([
@@ -446,6 +511,8 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
           ...(previous?.txHash ? { txHash: previous.txHash } : {}),
           ...(previous?.executionTxHash ? { executionTxHash: previous.executionTxHash } : {}),
           ...(previous?.entryPrice ? { entryPrice: previous.entryPrice } : {}),
+          ...(previous?.exitPrice ? { exitPrice: previous.exitPrice } : {}),
+          ...(typeof previous?.realizedPnlPct === "number" ? { realizedPnlPct: previous.realizedPnlPct } : {}),
         });
       }
     } catch {
@@ -510,21 +577,22 @@ export function createTradeAutomationRouter() {
         const ticker = await getTicker(order.instId);
         const currentPrice = ticker.last;
         let entryPrice = order.entryPrice;
-        if (order.version === "bracket-v1" && (state === 3 || state === 4) && BigInt(record[5] as bigint) > 0n) {
-          const [sellDecimals, buyDecimals] = await Promise.all([
-            publicClient.readContract({ address: order.sellToken as `0x${string}`, abi: erc20DecimalsAbi, functionName: "decimals" }),
-            publicClient.readContract({ address: order.buyToken as `0x${string}`, abi: erc20DecimalsAbi, functionName: "decimals" }),
-          ]);
-          const spent = Number(record[4] as bigint) / 10 ** Number(sellDecimals);
-          const received = Number(record[5] as bigint) / 10 ** Number(buyDecimals);
-          if (spent > 0 && received > 0) entryPrice = Boolean(record[12]) ? received / spent : spent / received;
-        }
+        if (order.version === "bracket-v1" && state >= 3 && BigInt(record[5] as bigint) > 0n)
+          entryPrice = await bracketEntryPrice(record, publicClient) || entryPrice;
+        const exitPrice = order.exitPrice || (lifecycle.status === "filled" ? await verifiedExitPrice(order, publicClient) : undefined);
+        const realizedPnlPct = entryPrice && exitPrice
+          ? ((exitPrice - entryPrice) / entryPrice) * 100
+          : order.realizedPnlPct ?? null;
         const view: RegisteredOrder = {
           ...order,
           ...lifecycle,
           lastError: order.lastError,
           currentPrice,
+          markObservedAt: new Date(Number(ticker.ts)).toISOString(),
+          markSource: "OKX public spot ticker",
           ...(entryPrice ? { entryPrice } : {}),
+          ...(exitPrice ? { exitPrice } : {}),
+          realizedPnlPct,
           estimatedPnlPct: (order.version === "oco-v1" || (order.version === "bracket-v1" && (state === 3 || state === 4))) && Boolean(entryPrice && entryPrice > 0)
             ? ((currentPrice - entryPrice!) / entryPrice!) * 100
             : null,
@@ -742,6 +810,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
                 });
         const state = Number(record.at(-1));
         const bracketProtected = item.version === "bracket-v1" && state === 3;
+        if (item.version === "bracket-v1") item.triggerAbove = Boolean(record[12]);
         Object.assign(item, reconcileOrderLifecycle(item.version, state, item));
         if (state === 2 || (item.version === "bracket-v1" && state === 4)) {
           item.updatedAt = new Date().toISOString();
@@ -861,6 +930,8 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
             ? takeProfitReached ? "automatic_take_profit" : "automatic_stop_loss"
             : "automatic_fill";
         if (entryBecomesProtected) {
+          const filledRecord = await publicClient.readContract({ address: item.account as `0x${string}`, abi: bracketAbi, functionName: "orders", args: [BigInt(item.orderId)] });
+          item.entryPrice = await bracketEntryPrice(filledRecord, publicClient) || item.entryPrice;
           item.status = "active";
           item.phase = "protected";
           item.onchainState = 3;
@@ -870,6 +941,13 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
           item.phase = "complete";
           item.onchainState = item.version === "bracket-v1" ? 5 : 3;
           item.lastAction = takeProfitReached ? "take_profit" : exitsProtectedPosition ? "stop_loss" : "fill";
+          if (exitsProtectedPosition) {
+            item.executionTxHash = executionHash;
+            item.exitPrice = await verifiedExitPrice(item, publicClient) || item.exitPrice;
+            item.realizedPnlPct = item.entryPrice && item.exitPrice
+              ? ((item.exitPrice - item.entryPrice) / item.entryPrice) * 100
+              : null;
+          }
         }
         item.executionTxHash = executionHash;
         item.lastError = undefined;
@@ -881,6 +959,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
           kind: executionKind,
           status: "confirmed",
           txHash: executionHash,
+          account: item.account,
           pair: item.instId,
           executionPair: item.executionPair,
           amount: String(amount),

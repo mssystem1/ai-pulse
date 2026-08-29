@@ -9,6 +9,7 @@ type ExecutionActivity = {
   txHash?: string;
   createdAt?: string;
   amount?: string;
+  fillPrice?: number;
 };
 
 export function cashFlowAdjustedPnl(
@@ -51,6 +52,10 @@ const RUNTIME_FIELDS = [
   "evidenceHash",
   "activeTakeProfit",
   "activeStopLoss",
+  "positionEntryPrice",
+  "lastEntryPrice",
+  "lastExitPrice",
+  "realizedPositionPnlPct",
   "exitPending",
   "lastRiskCheckAt",
   "evaluations",
@@ -146,18 +151,35 @@ export function reconcileStrategyExecution<T extends StrategyRecord>(strategy: T
   const currentIsSameOrNewerExecution = strategy.lastDecision === latest.kind
     && Number.isFinite(currentRunAt)
     && currentRunAt >= executionAt;
-  if (currentIsSameOrNewerExecution) return strategy;
-
-  const reconciled = {
+  const reconciled = (currentIsSameOrNewerExecution ? { ...strategy } : {
     ...strategy,
     lastDecision: latest.kind,
     lastRunAt: latest.createdAt,
     ...(latest.txHash ? { lastTxHash: latest.txHash } : {}),
-  } as T;
+  }) as T;
+  const latestBuy = activity
+    .filter((item) => item.status === "confirmed"
+      && item.source === "autopilot"
+      && item.account?.toLowerCase() === vault
+      && item.kind === "buy_filled"
+      && typeof item.fillPrice === "number"
+      && typeof item.createdAt === "string")
+    .sort((left, right) => Date.parse(right.createdAt!) - Date.parse(left.createdAt!))[0];
+  if (latestBuy?.fillPrice) {
+    (reconciled as Record<string, unknown>).lastEntryPrice = latestBuy.fillPrice;
+    if (targetBalance > 0n) (reconciled as Record<string, unknown>).positionEntryPrice = latestBuy.fillPrice;
+  }
   if (latest.kind === "sell_filled" && targetBalance === 0n) {
     (reconciled as Record<string, unknown>).exitPending = false;
     delete (reconciled as Record<string, unknown>).activeTakeProfit;
     delete (reconciled as Record<string, unknown>).activeStopLoss;
+    delete (reconciled as Record<string, unknown>).positionEntryPrice;
+    if (typeof latest.fillPrice === "number") {
+      (reconciled as Record<string, unknown>).lastExitPrice = latest.fillPrice;
+      if (latestBuy?.fillPrice) {
+        (reconciled as Record<string, unknown>).realizedPositionPnlPct = ((latest.fillPrice - latestBuy.fillPrice) / latestBuy.fillPrice) * 100;
+      }
+    }
   } else if (latest.kind === "sell_partial_filled" && targetBalance > 0n) {
     (reconciled as Record<string, unknown>).exitPending = true;
   }

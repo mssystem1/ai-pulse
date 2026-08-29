@@ -111,6 +111,25 @@ test("partial sell remains latched while target capital is still on-chain", () =
   assert.equal(reconciled.exitPending, true);
 });
 
+test("receipt-backed fills expose active entry and realized Autopilot prices", () => {
+  const strategy = { id: "xlayer:vault", vault: "0x0000000000000000000000000000000000000001" };
+  const buy = {
+    status: "confirmed", source: "autopilot", kind: "buy_filled",
+    account: strategy.vault, txHash: "0xbuy", createdAt: "2026-08-27T08:00:00.000Z", fillPrice: 2424.25,
+  };
+  const active = reconcileStrategyExecution(strategy, [buy], 10n);
+  assert.equal(active.positionEntryPrice, 2424.25);
+  assert.equal(active.lastEntryPrice, 2424.25);
+
+  const closed = reconcileStrategyExecution(active, [buy, {
+    status: "confirmed", source: "autopilot", kind: "sell_filled",
+    account: strategy.vault, txHash: "0xsell", createdAt: "2026-08-27T09:00:00.000Z", fillPrice: 2448.5,
+  }], 0n);
+  assert.equal("positionEntryPrice" in closed, false);
+  assert.equal(closed.lastExitPrice, 2448.5);
+  assert.ok(Math.abs(Number(closed.realizedPositionPnlPct) - 1.0003) < 0.001);
+});
+
 test("concurrent runtime saves merge evaluation history instead of deleting a fill", () => {
   const current = {
     id: "xlayer:vault",
