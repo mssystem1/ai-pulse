@@ -1,8 +1,11 @@
 # PULSE
 
-PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and AI agents. One responsive workspace provides Global Market, Prediction Market, Risk Guard, Spot Trading, Autopilot, Telegram, and Docs. Five public paid services keep discovery clear: Global Market Quick Plan ($0.10), Global Market Pro Strategy ($0.20), Prediction Market Quick View ($0.10), Prediction Market Pro Analysis ($0.20), and Onchain Pre-Trade Risk Guard ($0.05). Global Market includes OKX-listed crypto, xStocks and RWA assets. Execution separately verifies the selected network's identity-safe token, settlement asset, live route and wallet balance. Polymarket remains read-only.
+Canonical discovery: OKX.AI agent #8355 on X Layer; CDP Bazaar on Base and Arbitrum; Circle Agent Marketplace listing material on Arc Testnet. The public catalog has exactly five services. Autopilot AI passes ($1.50/24h, $10.50/7d, $45/30d per vault) are in-product entry-confirmation entitlements, not a sixth analysis service.
+
+PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and AI agents. One responsive workspace provides Global Market, Prediction Market, Risk Guard, Spot Trading, Autopilot, Telegram, and Docs. Five public paid services keep discovery clear: Global Market Quick Plan ($0.20), Global Market Pro Strategy ($0.30), Prediction Market Quick View ($0.20), Prediction Market Pro Analysis ($0.30), and Onchain Pre-Trade Risk Guard ($0.15). Global Market includes OKX-listed crypto, xStocks and RWA assets. Execution separately verifies the selected network's identity-safe token, settlement asset, live route and wallet balance. Polymarket remains read-only.
 
 - [Product documentation](/)
+- [PULSE agent #8355](https://www.okx.ai/agents/8355)
 - [Machine-readable service metadata](/v1/metadata)
 - [Crypto Polymarket discovery](/v1/polymarket/crypto)
 - [MCP endpoint](/mcp)

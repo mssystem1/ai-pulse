@@ -15,13 +15,13 @@ test("validates the exact network, native-USDC asset, route, and approved price"
   assert.doesNotThrow(() => validatePaymentChallenge({
     x402Version: 2,
     resource: { url: "http://localhost:4000/base/v1/analysis/fused/standard" },
-    accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "50000", payTo: "0x0000000000000000000000000000000000000001" }],
+    accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "250000", payTo: "0x0000000000000000000000000000000000000001" }],
   }, "http://localhost:4000/base/v1/analysis/fused/standard", "base", network));
 });
 
 test("rejects a substituted chain, token, price, or resource before wallet signing", () => {
   const network = WEB_NETWORKS.arbitrum;
-  const base = { x402Version: 2, resource: { url: "/arbitrum/v1/token/scan" }, accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "10000" }] };
+  const base = { x402Version: 2, resource: { url: "/arbitrum/v1/token/scan" }, accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "200000" }] };
   for (const challenge of [
     { ...base, accepts: [{ ...base.accepts[0], network: "eip155:8453" }] },
     { ...base, accepts: [{ ...base.accepts[0], asset: WEB_NETWORKS.base.payment.address }] },

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { boundedTargetSellAmount, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput } from "./autopilotPolicy.js";
+import { boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput } from "./autopilotPolicy.js";
 
 const candles = (kind: "trend" | "breakout" | "range") => Array.from({ length: 60 }, (_, index) => {
   const base = kind === "range" ? 100 + Math.sin(index / 3) * 2 : 80 + index * .4;
@@ -20,6 +20,12 @@ test("trend following buys only when report and moving-average rules all pass", 
   assert.equal(decision.action, "buy");
   assert.equal(decision.rules.every((rule) => rule.passed), true);
   assert.equal(evaluateAutopilotPolicy({ strategyType: "trend_following", candles: candles("trend"), report: report("neutral", 80), minConfidence: 70, hasPosition: false }).action, "hold");
+});
+
+test("deterministic prefilter avoids AI unless the selected strategy has a plausible entry", () => {
+  assert.equal(evaluateAutopilotEntryCandidate({ strategyType: "trend_following", candles: candles("trend") }).candidate, true);
+  assert.equal(evaluateAutopilotEntryCandidate({ strategyType: "breakout", candles: candles("range") }).candidate, false);
+  assert.equal(evaluateAutopilotEntryCandidate({ strategyType: "breakout", candles: candles("breakout") }).candidate, true);
 });
 
 test("breakout requires both a range break and volume confirmation", () => {

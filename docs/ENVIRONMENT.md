@@ -156,8 +156,13 @@ This table is the operational checklist for variables that require a choice. Fix
 | `AUTOMATION_WORKER_ENABLED` | `0` or `1` | `1` only during live acceptance | `1` on the single Railway worker | Enables guarded Spot reconciliation and Autopilot evaluation. Do not also run a Vercel cron. |
 | `AUTOMATION_EXECUTOR_PRIVATE_KEY` | 32-byte server secret | Optional; TEST wallet is the acceptance fallback | Required only on the automation host (Railway in the recommended split) | Dedicated signer whose address currently needs Registry Spot keeper + Autopilot executor roles and the OracleRouter updater role. It cannot call owner-only vault withdrawal. Never use an owner, seller, treasury or test key. |
 | `CRON_SECRET` | Long random server secret | Optional | Unset for Railway; required only for an all-in-one Vercel serverless API/cron | Authenticates `GET /v1/internal/automation/tick`; it is a scheduler secret, not an on-chain signer. |
-| `AUTOPILOT_ANALYSIS_INTERVAL_MS` | Milliseconds, at least `60000` | `900000` | `900000` | Interval for Premium analysis and strategy/structure decisions. |
+| `AUTOPILOT_ANALYSIS_INTERVAL_MS` | Milliseconds, at least `60000` | `300000` | `300000` | Scan cadence for a newly closed candle and deterministic entry/structure rules. It does not imply an xAI call. |
 | `AUTOPILOT_RISK_INTERVAL_MS` | Milliseconds, at least `30000` | `60000` | `60000` | Independent live TP/SL and latched partial-exit monitor. It does not call xAI, continues during an AI outage, and still uses the vault cooldown, oracle, route, simulation and nonce safeguards. |
+| `GROK_AUTOPILOT_MODEL` | Supported xAI model | `grok-4.3` | `grok-4.3` | Compact market-state classifier; never generates a full report. |
+| `GROK_MAX_INPUT_AUTOPILOT` / `GROK_MAX_OUTPUT_AUTOPILOT` | Token limits | `4000` / `320` | Same | Hard compact-signal prompt/output bounds. |
+| `AUTOPILOT_AI_MIN_INTERVAL_MS` / `AUTOPILOT_AI_SIGNAL_TTL_MS` | Milliseconds | `14400000` / `14400000` | Same | Four-hour per-vault minimum and shared pair/timeframe signal cache. |
+| `AUTOPILOT_AI_MAX_CALLS_PER_VAULT_DAY` / `AUTOPILOT_AI_MAX_CALLS_GLOBAL_DAY` | Integer calls | `3` / `50` | Operator capacity | Atomic daily call reservations before xAI. |
+| `AUTOPILOT_AI_MAX_USD_PER_VAULT_DAY` / `AUTOPILOT_AI_MAX_USD_GLOBAL_DAY` | USD | `0.15` / `2.00` | Operator capacity | Worst-case cost reservations; exhaustion fails closed to Hold. |
 | `TEST_WALLET_ADDRESS` / `TEST_WALLET_PRIVATE_KEY` | Ignored operator secrets | Scripts and bounded acceptance only | Never deploy | Funded checkout automation. The browser never reads these values. |
 
 The X Layer, Base and Arbitrum contract/router variables in the environment
@@ -169,29 +174,35 @@ URLs never receive such a fallback.
 
 ## Pricing: preserve current services, add V5 services
 
-The existing pricing contract is unchanged and must remain wired to the existing routes, MCP tools, SDK behavior, metadata, and OKX.AI replay flow:
+The current pricing contract must remain wired to REST routes, browser pre-sign checks, MCP/SDK metadata, and OKX.AI replay where that service is publicly exposed:
 
 ```env
-PRICE_ANALYSIS_BASE=0.10
-PRICE_ANALYSIS_PREMIUM=0.20
-PRICE_TOKEN_SCAN=0.10
-PRICE_PREFLIGHT=0.20
+PRICE_ANALYSIS_BASE=0.20
+PRICE_ANALYSIS_PREMIUM=0.30
+PRICE_TOKEN_SCAN=0.20
+PRICE_PREFLIGHT=0.15
+PRICE_WALLET_SCAN=0.11
+PRICE_MARKET_PULSE=0.11
+PRICE_SWAP_QUOTE=0.12
+PRICE_AUTOPILOT_PASS_24H=1.50
+PRICE_AUTOPILOT_PASS_7D=10.50
+PRICE_AUTOPILOT_PASS_30D=45.00
 ```
 
-These are the four paid services exposed by the current web application. The existing wallet-scan, market-pulse, and heuristic swap-quote backend routes retain their code defaults for API/SDK compatibility; they are not presented as configurable web-product prices.
+Global/Prediction reports and Risk Guard are public paid services. The three Autopilot pass routes are in-product, vault-bound entitlements. Wallet-scan, market-pulse, and heuristic swap-quote backend routes retain API/SDK compatibility but are not promoted as separate product choices.
 
 The V5 document leaves these prices open for product configuration. PULSE uses the following launch strategy:
 
 ```env
-PRICE_ANALYSIS_PREDICTION_STANDARD=0.10
-PRICE_ANALYSIS_PREDICTION_PREMIUM=0.20
-PRICE_ANALYSIS_FUSED_STANDARD=0.15
-PRICE_ANALYSIS_FUSED_PREMIUM=0.30
-PRICE_ANALYSIS_DIVERGENCE=0.10
-PRICE_PREFLIGHT_EVENT_RISK=0.20
+PRICE_ANALYSIS_PREDICTION_STANDARD=0.20
+PRICE_ANALYSIS_PREDICTION_PREMIUM=0.30
+PRICE_ANALYSIS_FUSED_STANDARD=0.25
+PRICE_ANALYSIS_FUSED_PREMIUM=0.40
+PRICE_ANALYSIS_DIVERGENCE=0.20
+PRICE_PREFLIGHT_EVENT_RISK=0.30
 ```
 
-Prediction pricing matches the configured standard/premium spot anchors. Fused pricing is higher because it validates and combines both OKX and selected Polymarket context. Divergence is a narrower specialized analysis at $0.10. Event-risk preflight extends the existing $0.20 preflight with fresh prediction-market validation and remains priced at $0.20. Existing price variables are never used as fallbacks for a different V5 service.
+Prediction pricing matches the configured standard/premium spot anchors. Fused pricing is higher because it validates and combines both OKX and selected Polymarket context. Divergence is a narrower specialized analysis at $0.20. Event-risk preflight adds fresh prediction-market validation and is $0.30; Onchain Pre-Trade Risk Guard is $0.15. Existing price variables are never used as fallbacks for a different service.
 
 Local templates enable all four new service flags. The production-canary template keeps them disabled while retaining their configured prices, so activation later requires only a deliberate feature-flag change and redeployment.
 
@@ -205,6 +216,9 @@ The price-to-route mapping follows V5 exactly:
 | `PRICE_ANALYSIS_FUSED_PREMIUM` | `POST /v1/analysis/fused/premium` |
 | `PRICE_ANALYSIS_DIVERGENCE` | `POST /v1/analysis/divergence` |
 | `PRICE_PREFLIGHT_EVENT_RISK` | `POST /v1/preflight/event-risk` |
+| `PRICE_AUTOPILOT_PASS_24H` | `POST /v1/autopilot/pass/24h` |
+| `PRICE_AUTOPILOT_PASS_7D` | `POST /v1/autopilot/pass/7d` |
+| `PRICE_AUTOPILOT_PASS_30D` | `POST /v1/autopilot/pass/30d` |
 
 Network-prefixed X Layer, Base, Arbitrum, and Arc routes reuse these service prices unless a future approved pricing policy explicitly introduces network-specific overrides.
 
@@ -297,6 +311,8 @@ AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservati
 Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=upstash_kv`, these counters are shared across instances and survive deployments; `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
 
 `GET /metrics` publishes Prometheus-compatible HTTP, provider, payment, job, report, queue, token, and cost series. Provider observations distinguish OKX, OKX DEX, Gamma, CLOB, Polymarket Data API, CDP Trade, and xAI. Payment middleware is measured as `challenge` or `verify_settle`; the official synchronous seller adapters do not expose truthful independent verify and settle timings. Structured JSON events carry the same `X-Correlation-ID` through payment, provider, job, xAI, and report work without logging request bodies, signatures, recovery tokens, or secrets.
+
+Compact Autopilot evaluations prefer xAI's returned `usage.cost_in_usd_ticks` for exact billed-cost telemetry. The configured input, cached-input and output rates are used only when that field is absent, and remain the fail-closed reservation basis before a provider call.
 
 `CDP_API_KEY_ID` and `CDP_API_KEY_SECRET` authenticate both the CDP x402 facilitator and the server-side CDP Trade API quote used by the Base/Arbitrum in-app native ETH → native USDC funding flow. They are server-only and must never use a `VITE_` prefix.
 

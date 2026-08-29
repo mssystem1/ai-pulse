@@ -20,7 +20,10 @@ async function telegram(token: string, method: string, payload: unknown) {
   return body;
 }
 
-function deliveryToken(chatId: number, secret: string) { const id=String(chatId),expires=String(Date.now()+7*24*60*60_000),payload=`${id}.${expires}`;return `${payload}.${createHmac("sha256",secret).update(payload).digest("base64url")}`; }
+// A capability may be attached to a 30-day Autopilot pass. Keep it valid for
+// five additional days so the two-hour warning and expiry notice still arrive
+// after a long pass. It remains chat-bound and cannot authorize wallet actions.
+function deliveryToken(chatId: number, secret: string) { const id=String(chatId),expires=String(Date.now()+35*24*60*60_000),payload=`${id}.${expires}`;return `${payload}.${createHmac("sha256",secret).update(payload).digest("base64url")}`; }
 function verifiedChatId(value: string, secret: string) { const match=/^(-?\d{1,20})\.(\d{13})\.([A-Za-z0-9_-]{43})$/.exec(value);if(!match||Number(match[2])<Date.now())return null;const payload=`${match[1]}.${match[2]}`,expected=createHmac("sha256",secret).update(payload).digest(),actual=Buffer.from(match[3],"base64url");return actual.length===expected.length&&timingSafeEqual(actual,expected)?match[1]:null; }
 export function isTelegramDeliveryCapability(value:string){const secret=process.env.TELEGRAM_WEBHOOK_SECRET?.trim()||"";return Boolean(secret&&verifiedChatId(value,secret));}
 export async function deliverTelegramReport(delivery:string, text:string, reportUrl:string){const token=process.env.TELEGRAM_BOT_TOKEN?.trim()||"";const secret=process.env.TELEGRAM_WEBHOOK_SECRET?.trim()||"";const chatId=verifiedChatId(delivery,secret);if(!token||!chatId)throw new Error("Telegram delivery capability is invalid");return telegram(token,"sendMessage",{chat_id:chatId,text:`${text.slice(0,3000)}\n\nOpen full report: ${reportUrl}`,disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"Open full PULSE report",url:reportUrl}]]}});}

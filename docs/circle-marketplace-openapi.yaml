@@ -1,11 +1,13 @@
 openapi: 3.1.0
 info:
   title: PULSE Circle Agent Marketplace API
-  version: 6.0.0
+  version: 6.1.0
   description: >-
     Five focused x402 services on Arc Testnet: two Global Market reports, two
     Prediction Market reports and one Onchain Pre-Trade Risk Guard. Payments
     use test USDC through Circle Gateway. Arc Testnet is analysis/payment only.
+    Spot execution, Autopilot execution and per-vault Autopilot AI passes are
+    deliberately outside this five-service marketplace contract.
   contact:
     url: https://www.ai-pulse.tech
   license:
@@ -27,7 +29,7 @@ paths:
       operationId: createArcSpotStandardReport
       summary: Global Market Quick Plan
       tags: [Global Market]
-      x-pulse-price-usd: 0.10
+      x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
@@ -45,7 +47,7 @@ paths:
       operationId: createArcSpotPremiumReport
       summary: Global Market Pro Strategy
       tags: [Global Market]
-      x-pulse-price-usd: 0.20
+      x-pulse-price-usd: 0.30
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
@@ -63,7 +65,7 @@ paths:
       operationId: createArcPredictionStandardReport
       summary: Prediction Market Quick View
       tags: [Prediction analysis]
-      x-pulse-price-usd: 0.10
+      x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
@@ -81,7 +83,7 @@ paths:
       operationId: createArcPredictionPremiumReport
       summary: Prediction Market Pro Analysis
       tags: [Prediction analysis]
-      x-pulse-price-usd: 0.20
+      x-pulse-price-usd: 0.30
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
@@ -100,7 +102,7 @@ paths:
       summary: Onchain Pre-Trade Risk Guard
       description: Deeper PASS/WARN/FAIL review of a token, route, amount or counterparty before an on-chain action.
       tags: [Risk Guard]
-      x-pulse-price-usd: 0.05
+      x-pulse-price-usd: 0.15
       x-x402-network: eip155:5042002
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway

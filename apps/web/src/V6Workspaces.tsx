@@ -7,8 +7,8 @@ import {
   parseUnits,
   toHex,
 } from "viem";
-import { apiGet, apiPost } from "./api";
-import { getInjectedProvider } from "./wallet";
+import { API_BASE, apiGet, apiPost } from "./api";
+import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
   switchWalletNetwork,
   fetchTokenBalance,
@@ -148,6 +148,7 @@ type AutopilotStrategyView = {
   paused?: boolean;
   lastDecision?: string;
   lastRunAt?: string;
+  createdAt?: string;
   lastError?: string;
   lastTxHash?: string;
   evidenceHash?: string;
@@ -174,6 +175,22 @@ type AutopilotStrategyView = {
   lastExitPrice?: number;
   realizedPositionPnlPct?: number;
   exitPending?: boolean;
+  lastEvaluatedCandleTs?: number;
+  lastAiSignalAt?: string;
+  lastAiSignalCandleTs?: number;
+  aiSignalSource?: "live" | "cache" | "deterministic";
+  aiBudgetDay?: string;
+  aiCallsToday?: number;
+  aiActualCostTodayUsd?: number;
+  aiReservedCostTodayUsd?: number;
+  aiBudgetStatus?: string;
+  aiNextEligibleAt?: string;
+  aiPass?: { purchasedAt: string; expiresAt: string; signalLimit: number; signalsUsed: number } | null;
+  evaluationCount?: number;
+  holdCount?: number;
+  filledBuyCount?: number;
+  filledSellCount?: number;
+  failureCount?: number;
   evaluations?: Array<{
     id: string;
     evaluatedAt: string;
@@ -3954,7 +3971,7 @@ export function AutopilotWorkspace({
   );
   const [pair, setPair] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("4H");
-  const [maxTrade, setMaxTrade] = useState("5");
+  const [maxTrade, setMaxTrade] = useState("50");
   const [dailyLoss, setDailyLoss] = useState("3");
   const [riskProfile, setRiskProfile] = useState<
     "conservative" | "balanced" | "active"
@@ -3968,7 +3985,7 @@ export function AutopilotWorkspace({
   const [dailyTurnoverPct, setDailyTurnoverPct] = useState("100");
   const [maxSlippagePct, setMaxSlippagePct] = useState("1");
   const [strategy, setStrategy] = useState(
-    "Trend-following with Premium analysis confirmation; stop after daily loss cap.",
+    "Trend-following with compact AI confirmation; stop after daily loss cap.",
   );
   const [activity, setActivity] = useState<Activity[]>([]);
   const [activitySyncNotice, setActivitySyncNotice] = useState("");
@@ -3976,6 +3993,12 @@ export function AutopilotWorkspace({
   const [strategyCatalog, setStrategyCatalog] = useState<
     AutopilotStrategyCatalogItem[]
   >([]);
+  const [aiPolicy, setAiPolicy] = useState<{
+    mode?: string;
+    maxCallsPerVaultDay?: number;
+    maxUsdPerVaultDay?: number;
+    commercialPass?: { enabled?: boolean; price24hUsd?: number; price7dUsd?: number; price30dUsd?: number; signalsPerDay?: number; expiryBehavior?: string };
+  } | null>(null);
   const [vaults, setVaults] = useState<readonly string[]>([]);
   const [vaultDetails, setVaultDetails] = useState<AccountSnapshot["vaults"]>(
     [],
@@ -4104,9 +4127,9 @@ export function AutopilotWorkspace({
       const settings =
         profile === "conservative"
           ? {
-              trade: "3",
+              trade: "25",
               loss: "2",
-              exposure: "35",
+              exposure: "25",
               turnover: "60",
               slippage: "0.5",
               cooldown: "900",
@@ -4114,16 +4137,16 @@ export function AutopilotWorkspace({
             }
           : profile === "active"
             ? {
-                trade: "10",
+                trade: "100",
                 loss: "5",
-                exposure: "75",
+                exposure: "100",
                 turnover: "200",
                 slippage: "1.5",
                 cooldown: "120",
                 confidence: "60",
               }
             : {
-                trade: "5",
+                trade: "50",
                 loss: "3",
                 exposure: "50",
                 turnover: "100",
@@ -4191,9 +4214,11 @@ export function AutopilotWorkspace({
         const runtimeData = runtime.data as {
           strategies?: AutopilotStrategyView[];
           strategyCatalog?: AutopilotStrategyCatalogItem[];
+          aiPolicy?: typeof aiPolicy;
         };
         setStrategies(runtimeData.strategies || []);
         setStrategyCatalog(runtimeData.strategyCatalog || []);
+        setAiPolicy(runtimeData.aiPolicy || null);
       } else
         syncNotice ||=
           "Autopilot monitoring is reconnecting. On-chain vault guardrails remain active.";
@@ -4251,6 +4276,7 @@ export function AutopilotWorkspace({
     } else {
       setActivity([]);
       setStrategies([]);
+      setAiPolicy(null);
       setActivitySyncNotice("");
       setVaults([]);
       setVaultDetails([]);
@@ -4525,7 +4551,7 @@ export function AutopilotWorkspace({
       if (typeof signature !== "string") throw new Error("Wallet returned no authorization signature");
       const response = await apiPost("/v1/autopilot/strategies", { ...payload, authorization: { expiresAt, signature } });
       if (!response.ok) throw new Error(errorText(response.data));
-      setMessage("Autopilot strategy activated. Premium analysis will run on the configured interval and every trade remains contract-bounded."); await refresh();
+      setMessage("Autopilot strategy activated. Cost-capped compact signals run only after deterministic entry gates; every trade remains contract-bounded."); await refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); } finally { setBusy(false); }
   }
 
@@ -5048,6 +5074,49 @@ export function AutopilotWorkspace({
     }
   }
 
+  async function purchaseAutopilotPass(plan: "24h" | "7d" | "30d") {
+    if (!wallet || !ADDRESS.test(selectedVault)) return setMessage("Select an existing Autopilot and connect its owner wallet first");
+    const prices = { "24h": aiPolicy?.commercialPass?.price24hUsd || 1.5, "7d": aiPolicy?.commercialPass?.price7dUsd || 10.5, "30d": aiPolicy?.commercialPass?.price30dUsd || 45 };
+    const available = fundingWalletBalance;
+    if (available === null) return setMessage(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
+    if (available < prices[plan]) return setMessage(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
+    setBusy(true);
+    setMessage(`Preparing the ${plan} Autopilot AI pass payment...`);
+    try {
+      const paidFetch = await createWalletPaidFetch(wallet, networkKey);
+      const telegramDelivery = new URLSearchParams(window.location.search).get("tg") || undefined;
+      const prefix = WEB_NETWORKS[networkKey].route;
+      const response = await paidFetch(`${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ owner: wallet, vault: selectedVault, ...(telegramDelivery ? { telegramDelivery } : {}) }),
+      });
+      const body = await response.json().catch(() => ({})) as { aiPass?: { expiresAt?: string }; error?: string };
+      if (!response.ok) throw new Error(body.error || `Autopilot pass purchase failed (${response.status})`);
+      setMessage(`Autopilot AI pass active until ${body.aiPass?.expiresAt ? new Date(body.aiPass.expiresAt).toLocaleString() : "the purchased expiry"}. New entries use at most three compact AI confirmations per covered day.`);
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportAutopilotLog(item: AutopilotStrategyView) {
+    const relatedActivity = activity.filter((entry) => entry.source === "autopilot" && (
+      entry.account?.toLowerCase() === item.vault.toLowerCase()
+      || (!entry.account && entry.pair === item.pair)
+    ));
+    const payload = { exportedAt: new Date().toISOString(), network: networkKey, strategy: item, activity: relatedActivity };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `pulse-autopilot-${item.pair.toLowerCase()}-${item.vault.slice(2, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   if (networkKey === "arc-testnet") return <DisabledArc feature="Autopilot" />;
 
   const displayedCapitalAtomic =
@@ -5121,10 +5190,13 @@ export function AutopilotWorkspace({
     },
     ...existingVaultPickerOptions,
   ];
+  const fundingWalletBalance = selectedVault
+    ? vaultWalletBalance
+    : autopilotBalances.settlement;
   const addMaximum =
-    vaultWalletBalance === null
+    fundingWalletBalance === null
       ? ""
-      : vaultWalletBalance.toLocaleString("en-US", {
+      : fundingWalletBalance.toLocaleString("en-US", {
           useGrouping: false,
           maximumFractionDigits: activeSettlementDecimals,
         });
@@ -5145,32 +5217,41 @@ export function AutopilotWorkspace({
     withdrawBalanceAtomic,
   );
   const walletBalanceText =
-    vaultWalletBalance === null
+    fundingWalletBalance === null
       ? "Balance unavailable"
-      : `${vaultWalletBalance.toLocaleString("en-US", {
+      : `${fundingWalletBalance.toLocaleString("en-US", {
           maximumFractionDigits: activeSettlementDecimals,
         })} ${activeSettlementSymbol}`;
+  const activePass = activeStrategy?.aiPass || null;
+  const passRemainingMs = activePass ? Date.parse(activePass.expiresAt) - Date.now() : 0;
+  const passSignalsRemaining = activePass ? Math.max(0, activePass.signalLimit - activePass.signalsUsed) : 0;
+  const passActive = passRemainingMs > 0 && passSignalsRemaining > 0;
+  const passTimeLabel = passRemainingMs > 0
+    ? passRemainingMs >= 86_400_000
+      ? `${Math.floor(passRemainingMs / 86_400_000)}d ${Math.floor((passRemainingMs % 86_400_000) / 3_600_000)}h remaining`
+      : `${Math.max(1, Math.ceil(passRemainingMs / 3_600_000))}h remaining`
+    : "Expired or not purchased";
   const strategyPresets = [
     {
       id: "trend_following",
       label: "Trend following",
       value:
-        "Trend-following with Premium analysis confirmation; stop after daily loss cap.",
-      note: "Bullish Premium signal + trend-up + close above SMA20 + SMA20 above SMA50.",
+        "Trend-following with compact AI confirmation; stop after daily loss cap.",
+      note: "Bullish compact signal + trend-up + close above SMA20 + SMA20 above SMA50.",
     },
     {
       id: "breakout",
       label: "Breakout",
       value:
-        "Breakout continuation only when Premium analysis confirms momentum and volume; otherwise hold.",
-      note: "Bullish Premium signal + prior 20-candle high break + at least 1.15x volume.",
+        "Breakout continuation only when compact AI confirms momentum and volume; otherwise hold.",
+      note: "Bullish compact signal + prior 20-candle high break + at least 1.15x volume.",
     },
     {
       id: "mean_reversion",
       label: "Mean reversion",
       value:
-        "Mean-reversion entries only at Premium-analysis support zones; stop after daily loss cap.",
-      note: "Bullish Premium signal near support/RSI pullback in a range or transition.",
+        "Mean-reversion entries only at compact-signal support zones; stop after daily loss cap.",
+      note: "Bullish compact signal near support/RSI pullback in a range or transition.",
     },
   ];
   const selectedStrategy =
@@ -5231,7 +5312,7 @@ export function AutopilotWorkspace({
       <section className="v6-heading">
         <div>
           <span className="eyebrow">
-            PREMIUM ANALYSIS · ON-CHAIN GUARDRAILS
+            COST-CAPPED AI SIGNALS · ON-CHAIN GUARDRAILS
           </span>
           <h2>Autopilot</h2>
           <p>
@@ -5255,10 +5336,10 @@ export function AutopilotWorkspace({
           setTimeframe(candidate.timeframe);
           setStrategy(
             candidate.strategyType === "breakout"
-              ? "Breakout continuation only when Premium analysis confirms momentum and volume; otherwise hold."
+              ? "Breakout continuation only when compact AI confirms momentum and volume; otherwise hold."
               : candidate.strategyType === "mean_reversion"
-                ? "Mean-reversion entries only at Premium-analysis support zones; stop after daily loss cap."
-                : "Trend-following with Premium analysis confirmation; stop after daily loss cap.",
+                ? "Mean-reversion entries only at compact-signal support zones; stop after daily loss cap."
+                : "Trend-following with compact AI confirmation; stop after daily loss cap.",
           );
         }}
       />
@@ -5282,7 +5363,7 @@ export function AutopilotWorkspace({
                 custody="erc20"
                 onSelect={(selected) => setPair(selected.pair)}
               />
-              <small>Choose directly; Premium analysis remains the strategy signal engine.</small>
+              <small>Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes.</small>
             </div>
             <div className="friendly-field">
               <span>Analysis timeframe</span>
@@ -5453,10 +5534,10 @@ export function AutopilotWorkspace({
                   <b>{profile[0].toUpperCase() + profile.slice(1)}</b>
                   <span>
                     {profile === "conservative"
-                      ? "Smaller trades · stricter signals"
+                      ? "Up to 25% per Buy · strictest signals"
                       : profile === "active"
-                        ? "Larger trades · wider tolerance"
-                        : "Moderate defaults"}
+                        ? "Up to 100% per Buy · wider tolerance"
+                        : "Up to 50% per Buy · balanced signals"}
                   </span>
                 </button>
               ),
@@ -5499,7 +5580,7 @@ export function AutopilotWorkspace({
             <div>
               <span>Signal threshold</span>
               <strong>{minConfidence}%</strong>
-              <small>Premium analysis confidence</small>
+              <small>Compact AI confidence</small>
             </div>
           </div>
           <details className="advanced-panel autopilot-advanced">
@@ -5596,7 +5677,7 @@ export function AutopilotWorkspace({
                 {selectedStrategy.label} · {pair} · {timeframe}
               </h3>
               <p>
-                PULSE starts by watching the market with Premium analysis,
+                PULSE starts with free deterministic monitoring and requests a compact AI entry signal only when a setup candidate exists,
                 trades only{" "}
                 {targetToken?.symbol || "the verified asset"}, and enforce the{" "}
                 {riskProfile} limits above on-chain.
@@ -5695,7 +5776,22 @@ export function AutopilotWorkspace({
                       "No trading decision yet"}
                 </small>
               </div>
-              <dl className="trade-facts">
+              {selectedVault && (
+                <section className={`autopilot-pass-card ${passActive ? "active" : "warning"}`}>
+                  <div>
+                    <span>AI ENTRY PASS</span>
+                    <strong>{passActive ? passTimeLabel : "New entries are on Hold"}</strong>
+                    <small>{passActive ? `${passSignalsRemaining} compact AI confirmation${passSignalsRemaining === 1 ? "" : "s"} remaining` : "TP/SL, deterministic exits, pause and withdrawal continue without interruption."}</small>
+                  </div>
+                  <div className="pass-plans">
+                    <button type="button" className="btn btn-accent" disabled={busy} onClick={() => void purchaseAutopilotPass("24h")}>24h · ${(aiPolicy?.commercialPass?.price24hUsd || 1.5).toFixed(2)}</button>
+                    <button type="button" className="btn btn-soft" disabled={busy} onClick={() => void purchaseAutopilotPass("7d")}>7d · ${(aiPolicy?.commercialPass?.price7dUsd || 10.5).toFixed(2)}</button>
+                    <button type="button" className="btn btn-soft" disabled={busy} onClick={() => void purchaseAutopilotPass("30d")}>30d · ${(aiPolicy?.commercialPass?.price30dUsd || 45).toFixed(2)}</button>
+                  </div>
+                  <small>Manual prepaid renewal only—never auto-renews. Buying again extends unused time. Telegram reminders are enabled when purchased from the PULSE Mini App.</small>
+                </section>
+              )}
+              {selectedVault && <><dl className="trade-facts">
                 <div>
                   <dt>Market</dt>
                   <dd>{activeStrategy?.pair || pair}</dd>
@@ -5741,7 +5837,15 @@ export function AutopilotWorkspace({
                 <div><span>Invested asset</span><strong>{formatAssetAtomic(activeStrategy?.targetBalance, activeStrategy?.targetDecimals ?? targetToken?.decimals ?? 18)} {activeStrategy?.targetSymbol || targetToken?.symbol || pair.split("-")[0]}</strong><small>Withdraw separately, or let the strategy sell</small></div>
                 <div><span>Total portfolio value</span><strong>{formatAssetAtomic(activeStrategy?.portfolioValueAtomic || activeVault?.balanceAtomic || undefined, activeSettlementDecimals)} {activeSettlementSymbol}</strong><small>Settlement plus marked invested asset</small></div>
               </div>
-              <section className="vault-capital-manager">
+              </>}
+              {!selectedVault && (
+                <div className="capital-source-card creation-only-guide">
+                  <span>NEW AUTOPILOT · ONE FUNDING STEP</span>
+                  <strong>Use Initial deposit on the left</strong>
+                  <small>PULSE creates the owner-controlled account, transfers exactly that amount, and derives its starting risk limits in one guided flow. Add funds is available only after creation as an optional later top-up.</small>
+                </div>
+              )}
+              {selectedVault && <section className="vault-capital-manager">
                 <div className="capital-action-tabs" role="tablist" aria-label="Manage Autopilot capital">
                   <button type="button" role="tab" aria-selected={capitalAction === "add"} className={capitalAction === "add" ? "active" : ""} onClick={() => setCapitalAction("add")}>Add funds</button>
                   <button type="button" role="tab" aria-selected={capitalAction === "withdraw"} className={capitalAction === "withdraw" ? "active" : ""} onClick={() => setCapitalAction("withdraw")}>Withdraw</button>
@@ -5807,8 +5911,8 @@ export function AutopilotWorkspace({
                     <small className="capital-help">Only the connected owner can withdraw. The automation executor has no withdrawal permission.</small>
                   </div>
                 )}
-              </section>
-              <div className="manager-actions vault-state-actions">
+              </section>}
+              {selectedVault && <div className="manager-actions vault-state-actions">
                 <button
                   className="btn btn-danger"
                   disabled={
@@ -5829,8 +5933,8 @@ export function AutopilotWorkspace({
                 >
                   Resume
                 </button>
-              </div>
-              {closeConfirming ? (
+              </div>}
+              {selectedVault && (closeConfirming ? (
                 <div className="account-lookup-error">
                   <span>Close this Autopilot?</span>
                   <small>PULSE will pause it and ask the owner wallet to withdraw every available settlement and invested asset. The empty contract remains auditable and reusable.</small>
@@ -5848,8 +5952,8 @@ export function AutopilotWorkspace({
                 >
                   Close &amp; withdraw all
                 </button>
-              )}
-              <small className="capital-help">The contract is not deleted: it remains verifiable on-chain and can be configured again later.</small>
+              ))}
+              {selectedVault && <small className="capital-help">The contract is not deleted: it remains verifiable on-chain and can be configured again later.</small>}
               <details className="advanced-panel contract-details">
                 <summary>Technical proof and addresses</summary>
                 <dl className="technical-facts">
@@ -5886,7 +5990,7 @@ export function AutopilotWorkspace({
             <ul>
               <li>Only the selected asset and settlement token</li>
               <li>Per-trade, exposure and daily-loss limits</li>
-              <li>Premium-analysis confidence threshold</li>
+              <li>Compact AI confidence threshold</li>
               <li>Owner-only pause and withdrawal</li>
             </ul>
           </div>
@@ -6008,6 +6112,12 @@ export function AutopilotWorkspace({
                 (entry) => entry.id === item.strategyType,
               );
               const latest = item.evaluations?.at(-1);
+              const evaluations = item.evaluations || [];
+              const evaluationCount = item.evaluationCount ?? evaluations.length;
+              const filledBuys = item.filledBuyCount ?? evaluations.filter((entry) => entry.action === "buy" && entry.status === "filled").length;
+              const filledSells = item.filledSellCount ?? evaluations.filter((entry) => entry.action === "sell" && entry.status === "filled").length;
+              const holds = item.holdCount ?? evaluations.filter((entry) => entry.action === "hold" && entry.status === "held").length;
+              const failures = item.failureCount ?? evaluations.filter((entry) => entry.status === "failed").length;
               return (
                 <details key={`${item.id}-report`}>
                   <summary>
@@ -6016,12 +6126,21 @@ export function AutopilotWorkspace({
                       item.strategyType?.replaceAll("_", " ") ||
                       "Strategy"}
                   </summary>
+                  <div className="autopilot-report-toolbar">
+                    <div><span>Evaluations</span><strong>{evaluationCount}</strong><small>lifetime</small></div>
+                    <div><span>Filled buys</span><strong>{filledBuys}</strong></div>
+                    <div><span>Filled sells</span><strong>{filledSells}</strong></div>
+                    <div><span>Holds</span><strong>{holds}</strong></div>
+                    <div><span>Failures</span><strong>{failures}</strong></div>
+                    <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
+                    <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export full JSON log</button>
+                  </div>
                   <div className="autopilot-report-grid">
                     <section>
                       <span className="eyebrow">STRATEGY FUNCTION</span>
                       <h4>
                         {definition?.purpose ||
-                          "Rule-bound Premium-analysis strategy"}
+                          "Rule-bound compact-signal strategy"}
                       </h4>
                       <b>Entry rules</b>
                       <ul>
@@ -6035,6 +6154,14 @@ export function AutopilotWorkspace({
                           <li key={rule}>{rule}</li>
                         ))}
                       </ul>
+                      <b>Live workflow</b>
+                      <ol>
+                        <li>Every new candle passes a free deterministic setup gate.</li>
+                        <li>Only a valid candidate may consume one compact AI confirmation from the prepaid pass.</li>
+                        <li>All signed entry rules must pass before a Buy; otherwise the vault remains in Hold.</li>
+                        <li>After a fill, one-minute deterministic TP/SL and structure monitoring govern Sell decisions without using xAI.</li>
+                        <li>After a full Sell, the same strategy may wait and Buy again while its pass remains active.</li>
+                      </ol>
                     </section>
                     <section>
                       <span className="eyebrow">LATEST EVALUATION</span>
@@ -6054,7 +6181,7 @@ export function AutopilotWorkspace({
                               </dd>
                             </div>
                             <div>
-                              <dt>Premium signal</dt>
+                              <dt>Compact AI signal</dt>
                               <dd>
                                 {latest.bias} - {latest.confidence}%
                               </dd>
@@ -6097,6 +6224,19 @@ export function AutopilotWorkspace({
                       )}
                     </section>
                   </div>
+                  <section className="autopilot-evaluation-log">
+                    <div className="dashboard-head"><div><span className="eyebrow">DECISION LOG</span><h4>Recent evaluations and actions</h4></div><small>Newest first · full JSON export includes wallet activity</small></div>
+                    {evaluations.length ? [...evaluations].reverse().slice(0, 20).map((entry) => (
+                      <div className="evaluation-log-row" key={entry.id}>
+                        <span className={`status-chip ${entry.status}`}>{entry.status}</span>
+                        <strong>{entry.action.toUpperCase()}</strong>
+                        <span>{new Date(entry.evaluatedAt).toLocaleString()}</span>
+                        <span>{entry.bias} · {entry.confidence}%</span>
+                        <small>{entry.reason}</small>
+                        {entry.txHash ? <a href={`${WEB_NETWORKS[networkKey].explorer}/tx/${entry.txHash}`} target="_blank" rel="noreferrer">Transaction ↗</a> : <span />}
+                      </div>
+                    )) : <div className="empty-dashboard compact"><strong>Awaiting the first new-candle evaluation</strong></div>}
+                  </section>
                 </details>
               );
             })}
@@ -6793,6 +6933,7 @@ export function DocsWorkspace() {
     ["docs-auto-rules", "Autopilot rules"],
     ["docs-auto-example", "Autopilot example"],
     ["docs-pay", "Payments"],
+    ["docs-agents", "Agents & API"],
     ["docs-recover", "Report history"],
     ["docs-telegram", "Telegram"],
   ];
@@ -7454,8 +7595,9 @@ export function DocsWorkspace() {
                   <b>1 · Market &amp; strategy</b>
                   <span>
                     Select pair/timeframe and Trend following, Breakout or Mean
-                    reversion. Premium Global analysis is the signal service; an
-                    uncertain signal results in Hold.
+                    reversion. A compact AI confirmation is requested only after a free
+                    deterministic candidate gate. An uncertain signal results
+                    in Hold without creating a trade.
                   </span>
                 </article>
                 <article>
@@ -7487,6 +7629,19 @@ export function DocsWorkspace() {
                 <span>Turnover cap</span>
                 <span>Cooldown</span>
                 <span>Owner pause &amp; withdrawal</span>
+              </div>
+              <div className="docs-callout">
+                <b>AI pass: predictable cost per vault</b>
+                <span>
+                  Choose $1.50 for 24 hours, $10.50 for 7 days, or $45 for 30
+                  days. Renewal adds time to the current expiry. Each covered
+                  day includes up to three compact entry confirmations; routine
+                  Holds and deterministic TP/SL or structure exits do not call
+                  xAI. Two hours before expiry PULSE shows an urgent reminder
+                  and can notify the linked Telegram chat. After expiry, new
+                  entries remain on Hold while protection, exits, Pause and
+                  Withdraw continue.
+                </span>
               </div>
             </div>
             <div className="docs-tip good">
@@ -7581,10 +7736,11 @@ export function DocsWorkspace() {
               <span className="eyebrow">AUTOPILOT · EXACT TRADING RULES</span>
               <h3>What each strategy actually does</h3>
               <p>
-                Every entry requires a bullish Premium report and the signed
-                confidence threshold. The selected deterministic preset then
-                adds its own checks. Narrative text cannot override a failed
-                rule.
+                Every entry first requires the selected deterministic setup.
+                Only a surviving candidate may consume one compact bullish AI
+                confirmation from the selected vault&apos;s prepaid pass. The
+                signed confidence threshold and every preset rule must still
+                pass; narrative text cannot override a failed rule.
               </p>
             </div>
             <div className="worked-examples autopilot-rule-docs">
@@ -7597,7 +7753,7 @@ export function DocsWorkspace() {
                 </p>
                 <p>
                   <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish report, or close below SMA20.
+                  bearish compact signal, or close below SMA20.
                 </p>
               </article>
               <article>
@@ -7610,19 +7766,19 @@ export function DocsWorkspace() {
                 </p>
                 <p>
                   <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish report, or close below SMA20.
+                  bearish compact signal, or close below SMA20.
                 </p>
               </article>
               <article>
                 <span>MEAN REVERSION</span>
                 <h4>Buy a confirmed pullback</h4>
                 <p>
-                  <b>Buy only when all pass:</b> within 1% of report support or
+                  <b>Buy only when all pass:</b> within 1% of confirmed support or
                   RSI14 ≤ 42, plus range/transition regime.
                 </p>
                 <p>
                   <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish report, or price reaches SMA20.
+                  bearish compact signal, or price reaches SMA20.
                 </p>
               </article>
             </div>
@@ -7630,22 +7786,23 @@ export function DocsWorkspace() {
               <div>
                 <b>Conservative</b>
                 <span>
-                  3% trade · 2% daily loss · 35% exposure · 0.5% slippage · 15
-                  min cooldown · 80% signal.
+                  Up to 25% per Buy · 2% daily loss · 25% exposure · 0.5%
+                  slippage · 15 min cooldown · 80% signal.
                 </span>
               </div>
               <div>
                 <b>Balanced</b>
                 <span>
-                  5% trade · 3% daily loss · 50% exposure · 1% slippage · 5 min
-                  cooldown · 70% signal.
+                  Up to 50% per Buy · 3% daily loss · 50% exposure · 1%
+                  slippage · 5 min cooldown · 70% signal.
                 </span>
               </div>
               <div>
                 <b>Active</b>
                 <span>
-                  10% trade · 5% daily loss · 75% exposure · 1.5% slippage · 2
-                  min cooldown · 60% signal.
+                  Up to 100% per Buy · 5% daily loss · 100% exposure · 1.5%
+                  slippage · 2 min cooldown · 60% signal. This is spot capital,
+                  never leverage or borrowed exposure.
                 </span>
               </div>
               <div>
@@ -7670,9 +7827,9 @@ export function DocsWorkspace() {
               <b>Opportunity Radar</b>
               <span>
                 Global Market, empty Spot and Autopilot share the same read-only
-                OKX candle shortlist. It is not a recommendation: Premium rules,
-                token identity, the selected-network route and wallet balance
-                must still pass.
+                OKX candle shortlist. It is not a recommendation: the
+                deterministic setup, compact AI confirmation, token identity,
+                selected-network route and wallet balance must still pass.
               </span>
             </div>
             <div className="docs-callout">
@@ -7727,7 +7884,7 @@ export function DocsWorkspace() {
               <i>→</i>
               <b>2 · Choose Trend following</b>
               <span>
-                The automation asks Premium analysis for a fresh decision on its
+                The automation requests a compact AI confirmation only after a deterministic candidate gate on its
                 cycle. Below-confidence or invalidated setups become Hold.
               </span>
               <i>→</i>
@@ -7805,11 +7962,11 @@ export function DocsWorkspace() {
                 and wallet account before signing.
               </p>
               <div className="docs-glossary payment-price-grid">
-                <div><b>Global Base</b><span>$0.10 per report</span></div>
-                <div><b>Global Premium</b><span>$0.20 per report</span></div>
-                <div><b>Prediction Base</b><span>$0.10 per report</span></div>
-                <div><b>Prediction Premium</b><span>$0.20 per report</span></div>
-                <div><b>Pre-Trade Risk Guard</b><span>$0.05 per check</span></div>
+                <div><b>Global Base</b><span>$0.20 per report</span></div>
+                <div><b>Global Premium</b><span>$0.30 per report</span></div>
+                <div><b>Prediction Base</b><span>$0.20 per report</span></div>
+                <div><b>Prediction Premium</b><span>$0.30 per report</span></div>
+                <div><b>Pre-Trade Risk Guard</b><span>$0.15 per check</span></div>
               </div>
               <div className="docs-callout">
                 <b>Report fee, trading capital and gas are separate</b>
@@ -7824,8 +7981,81 @@ export function DocsWorkspace() {
             </div>
           </section>
 
+          <section id="docs-agents" className="docs-deep-dive">
+            <div className="docs-deep-head">
+              <span className="eyebrow">AGENTS &amp; API</span>
+              <h3>Discover the same five services from any supported agent environment</h3>
+              <p>
+                PULSE keeps one clear public catalog. An agent discovers a
+                service, supplies its typed input, settles the network-specific
+                x402 challenge and receives a durable job it can poll or recover.
+                Spot execution and Autopilot remain next actions from a valid
+                Global Pro report, not extra marketplace services.
+              </p>
+            </div>
+            <div className="docs-agent-flow" aria-label="Agent service workflow">
+              <div><small>1 В· DISCOVER</small><b>Choose one PULSE service</b></div>
+              <i>в†’</i>
+              <div><small>2 В· REQUEST</small><b>Send typed market or risk input</b></div>
+              <i>в†’</i>
+              <div><small>3 В· SETTLE</small><b>Pay the x402 challenge</b></div>
+              <i>в†’</i>
+              <div><small>4 В· RECOVER</small><b>Poll the durable report job</b></div>
+            </div>
+            <div className="docs-agent-services">
+              <article><b>Global Quick</b><span>$0.20 В· concise Buy-or-Wait plan</span></article>
+              <article><b>Global Pro</b><span>$0.30 В· chart, Elliott paths, DeFi and next actions</span></article>
+              <article><b>Prediction Quick</b><span>$0.20 В· selected-market evidence</span></article>
+              <article><b>Prediction Pro</b><span>$0.30 В· deeper evidence and 4H underlying chart</span></article>
+              <article><b>Risk Guard</b><span>$0.15 В· PASS/WARN/FAIL before signing</span></article>
+            </div>
+            <div className="docs-agent-channels">
+              <article>
+                <span>OKX.AI В· X LAYER</span>
+                <h4>PULSE agent #8355</h4>
+                <p>
+                  The existing identity exposes the five X Layer service URLs
+                  and settles in USDT0. Base and Arbitrum do not require a
+                  second copy of this ERC-8004 identity.
+                </p>
+                <a href="https://www.okx.ai/agents/8355" target="_blank" rel="noreferrer">Open PULSE agent #8355 в†—</a>
+                <code>/xlayer/v1/analysis/spot/premium</code>
+              </article>
+              <article>
+                <span>CDP BAZAAR В· MAINNET</span>
+                <h4>Base and Arbitrum discovery</h4>
+                <p>
+                  The same five logical services are advertised under the
+                  selected network prefix with typed request and response
+                  schemas. Payment uses native USDC on that chain.
+                </p>
+                <code>/base/... В· /arbitrum/...</code>
+              </article>
+              <article>
+                <span>CIRCLE В· ARC TESTNET</span>
+                <h4>Circle Agent Marketplace</h4>
+                <p>
+                  The Arc listing exposes the same five analysis and Risk Guard
+                  services with test USDC. Arc Testnet never exposes Spot or
+                  Autopilot execution.
+                </p>
+                <code>/arc/v1/analysis/spot/premium</code>
+              </article>
+            </div>
+            <div className="docs-callout">
+              <b>Autopilot passes are not a sixth public analysis service</b>
+              <span>
+                $1.50 / 24 hours, $10.50 / 7 days and $45 / 30 days are
+                per-vault AI-entry entitlements purchased inside Autopilot.
+                They control compact entry confirmations; deterministic
+                monitoring and protective exits continue without spending an
+                analysis fee every cycle.
+              </span>
+            </div>
+          </section>
+
           <section id="docs-recover" className="docs-section">
-            <span className="docs-number">07</span>
+            <span className="docs-number">08</span>
             <div className="docs-copy">
               <span className="eyebrow">REPORT HISTORY &amp; RECOVERY</span>
               <h3>Your paying wallet carries report access across devices</h3>
@@ -7873,7 +8103,7 @@ export function DocsWorkspace() {
           </section>
 
           <section id="docs-telegram" className="docs-section">
-            <span className="docs-number">08</span>
+            <span className="docs-number">09</span>
             <div className="docs-copy">
               <span className="eyebrow">TELEGRAM</span>
               <h3>Request in chat, authorize in the Mini App</h3>

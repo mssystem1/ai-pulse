@@ -24,7 +24,7 @@ The layout is designed for desktop and mobile. The main two-column workspace col
 | OKB | X Layer native asset | 18 | Network gas and funding input |
 | USDT0 (USD₮0) | `0x779ded0c9e1022225f8e0630b35a9b54be713736` | 6 | x402 settlement |
 
-Browser prices live in `apps/web/src/balances.ts`: Global/Prediction Base $0.10, Global/Prediction Premium $0.20, and Onchain Pre-Trade Risk Guard $0.05. The browser guard is UX protection; seller middleware and the facilitator remain authoritative.
+Browser prices live in `apps/web/src/balances.ts`: Global/Prediction Base $0.20, Global/Prediction Premium $0.30, and Onchain Pre-Trade Risk Guard $0.15. The browser guard is UX protection; seller middleware and the facilitator remain authoritative.
 
 Balance reads use the configured X Layer RPC with `eth_getBalance` and ERC-20 `balanceOf`. A paid action always performs a fresh read, so a stale header value cannot authorize an underfunded attempt.
 

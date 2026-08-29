@@ -1,22 +1,27 @@
 # PULSE Autopilot Trading Report
 
-Updated: 2026-08-27
+Updated: 2026-08-29
 
-This document is the functional and acceptance report for Autopilot. It distinguishes strategy evaluation from vault administration. Creating, funding, pausing, resuming or withdrawing a vault proves owner control, but does **not** prove automated trading. A complete trading acceptance run must also prove a fresh Premium analysis, a deterministic decision, guarded execution, position reconciliation and an exit.
+This document is the functional and acceptance report for Autopilot. It distinguishes strategy evaluation from vault administration. Creating, funding, pausing, resuming or withdrawing a vault proves owner control, but does **not** prove automated trading. A complete trading acceptance run must also prove a fresh compact signal when an entry candidate exists, a deterministic decision, guarded execution, position reconciliation and an exit.
+
+## 2026-08-29 cost-control amendment
+
+The earlier acceptance runs used a full Premium report for every analysis cycle. That behavior is retired: it consumed roughly `$6–$9/day` in one observed active-vault run and was neither necessary nor commercially sustainable. Current code uses a deterministic new-candle gate, a strict 4,000-input/320-output-token classifier only for a surviving entry candidate, a four-hour pair/timeframe cache, atomic per-vault/global call and USD budgets, and a manually prepaid vault-bound AI pass. Historical transaction evidence below remains valid, but historical references to a full Premium cycle describe the tested release at that time, not the current scheduler.
 
 ## Trading workflow
 
 1. The user selects an analysis pair, timeframe (`15m`, `1H`, `4H` or `1D`), strategy, capital and risk profile.
 2. PULSE maps the analysis asset to an identity-safe token on the selected network and proves an amount-sized OKX Onchain OS route.
 3. The connected owner creates or reuses a guarded vault, signs its policy, allowlists one target asset, configures risk limits, funds it and activates it. Activation does not require a current Buy signal.
-4. Every automation cycle loads 120 current candles and a fresh Premium Global Market report.
-5. A deterministic strategy engine evaluates every documented entry or exit rule. An LLM narrative cannot override a failed rule.
-6. `Hold` is a normal running state: it stores the complete rule evaluation and evidence without sending an entry transaction. The strategy remains active for later cycles.
-7. `Buy` or `Sell` obtains a fresh amount-specific OKX quote. The worker verifies the configured router, zero native value, quote minimum and contract policy, then simulates before broadcasting.
-8. The vault independently enforces executor, adapter, asset, nonce, policy version, expiry, cooldown, per-trade value, daily turnover, exposure, slippage and daily-loss bounds.
-9. The runtime reads the actual settlement and target balances from the vault. A sell uses the actual target balance received, not a setup-time estimate. If its oracle value exceeds the signed per-trade cap, PULSE sells a bounded chunk and retains the exit state for later cooldown-qualified chunks.
-10. A separate one-minute deterministic risk monitor checks the live OKX mark against the active TP/SL and completes latched partial exits. It does not wait for the 15-minute Premium-analysis cycle or depend on xAI. A touched exit is latched while the on-chain cooldown runs, then uses the same guarded oracle, quote, router allowlist, simulation, policy version and nonce path as every other execution.
-11. The UI displays the decision, every passed/waiting rule, Premium bias/confidence, indicators, TP/SL, evidence hash, transaction and cash-flow-adjusted P&L.
+4. Every due cycle loads 120 current candles and ignores a candle already evaluated by that vault.
+5. When no position is open, a free deterministic strategy prefilter decides whether an entry candidate exists. Only a candidate with an active AI pass may consume a compact AI signal. Full charts, Elliott narratives, DeFi sections and report prose are excluded.
+6. A deterministic strategy engine evaluates every documented entry or exit rule. An AI classification cannot override a failed rule.
+7. `Hold` is a normal running state: it stores the complete rule evaluation and evidence without sending an entry transaction. The strategy remains active for later cycles.
+8. `Buy` or `Sell` obtains a fresh amount-specific OKX quote. The worker verifies the configured router, zero native value, quote minimum and contract policy, then simulates before broadcasting.
+9. The vault independently enforces executor, adapter, asset, nonce, policy version, expiry, cooldown, per-trade value, daily turnover, exposure, slippage and daily-loss bounds.
+10. The runtime reads the actual settlement and target balances from the vault. A sell uses the actual target balance received, not a setup-time estimate. If its oracle value exceeds the signed per-trade cap, PULSE sells a bounded chunk and retains the exit state for later cooldown-qualified chunks.
+11. A separate one-minute deterministic risk monitor checks the live OKX mark against the active TP/SL and completes latched partial exits. It does not wait for an AI signal. A touched exit is latched while the on-chain cooldown runs, then uses the same guarded oracle, quote, router allowlist, simulation, policy version and nonce path as every other execution.
+12. The UI displays decision statistics, each passed/waiting rule, compact-signal source/confidence, token/cost budget, pass expiry, TP/SL, evidence hash, transactions, cash-flow-adjusted P&L and a downloadable JSON log.
 
 ## Strategy rules
 
@@ -26,9 +31,9 @@ Purpose: join a confirmed directional trend and exit when the trend structure fa
 
 Entry requires **all** of the following:
 
-- Premium report bias is bullish.
-- Premium confidence meets the owner-signed threshold.
-- Premium regime is `trend_up`.
+- Compact AI bias is bullish.
+- Compact AI confidence meets the owner-signed threshold.
+- Compact AI regime is `trend_up`.
 - Latest close is above SMA20.
 - SMA20 is above SMA50.
 
@@ -36,7 +41,7 @@ Exit requires **any** of the following while the vault owns the target asset:
 
 - Take-profit is reached.
 - Stop-loss is reached.
-- Premium report turns bearish at or above the confidence threshold.
+- A fresh compact signal turns bearish at or above the confidence threshold.
 - Latest close falls below SMA20.
 
 ### Breakout
@@ -45,13 +50,13 @@ Purpose: enter only when both price and participation confirm a range break.
 
 Entry requires **all** of the following:
 
-- Premium report bias is bullish.
-- Premium confidence meets the owner-signed threshold.
+- Compact AI bias is bullish.
+- Compact AI confidence meets the owner-signed threshold.
 - Latest close exceeds the highest high of the preceding 20 candles.
 - Latest volume is at least 1.15 times the preceding 20-candle average.
-- Premium regime is `trend_up` or `transition`.
+- Compact AI regime is `trend_up` or `transition`.
 
-Exit requires **any** of the following: TP, SL, a threshold-qualified bearish Premium report, or a close below SMA20.
+Exit requires **any** of the following: TP, SL, a threshold-qualified bearish compact signal, or a close below SMA20.
 
 ### Mean reversion
 
@@ -59,22 +64,22 @@ Purpose: buy a confirmed pullback, not a falling trend, and exit when price reve
 
 Entry requires **all** of the following:
 
-- Premium report bias is bullish.
-- Premium confidence meets the owner-signed threshold.
-- Price is within 1% of a report support level, or RSI14 is 42 or lower.
-- Premium regime is `range` or `transition`.
+- Compact AI bias is bullish.
+- Compact AI confidence meets the owner-signed threshold.
+- Price is within 1% of compact-signal support, or RSI14 is 42 or lower.
+- Compact AI regime is `range` or `transition`.
 
-Exit requires **any** of the following: TP, SL, a threshold-qualified bearish Premium report, or price reaching SMA20.
+Exit requires **any** of the following: TP, SL, a threshold-qualified bearish compact signal, or price reaching SMA20.
 
 ## Risk profiles
 
 | Profile | Max/trade | Daily loss | Target exposure | Daily turnover | Max slippage | Cooldown | Min confidence |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| Conservative | 3% | 2% | 35% | 60% | 0.5% | 15 min | 80% |
-| Balanced | 5% | 3% | 50% | 100% | 1.0% | 5 min | 70% |
-| Active | 10% | 5% | 75% | 200% | 1.5% | 2 min | 60% |
+| Conservative | 25% | 2% | 25% | 60% | 0.5% | 15 min | 80% |
+| Balanced | 50% | 3% | 50% | 100% | 1.0% | 5 min | 70% |
+| Active | 100% | 5% | 100% | 200% | 1.5% | 2 min | 60% |
 
-Percentages are converted to settlement-token atomic units by the UI and committed to the vault. The contract caps slippage at 10% and daily loss at 30% even if a malformed client attempts a larger value.
+Percentages are converted to settlement-token atomic units by the UI and committed to the vault. Active may use all deposited spot capital in one Buy; this creates no leverage and borrows nothing. The contract caps slippage at 10% and daily loss at 30% even if a malformed client attempts a larger value.
 
 ## Contract functions and authority
 
@@ -93,12 +98,12 @@ Registry administration controls approved executors, adapters, keepers and the g
 
 ## Evidence and reporting
 
-Each cycle records up to 100 evaluations per strategy in private KV-backed strategy state. An execution evidence payload is stored before a trade and its hash is committed in the vault transaction. The report contains:
+Each cycle updates lifetime evaluation/Buy/Sell/Hold/failure counters and retains the latest 100 detailed evaluations per strategy in private KV-backed state. This keeps multi-week statistics without unbounded records. An execution evidence payload is stored before a trade and its hash is committed in the vault transaction. The report contains:
 
 - exact strategy and market/timeframe;
 - action (`Buy`, `Sell` or `Hold`) and reason;
 - observed value and required value for every rule;
-- Premium report and technical structure used;
+- compact signal, deterministic technical structure, source, token usage and cost budget status;
 - OKX quote and signed policy hash for executions;
 - evidence hash and transaction hash;
 - current settlement/target balances, mark-to-market value and cash-flow-adjusted P&L.

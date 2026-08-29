@@ -95,6 +95,21 @@ describe("PULSE API", () => {
     assert.equal(res.status, 400);
   });
 
+  it("rejects an invalid Autopilot pass target before x402 payment", async () => {
+    const malformed = await jfetch("/xlayer/v1/autopilot/pass/24h", {
+      method: "POST",
+      body: JSON.stringify({ owner: "bad", vault: ADDRESS }),
+    });
+    assert.equal(malformed.res.status, 400);
+
+    const unknownVault = await jfetch("/xlayer/v1/autopilot/pass/24h", {
+      method: "POST",
+      body: JSON.stringify({ owner: ADDRESS, vault: `0x${"1".repeat(40)}` }),
+    });
+    assert.equal(unknownVault.res.status, 404);
+    assert.doesNotMatch(JSON.stringify(unknownVault.json), /payment required/i);
+  });
+
   it("healthz", async () => {
     const { res, json } = await jfetch("/healthz");
     assert.equal(res.status, 200);
@@ -157,9 +172,13 @@ describe("PULSE API", () => {
     assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
     assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));
     assert.equal(services.some((item) => item.path === "/base/v1/token/scan"), false);
-    assert.equal(json.asp.version, "6.0.0");
+    assert.equal(json.asp.version, "6.1.0");
     assert.ok(json.asp.tags.includes("polymarket"));
     assert.ok(json.asp.tags.includes("multichain"));
+    assert.equal(json.asp.discovery.okxAi.publicUrl, "https://www.okx.ai/agents/8355");
+    assert.deepEqual(json.asp.discovery.cdpBazaar.servicePrefixes, ["/base", "/arbitrum"]);
+    assert.equal(json.asp.discovery.circleAgentMarketplace.servicePrefix, "/arc");
+    assert.equal(json.asp.autopilotAiPass.plans[0].priceUsd, 1.5);
     const publicPaths = (json.asp.services as Array<{ path: string }>).map((item) => item.path);
     for (const hidden of ["/v1/wallet/scan", "/v1/market/pulse", "/v1/swap/quote", "/v1/analysis/fused/standard", "/v1/analysis/fused/premium", "/v1/analysis/divergence", "/v1/preflight/event-risk"]) {
       assert.equal(publicPaths.includes(hidden), false, hidden);

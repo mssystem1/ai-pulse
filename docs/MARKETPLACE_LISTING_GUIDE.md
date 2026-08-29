@@ -7,7 +7,7 @@ This is an operator guide. It does not authorize a deployment, listing submissio
 Prepare one versioned package from the deployed product:
 
 - Name: PULSE.
-- Version: 6.0.0.
+- Version: 6.1.0.
 - OKX.AI ASP category: Trading. Circle positioning remains Financial analysis / market intelligence.
 - Square PNG logo and SVG brand asset served over public HTTPS.
 - Short and long descriptions from `/v1/metadata`.
@@ -89,6 +89,8 @@ If Circle has no public self-service publication surface at submission time, the
 
 Agent #8355 is an existing X Layer ASP identity. Update it; do not create a replacement unless OKX explicitly requires migration.
 
+Public record: https://www.okx.ai/agents/8355
+
 ### Preconditions
 
 - Final non-preview API HTTPS origin is healthy.
@@ -113,13 +115,15 @@ Agent #8355 is an existing X Layer ASP identity. Update it; do not create a repl
 
 Recommended OKX.AI service rows should use X Layer URLs because OKX’s x402 facilitator and marketplace payment validation are X Layer-focused:
 
-- Global Market Quick Plan — `/xlayer/v1/analysis/spot/standard` — $0.10.
-- Global Market Pro Strategy — `/xlayer/v1/analysis/spot/premium` — $0.20.
-- Prediction Market Quick View — `/xlayer/v1/analysis/prediction/standard` — $0.10.
-- Prediction Market Pro Analysis — `/xlayer/v1/analysis/prediction/premium` — $0.20.
-- Onchain Pre-Trade Risk Guard — `/xlayer/v1/preflight` — $0.05.
+- Global Market Quick Plan — `/xlayer/v1/analysis/spot/standard` — $0.20.
+- Global Market Pro Strategy — `/xlayer/v1/analysis/spot/premium` — $0.30.
+- Prediction Market Quick View — `/xlayer/v1/analysis/prediction/standard` — $0.20.
+- Prediction Market Pro Analysis — `/xlayer/v1/analysis/prediction/premium` — $0.30.
+- Onchain Pre-Trade Risk Guard — `/xlayer/v1/preflight` — $0.15.
 
 Do not publish Fused, Divergence, Event-risk, route tickets, Market/Limit execution or Autopilot evaluation as extra marketplace services. They are internal capabilities or next actions inside the Analyze → Act workflow.
+
+The Autopilot AI Pass is also not a sixth marketplace analysis service. It is a per-vault in-product entitlement for compact AI entry confirmations: $1.50 for 24 hours, $10.50 for 7 days or $45.00 for 30 days. Expiry blocks new AI-confirmed entries while deterministic monitoring and protective exits continue.
 
 Do not place Base, Arbitrum, or Arc payment endpoints under an OKX-settled service description. Those networks use their own providers and discovery channels.
 

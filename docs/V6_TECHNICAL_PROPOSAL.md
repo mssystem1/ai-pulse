@@ -4,6 +4,8 @@ Status: implementation specification
 Date: 2026-08-20  
 Scope: Global Market, Prediction Market, multichain payments, spot execution, Autopilot, Telegram, and product documentation
 
+> **Operational amendment · 2026-08-29:** routine Autopilot cycles no longer buy or generate full Premium reports. A free deterministic new-candle gate runs first; only a surviving entry candidate may use a compact, schema-bound AI market-state confirmation. Each vault requires a manually prepaid pass ($1.50/24h, $10.50/7d, or $45/30d), with up to three compact confirmations per covered day plus stricter global/per-vault call and USD ceilings. Renewal extends the active expiry. On expiry, new entries Hold while deterministic TP/SL, structural exits and owner controls continue. Any later sections describing a full Premium report per scheduler cycle document the earlier design and are superseded by this amendment.
+
 ## 1. Purpose
 
 This proposal defines the architecture and delivery contract for the nine requested PULSE updates. It is grounded in the existing monorepo and preserves its current strengths: live OKX and Polymarket evidence, network-aware x402 settlement, durable paid jobs, private report storage, connected browser wallets, and server-side provider credentials.

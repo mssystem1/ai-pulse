@@ -13,7 +13,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { put } from "@vercel/blob";
 import { buildMarketContext, getTicker } from "@pulse/market";
-import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedSpotAnalysis } from "@pulse/analysis";
+import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -22,8 +22,11 @@ import { listV6Activity, recordV6Activity } from "./v6Store.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
-import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
+import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
 import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
+import { observeProvider, recordAiUsage } from "./telemetry.js";
+import { deliverTelegramReportDurably } from "./telegram.js";
 
 type StrategyEvaluation = {
   id: string;
@@ -81,7 +84,22 @@ type Strategy = {
   lastEntryPrice?: number;
   lastExitPrice?: number;
   realizedPositionPnlPct?: number;
+  lastEvaluatedCandleTs?: number;
+  lastAiSignalAt?: string;
+  lastAiSignalCandleTs?: number;
+  aiSignalSource?: "live" | "cache" | "deterministic";
+  aiBudgetDay?: string;
+  aiCallsToday?: number;
+  aiActualCostTodayUsd?: number;
+  aiReservedCostTodayUsd?: number;
+  aiBudgetStatus?: string;
+  aiNextEligibleAt?: string;
   evaluations?: StrategyEvaluation[];
+  evaluationCount?: number;
+  holdCount?: number;
+  filledBuyCount?: number;
+  filledSellCount?: number;
+  failureCount?: number;
 };
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const NATIVE_TOKEN = /^0x[eE]{40}$/;
@@ -178,7 +196,102 @@ async function releaseStrategyLease(strategyId: string, scope: "analysis" | "exe
   }
   await kv(["EVAL", "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end", "1", key, token]);
 }
+const localSignalCache = new Map<string, { expiresAt: number; value: AutopilotSignalResult }>();
+const signalCacheKey = (pair: string, timeframe: string) => `pulse:v6:autopilot:signal:${pair}:${timeframe}`;
+async function cachedAutopilotSignal(pair: string, timeframe: string) {
+  const key = signalCacheKey(pair, timeframe);
+  const local = localSignalCache.get(key);
+  if (local && local.expiresAt > Date.now()) return local.value;
+  if (!kvConfigured()) return null;
+  const raw = await kv(["GET", key]).catch(() => null);
+  if (typeof raw !== "string") return null;
+  try {
+    const parsed = JSON.parse(raw) as { expiresAt?: number; value?: AutopilotSignalResult };
+    if (!parsed.value || !parsed.expiresAt || parsed.expiresAt <= Date.now()) return null;
+    localSignalCache.set(key, { expiresAt: parsed.expiresAt, value: parsed.value });
+    return parsed.value;
+  } catch {
+    return null;
+  }
+}
+async function cacheAutopilotSignal(pair: string, timeframe: string, value: AutopilotSignalResult, ttlMs: number) {
+  const key = signalCacheKey(pair, timeframe);
+  const entry = { expiresAt: Date.now() + ttlMs, value };
+  localSignalCache.set(key, entry);
+  if (kvConfigured()) await kv(["SET", key, JSON.stringify(entry), "EX", Math.max(1, Math.ceil(ttlMs / 1000))]);
+}
 let memory: Strategy[] = [];
+export type AutopilotPass = {
+  owner: string;
+  network: Network;
+  vault: string;
+  purchasedAt: string;
+  expiresAt: string;
+  signalLimit: number;
+  signalsUsed: number;
+  telegramDelivery?: string;
+  expiryWarningSentAt?: string;
+  expiredNoticeSentAt?: string;
+};
+const localPasses = new Map<string, AutopilotPass>();
+const passKey = (network: Network, vault: string) => `pulse:v6:autopilot:pass:${network}:${vault.toLowerCase()}`;
+export async function getAutopilotPass(network: Network, vault: string): Promise<AutopilotPass | null> {
+  const key = passKey(network, vault);
+  if (!kvConfigured()) return localPasses.get(key) || null;
+  const raw = await kv(["GET", key]).catch(() => null);
+  if (typeof raw !== "string") return localPasses.get(key) || null;
+  try {
+    const parsed = JSON.parse(raw) as AutopilotPass;
+    localPasses.set(key, parsed);
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+export async function autopilotPassTargetExists(input: { owner: string; network: Network; vault: string }) {
+  return (await list()).some((item) =>
+    item.network === input.network
+    && item.vault.toLowerCase() === input.vault.toLowerCase()
+    && item.owner.toLowerCase() === input.owner.toLowerCase(),
+  );
+}
+async function saveAutopilotPass(value: AutopilotPass) {
+  const key = passKey(value.network, value.vault);
+  localPasses.set(key, value);
+  if (kvConfigured()) await kv(["SET", key, JSON.stringify(value), "EX", Math.max(172800, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000) + 2_592_000)]);
+}
+export async function grantAutopilotPass(input: { owner: string; network: Network; vault: string; days: 1 | 7 | 30; telegramDelivery?: string }) {
+  const strategy = (await list()).find((item) => item.network === input.network && item.vault.toLowerCase() === input.vault.toLowerCase() && item.owner.toLowerCase() === input.owner.toLowerCase());
+  if (!strategy) throw new Error("The selected vault is not a registered Autopilot owned by this wallet on the selected network");
+  const existing = await getAutopilotPass(input.network, input.vault);
+  const now = Date.now();
+  const extendsActive = existing && Date.parse(existing.expiresAt) > now;
+  const startsAt = extendsActive ? Date.parse(existing!.expiresAt) : now;
+  const value: AutopilotPass = {
+    owner: input.owner.toLowerCase(), network: input.network, vault: input.vault.toLowerCase(),
+    purchasedAt: new Date(now).toISOString(),
+    expiresAt: new Date(startsAt + input.days * 86_400_000).toISOString(),
+    signalLimit: (extendsActive ? existing!.signalLimit - existing!.signalsUsed : 0) + input.days * 3,
+    signalsUsed: 0,
+    ...(input.telegramDelivery ? { telegramDelivery: input.telegramDelivery } : existing?.telegramDelivery ? { telegramDelivery: existing.telegramDelivery } : {}),
+  };
+  await saveAutopilotPass(value);
+  strategy.lastEvaluatedCandleTs = undefined;
+  strategy.lastRunAt = undefined;
+  strategy.aiBudgetStatus = "ready";
+  strategy.updatedAt = new Date().toISOString();
+  await save((await list()).map((item) => item.id === strategy.id ? strategy : item), "runtime");
+  return value;
+}
+async function consumeAutopilotPassSignal(strategy: Strategy) {
+  const value = await getAutopilotPass(strategy.network, strategy.vault);
+  const now = Date.now();
+  if (!value || value.owner !== strategy.owner.toLowerCase() || Date.parse(value.expiresAt) <= now) return { ok: false as const, reason: "pass_expired", pass: value };
+  if (value.signalsUsed >= value.signalLimit) return { ok: false as const, reason: "signals_exhausted", pass: value };
+  value.signalsUsed += 1;
+  await saveAutopilotPass(value);
+  return { ok: true as const, pass: value };
+}
 const POTENTIAL_GAINER_PAIRS = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT", "XRP-USDT", "ADA-USDT", "LTC-USDT", "PEPE-USDT", "SHIB-USDT", "WIF-USDT", "TURBO-USDT", "MOODENG-USDT"];
 const potentialGainerCache = new Map<string, { expiresAt: number; value: unknown[] }>();
 const potentialGainerInflight = new Map<string, Promise<unknown[]>>();
@@ -592,6 +705,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       activityByNetwork.set(network, await listV6Activity(owner, network));
     }));
     const views = await Promise.all(strategies.map(async (strategy) => {
+      const aiPass = await getAutopilotPass(strategy.network, strategy.vault);
       try {
         const { publicClient } = clients(strategy.network);
         const [chainState, ticker] = await Promise.all([
@@ -617,12 +731,28 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
           .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
         const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
         const reconciled = reconcileStrategyExecution(strategy, activityByNetwork.get(strategy.network) || [], targetBalance);
-        return { ...reconciled, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
+        return { ...reconciled, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
-        return { ...strategy, telemetryError: error instanceof Error ? error.message : String(error) };
+        return { ...strategy, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
       }
     }));
-    res.json({ strategies: views, strategyCatalog: AUTOPILOT_STRATEGY_CATALOG, persistence: kvCircuitStatus() });
+    res.json({
+      strategies: views,
+      strategyCatalog: AUTOPILOT_STRATEGY_CATALOG,
+      persistence: kvCircuitStatus(),
+      aiPolicy: {
+        mode: "event_driven_compact_signal",
+        fullPremiumReportsPerCycle: false,
+        deterministicRiskMonitoring: true,
+        minSignalIntervalMs: cfg.AUTOPILOT_AI_MIN_INTERVAL_MS,
+        sharedSignalTtlMs: cfg.AUTOPILOT_AI_SIGNAL_TTL_MS,
+        maxCallsPerVaultDay: cfg.AUTOPILOT_AI_MAX_CALLS_PER_VAULT_DAY,
+        maxCallsGlobalDay: cfg.AUTOPILOT_AI_MAX_CALLS_GLOBAL_DAY,
+        maxUsdPerVaultDay: cfg.AUTOPILOT_AI_MAX_USD_PER_VAULT_DAY,
+        maxUsdGlobalDay: cfg.AUTOPILOT_AI_MAX_USD_GLOBAL_DAY,
+        commercialPass: { enabled: true, renewal: "prepaid_manual", price24hUsd: cfg.PRICE_AUTOPILOT_PASS_24H, price7dUsd: cfg.PRICE_AUTOPILOT_PASS_7D, price30dUsd: cfg.PRICE_AUTOPILOT_PASS_30D, signalsPerDay: 3, expiryBehavior: "hold_new_entries_keep_risk_exits" },
+      },
+    });
   }));
   router.post("/v1/autopilot/strategies", asyncRoute(async (req, res) => {
     const parsed = StrategySchema.safeParse(req.body);
@@ -701,7 +831,17 @@ async function evidence(strategy: Strategy, payload: unknown) {
   return { hash, url: `kv:${key}` };
 }
 function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
-  strategy.evaluations = [...(strategy.evaluations || []), evaluation].slice(-100);
+  const previous = strategy.evaluations || [];
+  strategy.evaluationCount = (strategy.evaluationCount ?? previous.length) + 1;
+  strategy.holdCount = (strategy.holdCount ?? previous.filter((entry) => entry.action === "hold" && entry.status === "held").length)
+    + (evaluation.action === "hold" && evaluation.status === "held" ? 1 : 0);
+  strategy.filledBuyCount = (strategy.filledBuyCount ?? previous.filter((entry) => entry.action === "buy" && entry.status === "filled").length)
+    + (evaluation.action === "buy" && evaluation.status === "filled" ? 1 : 0);
+  strategy.filledSellCount = (strategy.filledSellCount ?? previous.filter((entry) => entry.action === "sell" && entry.status === "filled").length)
+    + (evaluation.action === "sell" && evaluation.status === "filled" ? 1 : 0);
+  strategy.failureCount = (strategy.failureCount ?? previous.filter((entry) => entry.status === "failed").length)
+    + (evaluation.status === "failed" ? 1 : 0);
+  strategy.evaluations = [...previous, evaluation].slice(-100);
 }
 export async function runAutopilotCycle(cfg: AppConfig) {
   {
@@ -714,7 +854,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
     const items = await list();
     const analysisInterval = Math.max(
       60_000,
-      Number(process.env.AUTOPILOT_ANALYSIS_INTERVAL_MS || 900000) || 900000,
+      Number(process.env.AUTOPILOT_ANALYSIS_INTERVAL_MS || 300000) || 300000,
     );
     const riskInterval = Math.max(
       30_000,
@@ -781,6 +921,21 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           settlementDecimals,
           settlementBalance,
         ] = await readRuntime();
+        if (mode === "analysis") {
+          const aiPass = await getAutopilotPass(s.network, s.vault);
+          if (aiPass?.telegramDelivery) {
+            const remainingMs = Date.parse(aiPass.expiresAt) - now;
+            if (remainingMs > 0 && remainingMs <= 2 * 60 * 60_000 && !aiPass.expiryWarningSentAt) {
+              await deliverTelegramReportDurably(`autopilot-pass-warning:${s.network}:${s.vault}:${aiPass.expiresAt}`, aiPass.telegramDelivery, `PULSE Autopilot pass for ${s.pair} expires in ${Math.max(1, Math.ceil(remainingMs / 60_000))} minutes. Renew to keep AI-assisted new entries available. TP/SL and exits continue even without a pass.`, `${cfg.BASE_URL.replace(/\/$/, "")}/autopilot`);
+              aiPass.expiryWarningSentAt = new Date().toISOString();
+              await saveAutopilotPass(aiPass);
+            } else if (remainingMs <= 0 && !aiPass.expiredNoticeSentAt) {
+              await deliverTelegramReportDurably(`autopilot-pass-expired:${s.network}:${s.vault}:${aiPass.expiresAt}`, aiPass.telegramDelivery, `PULSE Autopilot pass for ${s.pair} has expired. New entries now Hold. Deterministic TP/SL, exits, pause and withdrawal remain active.`, `${cfg.BASE_URL.replace(/\/$/, "")}/autopilot`);
+              aiPass.expiredNoticeSentAt = new Date().toISOString();
+              await saveAutopilotPass(aiPass);
+            }
+          }
+        }
         if (paused) {
           s.lastDecision = "hold_paused";
           if (mode === "analysis") s.lastRunAt = new Date().toISOString();
@@ -856,36 +1011,141 @@ export async function runAutopilotCycle(cfg: AppConfig) {
 
         if (!decision) {
           analysisAttempted = true;
-          if (!cfg.hasXaiKey) throw new Error("Premium analysis is not configured; deterministic TP/SL monitoring remains active");
           const market = await buildMarketContext({
             instId: s.pair,
             timeframe: s.timeframe,
             candleLimit: 120,
           });
-          const report = await runPreparedSpotAnalysis(
-            {
-              apiKey: cfg.XAI_API_KEY,
-              baseUrl: cfg.XAI_BASE_URL,
-              model: cfg.GROK_MODEL,
-            },
-            {
-              instId: s.pair,
-              timeframe: s.timeframe,
-              tier: "premium",
-              lang: "en",
-              userNote: s.policy.strategy,
-              maxInputTokens: cfg.GROK_MAX_INPUT_PREMIUM,
-              maxOutputTokens: cfg.GROK_MAX_OUTPUT_PREMIUM,
-              reasoningEffort: cfg.GROK_REASONING_PREMIUM,
-            },
-            market,
-          );
+          const candleTs = market.candles.at(-1)?.ts || 0;
+          if (s.lastEvaluatedCandleTs === candleTs) {
+            s.lastDecision = "hold_same_candle";
+            s.lastRunAt = new Date().toISOString();
+            s.lastError = undefined;
+            continue;
+          }
+          s.lastEvaluatedCandleTs = candleTs;
           const technical = buildTechnicalStructure(market.candles);
-          executionPlan = buildSpotExecutionPlan({ instId: s.pair, timeframe: s.timeframe, tier: "premium", lastPrice: market.ticker.last, analysis: report.analysis, technical });
-          const enrichedReport = { ...report, technical, executionPlan };
-          decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: enrichedReport, minConfidence: s.minConfidence, hasPosition: targetBalance > 0n, exitPending: s.exitPending, activeTakeProfit: s.activeTakeProfit, activeStopLoss: s.activeStopLoss });
           executionPrice = market.ticker.last;
-          evidenceContext = enrichedReport;
+          const neutralAnalysis = { bias: "neutral", confidence: 0, regime: "transition", keyLevels: { support: [] as number[], resistance: [] as number[] } };
+
+          // An open position never needs a new AI call to remain protected or
+          // to react to deterministic structure failure.
+          if (targetBalance > 0n) {
+            const report = { analysis: neutralAnalysis };
+            decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report, minConfidence: s.minConfidence, hasPosition: true, exitPending: s.exitPending, activeTakeProfit: s.activeTakeProfit, activeStopLoss: s.activeStopLoss });
+            s.aiSignalSource = "deterministic";
+            s.aiBudgetStatus = "not_required_for_open_position";
+            evidenceContext = { mode: "deterministic_position_monitor", technical };
+          } else {
+            const candidate = evaluateAutopilotEntryCandidate({ strategyType, candles: market.candles });
+            if (!candidate.candidate) {
+              decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, minConfidence: s.minConfidence, hasPosition: false });
+              s.aiSignalSource = "deterministic";
+              s.aiBudgetStatus = "candidate_not_ready";
+              evidenceContext = { mode: "deterministic_entry_prefilter", candidate, technical };
+            } else {
+              const pass = await getAutopilotPass(s.network, s.vault);
+              const passReady = Boolean(pass && Date.parse(pass.expiresAt) > Date.now() && pass.signalsUsed < pass.signalLimit);
+              let signal = passReady ? await cachedAutopilotSignal(s.pair, s.timeframe) : null;
+              if (!passReady) {
+                s.aiSignalSource = "deterministic";
+                s.aiBudgetStatus = pass && Date.parse(pass.expiresAt) > Date.now() ? "signals_exhausted" : "pass_expired";
+              } else if (signal) {
+                s.aiSignalSource = "cache";
+                s.aiBudgetStatus = "ready";
+              } else {
+                const lastSignalAt = Date.parse(s.lastAiSignalAt || "");
+                const nextEligible = Number.isFinite(lastSignalAt) ? lastSignalAt + cfg.AUTOPILOT_AI_MIN_INTERVAL_MS : 0;
+                s.aiNextEligibleAt = nextEligible > Date.now() ? new Date(nextEligible).toISOString() : undefined;
+                if (nextEligible > Date.now()) {
+                  s.aiBudgetStatus = "cooldown";
+                } else if (!cfg.hasXaiKey) {
+                  s.aiBudgetStatus = "provider_not_configured";
+                } else {
+                  const signalLeaseId = `signal:${s.pair}:${s.timeframe}`;
+                  const signalLease = await acquireStrategyLease(signalLeaseId, "analysis");
+                  if (!signalLease) {
+                    signal = await cachedAutopilotSignal(s.pair, s.timeframe);
+                    s.aiBudgetStatus = signal ? "ready" : "signal_generation_in_progress";
+                    s.aiSignalSource = signal ? "cache" : "deterministic";
+                  } else {
+                    try {
+                      signal = await cachedAutopilotSignal(s.pair, s.timeframe);
+                      if (!signal) {
+                        const estimatedCost = estimatedAutopilotSignalCostUsd({
+                          maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT,
+                          maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT,
+                          inputUsdPerMillion: cfg.XAI_INPUT_COST_PER_MILLION_USD,
+                          outputUsdPerMillion: cfg.XAI_OUTPUT_COST_PER_MILLION_USD,
+                        });
+                        const reservation = await reserveAutopilotAiBudget({
+                          strategyId: s.id,
+                          reservationId: `${s.pair}:${s.timeframe}:${candleTs}`,
+                          estimatedCostUsd: estimatedCost,
+                          limits: {
+                            maxCallsPerVaultDay: cfg.AUTOPILOT_AI_MAX_CALLS_PER_VAULT_DAY,
+                            maxCallsGlobalDay: cfg.AUTOPILOT_AI_MAX_CALLS_GLOBAL_DAY,
+                            maxUsdPerVaultDay: cfg.AUTOPILOT_AI_MAX_USD_PER_VAULT_DAY,
+                            maxUsdGlobalDay: cfg.AUTOPILOT_AI_MAX_USD_GLOBAL_DAY,
+                          },
+                        });
+                        if (s.aiBudgetDay !== reservation.day) {
+                          s.aiBudgetDay = reservation.day;
+                          s.aiCallsToday = 0;
+                          s.aiActualCostTodayUsd = 0;
+                          s.aiReservedCostTodayUsd = 0;
+                        }
+                        s.aiCallsToday = (s.aiCallsToday || 0) + 1;
+                        s.aiReservedCostTodayUsd = (s.aiReservedCostTodayUsd || 0) + reservation.reservedCostUsd;
+                        signal = await observeProvider("xai", "autopilot_compact_signal", () => runPreparedAutopilotSignal(
+                          { apiKey: cfg.XAI_API_KEY, baseUrl: cfg.XAI_BASE_URL, model: cfg.GROK_AUTOPILOT_MODEL },
+                          { instId: s.pair, timeframe: s.timeframe, strategyType, market, maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT, maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT },
+                        ));
+                        const usage = signal.usage;
+                        if (usage) {
+                          const actualCost = usage.costUsd ?? actualAutopilotSignalCostUsd({ promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, cachedTokens: usage.cachedTokens, inputUsdPerMillion: cfg.XAI_INPUT_COST_PER_MILLION_USD, cachedInputUsdPerMillion: cfg.XAI_CACHED_INPUT_COST_PER_MILLION_USD, outputUsdPerMillion: cfg.XAI_OUTPUT_COST_PER_MILLION_USD });
+                          s.aiActualCostTodayUsd = (s.aiActualCostTodayUsd || 0) + actualCost;
+                          recordAiUsage(usage.promptTokens, usage.completionTokens, actualCost, usage.cachedTokens, usage.reasoningTokens);
+                        }
+                        s.lastAiSignalAt = signal.generatedAt;
+                        s.lastAiSignalCandleTs = signal.candleTs;
+                        await cacheAutopilotSignal(s.pair, s.timeframe, signal, cfg.AUTOPILOT_AI_SIGNAL_TTL_MS);
+                        s.aiSignalSource = "live";
+                      } else {
+                        s.aiSignalSource = "cache";
+                      }
+                      s.aiBudgetStatus = "ready";
+                    } catch (error) {
+                      if (error instanceof AutopilotAiBudgetExceededError) s.aiBudgetStatus = error.dimension;
+                      else throw error;
+                    } finally {
+                      await releaseStrategyLease(signalLeaseId, "analysis", signalLease).catch(() => undefined);
+                    }
+                  }
+                }
+              }
+
+              if (signal) {
+                const entitlement = await consumeAutopilotPassSignal(s);
+                if (!entitlement.ok) {
+                  signal = null;
+                  s.aiSignalSource = "deterministic";
+                  s.aiBudgetStatus = entitlement.reason;
+                }
+              }
+              if (signal) {
+                const analysis = { bias: signal.signal.bias, confidence: signal.signal.confidence, regime: signal.signal.regime, keyLevels: { support: [...signal.signal.support], resistance: [...signal.signal.resistance] } };
+                executionPlan = buildSpotExecutionPlan({ instId: s.pair, timeframe: s.timeframe, tier: "premium", lastPrice: market.ticker.last, analysis, technical });
+                const compactReport = { analysis, executionPlan };
+                decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: compactReport, minConfidence: s.minConfidence, hasPosition: false });
+                evidenceContext = { mode: "event_driven_compact_signal", signal, candidate, technical, executionPlan };
+              } else {
+                decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, minConfidence: s.minConfidence, hasPosition: false });
+                decision = { ...decision, reason: `Hold: AI confirmation unavailable (${s.aiBudgetStatus || "unknown"}); deterministic protection remains active.` };
+                evidenceContext = { mode: "cost_guard_hold", status: s.aiBudgetStatus, candidate, technical };
+              }
+            }
+          }
         }
 
         const evaluationBase = { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(), strategyType, action: decision.action, reason: decision.reason, bias: decision.bias, confidence: decision.confidence, metrics: decision.metrics, rules: decision.rules };

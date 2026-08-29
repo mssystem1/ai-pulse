@@ -61,10 +61,10 @@ export async function fetchWalletBalances(address: string): Promise<WalletBalanc
 
 /** Service → required USDT0 (human) */
 export const PRICE_USDT0: Record<string, number> = {
-  base: 0.10,
-  premium: 0.20,
-  token: 0.01,
-  preflight: 0.05,
+  base: 0.20,
+  premium: 0.30,
+  token: 0.20,
+  preflight: 0.15,
 };
 
 export function assertUsdt0Enough(

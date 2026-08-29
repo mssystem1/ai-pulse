@@ -25,4 +25,8 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "Initial Autopilot deposit"), "自动驾驶初始存款");
   assert.equal(localizeUiText("zh", "Actual entry / exit"), "实际入场价 / 出场价");
   assert.equal(localizeUiText("zh", "is the timestamped OKX public spot last price."), "是带时间戳的 OKX 公共现货最新价。");
+  assert.equal(localizeUiText("zh", "AI ENTRY PASS"), "AI 入场通行证");
+  assert.equal(localizeUiText("zh", "2d 3h remaining"), "剩余 2 天 3 小时");
+  assert.equal(localizeUiText("zh", "3 compact AI confirmations remaining"), "剩余 3 次精简 AI 确认");
+  assert.equal(localizeUiText("zh", "Export full JSON log"), "导出完整 JSON 日志");
 });

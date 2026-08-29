@@ -34,7 +34,7 @@ Never put the bot token in `VITE_*`, frontend configuration, source control, KV,
 5. If BotFather offers a menu button, set it to open the same URL.
 6. Add the web origin to the application's allowed origins and wallet-connector configuration.
 
-PULSE appends `source=telegram`, a requested service, and a seven-day chat-bound HMAC delivery capability to Mini App links. The capability can route a completed report to that chat; it cannot authorize a payment, wallet action, trade, or report purchase. The web application still obtains a normal wallet connection and x402 authorization.
+PULSE appends `source=telegram`, a requested service, and a 35-day chat-bound HMAC delivery capability to Mini App links. The lifetime covers the longest 30-day Autopilot pass plus its reminder window. The capability can route a completed report or Autopilot expiry reminder to that chat; it cannot authorize a payment, wallet action, trade, or report purchase. The web application still obtains a normal wallet connection and x402 authorization.
 
 ## 4. Configure commands
 

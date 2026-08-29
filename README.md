@@ -126,7 +126,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 ### Link previews and search metadata
 
-The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Search engines, Telegram, X, Slack, and other link unfurlers use the versioned 1200×630 PULSE V6 social card at `apps/web/public/og-image-v6.png`. Updating these local files does not refresh any remote crawler cache; deployment and external cache invalidation remain explicit operator actions.
+The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X now reference the exact same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v7.png`; changing the filename prevents one platform from retaining an older image while another uses the current card. Updating these local files does not refresh any remote crawler cache until the next deployment and crawler refresh.
 
 ## Networks and payments
 
@@ -148,11 +148,14 @@ The web UI uses the familiar **Base** and **Premium** tier labels. Public agent 
 | Service | Price |
 | --- | ---: |
 | Free OKX and Polymarket discovery | Free |
-| Global Market Quick Plan | $0.10 |
-| Global Market Pro Strategy | $0.20 |
-| Prediction Market Quick View | $0.10 |
-| Prediction Market Pro Analysis | $0.20 |
-| Onchain Pre-Trade Risk Guard | $0.05 |
+| Global Market Quick Plan | $0.20 |
+| Global Market Pro Strategy | $0.30 |
+| Prediction Market Quick View | $0.20 |
+| Prediction Market Pro Analysis | $0.30 |
+| Onchain Pre-Trade Risk Guard | $0.15 |
+| Autopilot AI Pass — 24 hours / one vault | $1.50 |
+| Autopilot AI Pass — 7 days / one vault | $10.50 |
+| Autopilot AI Pass — 30 days / one vault | $45.00 |
 
 Prices are configured by environment variables and published through `/v1/metadata`. A paid request is rejected before the payment challenge when its schema is invalid or its required Polymarket market/order-book evidence is unavailable.
 
@@ -451,7 +454,17 @@ sequenceDiagram
 
 Autopilot capital is the vault’s actual settlement-token balance. It is separate from the connected wallet’s Spot capital and from every other Autopilot vault. A Hold does not disable a strategy: later evaluations may Buy; a held position may Hold, partially Sell, fully Sell, and later Buy again if the unchanged owner policy permits it. The one-minute deterministic risk path does not wait for xAI before enforcing an already configured TP/SL.
 
-For a new Autopilot, **Initial deposit** is the one-time amount transferred from the connected wallet during creation and used to calculate the first signed trade, exposure, turnover, and loss limits. **Add funds** is a later owner top-up to an existing vault; it changes the vault balance but does not silently widen an already signed policy. Save and restart the selected strategy when those limits should be recalculated from the larger capital base.
+For a new Autopilot, **Initial deposit** is the single amount transferred from the connected wallet during creation and used to calculate the first signed trade, exposure, turnover, and loss limits. The user does not also use Add funds. **Add funds** appears only for an already-created vault and is an optional later owner top-up; it changes the vault balance but does not silently widen an already signed policy. Save the selected strategy when those limits should be recalculated from the larger capital base.
+
+### Cost-controlled Autopilot AI
+
+Autopilot does not generate a full Premium report on every cycle. The runtime has three distinct layers:
+
+1. A one-minute deterministic risk path protects an open position and completes latched exits without xAI.
+2. A five-minute scheduler evaluates only a newly closed candle. A deterministic trend, breakout, or mean-reversion prefilter rejects non-candidates without xAI.
+3. Only a surviving entry candidate may use one compact 4,000-input/320-output-token classifier. Signals are cached by pair and timeframe for four hours, while hard per-vault and global daily call/USD budgets fail closed to Hold.
+
+Each owner-controlled vault uses a manually prepaid AI pass. One covered day costs **$1.50** and adds up to three compact entry confirmations; seven and 30-day options are exact multiples. Renewing extends the current expiry. Two hours before expiry the UI becomes urgent, and a purchase made through the Telegram Mini App also registers an expiring chat reminder. When the pass expires or its confirmations are exhausted, new entries Hold. Existing TP/SL, deterministic structure exits, pause, close and owner withdrawal continue normally and never require another payment.
 
 Spot and Autopilot dashboards distinguish four prices. The owner-defined **trigger** only decides when execution may start. **Actual entry** and **actual exit** are reconstructed from confirmed contract amounts or transaction-receipt ERC-20 balance transfers. The displayed **mark** is the timestamped OKX public spot last price. Open P&L compares mark with actual entry; realized P&L compares actual exit with actual entry, and PULSE reports an unavailable basis instead of substituting the trigger. Before an automated transaction, the restricted worker publishes the fresh OKX observation to `OracleRouterV1` with a five-minute maximum age; the contract rejects missing/stale data and independently enforces the approved adapter and minimum output.
 
@@ -477,7 +490,11 @@ The price path is near-real-time polling, not a continuously streaming Chainlink
 
 - Spot condition checks default to every 30 seconds through `AUTOMATION_INTERVAL_MS`.
 - Autopilot’s deterministic open-position risk check defaults to every 60 seconds through `AUTOPILOT_RISK_INTERVAL_MS`.
-- Autopilot Premium-analysis evaluation defaults to every 15 minutes through `AUTOPILOT_ANALYSIS_INTERVAL_MS`.
+- Autopilot's deterministic new-candle scheduler defaults to every five minutes through `AUTOPILOT_ANALYSIS_INTERVAL_MS`; it does not itself call xAI.
+- Compact AI entry confirmation is limited by `AUTOPILOT_AI_MIN_INTERVAL_MS`, shared cache TTL, per-vault/global call caps and per-vault/global USD caps.
+- Access is prepaid per owner-controlled vault: **$1.50 for 24 hours**, **$10.50 for 7 days**, or **$45 for 30 days**. Renewal appends time to an unexpired pass. Each covered day permits up to three compact confirmations, still subject to the stricter runtime budgets above.
+- At two hours remaining the web console marks the pass urgent. A Telegram Mini App purchase carries a chat-bound reminder capability and sends one warning plus one expiry notice. When time ends, PULSE blocks new AI-assisted entries but keeps deterministic protection/exits and every owner control available.
+- The UI exposes lifetime evaluation/Buy/Sell/Hold/failure counters, today’s provider calls and cost, the last signal source, pass state and budget status. When xAI returns `usage.cost_in_usd_ticks`, PULSE records that exact provider-billed amount; token-rate calculation is only the fallback for compatible responses without billed-cost ticks. KV retains the latest 100 detailed evaluations per vault while cumulative counters remain bounded; the JSON export combines that evidence window with reconciled vault activity.
 - Immediately before an automatic Spot or Autopilot execution, the restricted worker writes the current normalized OKX observation into `OracleRouterV1` with `maxAge = 300` seconds.
 - The contract rejects an absent, invalid, or stale oracle observation. It independently enforces the approved executor/keeper, adapter, token pair, amount, minimum output, policy version, nonce, and relevant risk limits.
 - The execution route and slippage quote remain separate from the oracle condition. Passing a trigger never waives minimum-output or adapter checks.
@@ -512,7 +529,7 @@ sequenceDiagram
   end
 ```
 
-The Telegram bot is a navigation and delivery adapter, not a wallet, model host, or separate analysis service. Its seven-day HMAC capability identifies only the destination chat and cannot pay, trade, retrieve arbitrary wallet history, or authorize Autopilot. Wallet connection and x402 signing remain in the Mini App. A full-report message uses a revocable opaque report share and therefore requires explicit `REPORT_SHARE_LINK_ENABLED=1`; the bot never receives a direct Blob URL. Duplicate updates are ignored, and failed messages are retried from KV under a per-delivery lock without rerunning or recharging the report.
+The Telegram bot is a navigation and delivery adapter, not a wallet, model host, or separate analysis service. Its 35-day HMAC capability identifies only the destination chat and cannot pay, trade, retrieve arbitrary wallet history, or authorize Autopilot. The duration covers a 30-day Autopilot pass plus its warning/expiry delivery window. Wallet connection and x402 signing remain in the Mini App. A full-report message uses a revocable opaque report share and therefore requires explicit `REPORT_SHARE_LINK_ENABLED=1`; the bot never receives a direct Blob URL. Duplicate updates are ignored, and failed messages are retried from KV under a per-delivery lock without rerunning or recharging the report.
 
 ## Data architecture: KV and Blob only
 
@@ -815,10 +832,19 @@ Production deployment is an operator action. Local readiness never authorizes a 
 ### Marketplace discovery contract
 
 - OKX.AI A2MCP endpoints must either return a free result or a standard paid challenge followed by a successful paid replay.
+- The existing X Layer identity is [PULSE agent #8355](https://www.okx.ai/agents/8355). PULSE updates this identity rather than creating duplicate Base or Arbitrum ERC-8004 agents.
 - X Layer challenges declare USD₮0 address, six decimals, symbol, EIP-712 name/version, amount, payee, and `eip155:196`.
 - Base and Arbitrum publish CDP Bazaar discovery extensions only after their deployed paid routes are enabled and verified.
 - Arc Testnet listing material must remain explicitly testnet and must not imply production-value USDC or Arc-native AI inference.
 - The Base dashboard verification tag is emitted by `apps/web/index.html` as `base:app_id=6a71cfab2c28265d676172e4`.
+
+| Discovery surface | Network and settlement | Public catalog |
+| --- | --- | --- |
+| OKX.AI agent #8355 | X Layer · USDT0 | Five X Layer report/Risk Guard endpoints under `/xlayer` |
+| CDP Bazaar | Base and Arbitrum · native USDC | The same five logical endpoints under `/base` and `/arbitrum`, with Bazaar request/response schemas |
+| Circle Agent Marketplace material | Arc Testnet · test USDC | The same five analysis/Risk Guard endpoints under `/arc`; no Spot or Autopilot execution |
+
+The per-vault Autopilot AI Pass ($1.50/24h, $10.50/7d, $45/30d) is an in-product compact-entry-confirmation entitlement, not a sixth public analysis service. Spot Market/Limit execution and Autopilot remain next actions after analysis rather than separate marketplace SKUs.
 
 Detailed operator steps are in [docs/MARKETPLACE_LISTING_GUIDE.md](docs/MARKETPLACE_LISTING_GUIDE.md).
 

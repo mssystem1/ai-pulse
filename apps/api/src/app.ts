@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { createCircleWalletRouter } from "./circleWallet.js";
 import { createTradeAutomationRouter } from "./tradeAutomation.js";
-import { createAutopilotAutomationRouter } from "./autopilotAutomation.js";
+import { autopilotPassTargetExists, createAutopilotAutomationRouter, grantAutopilotPass } from "./autopilotAutomation.js";
 import type { AppConfig } from "@pulse/config";
 import { buildAspMetadata, getNetwork, priceLabel, type NetworkKey } from "@pulse/config";
 
@@ -1070,6 +1070,31 @@ export function createApp(cfg: AppConfig, dependencies: {
     }
   });
 
+  const AutopilotPassBodySchema = z.object({
+    owner: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    vault: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
+    telegramDelivery: z.string().max(160).optional(),
+  });
+  const autopilotPassPaths = new Set([
+    "/v1/autopilot/pass/24h",
+    "/v1/autopilot/pass/7d",
+    "/v1/autopilot/pass/30d",
+  ]);
+
+  // Resolve schema, network availability and owner/vault registration before
+  // x402. A bad or stale UI selection must never result in a paid rejection.
+  app.use(async (req, res, next) => {
+    if (req.method !== "POST" || !autopilotPassPaths.has(req.path)) return next();
+    const parsed = AutopilotPassBodySchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
+    if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+    if (!(await autopilotPassTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
+      return res.status(404).json({ error: "This wallet does not own the selected Autopilot on the selected network" });
+    }
+    return next();
+  });
+
   // Payment gate for paid routes, measured only until challenge rejection or
   // verified/settled continuation (never including downstream provider work).
   const paymentGate = createPaymentGate(cfg);
@@ -1087,6 +1112,21 @@ export function createApp(cfg: AppConfig, dependencies: {
     res.once("finish", () => { if (!recorded) record(!signed ? res.statusCode === 402 : res.statusCode < 500 && res.statusCode !== 402); });
     return paymentGate(req, res, (error?: unknown) => { record(!error); return error ? next(error) : next(); });
   });
+
+  for (const [path, days] of [["/v1/autopilot/pass/24h", 1], ["/v1/autopilot/pass/7d", 7], ["/v1/autopilot/pass/30d", 30]] as const) {
+    app.post(path, async (req, res, next) => {
+      try {
+        const parsed = AutopilotPassBodySchema.safeParse(req.body);
+        if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+        const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
+        if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+        const payer = paymentPayer(req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT"));
+        if (!cfg.X402_MOCK && (!payer || payer !== parsed.data.owner.toLowerCase())) return res.status(403).json({ error: "The paying wallet must own the selected Autopilot" });
+        const aiPass = await grantAutopilotPass({ owner: parsed.data.owner, network, vault: parsed.data.vault, days, ...(parsed.data.telegramDelivery && isTelegramDeliveryCapability(parsed.data.telegramDelivery) ? { telegramDelivery: parsed.data.telegramDelivery } : {}) });
+        return res.status(201).json({ aiPass, behavior: { newEntries: "AI-assisted while the pass is active and signals remain", expired: "Hold new entries; deterministic risk monitoring and exits continue" } });
+      } catch (error) { return next(error); }
+    });
+  }
 
   const grokCfg = {
     apiKey: cfg.XAI_API_KEY,
@@ -1186,7 +1226,7 @@ export function createApp(cfg: AppConfig, dependencies: {
               ? `PULSE 已验证 ${defiAsset}（${defiTokenAddress}）是所选链上的对应资产，但没有使用该精确标的合约的 DeFi 产品通过验证。PULSE 不会虚构 APY。`
               : `检查 ${[...new Set(defiAliases.filter(Boolean))].join(", ")} 后，仍未验证到身份安全的 ${assetSymbol} 链上表示。PULSE 不会用流动性质押代币或无关衍生品替代。`
           : opportunities.length ? `${assetSymbol} is represented by ${defiAsset} (${defiTokenAddress}) on ${selectedNetwork}. Every product below was matched to that exact underlying token contract and ranked using execution availability, exit support, TVL, risk flags and observed APY—not APY alone.` : defiTokenAddress ? `PULSE verified ${defiAsset} (${defiTokenAddress}) as the selected-chain representation, but no DeFi product with that exact underlying contract passed verification. No APY is fabricated.` : `No identity-safe ${assetSymbol} representation was verified after checking ${[...new Set(defiAliases.filter(Boolean))].join(", ")}. PULSE will not substitute a liquid-staking token or unrelated derivative.` },
-        reportVersion: "pulse-v6.0.0",
+        reportVersion: cfg.methodologyVersion,
       };
       return canonical ? {
         ...enhanced,

@@ -114,10 +114,10 @@ export function App() {
   const [, setModel] = useState("");
   const [apiHint, setApiHint] = useState("");
   const [routePrices, setRoutePrices] = useState<Record<string, number>>({
-    "/v1/analysis/base": .03, "/v1/analysis/premium": .06,
-    "/v1/analysis/spot/standard": .03, "/v1/analysis/spot/premium": .06,
-    "/v1/analysis/prediction/standard": .10, "/v1/analysis/prediction/premium": .20,
-    "/v1/token/scan": .01, "/v1/preflight": .05,
+    "/v1/analysis/base": .20, "/v1/analysis/premium": .30,
+    "/v1/analysis/spot/standard": .20, "/v1/analysis/spot/premium": .30,
+    "/v1/analysis/prediction/standard": .20, "/v1/analysis/prediction/premium": .30,
+    "/v1/token/scan": .20, "/v1/preflight": .15,
   });
 
   const [wallet, setWallet] = useState<string | null>(null);

@@ -35,14 +35,14 @@ export function createV6Router(cfg: AppConfig) {
 
   router.get("/v1/trading/capabilities", (req, res) => {
     const network = String(req.query.network || "xlayer");
-    if (network === "arc-testnet") return res.json({ version: "v6.0.0", network, analysis: true, spot: { visible: false, enabled: false }, autopilot: { visible: false, enabled: false }, reasons: { spot: "Arc Testnet is analysis/payment only", autopilot: "Arc Testnet is analysis/payment only" } });
+    if (network === "arc-testnet") return res.json({ version: "v6.1.0", network, analysis: true, spot: { visible: false, enabled: false }, autopilot: { visible: false, enabled: false }, reasons: { spot: "Arc Testnet is analysis/payment only", autopilot: "Arc Testnet is analysis/payment only" } });
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     if (!chain) return res.status(400).json({ error: "Unsupported network" });
     const contracts = executionContracts(network as keyof typeof NETWORKS);
     const automationReady = process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY || "");
     const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN && process.env.BLOB_READ_WRITE_TOKEN);
     res.json({
-      version: "v6.0.0",
+      version: "v6.1.0",
       network,
       chainId: Number(chain.chainId),
       analysis: { base: true, premium: true },

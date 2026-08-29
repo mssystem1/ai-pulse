@@ -14,7 +14,7 @@ This file is the canonical, copy-ready submission package for Circle's Agent Mar
 | OpenAPI specification | https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml |
 | Logo | https://pulse-api-production-7aae.up.railway.app/brand/logo.png |
 
-The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the five marketplace services.
+The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the five marketplace services. The per-vault Autopilot AI Pass is an in-product mainnet execution entitlement, not a Circle marketplace analysis endpoint.
 
 ## Form answers
 
@@ -24,7 +24,7 @@ The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a compleme
 | Website | https://www.ai-pulse.tech |
 | Primary Service Category | Financial analysis / market intelligence; if unavailable, choose Data & Analytics |
 | Number of Endpoints | 5 |
-| Pricing Model | Usage-based through x402: Onchain Pre-Trade Risk Guard $0.05, Quick reports $0.10, Pro reports $0.20 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
+| Pricing Model | Usage-based through x402: Onchain Pre-Trade Risk Guard $0.15, Quick reports $0.20, Pro reports $0.30 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
 | Contact Name | Enter the legal or operational contact responsible for PULSE. |
 | Endpoints Documentation URL | https://github.com/mssystem1/ai-pulse/blob/main/docs/circle-marketplace-openapi.yaml |
 
@@ -38,13 +38,15 @@ PULSE is submitted as an Arc Testnet service using test USDC through Circle Gate
 
 ## Published Arc service endpoints
 
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/standard` — $0.10
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/premium` — $0.20
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/standard` — $0.10
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/premium` — $0.20
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/preflight` — $0.05
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/standard` — $0.20
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/premium` — $0.30
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/standard` — $0.20
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/premium` — $0.30
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/preflight` — $0.15
 
 All five declare Arc Testnet `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, the `exact` x402 scheme, and Circle Gateway in public metadata. Fused, divergence, event-risk and execution internals are intentionally excluded from the public service catalog.
+
+The Circle listing must not add Spot execution, Autopilot execution or Autopilot pass purchase as a sixth service. Arc Testnet remains analysis and Risk Guard only; a report may explain supported-mainnet next actions without claiming those actions execute on Arc.
 
 ## MCP verification
 

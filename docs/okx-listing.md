@@ -21,6 +21,7 @@ Use this document as the single copy source when registering the A2MCP service. 
 
 Do not reuse the legacy product name. **Pre-trade Safety Check** is one PULSE service; it is not the brand.
 For the current rejected listing, `<DOMAIN>` must not be a `*.vercel.app` hostname. Update existing agent **#8355** rather than creating another identity.
+Public record: https://www.okx.ai/agents/8355
 
 The canonical marketplace avatar is `assets/logo.png`: a real 512×512 PNG,
 under 1 MB, with an opaque square canvas and no rounded outer mask. It is rendered
@@ -39,13 +40,13 @@ PULSE turns live OKX Global Market and explicitly selected Polymarket evidence i
 
 | Public service | Price | Input | Output / next action |
 | --- | ---: | --- | --- |
-| Global Market Quick Plan | $0.10 | pair, timeframe, language, optional focus | Concise Buy-or-Wait analysis; Premium is the execution bridge |
-| Global Market Pro Strategy | $0.20 | pair, timeframe, language, optional focus | Chart, Elliott paths, DeFi and Market / Limit / Autopilot actions |
-| Prediction Market Quick View | $0.10 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
-| Prediction Market Pro Analysis | $0.20 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
-| Onchain Pre-Trade Risk Guard | $0.05 | network, intent, token/transaction context | PASS/WARN/FAIL with live RPC evidence and explicit unknowns |
+| Global Market Quick Plan | $0.20 | pair, timeframe, language, optional focus | Concise Buy-or-Wait analysis; Premium is the execution bridge |
+| Global Market Pro Strategy | $0.30 | pair, timeframe, language, optional focus | Chart, Elliott paths, DeFi and Market / Limit / Autopilot actions |
+| Prediction Market Quick View | $0.20 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
+| Prediction Market Pro Analysis | $0.30 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
+| Onchain Pre-Trade Risk Guard | $0.15 | network, intent, token/transaction context | PASS/WARN/FAIL with live RPC evidence and explicit unknowns |
 
-Free discovery and report-linked Spot/Autopilot execution are product workflow capabilities, not separate marketplace services.
+Free discovery and report-linked Spot/Autopilot execution are product workflow capabilities, not separate marketplace services. Autopilot AI passes ($1.50/24h, $10.50/7d and $45/30d per vault) are in-product compact-entry-confirmation entitlements and are not a sixth marketplace service.
 
 The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery. It uses OKX Onchain OS as the primary catalog and DexScreener only as best-effort X Layer enrichment. Catalog presence is not a safety verdict, and manual address entry remains available.
 
@@ -72,7 +73,7 @@ The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery
 2. Confirm `/healthz` reports `paymentMode: "okx"`, `hasOkxCredentials: true`, and `hasXaiKey: true`.
 3. Confirm `/v1/metadata` uses **PULSE**, the final HTTPS URLs, and the intended non-zero `payTo` address.
 4. Call a paid route without payment and inspect the HTTP 402 challenge.
-5. Confirm `GET /v1/token/scan` reports `input_required`, then complete one `$0.01` paid POST replay and retain `replayBody`, `PAYMENT-RESPONSE`, and the saved deliverable path.
+5. Confirm each advertised GET probe reports `input_required`, then complete one advertised paid POST replay (for example Risk Guard at $0.15) and retain `replayBody`, `PAYMENT-RESPONSE`, and the saved deliverable path.
 6. Verify `tools/list` and one free plus one paid `tools/call` through `/mcp`.
 7. Test the market picker, X Layer token catalog/manual input, report-preserving chart refresh, wallet drawer, balance guard, native OKB → USDT0 flow, and free contract inspector on desktop and mobile.
 8. Update the service URL on existing OKX Agent Identity #8355.

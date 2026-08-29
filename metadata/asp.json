@@ -1,6 +1,6 @@
 {
   "name": "PULSE",
-  "version": "6.0.0",
+  "version": "6.1.0",
   "type": "A2MCP",
   "category": "Trading",
   "tagline": "Analyze first. Spot trade or run a guarded Autopilot on your selected network.",
@@ -19,7 +19,7 @@
     "pngServedAt": "/brand/logo.png",
     "alt": "PULSE waveform logo"
   },
-  "methodologyVersion": "pulse-v6.0.0",
+  "methodologyVersion": "pulse-v6.1.0",
   "languages": ["en", "zh"],
   "network": "eip155:196",
   "settlementAsset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
@@ -67,21 +67,27 @@
     }
   ],
   "pricingUsd": {
-    "spotStandard": 0.10,
-    "spotPremium": 0.20,
-    "predictionStandard": 0.10,
-    "predictionPremium": 0.20,
+    "spotStandard": 0.20,
+    "spotPremium": 0.30,
+    "predictionStandard": 0.20,
+    "predictionPremium": 0.30,
     "tokenScan": 0.10,
-    "preflight": 0.05
+    "preflight": 0.15,
+    "autopilotPass24h": 1.50,
+    "autopilotPass7d": 10.50,
+    "autopilotPass30d": 45.00
   },
   "pricing": {
     "freeTeaser": 0,
-    "analysisBase": 0.10,
-    "analysisPremium": 0.20,
+    "analysisBase": 0.20,
+    "analysisPremium": 0.30,
     "tokenScan": 0.10,
-    "preflight": 0.05,
-    "predictionStandard": 0.10,
-    "predictionPremium": 0.20
+    "preflight": 0.15,
+    "predictionStandard": 0.20,
+    "predictionPremium": 0.30,
+    "autopilotPass24h": 1.50,
+    "autopilotPass7d": 10.50,
+    "autopilotPass30d": 45.00
   },
   "endpoints": {
     "health": "/healthz",
@@ -112,6 +118,33 @@
     "mcpTransport": "JSON-RPC 2.0 over HTTP",
     "mcpProtocolVersion": "2024-11-05"
   },
+  "discovery": {
+    "okxAi": {
+      "agentId": 8355,
+      "publicUrl": "https://www.okx.ai/agents/8355",
+      "identityNetwork": "eip155:196",
+      "servicePrefix": "/xlayer",
+      "settlementAsset": "USDT0"
+    },
+    "cdpBazaar": {
+      "networks": ["eip155:8453", "eip155:42161"],
+      "servicePrefixes": ["/base", "/arbitrum"],
+      "settlementAsset": "native USDC",
+      "catalog": "The same five public report and Risk Guard services; no duplicate ERC-8004 identity is required."
+    },
+    "circleAgentMarketplace": {
+      "network": "eip155:5042002",
+      "servicePrefix": "/arc",
+      "settlementAsset": "test USDC",
+      "execution": "analysis and Risk Guard only"
+    }
+  },
+  "autopilotAiPass": {
+    "scope": "one owner-controlled vault",
+    "plansUsd": { "24h": 1.50, "7d": 10.50, "30d": 45.00 },
+    "catalogPolicy": "An in-product AI entry entitlement, not a sixth public analysis marketplace service.",
+    "expiry": "New AI-confirmed entries hold after expiry; deterministic monitoring and protective exits continue."
+  },
   "wallet": {
     "browser": "Reown AppKit, Wagmi and Viem; wallet keys remain client-side",
     "marketplaceCallers": "Agent-compatible x402 buyer",
@@ -132,11 +165,11 @@
     "fixture": "Deterministic payment/job plumbing validation only; no market inference"
   },
   "publicServices": [
-    { "name": "Global Market Quick Plan", "path": "/v1/analysis/spot/standard", "priceUsd": 0.10 },
-    { "name": "Global Market Pro Strategy", "path": "/v1/analysis/spot/premium", "priceUsd": 0.20 },
-    { "name": "Prediction Market Quick View", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.10 },
-    { "name": "Prediction Market Pro Analysis", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.20 },
-    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.05 }
+    { "name": "Global Market Quick Plan", "path": "/v1/analysis/spot/standard", "priceUsd": 0.20 },
+    { "name": "Global Market Pro Strategy", "path": "/v1/analysis/spot/premium", "priceUsd": 0.30 },
+    { "name": "Prediction Market Quick View", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.20 },
+    { "name": "Prediction Market Pro Analysis", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.30 },
+    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.15 }
   ],
   "dataPolicy": {
     "polymarket": "Public read-only evidence only; no order placement",

@@ -112,6 +112,18 @@ PERSISTENCE_NAMESPACE=pulse:production
 # V6 Global reports require enough room to complete the strict Elliott schema.
 GROK_MAX_OUTPUT_STANDARD=1800
 GROK_MAX_OUTPUT_PREMIUM=3200
+GROK_AUTOPILOT_MODEL=grok-4.3
+GROK_MAX_INPUT_AUTOPILOT=4000
+GROK_MAX_OUTPUT_AUTOPILOT=320
+AUTOPILOT_AI_MIN_INTERVAL_MS=14400000
+AUTOPILOT_AI_SIGNAL_TTL_MS=14400000
+AUTOPILOT_AI_MAX_CALLS_PER_VAULT_DAY=3
+AUTOPILOT_AI_MAX_CALLS_GLOBAL_DAY=50
+AUTOPILOT_AI_MAX_USD_PER_VAULT_DAY=0.15
+AUTOPILOT_AI_MAX_USD_GLOBAL_DAY=2.00
+PRICE_AUTOPILOT_PASS_24H=1.50
+PRICE_AUTOPILOT_PASS_7D=10.50
+PRICE_AUTOPILOT_PASS_30D=45.00
 ```
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.

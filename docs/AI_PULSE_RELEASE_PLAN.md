@@ -50,6 +50,6 @@ Use the copy and evidence checklist in `CIRCLE_AGENT_MARKETPLACE_LISTING.md`. Su
 
 Marketplace forms and requirements change. Recheck the current official submission pages immediately before publication and do not claim a listing until its public page is visible.
 
-## OKX.AI after Genesis
+## OKX.AI agent #8355 update discipline
 
-Do not modify agent `8355` during the hackathon. After Genesis ends, prepare an exact before/after diff containing the PULSE V2 description, logo, `ai-pulse` custom web domain, new Railway endpoint, service rows, pricing, and successful X Layer USDT0 x402 evidence. Update agent `8355` only after explicit confirmation of that final diff.
+Agent `8355` is the existing PULSE identity: https://www.okx.ai/agents/8355. Do not create a replacement or mutate the public record from repository work alone. Prepare an exact before/after diff containing the PULSE V6.1 description, logo, custom web domain, Railway endpoint, five service rows, current pricing, and successful X Layer USDT0 x402 evidence. Update agent `8355` only after the operator reviews that final diff and explicitly confirms the external write.

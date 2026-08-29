@@ -109,7 +109,7 @@ Run both Market and Limit from one fresh `DOGE-USDT` report:
 
 Vault creation, funding, pause, resume and withdrawal are setup/control checks only. Do not mark Autopilot trading complete unless the same strategy records all of the following:
 
-1. A fresh Premium report and 120-candle market context.
+1. A fresh deterministic candle context. Only an entry candidate may request one compact AI market-state confirmation; routine monitoring must never generate a full Premium report.
 2. A detailed evaluation containing every strategy rule and its observed/required value.
 3. Monitoring activates independently of the first decision. Expect either a legitimate `Buy` only after every entry rule passes, or an auditable `Hold` that keeps the strategy active without sending a transaction.
 4. An amount-sized OKX quote, successful vault simulation and confirmed guarded execution whenever the decision is `Buy` or `Sell`.
@@ -125,11 +125,20 @@ Test Trend following, Breakout and Mean reversion decision fixtures even when li
 3. Create an isolated vault through the configured factory.
 4. Configure restrictive on-chain limits and fund only the intended amount.
 5. Activate the strategy and sign the five-minute connected-wallet authorization. Confirm a copied/modified payload, expired signature, non-factory vault, or ticker/token mismatch is rejected.
-6. Run one evaluation using Premium analysis when permitted by policy.
+6. Buy a vault-specific AI pass (`$1.50 / 24h`, `$10.50 / 7d`, or `$45 / 30d`). Verify an ordinary Hold consumes no xAI call; a deterministic entry candidate may consume one compact confirmation. Daily vault/global call and USD caps must fail closed to Hold.
 7. Confirm deterministic validation and exact transaction simulation precede executor submission.
 8. Prove wrong policy version, nonce replay, unapproved adapter, over-cap amount, cooldown, expiry, global pause and revoked executor all revert.
 9. Confirm pause, policy update, immediate owner withdrawal and independent Autopilot mark-to-market P&L/activity/proof hash. Fund and withdraw after activation and verify confirmed vault-specific cash flows change capital basis rather than appearing as trading P&L.
 10. Confirm no Autopilot action can move connected-wallet or Spot-account funds.
+
+### Autopilot pass and expiry acceptance
+
+1. Submit an invalid or non-owner vault and confirm PULSE rejects it before returning an x402 payment challenge.
+2. Buy 24 hours and confirm the selected vault shows its exact expiry, remaining compact confirmations and payment period.
+3. Renew before expiry and confirm the new duration is appended to the prior expiry rather than replacing unused time.
+4. At two hours remaining, confirm the web card becomes urgent. When purchased from the Telegram Mini App, confirm the chat receives one warning, not one per worker cycle.
+5. After expiry, confirm new AI-assisted entries remain in Hold. Existing deterministic TP/SL, structural exits, owner Pause, Withdraw and Close continue to work.
+6. Confirm the detailed trading report shows evaluation counts, Buy/Sell/Hold/failure totals, provider-call/cost telemetry, recent decision rows and a downloadable JSON audit log.
 
 ### Multi-agent strategy acceptance
 

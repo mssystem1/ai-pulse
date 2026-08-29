@@ -15,22 +15,22 @@ export const AUTOPILOT_STRATEGY_CATALOG = [
     id: "trend_following" as const,
     label: "Trend following",
     purpose: "Join a confirmed directional trend and leave when trend structure fails.",
-    entryRules: ["Premium bias is bullish", "Confidence meets the signed threshold", "Regime is trend-up", "Close is above SMA20", "SMA20 is above SMA50"],
-    exitRules: ["Take-profit or stop-loss is reached", "Premium bias turns bearish at the threshold", "Close falls below SMA20"],
+    entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Regime is trend-up", "Close is above SMA20", "SMA20 is above SMA50"],
+    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Close falls below SMA20"],
   },
   {
     id: "breakout" as const,
     label: "Breakout",
     purpose: "Enter only after price and volume confirm a break of the prior range.",
-    entryRules: ["Premium bias is bullish", "Confidence meets the signed threshold", "Close exceeds the previous 20-candle high", "Latest volume is at least 1.15x its 20-candle average", "Regime is trend-up or transition"],
-    exitRules: ["Take-profit or stop-loss is reached", "Premium bias turns bearish at the threshold", "Close loses SMA20"],
+    entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Close exceeds the previous 20-candle high", "Latest volume is at least 1.15x its 20-candle average", "Regime is trend-up or transition"],
+    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Close loses SMA20"],
   },
   {
     id: "mean_reversion" as const,
     label: "Mean reversion",
     purpose: "Buy a confirmed pullback near support and exit after reversion or invalidation.",
-    entryRules: ["Premium bias is bullish", "Confidence meets the signed threshold", "Price is within 1% of report support or RSI14 is 42 or lower", "Regime is range or transition"],
-    exitRules: ["Take-profit or stop-loss is reached", "Premium bias turns bearish at the threshold", "Price reverts to SMA20"],
+    entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Price is within 1% of signal support or RSI14 is 42 or lower", "Regime is range or transition"],
+    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Price reverts to SMA20"],
   },
 ] as const;
 
@@ -110,8 +110,42 @@ function rsi(candles: readonly Candle[], period = 14) {
 const numeric = (value: unknown) => Number.isFinite(Number(value)) ? Number(value) : null;
 
 /**
+ * Cheap, deterministic gate evaluated on each new candle before PULSE is
+ * allowed to request an AI signal. A false result can only Hold; it can never
+ * authorize a trade.
+ */
+export function evaluateAutopilotEntryCandidate(input: {
+  strategyType: AutopilotStrategyType;
+  candles: readonly Candle[];
+}) {
+  if (input.candles.length < 50) throw new Error("Autopilot requires at least 50 candles for deterministic rules");
+  const close = input.candles.at(-1)!.close;
+  const prior = input.candles.slice(0, -1);
+  const sma20 = average(input.candles.slice(-20).map((candle) => candle.close));
+  const sma50 = average(input.candles.slice(-50).map((candle) => candle.close));
+  const previous20High = Math.max(...prior.slice(-20).map((candle) => candle.high));
+  const volumeAverage20 = average(prior.slice(-20).map((candle) => candle.volume));
+  const volumeRatio = volumeAverage20 > 0 ? input.candles.at(-1)!.volume / volumeAverage20 : 0;
+  const rsi14 = rsi(input.candles);
+  const checks = input.strategyType === "trend_following"
+    ? [close > sma20, sma20 > sma50]
+    : input.strategyType === "breakout"
+      ? [close > previous20High, volumeRatio >= 1.15]
+      : [rsi14 <= 42];
+  const candidate = checks.every(Boolean);
+  return {
+    candidate,
+    reason: candidate
+      ? `${AUTOPILOT_STRATEGY_CATALOG.find((item) => item.id === input.strategyType)!.label} market preconditions passed; an AI confirmation may now be requested.`
+      : "Deterministic market preconditions did not pass; no AI call or entry is needed.",
+    strategyType: input.strategyType,
+    metrics: { close, sma20, sma50, previous20High, volumeRatio, rsi14 },
+  };
+}
+
+/**
  * Fast, deterministic protection path. TP/SL and a latched partial exit do
- * not depend on a new Premium report, but every action still waits for the
+ * not depend on a new AI confirmation, but every action still waits for the
  * on-chain cooldown and uses the normal quote/simulation/nonce path.
  */
 export function evaluateAutopilotRiskExit(input: {
@@ -193,14 +227,14 @@ export function evaluateAutopilotPolicy(input: {
     const exitCompletion = input.exitPending === true;
     add("take_profit", "Take-profit reached", tpReached, `${close}`, takeProfit === null ? "not configured" : `>= ${takeProfit}`, "exit");
     add("stop_loss", "Stop-loss reached", slReached, `${close}`, stopLoss === null ? "not configured" : `<= ${stopLoss}`, "exit");
-    add("bearish_report", "Premium bearish exit", bearishExit, `${bias} ${confidence}%`, `bearish and >= ${input.minConfidence}%`, "exit");
+    add("bearish_report", "Compact AI bearish exit", bearishExit, `${bias} ${confidence}%`, `bearish and >= ${input.minConfidence}%`, "exit");
     add("structure_exit", input.strategyType === "mean_reversion" ? "Reversion reached SMA20" : "Trend lost SMA20", structureExit, `close ${close}; SMA20 ${sma20}`, input.strategyType === "mean_reversion" ? "close >= SMA20" : "close < SMA20", "exit");
     add("exit_completion", "Complete triggered bounded exit", exitCompletion, exitCompletion ? "partial exit remains" : "not pending", "a previous policy exit left target balance", "exit");
     const trigger = rules.find((rule) => rule.passed);
     return { action: trigger ? "sell" as const : "hold" as const, reason: trigger ? trigger.label : "No signed exit condition is active.", strategyType: input.strategyType, bias, confidence, metrics: { close, sma20, sma50, previous20High, volumeRatio, rsi14, nearestSupport, takeProfit, stopLoss }, rules };
   }
 
-  add("bullish_bias", "Premium bullish bias", bias === "bullish", bias, "bullish", "entry");
+  add("bullish_bias", "Compact AI bullish bias", bias === "bullish", bias, "bullish", "entry");
   add("confidence", "Confidence threshold", confidence >= input.minConfidence, `${confidence}%`, `>= ${input.minConfidence}%`, "entry");
   if (input.strategyType === "trend_following") {
     add("trend_regime", "Trend-up regime", regime === "trend_up", regime, "trend_up", "entry");

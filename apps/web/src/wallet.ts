@@ -69,13 +69,14 @@ type PaymentRequirementLike = { scheme?: unknown; network?: unknown; asset?: unk
 type PaymentRequiredLike = { x402Version?: unknown; resource?: unknown; accepts?: PaymentRequirementLike[] };
 
 const EXPECTED_ROUTE_AMOUNTS: Readonly<Record<string, string>> = Object.freeze({
-  "/v1/analysis/base": "100000", "/v1/analysis/premium": "200000",
-  "/v1/analysis/spot/standard": "100000", "/v1/analysis/spot/premium": "200000",
-  "/v1/analysis/prediction/standard": "100000", "/v1/analysis/prediction/premium": "200000",
-  "/v1/analysis/fused/standard": "50000", "/v1/analysis/fused/premium": "100000",
-  "/v1/analysis/divergence": "40000", "/v1/preflight/event-risk": "70000",
-  "/v1/token/scan": "10000", "/v1/wallet/scan": "10000", "/v1/market/pulse": "10000",
-  "/v1/swap/quote": "20000", "/v1/preflight": "50000",
+  "/v1/analysis/base": "200000", "/v1/analysis/premium": "300000",
+  "/v1/analysis/spot/standard": "200000", "/v1/analysis/spot/premium": "300000",
+  "/v1/analysis/prediction/standard": "200000", "/v1/analysis/prediction/premium": "300000",
+  "/v1/analysis/fused/standard": "250000", "/v1/analysis/fused/premium": "400000",
+  "/v1/analysis/divergence": "200000", "/v1/preflight/event-risk": "300000",
+  "/v1/token/scan": "200000", "/v1/wallet/scan": "110000", "/v1/market/pulse": "110000",
+  "/v1/swap/quote": "120000", "/v1/preflight": "150000",
+  "/v1/autopilot/pass/24h": "1500000", "/v1/autopilot/pass/7d": "10500000", "/v1/autopilot/pass/30d": "45000000",
 });
 
 function canonicalPaidPath(input: RequestInfo | URL): string {
