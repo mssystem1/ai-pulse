@@ -9,8 +9,25 @@ import { inlineSettlement } from "./inlineSettlement.js";
 
 export function buildCdpDiscoveryContract(path: string) {
   const riskGuard = path === "/v1/preflight";
+  const autopilotStart = path.startsWith("/v1/autopilot/pass/");
   const prediction = path.includes("prediction") || path.includes("event-risk");
   const fused = path.includes("fused") || path.includes("divergence");
+  if (autopilotStart) {
+    return {
+      input: {
+        owner: "0x1111111111111111111111111111111111111111",
+        vault: "0x2222222222222222222222222222222222222222",
+      },
+      inputSchema: {
+        properties: {
+          owner: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Paying Agentic Wallet address and vault owner" },
+          vault: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Owner-controlled vault already configured, funded and registered through Agentic Wallet calls" },
+          telegramDelivery: { type: "string", maxLength: 160, description: "Optional chat-bound reminder capability; never wallet authority" },
+        },
+        required: ["owner", "vault"],
+      },
+    };
+  }
   if (riskGuard) {
     return {
       input: {
@@ -73,9 +90,12 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
     let middleware = cache.get(cacheKey);
     if (!middleware) {
       const { input, inputSchema } = buildCdpDiscoveryContract(req.path);
+      const autopilotStart = req.path.startsWith("/v1/autopilot/pass/");
       const extensions = cfg.BAZAAR_DISCOVERABLE ? declareDiscoveryExtension({
         input, inputSchema, bodyType: "json",
-        output: { example: { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id" } },
+        output: { example: autopilotStart
+          ? { aiPass: { vault: "owner-controlled-vault", status: "active", expiresAt: "ISO-8601 timestamp" }, behavior: { newEntries: "AI-assisted while runtime is active" } }
+          : { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id" } },
       }) : undefined;
       middleware = paymentMiddleware({
         [`${req.method.toUpperCase()} ${req.path}`]: {

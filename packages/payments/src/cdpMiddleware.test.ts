@@ -18,3 +18,11 @@ test("publishes market and prediction body contracts independently", () => {
   assert.ok("primaryMarketId" in prediction.inputSchema.properties);
   assert.equal("instId" in prediction.inputSchema.properties, false);
 });
+
+test("publishes owner-controlled Autopilot start inputs without report fields", () => {
+  const contract = buildCdpDiscoveryContract("/v1/autopilot/pass/24h");
+  assert.ok("owner" in contract.inputSchema.properties);
+  assert.ok("vault" in contract.inputSchema.properties);
+  assert.equal("instId" in contract.inputSchema.properties, false);
+  assert.deepEqual(contract.inputSchema.required, ["owner", "vault"]);
+});

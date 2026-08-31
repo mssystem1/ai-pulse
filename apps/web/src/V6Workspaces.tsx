@@ -177,7 +177,10 @@ type AutopilotStrategyView = {
   exitPending?: boolean;
   lastEvaluatedCandleTs?: number;
   lastAiSignalAt?: string;
+  lastAiAttemptAt?: string;
   lastAiSignalCandleTs?: number;
+  aiFailureStreak?: number;
+  aiRetryAt?: string;
   aiSignalSource?: "live" | "cache" | "deterministic";
   aiBudgetDay?: string;
   aiCallsToday?: number;
@@ -185,7 +188,7 @@ type AutopilotStrategyView = {
   aiReservedCostTodayUsd?: number;
   aiBudgetStatus?: string;
   aiNextEligibleAt?: string;
-  aiPass?: { purchasedAt: string; expiresAt: string; signalLimit: number; signalsUsed: number } | null;
+  aiPass?: { purchasedAt: string; expiresAt: string; signalLimit: number; signalsUsed: number; pausedAt?: string } | null;
   evaluationCount?: number;
   holdCount?: number;
   filledBuyCount?: number;
@@ -471,10 +474,11 @@ export function OpportunityRadar({
         </div>
       )}
       <div className="candidate-disclaimer">
-        <b>How to use this:</b> choose a candidate → buy Base or Premium
-        analysis → open the prefilled Spot ticket or Autopilot from the report.
-        Score alone never authorizes a trade. Execution also requires a verified
-        representation, live route and sufficient wallet balance on{" "}
+        <b>How to use this:</b> choose a candidate → either buy Base/Premium
+        analysis for a prefilled Spot Market/Limit ticket, or prepare a separate
+        Autopilot that evaluates fresh strategy signals. Score alone never
+        authorizes a trade. Execution also requires a verified representation,
+        live route and sufficient wallet balance on{" "}
         {WEB_NETWORKS[networkKey].label}.
       </div>
     </section>
@@ -3505,7 +3509,7 @@ export function SpotWorkspace({
   );
 
   /* Legacy console below is intentionally unreachable while migrations retain
-     its handler references. It will be removed after the V6 user-flow soak. */
+     its handler references. It will be removed after the PULSE user-flow soak. */
   const q = quote?.quote as Record<string, unknown> | undefined;
   return (
     <div className="v6-workspace">
@@ -4031,6 +4035,10 @@ export function AutopilotWorkspace({
   );
   const [minConfidence, setMinConfidence] = useState("70");
   const [busy, setBusy] = useState(false);
+  const [passBusy, setPassBusy] = useState(false);
+  const [selectedPassPlan, setSelectedPassPlan] = useState<"24h" | "7d" | "30d">("24h");
+  const [preparedCandidate, setPreparedCandidate] = useState("");
+  const builderRef = useRef<HTMLElement>(null);
   const [closeConfirming, setCloseConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const settlementDecimals = WEB_NETWORKS[networkKey].payment.decimals;
@@ -4629,7 +4637,7 @@ export function AutopilotWorkspace({
       safelyPaused = !wasExisting || activeVault?.paused !== false;
       if (!wasExisting) {
         setMessage(
-          "Step 1 of 5 · Confirm the owner-controlled strategy wallet.",
+          "Step 1 of 6 · Confirm the owner-controlled strategy wallet.",
         );
         const createData = encodeFunctionData({
           abi: [
@@ -4689,7 +4697,7 @@ export function AutopilotWorkspace({
       } else {
         if (activeVault?.paused === false) {
           setMessage(
-            "Step 1 of 5 · Pausing the existing strategy before changing its policy.",
+            "Step 1 of 6 · Pausing the existing strategy before changing its policy.",
           );
           const pauseHash = await sendPrepared(networkKey, wallet, {
             to: vault,
@@ -4704,7 +4712,7 @@ export function AutopilotWorkspace({
           await record("vault_pause", pauseHash, vault);
           safelyPaused = true;
         }
-        setMessage("Step 1 of 5 · Confirm the updated strategy policy.");
+        setMessage("Step 1 of 6 · Confirm the updated strategy policy.");
         const updateHash = await sendPrepared(networkKey, wallet, {
           to: vault,
           data: encodeFunctionData({
@@ -4719,7 +4727,7 @@ export function AutopilotWorkspace({
       }
 
       setMessage(
-        "Step 2 of 5 · Confirm the selected asset and maximum exposure.",
+        "Step 2 of 6 · Confirm the selected asset and maximum exposure.",
       );
       const staleAssets = [
         activeStrategy?.targetAsset,
@@ -4753,7 +4761,7 @@ export function AutopilotWorkspace({
       await waitForWalletReceipt(provider, assetHash);
       await record("vault_asset_policy", assetHash, vault);
 
-      setMessage("Step 3 of 5 · Confirm the risk limits.");
+      setMessage("Step 3 of 6 · Confirm the risk limits.");
       const limitsHash = await sendPrepared(networkKey, wallet, {
         to: vault,
         data: encodeFunctionData({
@@ -4775,7 +4783,7 @@ export function AutopilotWorkspace({
 
       if (!reusingFundedVault) {
         setMessage(
-          `Step 4 of 5 · Confirm the ${capitalHuman} ${WEB_NETWORKS[networkKey].payment.symbol} allocation.`,
+          `Step 4 of 6 · Confirm the ${capitalHuman} ${WEB_NETWORKS[networkKey].payment.symbol} allocation.`,
         );
         const fundHash = await sendPrepared(networkKey, wallet, {
           to: settlement,
@@ -4801,12 +4809,12 @@ export function AutopilotWorkspace({
         await record("vault_fund", fundHash, vault, parsedCapital.toString());
       } else {
         setMessage(
-          `Step 4 of 5 · Reusing ${formatUnits(existingVaultCapital, settlementDecimals)} ${WEB_NETWORKS[networkKey].payment.symbol} already held by your strategy wallet.`,
+          `Step 4 of 6 · Reusing ${formatUnits(existingVaultCapital, settlementDecimals)} ${WEB_NETWORKS[networkKey].payment.symbol} already held by your strategy wallet.`,
         );
       }
 
       setMessage(
-        "Step 5 of 5 · Authorize the strategy, then confirm activation.",
+        "Step 5 of 6 · Authorize the strategy configuration.",
       );
       const strategyType = strategy.toLowerCase().includes("breakout")
         ? "breakout"
@@ -4841,6 +4849,13 @@ export function AutopilotWorkspace({
         authorization: { expiresAt, signature },
       });
       if (!response.ok) throw new Error(errorText(response.data));
+      let passExpiry = activePass?.expiresAt;
+      if (!wasExisting || !passActive) {
+        setMessage(`Step 6 of 6 · Approve the ${selectedPassPlan} AI Entry Pass. The paid timer stops whenever this Autopilot is paused.`);
+        passExpiry = await requestAutopilotPass(selectedPassPlan, vault);
+      } else {
+        setMessage("Step 6 of 6 · Existing AI Entry Pass verified; no additional payment is required.");
+      }
       const resumeHash = await sendPrepared(networkKey, wallet, {
         to: vault,
         data: encodeFunctionData({
@@ -4859,13 +4874,14 @@ export function AutopilotWorkspace({
       );
       setVaultDetails(latestAccounts.vaults);
       setMessage(
-        `Autopilot is running for ${pair}. You can pause it or withdraw funds at any time.`,
+        `Autopilot is running for ${pair}. AI Entry Pass active until ${passExpiry ? new Date(passExpiry).toLocaleString() : "the purchased expiry"}; pause stops its timer.`,
       );
       await refresh();
     } catch (error) {
       setMessage(
         `${error instanceof Error ? error.message : String(error)}${safelyPaused ? " The strategy wallet remains paused; funds stay owner-withdrawable." : " Pause the existing strategy before retrying any policy change."}`,
       );
+      await refresh().catch(() => undefined);
     } finally {
       setBusy(false);
     }
@@ -5074,31 +5090,36 @@ export function AutopilotWorkspace({
     }
   }
 
-  async function purchaseAutopilotPass(plan: "24h" | "7d" | "30d") {
-    if (!wallet || !ADDRESS.test(selectedVault)) return setMessage("Select an existing Autopilot and connect its owner wallet first");
+  async function requestAutopilotPass(plan: "24h" | "7d" | "30d", vault: string) {
+    if (!wallet || !ADDRESS.test(vault)) throw new Error("Select an existing Autopilot and connect its owner wallet first");
     const prices = { "24h": aiPolicy?.commercialPass?.price24hUsd || 1.5, "7d": aiPolicy?.commercialPass?.price7dUsd || 10.5, "30d": aiPolicy?.commercialPass?.price30dUsd || 45 };
     const available = fundingWalletBalance;
-    if (available === null) return setMessage(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
-    if (available < prices[plan]) return setMessage(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
-    setBusy(true);
-    setMessage(`Preparing the ${plan} Autopilot AI pass payment...`);
+    if (available === null) throw new Error(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
+    if (available < prices[plan]) throw new Error(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
+    const paidFetch = await createWalletPaidFetch(wallet, networkKey);
+    const telegramDelivery = new URLSearchParams(window.location.search).get("tg") || undefined;
+    const prefix = WEB_NETWORKS[networkKey].route;
+    const response = await paidFetch(`${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ owner: wallet, vault, ...(telegramDelivery ? { telegramDelivery } : {}) }),
+    });
+    const body = await response.json().catch(() => ({})) as { aiPass?: { expiresAt?: string }; error?: string };
+    if (!response.ok) throw new Error(body.error || `Autopilot pass purchase failed (${response.status})`);
+    return body.aiPass?.expiresAt;
+  }
+
+  async function purchaseAutopilotPass(plan: "24h" | "7d" | "30d") {
+    setPassBusy(true);
+    setMessage(`Preparing the ${plan} AI Entry Pass payment…`);
     try {
-      const paidFetch = await createWalletPaidFetch(wallet, networkKey);
-      const telegramDelivery = new URLSearchParams(window.location.search).get("tg") || undefined;
-      const prefix = WEB_NETWORKS[networkKey].route;
-      const response = await paidFetch(`${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ owner: wallet, vault: selectedVault, ...(telegramDelivery ? { telegramDelivery } : {}) }),
-      });
-      const body = await response.json().catch(() => ({})) as { aiPass?: { expiresAt?: string }; error?: string };
-      if (!response.ok) throw new Error(body.error || `Autopilot pass purchase failed (${response.status})`);
-      setMessage(`Autopilot AI pass active until ${body.aiPass?.expiresAt ? new Date(body.aiPass.expiresAt).toLocaleString() : "the purchased expiry"}. New entries use at most three compact AI confirmations per covered day.`);
+      const expiry = await requestAutopilotPass(plan, selectedVault);
+      setMessage(`AI Entry Pass active until ${expiry ? new Date(expiry).toLocaleString() : "the purchased expiry"}. Its timer stops whenever you pause this Autopilot.`);
       await refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
-      setBusy(false);
+      setPassBusy(false);
     }
   }
 
@@ -5107,12 +5128,18 @@ export function AutopilotWorkspace({
       entry.account?.toLowerCase() === item.vault.toLowerCase()
       || (!entry.account && entry.pair === item.pair)
     ));
-    const payload = { exportedAt: new Date().toISOString(), network: networkKey, strategy: item, activity: relatedActivity };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const headings = ["record_type", "timestamp", "pair", "timeframe", "decision_or_event", "status", "bias", "confidence_pct", "reason", "error", "tx_hash", "vault", "network"];
+    const rows = [
+      ...(item.evaluations || []).map((entry) => ["strategy_decision", entry.evaluatedAt, item.pair, item.timeframe, entry.action, entry.status, entry.bias, entry.confidence, entry.reason, entry.error, entry.txHash, item.vault, networkKey]),
+      ...relatedActivity.map((entry) => ["onchain_activity", entry.createdAt, entry.pair || item.pair, item.timeframe, entry.kind, entry.status, "", "", "", "", entry.txHash, entry.account || item.vault, networkKey]),
+    ].sort((left, right) => Date.parse(String(left[1])) - Date.parse(String(right[1])));
+    const csv = [headings, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
+    const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `pulse-autopilot-${item.pair.toLowerCase()}-${item.vault.slice(2, 10)}.json`;
+    link.download = `pulse-autopilot-${item.pair.toLowerCase()}-${item.vault.slice(2, 10)}.csv`;
     link.click();
     URL.revokeObjectURL(url);
   }
@@ -5223,7 +5250,7 @@ export function AutopilotWorkspace({
           maximumFractionDigits: activeSettlementDecimals,
         })} ${activeSettlementSymbol}`;
   const activePass = activeStrategy?.aiPass || null;
-  const passRemainingMs = activePass ? Date.parse(activePass.expiresAt) - Date.now() : 0;
+  const passRemainingMs = activePass ? Date.parse(activePass.expiresAt) - (activePass.pausedAt ? Date.parse(activePass.pausedAt) : Date.now()) : 0;
   const passSignalsRemaining = activePass ? Math.max(0, activePass.signalLimit - activePass.signalsUsed) : 0;
   const passActive = passRemainingMs > 0 && passSignalsRemaining > 0;
   const passTimeLabel = passRemainingMs > 0
@@ -5231,6 +5258,7 @@ export function AutopilotWorkspace({
       ? `${Math.floor(passRemainingMs / 86_400_000)}d ${Math.floor((passRemainingMs % 86_400_000) / 3_600_000)}h remaining`
       : `${Math.max(1, Math.ceil(passRemainingMs / 3_600_000))}h remaining`
     : "Expired or not purchased";
+  const passTimerState = activePass?.pausedAt ? "Timer on hold while paused" : "Timer active while running";
   const strategyPresets = [
     {
       id: "trend_following",
@@ -5277,6 +5305,12 @@ export function AutopilotWorkspace({
       : autopilotBalances.target.toLocaleString("en-US", {
           maximumSignificantDigits: 8,
         });
+  const passPrices = { "24h": aiPolicy?.commercialPass?.price24hUsd || 1.5, "7d": aiPolicy?.commercialPass?.price7dUsd || 10.5, "30d": aiPolicy?.commercialPass?.price30dUsd || 45 };
+  const passPrice = passPrices[selectedPassPlan];
+  const needsActivationPass = !selectedVault || !passActive;
+  const requiredWalletFunds = (reusingFundedVault ? 0 : capitalNumber) + (needsActivationPass ? passPrice : 0);
+  const passFundingUnavailable = needsActivationPass && fundingWalletBalance === null;
+  const passFundingInsufficient = fundingWalletBalance !== null && fundingWalletBalance + 1e-9 < requiredWalletFunds;
   const startDisabled =
     busy ||
     !wallet ||
@@ -5284,6 +5318,8 @@ export function AutopilotWorkspace({
     !autopilotRouteAvailable ||
     effectiveCapital <= 0n ||
     autopilotInsufficientCapital ||
+    passFundingUnavailable ||
+    passFundingInsufficient ||
     !sellAmountAtomic ||
     vaultStatus === "checking" ||
     vaultStatus === "error";
@@ -5299,6 +5335,10 @@ export function AutopilotWorkspace({
             ? `Enter ${WEB_NETWORKS[networkKey].payment.symbol} capital to continue`
       : autopilotInsufficientCapital
         ? `Use available ${WEB_NETWORKS[networkKey].payment.symbol} balance first`
+        : passFundingUnavailable
+          ? `Refresh ${activeSettlementSymbol} balance before activation`
+        : passFundingInsufficient
+          ? `Keep ${passPrice.toFixed(2)} ${activeSettlementSymbol} for the AI Entry Pass`
         : vaultStatus === "checking"
           ? "Checking existing Autopilot…"
           : activeStrategy
@@ -5341,11 +5381,19 @@ export function AutopilotWorkspace({
                 ? "Mean-reversion entries only at compact-signal support zones; stop after daily loss cap."
                 : "Trend-following with compact AI confirmation; stop after daily loss cap.",
           );
+          setPreparedCandidate(`${candidate.pair} · ${candidate.timeframe} · ${candidate.strategyType.replaceAll("_", " ")}`);
+          requestAnimationFrame(() => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         }}
       />
+      {preparedCandidate && <div className="prepared-autopilot-notice" role="status"><strong>Autopilot draft prepared</strong><span>{preparedCandidate}. Review capital, risk and AI Entry Pass below; no transaction has been sent.</span></div>}
 
       <div className="autopilot-onboarding">
-        <section className="card autopilot-builder">
+        <section className="card autopilot-builder" ref={builderRef}>
+          <div className="setup-target-field">
+            <span>Configure</span>
+            <AutopilotAccountPicker value={selectedVault} options={vaultPickerOptions} onChange={(vault) => { createNewVaultRef.current = !vault; setSelectedVault(vault); setCloseConfirming(false); }} />
+            <small>{selectedVault ? "Editing only the selected account. Runtime controls remain in the dashboard." : "A new isolated owner-controlled vault will be created."}</small>
+          </div>
           <div className="autopilot-step-head">
             <span>1</span>
             <div>
@@ -5670,6 +5718,35 @@ export function AutopilotWorkspace({
             </label>
           </details>
 
+          <div className="autopilot-step-head">
+            <span>4</span>
+            <div>
+              <small>AI ENTRY PASS</small>
+              <h3>How long may AI confirm new entries?</h3>
+            </div>
+          </div>
+          <div className="setup-pass-step">
+            {selectedVault && passActive ? <div className="existing-pass-choice"><strong>Use current pass · {passTimeLabel}</strong><span>No additional payment when saving this strategy. Renew from the dashboard whenever you want to add time.</span></div> : <div className="pass-plans" role="radiogroup" aria-label="AI Entry Pass duration">
+              {(["24h", "7d", "30d"] as const).map((plan) => (
+                <button type="button" role="radio" aria-checked={selectedPassPlan === plan} className={`btn ${selectedPassPlan === plan ? "btn-accent" : "btn-soft"}`} key={plan} onClick={() => setSelectedPassPlan(plan)}>
+                  {plan} · ${passPrices[plan].toFixed(2)}
+                </button>
+              ))}
+            </div>}
+            <div className="pass-explainer">
+              <strong>Prepaid x402 payment · no auto-renewal</strong>
+              <span>Only compact AI checks for valid entry candidates consume the pass. Pausing the Autopilot freezes the time remaining. TP/SL, exits and withdrawals never require a pass.</span>
+              <small>{selectedVault && passActive ? "The existing pass remains bound to this vault." : "PULSE creates and registers a new vault first when needed, requests this payment in step 6, then starts it. Renew later from the dashboard."}</small>
+            </div>
+            {passFundingInsufficient && <div className="capital-inline-warning">The connected wallet needs {requiredWalletFunds.toFixed(2)} {activeSettlementSymbol} for {reusingFundedVault ? "this pass" : "the initial deposit plus this pass"}; available {fundingWalletBalance?.toLocaleString("en-US", { maximumFractionDigits: 6 })}.</div>}
+            {passFundingUnavailable && <div className="capital-inline-warning">PULSE cannot verify the connected-wallet payment balance. Refresh before any vault transaction is prepared.</div>}
+          </div>
+
+          <div className="autopilot-step-head">
+            <span>5</span>
+            <div><small>REVIEW</small><h3>Verify the complete Autopilot</h3></div>
+          </div>
+
           <div className="autopilot-review">
             <div>
               <span className="eyebrow">READY TO REVIEW</span>
@@ -5690,6 +5767,10 @@ export function AutopilotWorkspace({
               <li>Autopilot cannot withdraw your funds.</li>
               <li>You can pause at any time, then withdraw from the selected Autopilot.</li>
             </ul>
+          </div>
+          <div className="autopilot-step-head activation-step">
+            <span>6</span>
+            <div><small>ACTIVATE</small><h3>Approve setup, pass and start</h3></div>
           </div>
           <button
             className="btn btn-primary full autopilot-launch"
@@ -5727,7 +5808,7 @@ export function AutopilotWorkspace({
           )}
         </section>
 
-        <aside className="card autopilot-manager">
+        <aside hidden className="card autopilot-manager" aria-hidden="true">
           <span className="tier-mark premium">OWNER CONTROLLED</span>
           <h3>Your Autopilot</h3>
           {vaults.length ? (
@@ -5997,16 +6078,76 @@ export function AutopilotWorkspace({
         </aside>
       </div>
 
-      <section className="card activity-dashboard">
+      <section className="card activity-dashboard autopilot-unified-dashboard">
         <div className="dashboard-head">
           <div>
-            <span className="eyebrow">LIVE AUTOPILOT RUNTIME</span>
-            <h3>Strategies, exposure and proof</h3>
+            <span className="eyebrow">AUTOPILOT DASHBOARD</span>
+            <h3>Control, positions, decisions and activity</h3>
           </div>
           <button className="btn btn-soft" onClick={() => void refresh()}>
             Refresh
           </button>
         </div>
+        {message && <div className="v6-message dashboard-message" role="status">{message}</div>}
+        {vaults.length > 0 && <section className="dashboard-control-panel">
+          <div className="dashboard-account-line">
+            <div className="vault-picker-field">
+              <span>Autopilot account</span>
+              <AutopilotAccountPicker
+                value={selectedVault}
+                options={existingVaultPickerOptions}
+                onChange={(vault) => { setSelectedVault(vault); setCloseConfirming(false); }}
+              />
+            </div>
+            <div className="autopilot-status-card">
+              <span>Runtime</span>
+              <strong className={(activeStrategy?.paused ?? activeVault?.paused) ? "warning" : "positive"}>
+                {(activeStrategy?.paused ?? activeVault?.paused) ? "Paused" : activeStrategy?.exitPending ? "Closing position" : "Running"}
+              </strong>
+              <small>{activeStrategy?.lastDecision?.replaceAll("_", " ") || "Awaiting first decision"}</small>
+            </div>
+            <div className={`autopilot-pass-card compact ${passActive ? "active" : "warning"}`}>
+              <div><span>AI ENTRY PASS</span><strong>{passActive ? `${passTimeLabel}${activePass?.pausedAt ? " · on hold" : ""}` : "New entries on Hold"}</strong><small>{activePass?.pausedAt ? "Timer on hold while Autopilot is paused" : passTimerState} · {passSignalsRemaining} confirmations left</small></div>
+              <div className="pass-plans">
+                <button type="button" className="btn btn-accent" disabled={passBusy} onClick={() => void purchaseAutopilotPass("24h")}>24h · ${passPrices["24h"].toFixed(2)}</button>
+                <button type="button" className="btn btn-soft" disabled={passBusy} onClick={() => void purchaseAutopilotPass("7d")}>7d · ${passPrices["7d"].toFixed(2)}</button>
+                <button type="button" className="btn btn-soft" disabled={passBusy} onClick={() => void purchaseAutopilotPass("30d")}>30d · ${passPrices["30d"].toFixed(2)}</button>
+              </div>
+              <small>{passBusy ? "Waiting for wallet payment…" : "Manual x402 renewal. Added time starts after unused time; never auto-renews."}</small>
+            </div>
+          </div>
+          {selectedVault && <>
+            <div className="dashboard-balance-strip">
+              <div><span>Wallet available</span><strong>{walletBalanceText}</strong><small>Source for top-ups and pass payments</small></div>
+              <div><span>Vault settlement</span><strong>{formatAssetAtomic(activeStrategy?.settlementBalance || activeVault?.balanceAtomic || undefined, activeSettlementDecimals)} {activeSettlementSymbol}</strong><small>Withdrawable after pausing</small></div>
+              <div><span>Invested asset</span><strong>{formatAssetAtomic(activeStrategy?.targetBalance, activeStrategy?.targetDecimals ?? targetToken?.decimals ?? 18)} {activeStrategy?.targetSymbol || targetToken?.symbol || pair.split("-")[0]}</strong><small>May be sold by the strategy or withdrawn</small></div>
+              <div><span>Total value</span><strong>{formatAssetAtomic(activeStrategy?.portfolioValueAtomic || activeVault?.balanceAtomic || undefined, activeSettlementDecimals)} {activeSettlementSymbol}</strong><small>Mark-to-market</small></div>
+            </div>
+            <div className="dashboard-actions-grid">
+              <section className="vault-capital-manager">
+                <div className="capital-action-tabs" role="tablist" aria-label="Manage Autopilot capital">
+                  <button type="button" role="tab" aria-selected={capitalAction === "add"} className={capitalAction === "add" ? "active" : ""} onClick={() => setCapitalAction("add")}>Add funds</button>
+                  <button type="button" role="tab" aria-selected={capitalAction === "withdraw"} className={capitalAction === "withdraw" ? "active" : ""} onClick={() => setCapitalAction("withdraw")}>Withdraw</button>
+                </div>
+                {capitalAction === "add" ? <div className="capital-action-panel" role="tabpanel">
+                  <label><span>Amount from connected wallet</span><div className="unit-input"><input inputMode="decimal" value={addAmountHuman} onChange={(event) => setAddAmountHuman(event.target.value)} placeholder="0.00" /><button type="button" className="unit-max" disabled={!addMaximum || Number(addMaximum) <= 0} onClick={() => setAddAmountHuman(addMaximum)}>Max</button><b>{activeSettlementSymbol}</b></div></label>
+                  {addBalanceState === "insufficient" && <div className="capital-inline-warning">Amount exceeds the connected wallet balance.</div>}
+                  <button className="btn btn-accent full" disabled={busy || addBalanceState !== "ready"} onClick={() => void operateVault("fund")}>Add funds</button>
+                </div> : <div className="capital-action-panel" role="tabpanel">
+                  <div className="withdraw-asset-tabs" role="tablist"><button type="button" className={withdrawAssetMode === "settlement" ? "active" : ""} onClick={() => { setWithdrawAssetMode("settlement"); setWithdrawAmountHuman(""); }}>{activeSettlementSymbol}</button><button type="button" className={withdrawAssetMode === "target" ? "active" : ""} disabled={!activeStrategy?.targetAsset} onClick={() => { setWithdrawAssetMode("target"); setWithdrawAmountHuman(""); }}>{activeStrategy?.targetSymbol || targetToken?.symbol || pair.split("-")[0]}</button></div>
+                  <label><span>Amount available: {formatAssetAtomic(withdrawBalanceAtomic || undefined, withdrawDecimals)} {withdrawSymbol}</span><div className="unit-input"><input inputMode="decimal" value={withdrawAmountHuman} onChange={(event) => setWithdrawAmountHuman(event.target.value)} placeholder="0.00" /><button type="button" className="unit-max" disabled={BigInt(withdrawBalanceAtomic || "0") <= 0n} onClick={() => setWithdrawAmountHuman(formatUnits(BigInt(withdrawBalanceAtomic || "0"), withdrawDecimals))}>Max</button><b>{withdrawSymbol}</b></div></label>
+                  <button className="btn btn-accent full" disabled={busy || !(activeStrategy?.paused ?? activeVault?.paused ?? true) || withdrawBalanceState !== "ready"} onClick={() => void operateVault("withdraw")}>Withdraw to owner</button>
+                  {!(activeStrategy?.paused ?? activeVault?.paused) && <small>Pause first; only the owner wallet can withdraw.</small>}
+                </div>}
+              </section>
+              <section className="runtime-controls">
+                <span className="eyebrow">OWNER CONTROLS</span>
+                <div className="manager-actions"><button className="btn btn-danger" disabled={busy || (activeStrategy?.paused ?? activeVault?.paused ?? true)} onClick={() => void operateVault("pause")}>Pause · hold pass timer</button><button className="btn btn-accent" disabled={busy || !(activeStrategy?.paused ?? activeVault?.paused ?? false)} onClick={() => void operateVault("resume")}>Resume · run timer</button></div>
+                {closeConfirming ? <div className="account-lookup-error"><strong>Withdraw every asset and close?</strong><small>The auditable vault contract remains reusable.</small><div className="manager-actions"><button className="btn btn-soft" onClick={() => setCloseConfirming(false)}>Cancel</button><button className="btn btn-danger" disabled={busy} onClick={() => void closeAndWithdrawAutopilot()}>Confirm</button></div></div> : <button className="btn btn-danger full" disabled={busy} onClick={() => setCloseConfirming(true)}>Close &amp; withdraw all</button>}
+              </section>
+            </div>
+          </>}
+        </section>}
         <div className="dashboard-metrics">
           <div>
             <span>Strategies</span>
@@ -6091,7 +6232,9 @@ export function AutopilotWorkspace({
                 )}
                 {(item.lastError || item.telemetryError) && (
                   <small className="runtime-error">
-                    {item.lastError || item.telemetryError}
+                    {/\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(item.lastError || item.telemetryError || "")
+                      ? `AI provider unavailable. New entry checks are backed off${item.aiRetryAt ? ` until ${new Date(item.aiRetryAt).toLocaleString()}` : ""}; no assets moved.`
+                      : "A dependency check failed closed. Open the Strategy journal for details."}
                   </small>
                 )}
               </div>
@@ -6118,10 +6261,24 @@ export function AutopilotWorkspace({
               const filledSells = item.filledSellCount ?? evaluations.filter((entry) => entry.action === "sell" && entry.status === "filled").length;
               const holds = item.holdCount ?? evaluations.filter((entry) => entry.action === "hold" && entry.status === "held").length;
               const failures = item.failureCount ?? evaluations.filter((entry) => entry.status === "failed").length;
+              const failureIncidents = evaluations.reduce((count, entry, index) => {
+                if (entry.status !== "failed") return count;
+                const previous = evaluations[index - 1];
+                const sameBurst = previous?.status === "failed"
+                  && `${previous.reason}:${previous.error || ""}` === `${entry.reason}:${entry.error || ""}`
+                  && Date.parse(entry.evaluatedAt) - Date.parse(previous.evaluatedAt) < 6 * 60 * 60_000;
+                return count + (sameBurst ? 0 : 1);
+              }, 0);
+              const recentDecisions = [...evaluations].reverse().filter((entry, index, all) => {
+                if (index === 0) return true;
+                const previous = all[index - 1];
+                return `${entry.action}:${entry.status}:${entry.reason}:${entry.error || ""}` !== `${previous.action}:${previous.status}:${previous.reason}:${previous.error || ""}`;
+              }).slice(0, 20);
+              const providerBlocked = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(latest?.error || "");
               return (
                 <details key={`${item.id}-report`}>
                   <summary>
-                    Detailed trading report - {item.pair} -{" "}
+                    Strategy journal · {item.pair} ·{" "}
                     {definition?.label ||
                       item.strategyType?.replaceAll("_", " ") ||
                       "Strategy"}
@@ -6131,9 +6288,16 @@ export function AutopilotWorkspace({
                     <div><span>Filled buys</span><strong>{filledBuys}</strong></div>
                     <div><span>Filled sells</span><strong>{filledSells}</strong></div>
                     <div><span>Holds</span><strong>{holds}</strong></div>
-                    <div><span>Failures</span><strong>{failures}</strong></div>
+                    <div><span>Failure incidents</span><strong>{failureIncidents}</strong><small>{failures} raw failed attempts retained</small></div>
                     <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
-                    <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export full JSON log</button>
+                    <div><span>Last cycle</span><strong>{latest ? new Date(latest.evaluatedAt).toLocaleTimeString() : "—"}</strong><small>{latest ? new Date(latest.evaluatedAt).toLocaleDateString() : "awaiting"}</small></div>
+                    <div><span>Next AI eligible</span><strong>{item.aiNextEligibleAt ? new Date(item.aiNextEligibleAt).toLocaleTimeString() : "Candidate driven"}</strong><small>{item.aiBudgetStatus?.replaceAll("_", " ") || "free gate first"}</small></div>
+                    <div><span>Position basis</span><strong>{item.positionEntryPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No open entry"}</strong><small>mark {item.markPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "—"}</small></div>
+                    <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export CSV activity</button>
+                  </div>
+                  <div className={`strategy-now ${item.paused ? "paused" : latest?.status || "held"}`}>
+                    <div><span>WHAT IT IS DOING NOW</span><strong>{item.paused ? "PAUSED · no entry checks" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>
+                    <p>{item.paused ? "The vault cannot trade and the AI Entry Pass timer is on hold. Resume when you want monitoring to continue." : providerBlocked ? `No assets moved. New AI requests are blocked until ${item.aiRetryAt ? new Date(item.aiRetryAt).toLocaleString() : "the provider retry window"}; deterministic position protection remains available.` : latest?.reason || "PULSE is waiting for the next eligible candle."}</p>
                   </div>
                   <div className="autopilot-report-grid">
                     <section>
@@ -6217,16 +6381,14 @@ export function AutopilotWorkspace({
                               Open executed trade
                             </a>
                           )}
-                          {latest.error && (
-                            <div className="runtime-error">{latest.error}</div>
-                          )}
+                          {latest.error && <details className="technical-error"><summary>Technical error details</summary><div className="runtime-error">{latest.error}</div></details>}
                         </>
                       )}
                     </section>
                   </div>
                   <section className="autopilot-evaluation-log">
-                    <div className="dashboard-head"><div><span className="eyebrow">DECISION LOG</span><h4>Recent evaluations and actions</h4></div><small>Newest first · full JSON export includes wallet activity</small></div>
-                    {evaluations.length ? [...evaluations].reverse().slice(0, 20).map((entry) => (
+                    <div className="dashboard-head"><div><span className="eyebrow">STRATEGY DECISIONS</span><h4>Why PULSE waited, bought or sold</h4></div><small>Newest first · repeated identical failures are collapsed · CSV includes on-chain activity</small></div>
+                    {recentDecisions.length ? recentDecisions.map((entry) => (
                       <div className="evaluation-log-row" key={entry.id}>
                         <span className={`status-chip ${entry.status}`}>{entry.status}</span>
                         <strong>{entry.action.toUpperCase()}</strong>
@@ -6242,15 +6404,20 @@ export function AutopilotWorkspace({
             })}
           </div>
         )}
+        <section className="autopilot-chain-activity">
+          <div className="dashboard-head"><div><span className="eyebrow">ON-CHAIN ACTIVITY</span><h4>Wallet confirmations, fills and owner actions</h4></div><small>Separate from strategy decisions · newest first</small></div>
+          {activitySyncNotice && <div className="capital-inline-warning">{activitySyncNotice}</div>}
+          {activity.filter((entry) => entry.source === "autopilot").length ? activity.filter((entry) => entry.source === "autopilot").slice().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 30).map((entry) => (
+            <div className="chain-activity-row" key={entry.id}>
+              <span className={`status-chip ${entry.status}`}>{entry.status}</span>
+              <strong>{entry.kind.replaceAll("_", " ")}</strong>
+              <span>{entry.pair || "Autopilot account"}</span>
+              <time>{new Date(entry.createdAt).toLocaleString()}</time>
+              {entry.txHash ? <a href={`${WEB_NETWORKS[networkKey].explorer}/tx/${entry.txHash}`} target="_blank" rel="noreferrer">Transaction ↗</a> : <span />}
+            </div>
+          )) : <div className="empty-dashboard compact"><strong>No on-chain activity yet</strong><span>Wallet confirmations and executed trades will appear here.</span></div>}
+        </section>
       </section>
-      <ActivityDashboard
-        title="Autopilot vaults, decisions and P&L"
-        activity={activity.filter((item) => item.source === "autopilot")}
-        strategies={strategies}
-        networkKey={networkKey}
-        onRefresh={refresh}
-        syncNotice={activitySyncNotice}
-      />
     </div>
   );
 
@@ -6950,7 +7117,7 @@ export function DocsWorkspace() {
         </div>
         <div className="docs-version">
           <span>PRODUCT GUIDE</span>
-          <strong>V6</strong>
+          <strong>PULSE</strong>
           <small>Global · Prediction · Spot · Autopilot</small>
         </div>
       </header>
@@ -7036,8 +7203,9 @@ export function DocsWorkspace() {
                 </li>
                 <li>
                   When the evidence supports a long spot setup, choose{" "}
-                  <b>Market buy</b>, <b>Limit buy</b>, or <b>Autopilot</b>{" "}
-                  directly in the report.
+                  <b>Market buy</b> or <b>Limit buy</b> directly in the report.
+                  Agentic Wallet reviews and signs the prepared transaction.
+                  Autopilot starts separately with its own live signal policy.
                 </li>
               </ol>
               <div className="docs-callout">
@@ -7581,7 +7749,7 @@ export function DocsWorkspace() {
             <span className="docs-number">05</span>
             <div className="docs-copy">
               <span className="eyebrow">AUTOPILOT</span>
-              <h3>Three trader decisions; guardrails handled by PULSE</h3>
+              <h3>Six clear setup steps; one runtime dashboard</h3>
               <p>
                 Choose the market and timeframe, a familiar strategy preset, and
                 the capital/risk profile. PULSE resolves tokens, verifies the
@@ -7611,14 +7779,13 @@ export function DocsWorkspace() {
                   </span>
                 </article>
                 <article>
-                  <b>3 · Start &amp; control</b>
+                  <b>3 · Pass, review &amp; activate</b>
                   <span>
-                    Press Start once. Confirm the guided setup, then monitor
-                    decisions and P&amp;L. Add capital from the connected wallet
-                    later without recreating the vault. A top-up changes the
-                    vault balance, not the already signed limits; save the
-                    selected strategy again to resize those limits. Pause before
-                    withdrawing settlement or invested assets as the owner.
+                    Choose 24h, 7d or 30d AI Entry Pass time, review the whole
+                    policy, then approve activation. A new vault is registered
+                    before its x402 pass payment; an existing active pass is
+                    reused without charging again. Runtime controls then live
+                    together in the dashboard, not in a separate side card.
                   </span>
                 </article>
               </div>
@@ -7634,10 +7801,12 @@ export function DocsWorkspace() {
                 <b>AI pass: predictable cost per vault</b>
                 <span>
                   Choose $1.50 for 24 hours, $10.50 for 7 days, or $45 for 30
-                  days. Renewal adds time to the current expiry. Each covered
+                  days. Renewal adds time to the current expiry. Pausing freezes
+                  the paid timer; resuming restores it with the same remaining
+                  time. Each covered
                   day includes up to three compact entry confirmations; routine
                   Holds and deterministic TP/SL or structure exits do not call
-                  xAI. Two hours before expiry PULSE shows an urgent reminder
+                  xAI. Two active-runtime hours before expiry PULSE shows an urgent reminder
                   and can notify the linked Telegram chat. After expiry, new
                   entries remain on Hold while protection, exits, Pause and
                   Withdraw continue.
@@ -7661,7 +7830,7 @@ export function DocsWorkspace() {
               <h3>Know which balance moves before you sign</h3>
               <p>
                 Every strategy account is isolated. First choose the exact
-                Autopilot in the themed account popup; its status, portfolio
+                Autopilot in the dashboard account selector; its status, portfolio
                 value, available settlement asset and invested asset update
                 together. Changing Network &amp; Payment shows only that chain’s
                 accounts.
@@ -7694,7 +7863,7 @@ export function DocsWorkspace() {
               <b>1 · Select Autopilot 1</b>
               <span>
                 Confirm its short address, Paused/Running state and portfolio
-                value in the popup. Do not use another account’s balance.
+                value in the unified dashboard. Do not use another account’s balance.
               </span>
               <i>→</i>
               <b>2 · Read the three balance cards</b>
@@ -7817,10 +7986,15 @@ export function DocsWorkspace() {
             <div className="docs-callout">
               <b>How to read the trading report</b>
               <span>
+                Open the Strategy journal. “What it is doing now” translates
+                runtime state into Wait, Buy, Sell, Paused or provider outage.
                 PASS means the observed market value met that signed rule. WAIT
                 means it did not. Buy requires every entry row to pass; Sell
                 needs one exit row. Hold never sends a transaction. A filled row
-                includes the evidence hash and explorer transaction.
+                includes the evidence hash and explorer transaction. Strategy
+                decisions are separate from wallet/on-chain activity, repeated
+                identical failures are collapsed, and Export CSV activity joins
+                both streams for auditing.
               </span>
             </div>
             <div className="docs-callout">
@@ -7840,18 +8014,21 @@ export function DocsWorkspace() {
                 may monitor 0.5 USDT0 in WETH Mean Reversion on X Layer, 0.5
                 USDC in cbDOGE Breakout on Base and 0.5 USDC in WBTC Mean
                 Reversion on Arbitrum. Switch Network &amp; payment to view that
-                network&apos;s agents. The selected-account card shows one
-                agent&apos;s capital; Total portfolio value and runtime P&amp;L
-                aggregate all agents on the selected network.
+                network&apos;s agents. The selected dashboard account shows one
+                vault&apos;s capital and P&amp;L; the strategy summary above it
+                aggregates all vaults on the selected network.
               </span>
             </div>
             <div className="docs-callout">
               <b>If a dependency disconnects</b>
               <span>
                 PULSE fails closed and moves no assets. A temporary provider or
-                RPC failure appears as dependency retry, while the scheduler
-                keeps the signed strategy and retries without requiring the
-                browser tab or another wallet signature.
+                RPC failure appears as dependency retry. Every xAI attempt is
+                timestamped before the request, so even a failed call observes
+                the 15-minute minimum. Billing, permission and quota failures
+                open a six-hour circuit breaker instead of retrying every worker
+                tick. The signed strategy remains available without the browser
+                tab or another wallet signature.
               </span>
             </div>
             <div className="docs-callout">
@@ -7890,17 +8067,16 @@ export function DocsWorkspace() {
               <i>→</i>
               <b>3 · Allocate 500 USDC</b>
               <span>
-                Select Balanced. PULSE displays 25 USDC maximum per trade, 15
+                Select Balanced. PULSE displays 250 USDC maximum per trade, 15
                 USDC daily-loss stop and 250 USDC maximum WETH exposure.
               </span>
               <i>→</i>
-              <b>4 · Create a new Autopilot</b>
+              <b>4 · Choose the AI Entry Pass</b>
               <span>
-                Choose Create new Autopilot in the account selector, then press
-                Create &amp; start new Autopilot. Selecting an existing account
-                instead changes that account and the button says Save changes
-                &amp; restart selected. PULSE validates ERC-20 contracts and the
-                live route before the first wallet confirmation.
+                Choose $1.50 / 24h, $10.50 / 7d or $45 / 30d. PULSE validates
+                ERC-20 contracts and the live route, creates/registers the vault,
+                then requests x402 payment as the final activation step. Paid
+                time is frozen whenever the vault is paused.
               </span>
               <i>→</i>
               <b>5 · Evaluate and execute</b>
@@ -7914,10 +8090,11 @@ export function DocsWorkspace() {
               <i>→</i>
               <b>6 · Reconcile and control</b>
               <span>
-                See actual vault capital, target balance, decision history,
-                evidence, transaction and cash-flow-adjusted P&amp;L. Select the
-                exact vault, pause it, then withdraw its displayed settlement
-                or invested balance as the owner.
+                In one dashboard, see actual vault capital, target balance,
+                Strategy journal, on-chain activity, evidence, transaction and
+                cash-flow-adjusted P&amp;L. Select the exact vault; pause/resume,
+                renew, add funds, withdraw either asset with Max, or close and
+                withdraw all as the owner.
               </span>
             </div>
             <div className="docs-callout">
@@ -7984,13 +8161,13 @@ export function DocsWorkspace() {
           <section id="docs-agents" className="docs-deep-dive">
             <div className="docs-deep-head">
               <span className="eyebrow">AGENTS &amp; API</span>
-              <h3>Discover the same five services from any supported agent environment</h3>
+              <h3>Discover eight services on every supported execution mainnet</h3>
               <p>
-                PULSE keeps one clear public catalog. An agent discovers a
-                service, supplies its typed input, settles the network-specific
-                x402 challenge and receives a durable job it can poll or recover.
-                Spot execution and Autopilot remain next actions from a valid
-                Global Pro report, not extra marketplace services.
+                X Layer, Base and Arbitrum expose five analysis/risk services
+                plus three duration-specific Autopilot start services. Global
+                Spot and Autopilot contract calls remain owned and confirmed by
+                the caller&apos;s Agentic Wallet. Circle/Arc exposes only the five
+                analysis/risk services because execution is unavailable there.
               </p>
             </div>
             <div className="docs-agent-flow" aria-label="Agent service workflow">
@@ -8003,20 +8180,24 @@ export function DocsWorkspace() {
               <div><small>4 В· RECOVER</small><b>Poll the durable report job</b></div>
             </div>
             <div className="docs-agent-services">
-              <article><b>Global Quick</b><span>$0.20 В· concise Buy-or-Wait plan</span></article>
-              <article><b>Global Pro</b><span>$0.30 В· chart, Elliott paths, DeFi and next actions</span></article>
+              <article><b>Global Quick → Spot Market or Limit</b><span>$0.20 В· concise plan, then Agentic Wallet execution</span></article>
+              <article><b>Global Pro → Spot Market or Limit</b><span>$0.30 В· deeper chart and Elliott plan, then Agentic Wallet execution</span></article>
               <article><b>Prediction Quick</b><span>$0.20 В· selected-market evidence</span></article>
               <article><b>Prediction Pro</b><span>$0.30 В· deeper evidence and 4H underlying chart</span></article>
               <article><b>Risk Guard</b><span>$0.15 В· PASS/WARN/FAIL before signing</span></article>
+              <article><b>Start Autopilot В· 24h</b><span>$1.50 В· six-step owner-wallet setup and active runtime</span></article>
+              <article><b>Start Autopilot В· 7d</b><span>$10.50 В· same workflow for seven active-runtime days</span></article>
+              <article><b>Start Autopilot В· 30d</b><span>$45.00 В· same workflow for 30 active-runtime days</span></article>
             </div>
             <div className="docs-agent-channels">
               <article>
                 <span>OKX.AI В· X LAYER</span>
                 <h4>PULSE agent #8355</h4>
                 <p>
-                  The existing identity exposes the five X Layer service URLs
-                  and settles in USDT0. Base and Arbitrum do not require a
-                  second copy of this ERC-8004 identity.
+                  The existing identity exposes all eight X Layer services and
+                  settles in USDT0. Agentic Wallet owns and confirms Spot and
+                  Autopilot calls. Base and Arbitrum do not require a second
+                  copy of this ERC-8004 identity.
                 </p>
                 <a href="https://www.okx.ai/agents/8355" target="_blank" rel="noreferrer">Open PULSE agent #8355 в†—</a>
                 <code>/xlayer/v1/analysis/spot/premium</code>
@@ -8025,9 +8206,9 @@ export function DocsWorkspace() {
                 <span>CDP BAZAAR В· MAINNET</span>
                 <h4>Base and Arbitrum discovery</h4>
                 <p>
-                  The same five logical services are advertised under the
-                  selected network prefix with typed request and response
-                  schemas. Payment uses native USDC on that chain.
+                  The same eight services are advertised under the selected
+                  network prefix with typed schemas. Agentic Wallet signs Spot
+                  and Autopilot contract calls; payment uses native USDC.
                 </p>
                 <code>/base/... В· /arbitrum/...</code>
               </article>
@@ -8043,13 +8224,14 @@ export function DocsWorkspace() {
               </article>
             </div>
             <div className="docs-callout">
-              <b>Autopilot passes are not a sixth public analysis service</b>
+              <b>Three Agentic Wallet Autopilot start services</b>
               <span>
-                $1.50 / 24 hours, $10.50 / 7 days and $45 / 30 days are
-                per-vault AI-entry entitlements purchased inside Autopilot.
-                They control compact entry confirmations; deterministic
-                monitoring and protective exits continue without spending an
-                analysis fee every cycle.
+                Choose pair/timeframe, strategy, capital/risk and vault. The
+                caller&apos;s Agentic Wallet reviews creation, configuration,
+                funding and registration calls; x402 then activates 24h, 7d or
+                30d and the owner resumes/starts the vault. Pause freezes paid
+                runtime. Autopilot never requires a Global report and does not
+                spend a full analysis fee every cycle.
               </span>
             </div>
           </section>

@@ -109,7 +109,7 @@ REPORT_ENCRYPTION_KEY=<BASE64URL_32_BYTE_REPORT_ENCRYPTION_KEY>
 QUEUE_PROVIDER=upstash_kv
 PERSISTENCE_NAMESPACE=pulse:production
 
-# V6 Global reports require enough room to complete the strict Elliott schema.
+# PULSE Global reports require enough room to complete the strict Elliott schema.
 GROK_MAX_OUTPUT_STANDARD=1800
 GROK_MAX_OUTPUT_PREMIUM=3200
 GROK_AUTOPILOT_MODEL=grok-4.3
@@ -145,7 +145,7 @@ Important Railway rules:
 - `PAY_TO_ADDRESS` must be a deliberately verified non-zero seller address.
 - The supplied PULSE Blob store is public, so Railway must use `BLOB_ACCESS=public` with the same server-only 32-byte `REPORT_ENCRYPTION_KEY` used for all report reads. Do not change this access mode during deployment.
 - Production startup fails closed before accepting traffic if `STORAGE_PROVIDER=vercel_blob` is combined with any Blob access mode other than `public`, or if the encryption key is missing or invalid.
-- Do not reduce `GROK_MAX_OUTPUT_STANDARD` below `1800` or `GROK_MAX_OUTPUT_PREMIUM` below `3200`. The runtime clamps obsolete lower values, but the environment should reflect the actual cost ceiling used by V6 reports.
+- Do not reduce `GROK_MAX_OUTPUT_STANDARD` below `1800` or `GROK_MAX_OUTPUT_PREMIUM` below `3200`. The runtime clamps obsolete lower values, but the environment should reflect the actual cost ceiling used by PULSE reports.
 - `DATABASE_URL` remains empty. PULSE uses KV and Blob, not PostgreSQL.
 - Leave `CRON_SECRET` empty in this Railway topology.
 
@@ -259,7 +259,7 @@ Test production at desktop widths and at 390 px mobile width:
 - wallet balance and selected network update without reloading the app;
 - Global Market loads live instruments, candles, Base/Premium reports and cross-device report history;
 - report charts fit their card and click to zoom in/out;
-- a Premium report clearly offers Market, Limit and Autopilot next actions;
+- both Global tiers clearly offer Agentic-Wallet-signed Spot Market and Limit next actions, while Autopilot starts independently through its own six-step service;
 - Spot accepts direct pair selection and report-prefilled selection, validates chain mapping and balances, and preserves pending/active/executed/cancelled activity across tabs and devices;
 - Autopilot shows the strategy account's real capital, the connected wallet's available settlement balance, separate Add/Withdraw flows and Max controls;
 - Prediction Market, Telegram, Docs and Risk Guard load without stale API state;
@@ -319,7 +319,7 @@ Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` va
 | Browser says API offline | Wrong build-time `VITE_API_URL`, failed Railway health or TLS/CORS issue | Open Railway `/healthz`, compare the exact API origin, then rebuild Vercel. |
 | Reports or dashboards disappear | Vercel and Railway point to different KV/Blob resources or namespaces | Verify Railway storage variables; Vercel web must not own authoritative storage. |
 | Paid report reaches `failed terminal` or `manual reconciliation` with `Cannot use private access on a public store` | Railway `BLOB_ACCESS` does not match the Vercel Blob store | For the supplied public store, set `BLOB_ACCESS=public` and the stable server-only `REPORT_ENCRYPTION_KEY`; redeploy, sign into Paid report history and press **Retry**. The settled receipt is reused and no second payment occurs. |
-| Global report logs show `Unterminated string` near the end of Grok JSON | Obsolete Global output limits truncated the strict V6 schema | Set `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`, redeploy, then retry the settled job from report history. |
+| Global report logs show `Unterminated string` near the end of Grok JSON | Obsolete Global output limits truncated the strict PULSE schema | Set `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`, redeploy, then retry the settled job from report history. |
 
 ## Alternative: all-in-one Vercel serverless
 

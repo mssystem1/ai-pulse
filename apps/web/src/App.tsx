@@ -492,12 +492,6 @@ export function App() {
     window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
   }
 
-  function openAutopilotFromReport(intent: ReportTradeIntent) {
-    setTradeIntent(intent);
-    navigateTo("autopilot");
-    window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
-  }
-
   function selectCandidateForAnalysis(candidatePair: string, candidateTimeframe: string) {
     supersedeRequests(reportRequestRef);
     setInstId(candidatePair);
@@ -828,7 +822,7 @@ export function App() {
       {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
 
       {tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
-        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace />
         : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>
@@ -983,7 +977,7 @@ export function App() {
           {result && service === "preflight" && <SafetyPreflightReport data={result} />}
           {result && (service === "contract_inspect" || service === "live_contract_evidence") && <ContractEvidenceReport data={result} />}
           {result && (service === "analysis_base" || service === "analysis_premium" || service === "spot_analysis_standard" || service === "spot_analysis_premium") && (
-            <AnalysisReport data={result} nfa={d.nfa} onTrade={networkKey === "arc-testnet" ? undefined : openTradeFromReport} onAutopilot={networkKey === "arc-testnet" ? undefined : openAutopilotFromReport} />
+            <AnalysisReport data={result} nfa={d.nfa} onTrade={networkKey === "arc-testnet" ? undefined : openTradeFromReport} />
           )}
           {result &&
             service !== "token_scan" &&

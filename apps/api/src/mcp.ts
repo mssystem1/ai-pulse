@@ -116,6 +116,19 @@ const TOOLS = [
   ]),
   { name: "divergence_analysis", description: "Paid: deterministic spot and selected-market divergence", inputSchema: { type: "object", properties: { instId: { type: "string" }, timeframe: { type: "string" }, primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } } }, required: ["instId", "primaryMarketId"] } },
   { name: "event_risk_preflight", description: "Paid: selected prediction-market event-risk preflight", inputSchema: { type: "object", properties: { primaryMarketId: { type: "string" }, additionalMarketIds: { type: "array", items: { type: "string" } }, intent: { type: "string" } }, required: ["primaryMarketId"] } },
+  ...(["24h", "7d", "30d"] as const).map((duration) => ({
+    name: `start_autopilot_${duration}`,
+    description: `Paid: start or extend an owner-controlled Autopilot for ${duration} after its Agentic Wallet setup is complete`,
+    inputSchema: {
+      type: "object",
+      properties: {
+        owner: { type: "string", description: "Agentic Wallet EVM address that owns the vault" },
+        vault: { type: "string", description: "Owner-controlled vault already created, configured, funded and registered through Agentic Wallet contract calls" },
+        telegramDelivery: { type: "string", description: "Optional chat-bound expiry-reminder capability; never wallet authority" },
+      },
+      required: ["owner", "vault"],
+    },
+  })),
   { name: "job_status", description: "Free authenticated status read for a previously paid durable job; never pay again to poll", inputSchema: { type: "object", properties: { jobId: { type: "string" }, recoveryToken: { type: "string" } }, required: ["jobId", "recoveryToken"] } },
   { name: "job_report", description: "Free authenticated final-report retrieval for a previously paid durable job; never pay again to retrieve", inputSchema: { type: "object", properties: { jobId: { type: "string" }, recoveryToken: { type: "string" } }, required: ["jobId", "recoveryToken"] } },
 ];
@@ -133,6 +146,9 @@ function availableTools(cfg: AppConfig) {
     "spot_analysis_premium",
     "prediction_analysis_standard",
     "prediction_analysis_premium",
+    "start_autopilot_24h",
+    "start_autopilot_7d",
+    "start_autopilot_30d",
     "preflight",
     "job_status",
     "job_report",
@@ -145,11 +161,14 @@ function availableTools(cfg: AppConfig) {
     if (tool.name === "event_risk_preflight") return cfg.FEATURE_EVENT_RISK_ANALYSIS;
     return true;
   }).map((tool) => {
-    if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Market Quick Plan · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise OKX-grounded Buy-or-Wait plan with Elliott candidate paths` };
-    if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Market Pro Strategy · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots, Elliott paths, DeFi and report-linked execution actions` };
-    if (tool.name === "prediction_analysis_standard") return { ...tool, description: `Prediction Market Quick View · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_STANDARD)} · concise evidence, probability and invalidation` };
-    if (tool.name === "prediction_analysis_premium") return { ...tool, description: `Prediction Market Pro Analysis · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_PREMIUM)} · detailed counter-case plus independent 4H underlying chart` };
+    if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Quick → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise OKX-grounded Buy-or-Wait plan followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
+    if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Pro → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots and Elliott paths followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
+    if (tool.name === "prediction_analysis_standard") return { ...tool, description: `Prediction Quick · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_STANDARD)} · concise evidence, probability and invalidation` };
+    if (tool.name === "prediction_analysis_premium") return { ...tool, description: `Prediction Pro · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_PREMIUM)} · detailed counter-case plus independent 4H underlying chart` };
     if (tool.name === "preflight") return { ...tool, description: `Onchain Pre-Trade Risk Guard · ${priceLabel(cfg.PRICE_PREFLIGHT)} · deeper token, route, amount and counterparty PASS/WARN/FAIL review` };
+    if (tool.name === "start_autopilot_24h") return { ...tool, description: `Start Autopilot · 24h · ${priceLabel(cfg.PRICE_AUTOPILOT_PASS_24H)} · final x402 runtime activation after the Agentic Wallet creates, configures, funds and registers the owner-controlled vault` };
+    if (tool.name === "start_autopilot_7d") return { ...tool, description: `Start Autopilot · 7d · ${priceLabel(cfg.PRICE_AUTOPILOT_PASS_7D)} · final x402 runtime activation after the Agentic Wallet creates, configures, funds and registers the owner-controlled vault` };
+    if (tool.name === "start_autopilot_30d") return { ...tool, description: `Start Autopilot · 30d · ${priceLabel(cfg.PRICE_AUTOPILOT_PASS_30D)} · final x402 runtime activation after the Agentic Wallet creates, configures, funds and registers the owner-controlled vault` };
     return tool;
   });
 }
@@ -316,8 +335,9 @@ async function dispatch(
       return report;
     }
     default:
-      if (/^(spot|prediction|fused)_analysis_(standard|premium)$/.test(name) || name === "divergence_analysis" || name === "event_risk_preflight") {
-        const route = name === "divergence_analysis" ? "/v1/analysis/divergence"
+      if (/^(spot|prediction|fused)_analysis_(standard|premium)$/.test(name) || /^start_autopilot_(24h|7d|30d)$/.test(name) || name === "divergence_analysis" || name === "event_risk_preflight") {
+        const route = name.startsWith("start_autopilot_") ? `/v1/autopilot/pass/${name.replace("start_autopilot_", "")}`
+          : name === "divergence_analysis" ? "/v1/analysis/divergence"
           : name === "event_risk_preflight" ? "/v1/preflight/event-risk"
             : `/v1/analysis/${name.replace("_analysis_", "/")}`;
         const response = await fetch(`${cfg.BASE_URL.replace(/\/$/, "")}${route}`, {

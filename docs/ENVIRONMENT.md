@@ -148,7 +148,7 @@ This table is the operational checklist for variables that require a choice. Fix
 | `OKX_XLAYER_API_*` | Server secrets | Required for X Layer | Required | Existing OKX x402/DEX compatibility credentials. |
 | `STORAGE_PROVIDER` | `memory` or `vercel_blob` | `memory` for isolated testing, or configured Blob for recovery E2E | `vercel_blob` | Report-body persistence. Blob requires its token and KV metadata. |
 | `QUEUE_PROVIDER` | `memory` or `upstash_kv` | `memory` for one process, or Upstash for durability E2E | `upstash_kv` | Jobs, locks, receipts, idempotency, and shared budgets. |
-| `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates jobs, reports, history, budgets and cron keys. V6 trading keys use a stable prefix, so never reuse the production KV database for localhost tests. |
+| `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates jobs, reports, history, budgets and cron keys. Legacy trading keys use a stable prefix, so never reuse the production KV database for localhost tests. |
 | `BLOB_ACCESS` | `public` | `public` | `public` | The supplied PULSE Blob store is public; report bodies are encrypted before upload. |
 | `REPORT_ENCRYPTION_KEY` | Base64url 32-byte key | Required for the supplied public Blob | Same stable key | Encrypts report bodies stored in public Blob. Changing it makes earlier encrypted reports unreadable. |
 | `REPORT_DEFAULT_VISIBILITY` | `private` | `private` | `private` | Default paid-report access policy. |
@@ -156,7 +156,7 @@ This table is the operational checklist for variables that require a choice. Fix
 | `AUTOMATION_WORKER_ENABLED` | `0` or `1` | `1` only during live acceptance | `1` on the single Railway worker | Enables guarded Spot reconciliation and Autopilot evaluation. Do not also run a Vercel cron. |
 | `AUTOMATION_EXECUTOR_PRIVATE_KEY` | 32-byte server secret | Optional; TEST wallet is the acceptance fallback | Required only on the automation host (Railway in the recommended split) | Dedicated signer whose address currently needs Registry Spot keeper + Autopilot executor roles and the OracleRouter updater role. It cannot call owner-only vault withdrawal. Never use an owner, seller, treasury or test key. |
 | `CRON_SECRET` | Long random server secret | Optional | Unset for Railway; required only for an all-in-one Vercel serverless API/cron | Authenticates `GET /v1/internal/automation/tick`; it is a scheduler secret, not an on-chain signer. |
-| `AUTOPILOT_ANALYSIS_INTERVAL_MS` | Milliseconds, at least `60000` | `300000` | `300000` | Scan cadence for a newly closed candle and deterministic entry/structure rules. It does not imply an xAI call. |
+| `AUTOPILOT_ANALYSIS_INTERVAL_MS` | Milliseconds, effective minimum `900000` | `900000` | `900000` | Scan cadence for a newly closed candle and deterministic entry/structure rules. Values below 15 minutes are ignored by the worker. It does not imply an xAI call. |
 | `AUTOPILOT_RISK_INTERVAL_MS` | Milliseconds, at least `30000` | `60000` | `60000` | Independent live TP/SL and latched partial-exit monitor. It does not call xAI, continues during an AI outage, and still uses the vault cooldown, oracle, route, simulation and nonce safeguards. |
 | `GROK_AUTOPILOT_MODEL` | Supported xAI model | `grok-4.3` | `grok-4.3` | Compact market-state classifier; never generates a full report. |
 | `GROK_MAX_INPUT_AUTOPILOT` / `GROK_MAX_OUTPUT_AUTOPILOT` | Token limits | `4000` / `320` | Same | Hard compact-signal prompt/output bounds. |
@@ -174,39 +174,55 @@ URLs never receive such a fallback.
 
 ## Pricing: preserve current services, add V5 services
 
-The current pricing contract must remain wired to REST routes, browser pre-sign checks, MCP/SDK metadata, and OKX.AI replay where that service is publicly exposed:
+The environment contains several price classes. Eight rows are public on X Layer, Base and Arbitrum: five analysis/risk services plus three Autopilot start services. Circle/Arc publishes only the five analysis/risk rows because Arc Testnet has no Autopilot execution. A configured price does not by itself make a legacy route a public product.
+
+### Public marketplace catalog
 
 ```env
 PRICE_ANALYSIS_BASE=0.20
 PRICE_ANALYSIS_PREMIUM=0.30
-PRICE_TOKEN_SCAN=0.20
 PRICE_PREFLIGHT=0.15
-PRICE_WALLET_SCAN=0.11
-PRICE_MARKET_PULSE=0.11
-PRICE_SWAP_QUOTE=0.12
+PRICE_ANALYSIS_PREDICTION_STANDARD=0.20
+PRICE_ANALYSIS_PREDICTION_PREMIUM=0.30
+```
+
+These are Global Market Quick/Pro, Prediction Market Quick/Pro, and Onchain Pre-Trade Risk Guard. They must remain wired to REST routes, browser pre-sign checks, MCP/SDK metadata, and marketplace replay.
+
+### Public Autopilot start services
+
+```env
 PRICE_AUTOPILOT_PASS_24H=1.50
 PRICE_AUTOPILOT_PASS_7D=10.50
 PRICE_AUTOPILOT_PASS_30D=45.00
 ```
 
-Global/Prediction reports and Risk Guard are public paid services. The three Autopilot pass routes are in-product, vault-bound entitlements. Wallet-scan, market-pulse, and heuristic swap-quote backend routes retain API/SDK compatibility but are not promoted as separate product choices.
+The three routes are advertised as **Start Autopilot · 24h/7d/30d** on X Layer, Base and Arbitrum. The caller's Agentic Wallet performs the six-step vault, policy, funding, registration and start workflow; the priced route is the final x402 AI-runtime activation step and requires an owner-registered vault. They increase the execution-mainnet catalog from five to eight and are deliberately omitted from Arc/Circle discovery.
 
-The V5 document leaves these prices open for product configuration. PULSE uses the following launch strategy:
+### Legacy API/SDK compatibility prices
 
 ```env
-PRICE_ANALYSIS_PREDICTION_STANDARD=0.20
-PRICE_ANALYSIS_PREDICTION_PREMIUM=0.30
+PRICE_TOKEN_SCAN=0.20
+PRICE_WALLET_SCAN=0.11
+PRICE_MARKET_PULSE=0.11
+PRICE_SWAP_QUOTE=0.12
+```
+
+These backend routes remain configurable for compatibility but are not promoted in the product navigation or agent discovery catalog. `PRICE_ANALYSIS_BASE` and `PRICE_ANALYSIS_PREMIUM` also serve the old `/v1/analysis/base` and `/v1/analysis/premium` aliases; those aliases are not additional products.
+
+### Disabled experimental compatibility prices
+
+```env
 PRICE_ANALYSIS_FUSED_STANDARD=0.25
 PRICE_ANALYSIS_FUSED_PREMIUM=0.40
 PRICE_ANALYSIS_DIVERGENCE=0.20
 PRICE_PREFLIGHT_EVENT_RISK=0.30
 ```
 
-Prediction pricing matches the configured standard/premium spot anchors. Fused pricing is higher because it validates and combines both OKX and selected Polymarket context. Divergence is a narrower specialized analysis at $0.20. Event-risk preflight adds fresh prediction-market validation and is $0.30; Onchain Pre-Trade Risk Guard is $0.15. Existing price variables are never used as fallbacks for a different service.
+Fused, divergence, and event-risk routes remain disabled by their `FEATURE_*` flags in the supported deployment profile. Their variables exist only so an old integration fails predictably if temporarily enabled; they are not approved public services. Existing price variables are never used as fallbacks for a different service.
 
 Local templates enable all four new service flags. The production-canary template keeps them disabled while retaining their configured prices, so activation later requires only a deliberate feature-flag change and redeployment.
 
-The price-to-route mapping follows V5 exactly:
+The canonical price-to-route mapping is:
 
 | Variable | Shared logical route |
 |---|---|
@@ -306,7 +322,7 @@ Use `ARC_AI_MODE=fixture` only for a pre-release plumbing canary that is explici
 
 Fused, divergence, and event-risk flags remain documented for backward-compatible API operation, but the current product strategy keeps all three disabled. The web product exposes only base and premium prediction analysis.
 
-AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. Global Market V6 enforces effective output floors of `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`; this prevents the strict Elliott-wave JSON object from being cut off before its closing braces. Higher configured values remain valid. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
+AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. Global Market enforces effective output floors of `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`; this prevents the strict Elliott-wave JSON object from being cut off before its closing braces. Higher configured values remain valid. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
 
 Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=upstash_kv`, these counters are shared across instances and survive deployments; `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
 
@@ -391,7 +407,7 @@ DATABASE_URL=
 
 `DATABASE_URL` remains empty for this design. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Upstash job complete with the Blob URL and checksum. If that bounded Blob write fails after payment—for example, during an access-mode mismatch or transient outage—the API stores report bodies up to 512 KiB in a private, retention-bound KV fallback and still verifies the SHA-256 checksum on read. This is a paid-delivery safety net, not the normal artifact path.
 
-`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain stable `pulse:v6:*` keys to preserve existing mainnet continuity. Therefore local, canary, and production deployments must use separate Upstash databases; a different namespace alone is not sufficient isolation for V6 trading tests.
+`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain the legacy stable `pulse:v6:*` storage prefix to preserve existing mainnet continuity. Therefore local, canary, and production deployments must use separate Upstash databases; a different namespace alone is not sufficient isolation for PULSE trading tests.
 
 The supplied PULSE Blob store is public. Set `BLOB_ACCESS=public` and provide a server-only base64url encoding of 32 random bytes in `REPORT_ENCRYPTION_KEY`; PULSE stores only AES-256-GCM ciphertext in Blob and verifies the decrypted plaintext checksum. Keep the same encryption key across deployments so retained reports remain readable.
 

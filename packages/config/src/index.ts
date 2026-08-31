@@ -355,37 +355,37 @@ export function loadConfig(): AppConfig {
         "Grok-powered deep OKX spot analysis: multi-scenario targets, risk plan, and agent checklist from live OHLCV.",
     },
     "POST /v1/analysis/spot/standard": {
-      name: "Global Market Quick Plan",
+      name: "Global Quick → Spot Market or Limit",
       priceUsd: parsed.PRICE_ANALYSIS_BASE,
-      description: "A concise Global Market report with live OKX evidence, actionable levels, an Elliott candidate count, invalidation and a clear Buy-or-Wait conclusion.",
+      description: "A concise Global Base analysis with live OKX evidence, actionable levels, an Elliott candidate count, invalidation and a Buy-or-Wait conclusion, followed by a prefilled wallet-signed Spot Market or Limit order on a supported execution mainnet.",
     },
     "POST /v1/autopilot/pass/24h": {
-      name: "Autopilot AI Pass - 24 hours",
+      name: "Start Autopilot · 24h",
       priceUsd: parsed.PRICE_AUTOPILOT_PASS_24H,
-      description: "Prepaid 24-hour AI entry-confirmation entitlement for one owner-controlled Autopilot vault; deterministic monitoring and exits never require the pass.",
+      description: "Guided start or extension of one owner-controlled Autopilot for 24 active-runtime hours. The caller's Agentic Wallet signs vault selection/creation, policy configuration, capital deposit, registration and start; this x402 endpoint activates AI runtime only after the vault exists. Pausing freezes paid time.",
     },
     "POST /v1/autopilot/pass/7d": {
-      name: "Autopilot AI Pass - 7 days",
+      name: "Start Autopilot · 7d",
       priceUsd: parsed.PRICE_AUTOPILOT_PASS_7D,
-      description: "Prepaid seven-day AI entry-confirmation entitlement for one owner-controlled Autopilot vault.",
+      description: "Guided start or extension of one owner-controlled Autopilot for seven active-runtime days. The caller's Agentic Wallet retains custody and signs every vault, policy, funding and start action; pausing freezes paid time.",
     },
     "POST /v1/autopilot/pass/30d": {
-      name: "Autopilot AI Pass - 30 days",
+      name: "Start Autopilot · 30d",
       priceUsd: parsed.PRICE_AUTOPILOT_PASS_30D,
-      description: "Prepaid 30-day AI entry-confirmation entitlement for one owner-controlled Autopilot vault.",
+      description: "Guided start or extension of one owner-controlled Autopilot for 30 active-runtime days. The caller's Agentic Wallet retains custody and signs every vault, policy, funding and start action; pausing freezes paid time.",
     },
     "POST /v1/analysis/spot/premium": {
-      name: "Global Market Pro Strategy",
+      name: "Global Pro → Spot Market or Limit",
       priceUsd: parsed.PRICE_ANALYSIS_PREMIUM,
-      description: "A trading-focused Global Market strategy with chart, Fibonacci and pivot levels, global Elliott wave paths, DeFi opportunities and report-linked Spot or Autopilot next actions.",
+      description: "A Premium Global analysis with chart, Fibonacci and pivot levels, global Elliott wave paths and DeFi opportunities, followed by a prefilled wallet-signed Spot Market or Limit order on a supported execution mainnet.",
     },
     "POST /v1/analysis/prediction/standard": {
-      name: "Prediction Market Quick View",
+      name: "Prediction Quick",
       priceUsd: parsed.PRICE_ANALYSIS_PREDICTION_STANDARD,
       description: "A concise evidence-based view of one selected Polymarket question with probability, market quality, invalidation, limitations and provenance.",
     },
     "POST /v1/analysis/prediction/premium": {
-      name: "Prediction Market Pro Analysis",
+      name: "Prediction Pro",
       priceUsd: parsed.PRICE_ANALYSIS_PREDICTION_PREMIUM,
       description: "A detailed selected-question analysis with counter-case, execution risk and an independent 4H underlying-asset chart with Fibonacci, pivots and Elliott paths.",
     },
@@ -473,14 +473,14 @@ export function loadConfig(): AppConfig {
   return {
     ...parsed,
     enabledNetworks: parseEnabledNetworks(parsed.ENABLED_NETWORKS),
-    methodologyVersion: "pulse-v6.1.0",
+    methodologyVersion: "pulse",
     productName: name,
     productTagline: "Analyze first. Spot trade or run a guarded Autopilot on your selected network.",
     productTaglineZh: "先分析，再在所选网络进行现货交易或运行受保护的自动驾驶。",
     productShortDescription:
-      "PULSE turns live Global and selected Prediction Market evidence into readable, recoverable plans, then connects valid Global plans to owner-signed Spot execution or policy-bounded Autopilot.",
+      "PULSE turns live Global and selected Prediction Market evidence into readable, recoverable plans, connects Global plans to Agentic-Wallet-signed Spot execution, and offers separate cost-controlled Autopilot start services.",
     productDescription:
-      "PULSE is a focused Analyze → Spot or Autopilot workflow for humans and AI agents. Global Market includes live OKX crypto, xStocks and listed RWA instruments while separating broad analysis coverage from identity-safe on-chain execution. Prediction Market analyzes one explicitly selected Polymarket question read-only. Onchain Pre-Trade Risk Guard is the fifth public paid service. Spot and Autopilot independently verify the selected network's real token representation, settlement asset, live OKX route and wallet balance. Reports are durable and wallet-recoverable across X Layer, Base, Arbitrum One and Arc Testnet payment routes.",
+      "PULSE is a focused Analyze → Spot or Autopilot workflow for humans and AI agents. Global Market includes live OKX crypto, xStocks and listed RWA instruments while separating broad analysis coverage from identity-safe on-chain execution. Prediction Market analyzes one explicitly selected Polymarket question read-only. The execution-mainnet catalog has eight paid services: two Global tiers leading to Agentic-Wallet-signed Spot Market or Limit orders, two Prediction tiers, Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot starts independently and uses deterministic candidate gates, compact prepaid AI entry confirmation and one owner-control dashboard instead of rerunning full Premium reports. Arc Testnet exposes only the five analysis/risk services because execution is unavailable there. Reports are durable and wallet-recoverable across X Layer, Base, Arbitrum One and Arc Testnet payment routes.",
     logoPath,
     logoUrl,
     hasOkxCredentials,
@@ -508,6 +508,9 @@ export function buildAspMetadata(cfg: AppConfig) {
     "/v1/analysis/prediction/standard",
     "/v1/analysis/prediction/premium",
     "/v1/preflight",
+    "/v1/autopilot/pass/24h",
+    "/v1/autopilot/pass/7d",
+    "/v1/autopilot/pass/30d",
   ]);
   const isPublicProductRoute = (route: string) => {
     const path = route.split(" ")[1] || "";
@@ -539,8 +542,9 @@ export function buildAspMetadata(cfg: AppConfig) {
       };
     });
 
-  // Marketplace discovery deliberately exposes only the five customer-facing
-  // services. Trading and Autopilot are report actions, not extra paid SKUs.
+  // The public catalog contains five analysis/risk services plus three
+  // Agentic Wallet Autopilot start services. Spot execution remains a
+  // wallet-signed next action rather than a separate paid SKU.
   const hero = publicRoutes.map(([route, info]) => {
     const [method, path] = route.split(" ");
     return {
@@ -565,13 +569,17 @@ export function buildAspMetadata(cfg: AppConfig) {
     "/v1/analysis/prediction/standard",
     "/v1/analysis/prediction/premium",
     "/v1/preflight",
+    "/v1/autopilot/pass/24h",
+    "/v1/autopilot/pass/7d",
+    "/v1/autopilot/pass/30d",
   ]);
   const networkServices = cfg.enabledNetworks.filter(paymentNetworkEnabled).flatMap((key) => {
     const network = getNetwork(key);
     return publicRoutes.filter(([route, info]) => {
       if (info.free) return false;
       const [, path] = route.split(" ");
-      return key === "xlayer" || multichainPaidPaths.has(path);
+      if (!multichainPaidPaths.has(path)) return false;
+      return key !== "arc-testnet" || !path.startsWith("/v1/autopilot/pass/");
     }).map(([route, info]) => {
       const [method, path] = route.split(" ");
       const aliasPath = `/${publicAlias(key)}${path}`;
@@ -588,8 +596,8 @@ export function buildAspMetadata(cfg: AppConfig) {
 
   return {
     asp: {
+      product: cfg.productName,
       name: cfg.productName,
-      version: "6.1.0",
       type: "A2MCP",
       category: cfg.PRODUCT_CATEGORY,
       tagline: cfg.productTagline,
@@ -602,7 +610,6 @@ export function buildAspMetadata(cfg: AppConfig) {
       repository: "https://github.com/mssystem1/ai-pulse",
       documentation: "https://github.com/mssystem1/ai-pulse/blob/main/docs/CIRCLE_AGENT_MARKETPLACE_LISTING.md",
       openApiSpec: "https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml",
-      methodology_version: cfg.methodologyVersion,
       grokModel: cfg.GROK_MODEL,
       network: cfg.X402_NETWORK,
       settlementAsset: cfg.X402_ASSET,
@@ -634,6 +641,8 @@ export function buildAspMetadata(cfg: AppConfig) {
         "recoverable-reports",
         "risk-guard",
         "guarded-autopilot",
+        "ai-entry-pass",
+        "cost-controlled-automation",
         "xstocks",
         "rwa",
         "persistent-network-selection",
@@ -656,7 +665,7 @@ export function buildAspMetadata(cfg: AppConfig) {
           networks: ["eip155:8453", "eip155:42161"],
           servicePrefixes: ["/base", "/arbitrum"],
           settlementAsset: "native USDC",
-          catalog: "The same five public report and Risk Guard services; no duplicate ERC-8004 identity is required.",
+          catalog: "Eight services on each execution mainnet: five analysis/risk services plus three Agentic Wallet Autopilot start services. No duplicate ERC-8004 identity is required.",
         },
         circleAgentMarketplace: {
           network: "eip155:5042002",
@@ -672,8 +681,31 @@ export function buildAspMetadata(cfg: AppConfig) {
           { duration: "7d", priceUsd: cfg.PRICE_AUTOPILOT_PASS_7D },
           { duration: "30d", priceUsd: cfg.PRICE_AUTOPILOT_PASS_30D },
         ],
-        catalogPolicy: "In-product compact AI entry entitlement; not a sixth public analysis marketplace service.",
-        expiry: "New AI-confirmed entries hold after expiry; deterministic monitoring and protective exits continue.",
+        catalogPolicy: "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; excluded from Arc Testnet because execution is unavailable there.",
+        activation: "Selected during the six-step Autopilot setup and paid through x402 only after the new vault is created and registered. An existing active pass is reused without another charge.",
+        renewal: "Manual only. Buying another period appends it to unused paid time; there is no automatic renewal.",
+        timer: "Only active Autopilot runtime consumes paid time. Pausing freezes the timer and resuming preserves the unused duration.",
+        expiry: "Pausing freezes remaining paid time and reminders. After active paid time expires, new AI-confirmed entries hold while deterministic monitoring and protective exits continue.",
+        providerFailure: "Every AI attempt is timestamped before the request. Billing, permission and quota failures open a six-hour circuit breaker instead of retrying on each worker tick.",
+        audit: "The unified Autopilot dashboard separates strategy decisions from on-chain activity and exports both streams as CSV.",
+      },
+      agenticWalletWorkflows: {
+        custody: "The caller's Agentic Wallet owns the account or vault and confirms every state-changing contract call. PULSE never receives or uses its private key.",
+        globalSpot: {
+          services: ["Global Quick → Spot Market or Limit", "Global Pro → Spot Market or Limit"],
+          flow: ["Buy and recover the selected Global report", "Choose Market or Limit", "Verify wallet balance, identity-safe token, live route, slippage and optional TP/SL", "Review and sign the prepared transaction in Agentic Wallet"],
+        },
+        autopilotStart: {
+          services: ["Start Autopilot · 24h", "Start Autopilot · 7d", "Start Autopilot · 30d"],
+          flow: ["Choose create-new or an existing vault", "Choose pair/timeframe and verify token/route", "Choose strategy", "Choose capital and signed risk profile", "Review Agentic Wallet vault/configuration/funding/registration calls", "Pay the selected x402 runtime and resume/start the registered vault"],
+          renewal: "An existing vault skips creation and appends active-runtime time after payment.",
+        },
+        networks: {
+          xlayer: "OKX Agentic Wallet on chain 196; X Layer gas is zero.",
+          base: "Agentic Wallet on Base mainnet; keep native ETH for gas.",
+          arbitrum: "Agentic Wallet on Arbitrum One; keep native ETH for gas.",
+          arcTestnet: "Analysis and Risk Guard only; Spot and Autopilot workflows are unavailable.",
+        },
       },
     },
     registration: {

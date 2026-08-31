@@ -1,6 +1,6 @@
-# PULSE V6 Contract Deployment and Address Guide
+# PULSE Contract Deployment and Address Guide
 
-The V6 contracts are non-upgradeable deployments. X Layer, Base, and Arbitrum receive separate instances and separate environment addresses. Arc Testnet receives none because Spot and Autopilot are disabled there.
+The PULSE contracts are non-upgradeable deployments. X Layer, Base, and Arbitrum receive separate instances and separate environment addresses. Arc Testnet receives none because Spot and Autopilot are disabled there.
 
 ## Contracts
 

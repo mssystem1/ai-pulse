@@ -1,4 +1,4 @@
-# PULSE V6 Product Testing Guide
+# PULSE Product Testing Guide
 
 This guide starts with local UI/API verification and finishes with real mainnet certification. Local success does not certify money-moving production behavior.
 
@@ -55,7 +55,7 @@ Confirm Arc returns Spot and Autopilot hidden/disabled. Mainnet capabilities mus
 8. Without changing the pair, buy Premium. The report must immediately enter Premium loading, create a new paid job, then render a PREMIUM mark.
 9. Confirm Premium includes attached candles, Fibonacci levels, pivots, Elliott candidate/invalidation, bullish/bearish moves and explanation.
 10. Confirm DeFi uses the selected RPC's identity-safe representation (`BTC -> cbBTC`, `ETH -> WETH`, etc.). If no exact product is verified, it must say unavailable and never invent APY.
-11. From a Buy report choose Market, Limit or Autopilot and verify pair, timeframe, entry, TP and SL carry forward together.
+11. From either Base/Quick or Premium/Pro Buy report choose Market or Limit and verify pair, timeframe, entry, TP and SL carry forward together. Then open Autopilot separately and confirm no report, entry, TP or SL is inherited; Opportunity Radar may prefill only pair/timeframe as a fresh strategy draft.
 12. Refresh during generation and confirm job recovery does not charge again.
 
 ## 4. Prediction Market
@@ -116,7 +116,7 @@ Vault creation, funding, pause, resume and withdrawal are setup/control checks o
 5. Reconciliation of actual target tokens received, portfolio capital, mark price and P&L.
 6. A later cycle that holds the owned position unless a documented exit is active.
 7. A `Sell` after TP, SL, bearish confirmation or strategy-specific structural exit. After a complete exit, a later qualified signal may `Buy` again without recreating the strategy. An owner pause/withdraw plus explicit Spot sell may safely unwind a bounded test, but must be labelled an operator exit rather than a strategy-qualified sell.
-8. Evidence and transaction hashes visible in **Detailed trading report** and the reconciled Activity dashboard.
+8. Evidence and transaction hashes visible in the **Strategy journal** and the unified Autopilot dashboard. Confirm strategy decisions and on-chain activity are separate sections, not duplicate dashboards.
 
 Test Trend following, Breakout and Mean reversion decision fixtures even when live market conditions do not produce all three entries. Exact rules and contract functions are in `docs/AUTOPILOT_TRADING_REPORT.md`.
 
@@ -125,20 +125,22 @@ Test Trend following, Breakout and Mean reversion decision fixtures even when li
 3. Create an isolated vault through the configured factory.
 4. Configure restrictive on-chain limits and fund only the intended amount.
 5. Activate the strategy and sign the five-minute connected-wallet authorization. Confirm a copied/modified payload, expired signature, non-factory vault, or ticker/token mismatch is rejected.
-6. Buy a vault-specific AI pass (`$1.50 / 24h`, `$10.50 / 7d`, or `$45 / 30d`). Verify an ordinary Hold consumes no xAI call; a deterministic entry candidate may consume one compact confirmation. Daily vault/global call and USD caps must fail closed to Hold.
-7. Confirm deterministic validation and exact transaction simulation precede executor submission.
-8. Prove wrong policy version, nonce replay, unapproved adapter, over-cap amount, cooldown, expiry, global pause and revoked executor all revert.
-9. Confirm pause, policy update, immediate owner withdrawal and independent Autopilot mark-to-market P&L/activity/proof hash. Fund and withdraw after activation and verify confirmed vault-specific cash flows change capital basis rather than appearing as trading P&L.
-10. Confirm no Autopilot action can move connected-wallet or Spot-account funds.
+6. Select a vault-specific AI Entry Pass (`$1.50 / 24h`, `$10.50 / 7d`, or `$45 / 30d`) during setup. A new vault must register before the final x402 payment and must not resume if payment fails. Saving an existing vault with active time must reuse the pass without charging again. Verify an ordinary Hold consumes no xAI call; a deterministic entry candidate may consume one compact confirmation. Daily vault/global call and USD caps must fail closed to Hold.
+7. Pause the vault and record its displayed remaining time. Wait through at least one worker tick: the timer and Telegram warning state must remain frozen. Resume it and verify the expiry moved forward by the paused duration.
+8. Force one provider 403 in a controlled environment. Confirm the attempt timestamp is persisted before the call, no second request occurs for six hours, and the journal shows one human-readable provider outage rather than one failure per worker tick.
+9. Confirm deterministic validation and exact transaction simulation precede executor submission.
+10. Prove wrong policy version, nonce replay, unapproved adapter, over-cap amount, cooldown, expiry, global pause and revoked executor all revert.
+11. Confirm pause, policy update, immediate owner withdrawal and independent Autopilot mark-to-market P&L/activity/proof hash. Fund and withdraw after activation and verify confirmed vault-specific cash flows change capital basis rather than appearing as trading P&L.
+12. Confirm no Autopilot action can move connected-wallet or Spot-account funds.
 
 ### Autopilot pass and expiry acceptance
 
 1. Submit an invalid or non-owner vault and confirm PULSE rejects it before returning an x402 payment challenge.
 2. Buy 24 hours and confirm the selected vault shows its exact expiry, remaining compact confirmations and payment period.
 3. Renew before expiry and confirm the new duration is appended to the prior expiry rather than replacing unused time.
-4. At two hours remaining, confirm the web card becomes urgent. When purchased from the Telegram Mini App, confirm the chat receives one warning, not one per worker cycle.
+4. At two active-runtime hours remaining, confirm the web card becomes urgent. Pause the vault and confirm the countdown and warnings freeze; resume and confirm expiry shifts by the paused duration. When purchased from the Telegram Mini App, confirm the chat receives one warning, not one per worker cycle.
 5. After expiry, confirm new AI-assisted entries remain in Hold. Existing deterministic TP/SL, structural exits, owner Pause, Withdraw and Close continue to work.
-6. Confirm the detailed trading report shows evaluation counts, Buy/Sell/Hold/failure totals, provider-call/cost telemetry, recent decision rows and a downloadable JSON audit log.
+6. Confirm the Strategy journal shows evaluation counts, Buy/Sell/Hold/failure totals, provider-call/cost telemetry, readable decision rows and a downloadable CSV audit log containing both decisions and on-chain activity.
 
 ### Multi-agent strategy acceptance
 
@@ -148,7 +150,7 @@ Create at least one vault for each preset rather than treating vault creation as
 2. Confirm every vault is independently discovered from its network factory before PULSE offers creation.
 3. Confirm each selected-vault card shows only that vault's capital, while **Total portfolio value** and runtime P&L aggregate all strategies on the selected network.
 4. Leave the browser tab, change networks, restart the API and confirm scheduled evaluations continue from KV-backed signed state.
-5. For a legitimate Hold, inspect every PASS/WAIT rule in **Detailed trading report** and confirm no oracle update or swap transaction was sent.
+5. For a legitimate Hold, inspect every PASS/WAIT rule in the **Strategy journal** and confirm no oracle update or swap transaction was sent.
 6. Temporarily interrupt one dependency in a controlled test. The vault must fail closed as `hold_dependency_retry`, retain capital and policy, and recover on the next scheduler cycle without owner action.
 7. Do not call the matrix complete until at least one agent has a confirmed Buy, protected Hold and strategy-qualified Sell, or clearly label the outstanding live-monitoring condition.
 

@@ -1,4 +1,4 @@
-# PULSE V6 Technical Proposal
+# PULSE Technical Specification
 
 Status: implementation specification  
 Date: 2026-08-20  
@@ -237,7 +237,7 @@ No opportunity is better than a same-symbol product on the wrong chain. Empty co
 
 ### 5.8 Report schema version
 
-Introduce `pulse-v6` response schemas while retaining parsers for stored legacy reports. Report rendering dispatches by schema/methodology version.
+Use the current PULSE response schemas while retaining parsers for stored legacy reports. Report rendering dispatches by schema/methodology identifier.
 
 ## 6. Point 4: Base-to-Premium report replacement bug
 
@@ -479,7 +479,7 @@ Never calculate final P&L from quoted amounts when confirmed fills are available
 
 Autopilot has its own tab, contracts, API namespace, persistence, balances, strategies, decision records, executor, monitoring, and dashboard. Spot positions never become Autopilot positions implicitly.
 
-Autopilot can optionally purchase a Premium Global Market report as an input, but the report is evidence—not transaction authorization.
+Autopilot does not purchase or reuse a Global Market report. It starts from its own pair, timeframe, strategy, capital/risk policy and duration service. A free deterministic candidate gate runs first; only a surviving candidate may request the compact AI confirmation covered by its active runtime. Opportunity Radar may prefill pair/timeframe as navigation context, but no report recommendation, entry, TP or SL becomes an Autopilot signal or authorization.
 
 ### 9.2 Autopilot Vault
 
@@ -1566,7 +1566,7 @@ Application implementation can begin from this proposal. The following values ar
 
 ### 29.1 Product information architecture
 
-PULSE V6 is one product with six route-level workspaces and one persistent application shell:
+PULSE is one product with six route-level workspaces and one persistent application shell:
 
 ```text
 PULSE shell
@@ -1846,7 +1846,7 @@ The proposal is satisfied only when the deliverable and its evidence both exist.
 
 ## 34. No-mock production release gate
 
-Mocks, local chains, forked chains, fixtures, and test providers are development tools only. They are forbidden in the production dependency graph and cannot satisfy release acceptance. Before PULSE V6 is called fully operational:
+Mocks, local chains, forked chains, fixtures, and test providers are development tools only. They are forbidden in the production dependency graph and cannot satisfy release acceptance. Before PULSE is called fully operational:
 
 1. production configuration validation rejects mock x402, mock market, mock oracle, placeholder contract address, localhost callback, and unencrypted artifact modes;
 2. every enabled chain passes live primary/fallback RPC health, verified-contract, oracle, route, quote, simulation, receipt, indexer, and reconciliation checks;

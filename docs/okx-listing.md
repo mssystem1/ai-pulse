@@ -30,23 +30,26 @@ radar artwork or a rounded-corner export.
 
 ## Short description
 
-PULSE is an Analyze -> Spot or Autopilot workflow for traders and AI agents. Preview live OKX markets for free, buy one focused Global or Prediction report, then use its plan in connected-wallet Spot or a separately guarded Autopilot. Payments use USDT0 on X Layer or USDC on Base and Arbitrum through x402; Arc Testnet supports analysis payment testing.
+PULSE is an Analyze -> Spot or Autopilot workflow for traders and AI agents. Preview live OKX markets for free, buy a focused Global report and use its plan for an Agentic-Wallet-signed Spot Market or Limit order, or start a separately guarded Autopilot without a report. Payments use USDT0 on X Layer or USDC on Base and Arbitrum through x402; Arc Testnet supports analysis payment testing.
 
 ## Full description
 
-PULSE turns live OKX Global Market and explicitly selected Polymarket evidence into recoverable Quick or Pro reports. Global coverage includes crypto, xStocks, and RWA instruments. Pro reports add Fibonacci, pivots, global Elliott-wave paths, selected-network DeFi opportunities, and a Buy-or-Wait execution plan. A valid plan can prefill owner-signed Market or Limit Spot execution with optional TP/SL, or become the signal policy for a separate guarded Autopilot. Every onchain action independently verifies the selected network’s identity-safe token representation, settlement asset, live route, and wallet balance. Onchain Pre-Trade Risk Guard exposes PASS/WARN/FAIL evidence with explicit unknowns. Humans use the bilingual web console; agents use REST, MCP, or the TypeScript SDK. The five public paid services settle per request through multichain x402 with no subscription.
+PULSE turns live OKX Global Market and explicitly selected Polymarket evidence into recoverable Quick or Pro reports. Global coverage includes crypto, xStocks, and RWA instruments. Pro reports add Fibonacci, pivots, global Elliott-wave paths, selected-network DeFi opportunities, and a Buy-or-Wait execution plan. A valid Global plan can prefill an Agentic-Wallet-signed Market or Limit Spot order with optional TP/SL. Autopilot starts independently through its own six-step pair, strategy, capital/risk, vault and runtime workflow; it does not require a report. Every onchain action independently verifies the selected network’s identity-safe token representation, settlement asset, live route, and wallet balance. Onchain Pre-Trade Risk Guard exposes PASS/WARN/FAIL evidence with explicit unknowns. Humans use the bilingual web console; agents use REST, MCP, or the TypeScript SDK. Eight public paid services are available on X Layer, Base and Arbitrum; Arc Testnet exposes the five analysis/risk services only.
 
 ## Services submitted to the marketplace
 
 | Public service | Price | Input | Output / next action |
 | --- | ---: | --- | --- |
-| Global Market Quick Plan | $0.20 | pair, timeframe, language, optional focus | Concise Buy-or-Wait analysis; Premium is the execution bridge |
-| Global Market Pro Strategy | $0.30 | pair, timeframe, language, optional focus | Chart, Elliott paths, DeFi and Market / Limit / Autopilot actions |
-| Prediction Market Quick View | $0.20 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
-| Prediction Market Pro Analysis | $0.30 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
+| Global Quick → Spot Market or Limit | $0.20 | pair, timeframe, language, optional focus | Concise Buy-or-Wait analysis, then a prefilled Agentic-Wallet-signed Spot Market or Limit order |
+| Global Pro → Spot Market or Limit | $0.30 | pair, timeframe, language, optional focus | Chart, Elliott paths and DeFi context, then a prefilled Agentic-Wallet-signed Spot Market or Limit order |
+| Prediction Quick | $0.20 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
+| Prediction Pro | $0.30 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
 | Onchain Pre-Trade Risk Guard | $0.15 | network, intent, token/transaction context | PASS/WARN/FAIL with live RPC evidence and explicit unknowns |
+| Start Autopilot · 24h | $1.50 | owner, vault and six-step strategy setup | Agentic Wallet creates/configures/funds/registers the vault; x402 activates 24 active-runtime hours |
+| Start Autopilot · 7d | $10.50 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with seven active-runtime days |
+| Start Autopilot · 30d | $45.00 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with 30 active-runtime days |
 
-Free discovery and report-linked Spot/Autopilot execution are product workflow capabilities, not separate marketplace services. Autopilot AI passes ($1.50/24h, $10.50/7d and $45/30d per vault) are in-product compact-entry-confirmation entitlements and are not a sixth marketplace service.
+Spot Market and Limit are execution choices inside the two Global services, not separate marketplace rows. The three Autopilot rows are complete guided start/extension services. Their `/autopilot/pass/...` HTTP call is specifically the final x402 activation step after Agentic Wallet has created or selected, configured, funded and registered the owner vault; it must not be described as creating the vault by itself.
 
 The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery. It uses OKX Onchain OS as the primary catalog and DexScreener only as best-effort X Layer enrichment. Catalog presence is not a safety verdict, and manual address entry remains available.
 

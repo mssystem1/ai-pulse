@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: PULSE Circle Agent Marketplace API
-  version: 6.1.0
+  version: current
   description: >-
     Five focused x402 services on Arc Testnet: two Global Market reports, two
     Prediction Market reports and one Onchain Pre-Trade Risk Guard. Payments
@@ -27,7 +27,8 @@ paths:
   /arc/v1/analysis/spot/standard:
     post:
       operationId: createArcSpotStandardReport
-      summary: Global Market Quick Plan
+      summary: Global Quick to Spot Market or Limit
+      description: Concise Global Base analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Testnet itself remains analysis-only.
       tags: [Global Market]
       x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
@@ -45,7 +46,8 @@ paths:
   /arc/v1/analysis/spot/premium:
     post:
       operationId: createArcSpotPremiumReport
-      summary: Global Market Pro Strategy
+      summary: Global Pro to Spot Market or Limit
+      description: Premium Global analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Testnet itself remains analysis-only.
       tags: [Global Market]
       x-pulse-price-usd: 0.30
       x-x402-network: eip155:5042002
@@ -63,7 +65,7 @@ paths:
   /arc/v1/analysis/prediction/standard:
     post:
       operationId: createArcPredictionStandardReport
-      summary: Prediction Market Quick View
+      summary: Prediction Quick
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042002
@@ -81,7 +83,7 @@ paths:
   /arc/v1/analysis/prediction/premium:
     post:
       operationId: createArcPredictionPremiumReport
-      summary: Prediction Market Pro Analysis
+      summary: Prediction Pro
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.30
       x-x402-network: eip155:5042002

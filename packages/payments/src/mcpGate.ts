@@ -20,6 +20,9 @@ const PAID_TOOLS: Record<string, { routePath: string; priceKey: string }> = {
   fused_analysis_premium: { routePath: "/v1/analysis/fused/premium", priceKey: "POST /v1/analysis/fused/premium" },
   divergence_analysis: { routePath: "/v1/analysis/divergence", priceKey: "POST /v1/analysis/divergence" },
   event_risk_preflight: { routePath: "/v1/preflight/event-risk", priceKey: "POST /v1/preflight/event-risk" },
+  start_autopilot_24h: { routePath: "/v1/autopilot/pass/24h", priceKey: "POST /v1/autopilot/pass/24h" },
+  start_autopilot_7d: { routePath: "/v1/autopilot/pass/7d", priceKey: "POST /v1/autopilot/pass/7d" },
+  start_autopilot_30d: { routePath: "/v1/autopilot/pass/30d", priceKey: "POST /v1/autopilot/pass/30d" },
 };
 
 export type McpGateResult =

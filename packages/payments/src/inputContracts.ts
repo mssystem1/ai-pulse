@@ -275,6 +275,39 @@ const routeInputs: Record<string, RouteInputDefinition> = {
 routeInputs["/v1/analysis/spot/standard"] = routeInputs["/v1/analysis/base"];
 routeInputs["/v1/analysis/spot/premium"] = routeInputs["/v1/analysis/premium"];
 
+const autopilotStartFields: X402InputField[] = [
+  {
+    name: "owner",
+    carrier: "body",
+    type: "string",
+    required: true,
+    pattern: EVM_ADDRESS_PATTERN,
+    description: "Agentic Wallet EVM address that owns and pays for the selected Autopilot vault.",
+  },
+  {
+    name: "vault",
+    carrier: "body",
+    type: "string",
+    required: true,
+    pattern: EVM_ADDRESS_PATTERN,
+    description: "Owner-controlled Autopilot vault already created, configured, funded and registered through Agentic Wallet contract calls.",
+  },
+  {
+    name: "telegramDelivery",
+    carrier: "body",
+    type: "string",
+    required: false,
+    description: "Optional chat-bound PULSE delivery capability for runtime-expiry reminders; never a wallet authorization.",
+  },
+];
+for (const path of ["/v1/autopilot/pass/24h", "/v1/autopilot/pass/7d", "/v1/autopilot/pass/30d"]) {
+  routeInputs[path] = {
+    message: "Complete the Agentic Wallet vault setup, then provide its owner and registered vault for the final x402 Autopilot runtime activation.",
+    requiredArgs: ["owner", "vault"],
+    fields: autopilotStartFields,
+  };
+}
+
 const predictionFields: X402InputField[] = [
   { name: "primaryMarketId", carrier: "body", type: "string", required: true, description: "Explicit Polymarket market or pm:condition ID." },
   { name: "additionalMarketIds", carrier: "body", type: "array", required: false, description: "Optional array of additional explicitly selected market IDs." },
@@ -316,6 +349,7 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
     "/v1/analysis/fused/standard", "/v1/analysis/fused/premium",
     "/v1/analysis/divergence", "/v1/preflight/event-risk",
   ].includes(path);
+  const autopilotStart = path.startsWith("/v1/autopilot/pass/");
   return {
     method: "POST",
     input: Object.fromEntries(
@@ -331,6 +365,13 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
       },
       terminalStages: ["completed", "completed_partial", "failed_terminal", "manual_reconciliation"],
       reportPath: "/v1/jobs/{jobId}/report",
+    } } : autopilotStart ? { output: {
+      status: 201,
+      delivery: "autopilot_runtime_activation",
+      fields: {
+        aiPass: { type: "object", description: "Vault-bound duration, expiry, remaining compact confirmations and pause-aware runtime state." },
+        behavior: { type: "object", description: "New-entry and expiry behavior. Agentic Wallet still owns resume/start and every later state change." },
+      },
     } } : {}),
   };
 }

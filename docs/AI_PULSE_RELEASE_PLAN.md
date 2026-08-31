@@ -52,4 +52,4 @@ Marketplace forms and requirements change. Recheck the current official submissi
 
 ## OKX.AI agent #8355 update discipline
 
-Agent `8355` is the existing PULSE identity: https://www.okx.ai/agents/8355. Do not create a replacement or mutate the public record from repository work alone. Prepare an exact before/after diff containing the PULSE V6.1 description, logo, custom web domain, Railway endpoint, five service rows, current pricing, and successful X Layer USDT0 x402 evidence. Update agent `8355` only after the operator reviews that final diff and explicitly confirms the external write.
+Agent `8355` is the existing unversioned PULSE identity: https://www.okx.ai/agents/8355. Do not create a replacement or mutate the public record from repository work alone. Prepare an exact before/after diff containing the current PULSE description, canonical logo, custom web domain, Railway endpoint, all eight X Layer service rows, current pricing, and successful X Layer USDT0 x402 evidence. Update agent `8355` only after the operator reviews that final diff and explicitly confirms the external write.

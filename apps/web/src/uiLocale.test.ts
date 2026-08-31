@@ -28,5 +28,9 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "AI ENTRY PASS"), "AI 入场通行证");
   assert.equal(localizeUiText("zh", "2d 3h remaining"), "剩余 2 天 3 小时");
   assert.equal(localizeUiText("zh", "3 compact AI confirmations remaining"), "剩余 3 次精简 AI 确认");
-  assert.equal(localizeUiText("zh", "Export full JSON log"), "导出完整 JSON 日志");
+  assert.equal(localizeUiText("zh", "Export CSV activity"), "导出 CSV 活动记录");
+  assert.equal(localizeUiText("zh", "AUTOPILOT DASHBOARD"), "自动驾驶仪表板");
+  assert.equal(localizeUiText("zh", "Pause · hold pass timer"), "暂停 · 停止通行证计时");
+  assert.equal(localizeUiText("zh", "Global Quick → Spot Market or Limit"), "全球市场快速分析 → 现货市价或限价交易");
+  assert.match(localizeUiText("zh", "The same eight services are advertised under the selected network prefix with typed schemas. Agentic Wallet signs Spot and Autopilot contract calls; payment uses native USDC."), /八项服务/);
 });

@@ -1,12 +1,12 @@
 {
+  "product": "PULSE",
   "name": "PULSE",
-  "version": "6.1.0",
   "type": "A2MCP",
   "category": "Trading",
   "tagline": "Analyze first. Spot trade or run a guarded Autopilot on your selected network.",
   "taglineZh": "先分析，再在所选网络进行现货交易或运行受保护的自动驾驶。",
-  "shortDescription": "PULSE turns live OKX Global Market and selected Polymarket evidence into recoverable Quick or Pro reports, then connects valid Global Market plans to owner-signed Spot Trading or guarded Autopilot.",
-  "description": "PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and agents. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. Five public paid services keep discovery clear: two Global Market tiers, two Prediction Market tiers and one Onchain Pre-Trade Risk Guard. Reports are durable and wallet-recoverable. Arc Testnet remains analysis/payment only until Arc mainnet execution support is released.",
+  "shortDescription": "PULSE turns live OKX Global Market and selected Polymarket evidence into recoverable Quick or Pro reports, connects Global plans to Agentic-Wallet-signed Spot Trading, and offers separate cost-controlled Autopilot start services.",
+  "description": "PULSE is a multichain Analyze → Spot or Autopilot workflow for humans and agents. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. The public execution-mainnet catalog has eight paid services: two Global tiers leading to Agentic-Wallet-signed Spot Market or Limit orders, two Prediction tiers, one Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot starts independently and uses deterministic candidate gates, compact prepaid AI entry confirmation and one owner-control dashboard rather than generating a full Premium report on every worker cycle. Reports are durable and wallet-recoverable. Arc Testnet exposes only the five analysis/risk services because Spot and Autopilot execution are unavailable there.",
   "website": "https://www.ai-pulse.tech",
   "repository": "https://github.com/mssystem1/ai-pulse",
   "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
@@ -19,7 +19,6 @@
     "pngServedAt": "/brand/logo.png",
     "alt": "PULSE waveform logo"
   },
-  "methodologyVersion": "pulse-v6.1.0",
   "languages": ["en", "zh"],
   "network": "eip155:196",
   "settlementAsset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
@@ -71,7 +70,6 @@
     "spotPremium": 0.30,
     "predictionStandard": 0.20,
     "predictionPremium": 0.30,
-    "tokenScan": 0.10,
     "preflight": 0.15,
     "autopilotPass24h": 1.50,
     "autopilotPass7d": 10.50,
@@ -81,7 +79,6 @@
     "freeTeaser": 0,
     "analysisBase": 0.20,
     "analysisPremium": 0.30,
-    "tokenScan": 0.10,
     "preflight": 0.15,
     "predictionStandard": 0.20,
     "predictionPremium": 0.30,
@@ -98,9 +95,6 @@
     "candles": "GET /v1/market/candles",
     "xlayerTokens": "GET /v1/xlayer/tokens",
     "contractEvidence": "POST /v1/contract/inspect",
-    "analysisBase": "POST /v1/analysis/base",
-    "analysisPremium": "POST /v1/analysis/premium",
-    "tokenScan": "POST /v1/token/scan",
     "preflight": "POST /v1/preflight",
     "checkout": "POST /v1/checkout",
     "polymarketDiscovery": "/v1/polymarket/markets",
@@ -108,7 +102,11 @@
     "spotPremium": "POST /v1/analysis/spot/premium",
     "predictionStandard": "POST /v1/analysis/prediction/standard",
     "predictionPremium": "POST /v1/analysis/prediction/premium",
-    "cryptoPredictionDiscovery": "GET /v1/polymarket/crypto"
+    "cryptoPredictionDiscovery": "GET /v1/polymarket/crypto",
+    "autopilotStrategies": "GET /v1/autopilot/strategies",
+    "autopilotPass24h": "POST /v1/autopilot/pass/24h",
+    "autopilotPass7d": "POST /v1/autopilot/pass/7d",
+    "autopilotPass30d": "POST /v1/autopilot/pass/30d"
   },
   "timeframes": ["15m", "1H", "4H", "1D", "1W"],
   "paymentProtocol": "x402",
@@ -130,7 +128,7 @@
       "networks": ["eip155:8453", "eip155:42161"],
       "servicePrefixes": ["/base", "/arbitrum"],
       "settlementAsset": "native USDC",
-      "catalog": "The same five public report and Risk Guard services; no duplicate ERC-8004 identity is required."
+      "catalog": "Eight services on each execution mainnet: five analysis/risk services plus three Agentic Wallet Autopilot start services; no duplicate ERC-8004 identity is required."
     },
     "circleAgentMarketplace": {
       "network": "eip155:5042002",
@@ -142,8 +140,30 @@
   "autopilotAiPass": {
     "scope": "one owner-controlled vault",
     "plansUsd": { "24h": 1.50, "7d": 10.50, "30d": 45.00 },
-    "catalogPolicy": "An in-product AI entry entitlement, not a sixth public analysis marketplace service.",
-    "expiry": "New AI-confirmed entries hold after expiry; deterministic monitoring and protective exits continue."
+    "catalogPolicy": "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; excluded from Arc Testnet because execution is unavailable there.",
+    "activation": "Selected during the six-step setup and paid through x402 only after a new vault is created and registered. Existing active time is reused without another charge.",
+    "renewal": "Manual only. A new purchase extends unused paid time and never auto-renews.",
+    "timer": "Active runtime consumes paid time; Pause freezes it and Resume preserves the unused duration.",
+    "expiry": "New AI-confirmed entries hold after expiry; deterministic monitoring, protective exits and owner withdrawals continue.",
+    "providerFailure": "Billing, permission and quota failures open a six-hour circuit breaker instead of retrying every worker tick.",
+    "audit": "One Autopilot dashboard combines controls, balances, strategy journals and on-chain activity, with CSV export."
+  },
+  "agenticWalletWorkflows": {
+    "custody": "The caller's Agentic Wallet owns the account or vault and confirms every state-changing contract call. PULSE never receives or uses its private key.",
+    "globalSpot": {
+      "services": ["Global Quick → Spot Market or Limit", "Global Pro → Spot Market or Limit"],
+      "flow": ["Buy and recover the selected Global report", "Choose Market or Limit", "Verify balance, identity-safe token, live route, slippage and optional TP/SL", "Review and sign in Agentic Wallet"]
+    },
+    "autopilotStart": {
+      "services": ["Start Autopilot · 24h", "Start Autopilot · 7d", "Start Autopilot · 30d"],
+      "flow": ["Choose create-new or an existing vault", "Choose pair/timeframe and verify token/route", "Choose strategy", "Choose capital and signed risk profile", "Review Agentic Wallet vault/configuration/funding/registration calls", "Pay the selected x402 runtime and resume/start the registered vault"]
+    },
+    "networks": {
+      "xlayer": "OKX Agentic Wallet on chain 196; X Layer gas is zero.",
+      "base": "Agentic Wallet on Base mainnet; native ETH is required for gas.",
+      "arbitrum": "Agentic Wallet on Arbitrum One; native ETH is required for gas.",
+      "arc-testnet": "Analysis and Risk Guard only; Spot and Autopilot workflows are unavailable."
+    }
   },
   "wallet": {
     "browser": "Reown AppKit, Wagmi and Viem; wallet keys remain client-side",
@@ -157,7 +177,9 @@
     "navigation": ["Global Market", "Prediction Market", "Risk Guard", "Spot Trading", "Autopilot", "Telegram", "Docs"],
     "predictionSelection": "Single active crypto price/direction market selected from an in-page popup; no separate predictions page",
     "predictionReport": "Readable confidence, summary, outcome probabilities, bid/ask, evidence quality, market metrics, invalidation, limitations, provenance, and disclaimer; technical JSON is collapsed",
-    "focusNote": "A valid Global Market Buy setup can prefill a Market, Limit or Autopilot action; every Spot signature remains owner-controlled and Autopilot remains policy-bounded",
+    "focusNote": "A valid Global Market Buy setup can prefill a wallet-signed Spot Market or Limit action. Autopilot starts independently with its own deterministic gates, compact AI confirmation and owner policy.",
+    "autopilotSetup": "Six steps: account target, market, strategy, capital and risk, AI Entry Pass, review and activation.",
+    "autopilotDashboard": "One dashboard for account selection, pass renewal, pause/resume, add/withdraw/withdraw-all, balances, strategy journals, on-chain activity and CSV export.",
     "themes": "Network-aware Base, Arbitrum, and Arc themes with the original X Layer design preserved"
   },
   "arcAi": {
@@ -165,11 +187,14 @@
     "fixture": "Deterministic payment/job plumbing validation only; no market inference"
   },
   "publicServices": [
-    { "name": "Global Market Quick Plan", "path": "/v1/analysis/spot/standard", "priceUsd": 0.20 },
-    { "name": "Global Market Pro Strategy", "path": "/v1/analysis/spot/premium", "priceUsd": 0.30 },
-    { "name": "Prediction Market Quick View", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.20 },
-    { "name": "Prediction Market Pro Analysis", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.30 },
-    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.15 }
+    { "name": "Global Quick → Spot Market or Limit", "path": "/v1/analysis/spot/standard", "priceUsd": 0.20, "nextActions": ["wallet-signed Spot Market order", "wallet-signed Spot Limit order"] },
+    { "name": "Global Pro → Spot Market or Limit", "path": "/v1/analysis/spot/premium", "priceUsd": 0.30, "nextActions": ["wallet-signed Spot Market order", "wallet-signed Spot Limit order"] },
+    { "name": "Prediction Quick", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.20 },
+    { "name": "Prediction Pro", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.30 },
+    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.15 },
+    { "name": "Start Autopilot · 24h", "path": "/v1/autopilot/pass/24h", "priceUsd": 1.50, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" },
+    { "name": "Start Autopilot · 7d", "path": "/v1/autopilot/pass/7d", "priceUsd": 10.50, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" },
+    { "name": "Start Autopilot · 30d", "path": "/v1/autopilot/pass/30d", "priceUsd": 45.00, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" }
   ],
   "dataPolicy": {
     "polymarket": "Public read-only evidence only; no order placement",
@@ -193,6 +218,8 @@
     "market-intelligence",
     "spot-trading",
     "guarded-autopilot",
+    "ai-entry-pass",
+    "cost-controlled-automation",
     "risk-guard",
     "xstocks",
     "rwa",

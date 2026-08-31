@@ -121,7 +121,7 @@ The x402/viem browser buyer is dynamically imported only when a paid request beg
 
 ### Dependency audit
 
-The 2026-08-20 V6 audit reports 12 production findings (11 moderate, 1 high). They are transitive dependencies of Circle's current `@circle-fin/w3s-pw-web-sdk@1.1.11`: Firebase 10.14.1 pins vulnerable Undici 6.x builds and the Circle package pins UUID 9.x. npm offers only a downgrade to Circle SDK 1.0.13, which is not a safe or compatible remediation. PULSE confines that SDK to the Arc Testnet email-wallet path; Spot and Autopilot are hidden on Arc and do not import it in their API workers. Track the upstream Circle release and upgrade once it carries patched dependencies. Do not use `npm audit fix --force` or pretend an ineffective nested override resolved these findings. The full tree currently reports 20 findings (7 low, 11 moderate, 2 high), including development tooling.
+The 2026-08-20 PULSE audit reports 12 production findings (11 moderate, 1 high). They are transitive dependencies of Circle's current `@circle-fin/w3s-pw-web-sdk@1.1.11`: Firebase 10.14.1 pins vulnerable Undici 6.x builds and the Circle package pins UUID 9.x. npm offers only a downgrade to Circle SDK 1.0.13, which is not a safe or compatible remediation. PULSE confines that SDK to the Arc Testnet email-wallet path; Spot and Autopilot are hidden on Arc and do not import it in their API workers. Track the upstream Circle release and upgrade once it carries patched dependencies. Do not use `npm audit fix --force` or pretend an ineffective nested override resolved these findings. The full tree currently reports 20 findings (7 low, 11 moderate, 2 high), including development tooling.
 
 ## Completed local verification
 

@@ -172,7 +172,10 @@ describe("PULSE API", () => {
     assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
     assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));
     assert.equal(services.some((item) => item.path === "/base/v1/token/scan"), false);
-    assert.equal(json.asp.version, "6.1.0");
+    assert.equal(json.asp.name, "PULSE");
+    assert.equal(json.asp.product, "PULSE");
+    assert.equal(json.asp.version, undefined);
+    assert.equal(json.asp.methodology_version, undefined);
     assert.ok(json.asp.tags.includes("polymarket"));
     assert.ok(json.asp.tags.includes("multichain"));
     assert.equal(json.asp.discovery.okxAi.publicUrl, "https://www.okx.ai/agents/8355");
@@ -185,7 +188,20 @@ describe("PULSE API", () => {
     }
     assert.ok(publicPaths.includes("/v1/analysis/prediction/standard"));
     assert.ok(publicPaths.includes("/v1/analysis/prediction/premium"));
-    assert.deepEqual(new Set(publicPaths), new Set(["/v1/analysis/spot/standard", "/v1/analysis/spot/premium", "/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium", "/v1/preflight"]));
+    assert.deepEqual(new Set(publicPaths), new Set([
+      "/v1/analysis/spot/standard",
+      "/v1/analysis/spot/premium",
+      "/v1/analysis/prediction/standard",
+      "/v1/analysis/prediction/premium",
+      "/v1/preflight",
+      "/v1/autopilot/pass/24h",
+      "/v1/autopilot/pass/7d",
+      "/v1/autopilot/pass/30d",
+    ]));
+    assert.ok(services.some((item) => item.path === "/xlayer/v1/autopilot/pass/24h" && item.paymentProvider === "okx"));
+    assert.ok(services.some((item) => item.path === "/base/v1/autopilot/pass/7d" && item.network === "eip155:8453"));
+    assert.ok(services.some((item) => item.path === "/arbitrum/v1/autopilot/pass/30d" && item.network === "eip155:42161"));
+    assert.equal(services.some((item) => item.path.startsWith("/arc/v1/autopilot/pass/")), false);
   });
 
   it("returns 402 without payment", async () => {
@@ -414,6 +430,9 @@ describe("PULSE API", () => {
       "prediction_analysis_standard",
       "spot_analysis_premium",
       "prediction_analysis_premium",
+      "start_autopilot_24h",
+      "start_autopilot_7d",
+      "start_autopilot_30d",
       "job_status",
       "job_report",
     ]);

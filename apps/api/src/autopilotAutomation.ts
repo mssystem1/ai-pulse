@@ -86,7 +86,10 @@ type Strategy = {
   realizedPositionPnlPct?: number;
   lastEvaluatedCandleTs?: number;
   lastAiSignalAt?: string;
+  lastAiAttemptAt?: string;
   lastAiSignalCandleTs?: number;
+  aiFailureStreak?: number;
+  aiRetryAt?: string;
   aiSignalSource?: "live" | "cache" | "deterministic";
   aiBudgetDay?: string;
   aiCallsToday?: number;
@@ -229,10 +232,37 @@ export type AutopilotPass = {
   expiresAt: string;
   signalLimit: number;
   signalsUsed: number;
+  /** Wall-clock expiry is frozen while the owner pauses the vault. */
+  pausedAt?: string;
   telegramDelivery?: string;
   expiryWarningSentAt?: string;
   expiredNoticeSentAt?: string;
 };
+export const AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS = 15 * 60_000;
+export const AUTOPILOT_PROVIDER_BLOCK_BACKOFF_MS = 6 * 60 * 60_000;
+
+export function autopilotPassRemainingMs(value: AutopilotPass, now = Date.now()) {
+  const reference = value.pausedAt ? Date.parse(value.pausedAt) : now;
+  return Date.parse(value.expiresAt) - reference;
+}
+
+export function nextAutopilotAiRetryAt(input: {
+  now: number;
+  minimumIntervalMs: number;
+  failureStreak: number;
+  error?: string;
+}) {
+  const providerBlocked = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(input.error || "");
+  const transientBackoff = Math.min(
+    AUTOPILOT_PROVIDER_BLOCK_BACKOFF_MS,
+    AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS * 2 ** Math.max(0, Math.min(5, input.failureStreak - 1)),
+  );
+  return input.now + Math.max(
+    AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS,
+    input.minimumIntervalMs,
+    providerBlocked ? AUTOPILOT_PROVIDER_BLOCK_BACKOFF_MS : transientBackoff,
+  );
+}
 const localPasses = new Map<string, AutopilotPass>();
 const passKey = (network: Network, vault: string) => `pulse:v6:autopilot:pass:${network}:${vault.toLowerCase()}`;
 export async function getAutopilotPass(network: Network, vault: string): Promise<AutopilotPass | null> {
@@ -258,14 +288,34 @@ export async function autopilotPassTargetExists(input: { owner: string; network:
 async function saveAutopilotPass(value: AutopilotPass) {
   const key = passKey(value.network, value.vault);
   localPasses.set(key, value);
-  if (kvConfigured()) await kv(["SET", key, JSON.stringify(value), "EX", Math.max(172800, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000) + 2_592_000)]);
+  if (kvConfigured()) {
+    // A paused pass has no moving wall-clock expiry, so its KV record must not
+    // disappear while the owner intentionally leaves a vault paused.
+    if (value.pausedAt) await kv(["SET", key, JSON.stringify(value)]);
+    else await kv(["SET", key, JSON.stringify(value), "EX", Math.max(172800, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000) + 2_592_000)]);
+  }
+}
+async function synchronizeAutopilotPassPause(value: AutopilotPass, paused: boolean, now: number) {
+  if (paused && !value.pausedAt) {
+    value.pausedAt = new Date(now).toISOString();
+    await saveAutopilotPass(value);
+  } else if (!paused && value.pausedAt) {
+    const pausedAt = Date.parse(value.pausedAt);
+    const pausedFor = Number.isFinite(pausedAt) ? Math.max(0, now - pausedAt) : 0;
+    value.expiresAt = new Date(Date.parse(value.expiresAt) + pausedFor).toISOString();
+    value.pausedAt = undefined;
+    value.expiryWarningSentAt = undefined;
+    value.expiredNoticeSentAt = undefined;
+    await saveAutopilotPass(value);
+  }
+  return value;
 }
 export async function grantAutopilotPass(input: { owner: string; network: Network; vault: string; days: 1 | 7 | 30; telegramDelivery?: string }) {
   const strategy = (await list()).find((item) => item.network === input.network && item.vault.toLowerCase() === input.vault.toLowerCase() && item.owner.toLowerCase() === input.owner.toLowerCase());
   if (!strategy) throw new Error("The selected vault is not a registered Autopilot owned by this wallet on the selected network");
   const existing = await getAutopilotPass(input.network, input.vault);
   const now = Date.now();
-  const extendsActive = existing && Date.parse(existing.expiresAt) > now;
+  const extendsActive = existing && autopilotPassRemainingMs(existing, now) > 0;
   const startsAt = extendsActive ? Date.parse(existing!.expiresAt) : now;
   const value: AutopilotPass = {
     owner: input.owner.toLowerCase(), network: input.network, vault: input.vault.toLowerCase(),
@@ -273,6 +323,7 @@ export async function grantAutopilotPass(input: { owner: string; network: Networ
     expiresAt: new Date(startsAt + input.days * 86_400_000).toISOString(),
     signalLimit: (extendsActive ? existing!.signalLimit - existing!.signalsUsed : 0) + input.days * 3,
     signalsUsed: 0,
+    ...(existing?.pausedAt ? { pausedAt: existing.pausedAt } : {}),
     ...(input.telegramDelivery ? { telegramDelivery: input.telegramDelivery } : existing?.telegramDelivery ? { telegramDelivery: existing.telegramDelivery } : {}),
   };
   await saveAutopilotPass(value);
@@ -286,7 +337,7 @@ export async function grantAutopilotPass(input: { owner: string; network: Networ
 async function consumeAutopilotPassSignal(strategy: Strategy) {
   const value = await getAutopilotPass(strategy.network, strategy.vault);
   const now = Date.now();
-  if (!value || value.owner !== strategy.owner.toLowerCase() || Date.parse(value.expiresAt) <= now) return { ok: false as const, reason: "pass_expired", pass: value };
+  if (!value || value.owner !== strategy.owner.toLowerCase() || autopilotPassRemainingMs(value, now) <= 0) return { ok: false as const, reason: "pass_expired", pass: value };
   if (value.signalsUsed >= value.signalLimit) return { ok: false as const, reason: "signals_exhausted", pass: value };
   value.signalsUsed += 1;
   await saveAutopilotPass(value);
@@ -724,6 +775,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
           getTicker(strategy.pair),
         ]);
         const [settlementBalance, targetBalance, settlementDecimals, targetDecimals, settlementSymbol, targetSymbol, paused] = chainState;
+        if (aiPass) await synchronizeAutopilotPassPause(aiPass, Boolean(paused), Date.now());
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const portfolioValueAtomic = settlementBalance + targetBalance * price * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
@@ -750,7 +802,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         maxCallsGlobalDay: cfg.AUTOPILOT_AI_MAX_CALLS_GLOBAL_DAY,
         maxUsdPerVaultDay: cfg.AUTOPILOT_AI_MAX_USD_PER_VAULT_DAY,
         maxUsdGlobalDay: cfg.AUTOPILOT_AI_MAX_USD_GLOBAL_DAY,
-        commercialPass: { enabled: true, renewal: "prepaid_manual", price24hUsd: cfg.PRICE_AUTOPILOT_PASS_24H, price7dUsd: cfg.PRICE_AUTOPILOT_PASS_7D, price30dUsd: cfg.PRICE_AUTOPILOT_PASS_30D, signalsPerDay: 3, expiryBehavior: "hold_new_entries_keep_risk_exits" },
+        commercialPass: { enabled: true, renewal: "prepaid_manual", price24hUsd: cfg.PRICE_AUTOPILOT_PASS_24H, price7dUsd: cfg.PRICE_AUTOPILOT_PASS_7D, price30dUsd: cfg.PRICE_AUTOPILOT_PASS_30D, signalsPerDay: 3, expiryBehavior: "pause_freezes_timer; expiry_holds_new_entries_and_keeps_risk_exits" },
       },
     });
   }));
@@ -853,8 +905,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
       return;
     const items = await list();
     const analysisInterval = Math.max(
-      60_000,
-      Number(process.env.AUTOPILOT_ANALYSIS_INTERVAL_MS || 300000) || 300000,
+      AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS,
+      Number(process.env.AUTOPILOT_ANALYSIS_INTERVAL_MS || AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS) || AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS,
     );
     const riskInterval = Math.max(
       30_000,
@@ -870,6 +922,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
       const lease = await acquireStrategyLease(s.id, leaseScope);
       if (!lease) continue;
       let analysisAttempted = false;
+      let aiAttemptedThisCycle = false;
       try {
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
@@ -921,15 +974,16 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           settlementDecimals,
           settlementBalance,
         ] = await readRuntime();
+        const aiPass = await getAutopilotPass(s.network, s.vault);
+        if (aiPass) await synchronizeAutopilotPassPause(aiPass, Boolean(paused), now);
         if (mode === "analysis") {
-          const aiPass = await getAutopilotPass(s.network, s.vault);
           if (aiPass?.telegramDelivery) {
-            const remainingMs = Date.parse(aiPass.expiresAt) - now;
-            if (remainingMs > 0 && remainingMs <= 2 * 60 * 60_000 && !aiPass.expiryWarningSentAt) {
+            const remainingMs = autopilotPassRemainingMs(aiPass, now);
+            if (!aiPass.pausedAt && remainingMs > 0 && remainingMs <= 2 * 60 * 60_000 && !aiPass.expiryWarningSentAt) {
               await deliverTelegramReportDurably(`autopilot-pass-warning:${s.network}:${s.vault}:${aiPass.expiresAt}`, aiPass.telegramDelivery, `PULSE Autopilot pass for ${s.pair} expires in ${Math.max(1, Math.ceil(remainingMs / 60_000))} minutes. Renew to keep AI-assisted new entries available. TP/SL and exits continue even without a pass.`, `${cfg.BASE_URL.replace(/\/$/, "")}/autopilot`);
               aiPass.expiryWarningSentAt = new Date().toISOString();
               await saveAutopilotPass(aiPass);
-            } else if (remainingMs <= 0 && !aiPass.expiredNoticeSentAt) {
+            } else if (!aiPass.pausedAt && remainingMs <= 0 && !aiPass.expiredNoticeSentAt) {
               await deliverTelegramReportDurably(`autopilot-pass-expired:${s.network}:${s.vault}:${aiPass.expiresAt}`, aiPass.telegramDelivery, `PULSE Autopilot pass for ${s.pair} has expired. New entries now Hold. Deterministic TP/SL, exits, pause and withdrawal remain active.`, `${cfg.BASE_URL.replace(/\/$/, "")}/autopilot`);
               aiPass.expiredNoticeSentAt = new Date().toISOString();
               await saveAutopilotPass(aiPass);
@@ -1045,17 +1099,22 @@ export async function runAutopilotCycle(cfg: AppConfig) {
               evidenceContext = { mode: "deterministic_entry_prefilter", candidate, technical };
             } else {
               const pass = await getAutopilotPass(s.network, s.vault);
-              const passReady = Boolean(pass && Date.parse(pass.expiresAt) > Date.now() && pass.signalsUsed < pass.signalLimit);
+              const passReady = Boolean(pass && autopilotPassRemainingMs(pass) > 0 && pass.signalsUsed < pass.signalLimit);
               let signal = passReady ? await cachedAutopilotSignal(s.pair, s.timeframe) : null;
               if (!passReady) {
                 s.aiSignalSource = "deterministic";
-                s.aiBudgetStatus = pass && Date.parse(pass.expiresAt) > Date.now() ? "signals_exhausted" : "pass_expired";
+                s.aiBudgetStatus = pass && autopilotPassRemainingMs(pass) > 0 ? "signals_exhausted" : "pass_expired";
               } else if (signal) {
                 s.aiSignalSource = "cache";
                 s.aiBudgetStatus = "ready";
               } else {
-                const lastSignalAt = Date.parse(s.lastAiSignalAt || "");
-                const nextEligible = Number.isFinite(lastSignalAt) ? lastSignalAt + cfg.AUTOPILOT_AI_MIN_INTERVAL_MS : 0;
+                const lastSignalAt = Math.max(
+                  Date.parse(s.lastAiSignalAt || "") || 0,
+                  Date.parse(s.lastAiAttemptAt || "") || 0,
+                );
+                const configuredNext = lastSignalAt ? lastSignalAt + Math.max(AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS, cfg.AUTOPILOT_AI_MIN_INTERVAL_MS) : 0;
+                const retryAt = Date.parse(s.aiRetryAt || "") || 0;
+                const nextEligible = Math.max(configuredNext, retryAt);
                 s.aiNextEligibleAt = nextEligible > Date.now() ? new Date(nextEligible).toISOString() : undefined;
                 if (nextEligible > Date.now()) {
                   s.aiBudgetStatus = "cooldown";
@@ -1072,6 +1131,11 @@ export async function runAutopilotCycle(cfg: AppConfig) {
                     try {
                       signal = await cachedAutopilotSignal(s.pair, s.timeframe);
                       if (!signal) {
+                        // Record the attempt before any network call. A rejected
+                        // request must throttle the next cycle exactly like a
+                        // successful request.
+                        s.lastAiAttemptAt = new Date().toISOString();
+                        aiAttemptedThisCycle = true;
                         const estimatedCost = estimatedAutopilotSignalCostUsd({
                           maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT,
                           maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT,
@@ -1108,6 +1172,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
                           recordAiUsage(usage.promptTokens, usage.completionTokens, actualCost, usage.cachedTokens, usage.reasoningTokens);
                         }
                         s.lastAiSignalAt = signal.generatedAt;
+                        s.aiFailureStreak = 0;
+                        s.aiRetryAt = undefined;
                         s.lastAiSignalCandleTs = signal.candleTs;
                         await cacheAutopilotSignal(s.pair, s.timeframe, signal, cfg.AUTOPILOT_AI_SIGNAL_TTL_MS);
                         s.aiSignalSource = "live";
@@ -1381,6 +1447,19 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           error instanceof Error ? error.message : String(error)
         ).slice(0, 500);
         const transient = /rate limit|429|timeout|timed out|aborted|fetch failed|network|rpc request failed|temporarily unavailable/i.test(detail);
+        if (aiAttemptedThisCycle) {
+          s.aiFailureStreak = (s.aiFailureStreak || 0) + 1;
+          s.aiRetryAt = new Date(nextAutopilotAiRetryAt({
+            now: Date.now(),
+            minimumIntervalMs: cfg.AUTOPILOT_AI_MIN_INTERVAL_MS,
+            failureStreak: s.aiFailureStreak,
+            error: detail,
+          })).toISOString();
+          s.aiNextEligibleAt = s.aiRetryAt;
+          s.aiBudgetStatus = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(detail)
+            ? "provider_billing_blocked"
+            : "provider_backoff";
+        }
         s.lastError = detail;
         s.lastDecision = transient
           ? "hold_dependency_retry"

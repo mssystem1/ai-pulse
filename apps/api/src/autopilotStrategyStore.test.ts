@@ -56,6 +56,18 @@ test("a current worker persists the independent fast-risk timestamp", () => {
   assert.deepEqual(mergeStrategyRuntime(current, incoming), incoming);
 });
 
+test("provider attempt and backoff state survive runtime merges", () => {
+  const current = { id: "xlayer:vault", configurationHash: "0xsame" };
+  const incoming = {
+    ...current,
+    lastAiAttemptAt: "2026-08-31T10:00:00.000Z",
+    aiFailureStreak: 1,
+    aiRetryAt: "2026-08-31T16:00:00.000Z",
+    aiBudgetStatus: "provider_billing_blocked",
+  };
+  assert.deepEqual(mergeStrategyRuntime(current, incoming), incoming);
+});
+
 test("a slower concurrent cycle cannot overwrite newer runtime telemetry", () => {
   const current = {
     id: "xlayer:vault",

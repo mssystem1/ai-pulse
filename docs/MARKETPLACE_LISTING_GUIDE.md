@@ -1,13 +1,13 @@
-# PULSE V6 marketplace and discovery guide
+# PULSE marketplace and discovery guide
 
 This is an operator guide. It does not authorize a deployment, listing submission, or on-chain agent mutation. Complete localhost testing first, deploy the final public HTTPS origins second, validate those origins third, and request explicit approval immediately before each external write.
 
 ## Shared publication package
 
-Prepare one versioned package from the deployed product:
+Prepare one publication package from the deployed product:
 
 - Name: PULSE.
-- Version: 6.1.0.
+- Public product identity: `product: "PULSE"`. PULSE has no public product version before launch; do not add `V6`, `6.x`, a version field, or a numbered methodology to marketplace metadata or listing copy unless the owner explicitly introduces versioning later.
 - OKX.AI ASP category: Trading. Circle positioning remains Financial analysis / market intelligence.
 - Square PNG logo and SVG brand asset served over public HTTPS.
 - Short and long descriptions from `/v1/metadata`.
@@ -50,17 +50,20 @@ Base paid services use the `/base` aliases, Base mainnet `eip155:8453`, and nati
 5. Query the current CDP Bazaar discovery surface and confirm the final HTTPS resource appears with the correct method, price, Base chain, native-USDC address, and output schema.
 6. Remove or disable any stale resource URL before advertising the new one.
 
-Recommended Base V6 paid resources (the complete public catalog):
+Recommended Base paid resources (the complete eight-service execution-mainnet catalog):
 
 - `/base/v1/analysis/spot/standard`
 - `/base/v1/analysis/spot/premium`
 - `/base/v1/analysis/prediction/standard`
 - `/base/v1/analysis/prediction/premium`
 - `/base/v1/preflight`
+- `/base/v1/autopilot/pass/24h`
+- `/base/v1/autopilot/pass/7d`
+- `/base/v1/autopilot/pass/30d`
 
 ## Arbitrum API discovery
 
-PULSE exposes the same approved five-service V6 catalog under `/arbitrum`, using `eip155:42161` and native USDC `0xaf88d065e77c8cc2239327c5edb3a432268e5831`.
+PULSE exposes the same approved eight-service catalog under `/arbitrum`, using `eip155:42161` and native USDC `0xaf88d065e77c8cc2239327c5edb3a432268e5831`: five analysis/risk services plus Start Autopilot for 24h, 7d and 30d.
 
 1. Keep Arbitrum disabled until the Base CDP path has passed production canary gates.
 2. Enable `FEATURE_ARBITRUM_PAYMENTS=1` and retain Bazaar discovery only after verifying CDP currently advertises Arbitrum resources in the target environment.
@@ -105,7 +108,7 @@ Public record: https://www.okx.ai/agents/8355
 
 1. Ask the operator’s Onchain OS-enabled agent to show details and services for agent #8355.
 2. Compare ownership, role, active state, name, logo, description, and every service with the approved publication package.
-3. Prepare the updated ASP description using the focused V6 metadata. Preserve the original OKX/X Layer identity; describe Base, Arbitrum and Arc as separate network/provider aliases without implying that OKX settles their payments.
+3. Prepare the updated ASP description using the focused PULSE metadata. Preserve the original OKX/X Layer identity; describe Base, Arbitrum and Arc as separate network/provider aliases without implying that OKX settles their payments.
 4. Add services one at a time. For each service provide name, concise description, exact per-call price, method, input, and final production endpoint. After every service, explicitly choose whether to add another; finish the service list only when all intended rows are reviewed.
 5. Run the marketplace validator against every paid endpoint with a valid body. A GET input-discovery probe may return `input_required`; the valid POST must return a compliant challenge.
 6. Review the complete mutation card. Confirm that the target is #8355, not a new agent; verify all endpoints and prices character-for-character.
@@ -115,15 +118,20 @@ Public record: https://www.okx.ai/agents/8355
 
 Recommended OKX.AI service rows should use X Layer URLs because OKX’s x402 facilitator and marketplace payment validation are X Layer-focused:
 
-- Global Market Quick Plan — `/xlayer/v1/analysis/spot/standard` — $0.20.
-- Global Market Pro Strategy — `/xlayer/v1/analysis/spot/premium` — $0.30.
-- Prediction Market Quick View — `/xlayer/v1/analysis/prediction/standard` — $0.20.
-- Prediction Market Pro Analysis — `/xlayer/v1/analysis/prediction/premium` — $0.30.
+- Global Quick → Spot Market or Limit — `/xlayer/v1/analysis/spot/standard` — $0.20.
+- Global Pro → Spot Market or Limit — `/xlayer/v1/analysis/spot/premium` — $0.30.
+- Prediction Quick — `/xlayer/v1/analysis/prediction/standard` — $0.20.
+- Prediction Pro — `/xlayer/v1/analysis/prediction/premium` — $0.30.
 - Onchain Pre-Trade Risk Guard — `/xlayer/v1/preflight` — $0.15.
+- Start Autopilot · 24h — `/xlayer/v1/autopilot/pass/24h` — $1.50.
+- Start Autopilot · 7d — `/xlayer/v1/autopilot/pass/7d` — $10.50.
+- Start Autopilot · 30d — `/xlayer/v1/autopilot/pass/30d` — $45.00.
 
-Do not publish Fused, Divergence, Event-risk, route tickets, Market/Limit execution or Autopilot evaluation as extra marketplace services. They are internal capabilities or next actions inside the Analyze → Act workflow.
+Do not publish Fused, Divergence, Event-risk, route tickets, separate Market/Limit execution or Autopilot evaluation as extra marketplace services. Market/Limit are Agentic Wallet actions inside the two Global services. The three duration-specific Autopilot starts are the only separate Autopilot marketplace rows.
 
-The Autopilot AI Pass is also not a sixth marketplace analysis service. It is a per-vault in-product entitlement for compact AI entry confirmations: $1.50 for 24 hours, $10.50 for 7 days or $45.00 for 30 days. Expiry blocks new AI-confirmed entries while deterministic monitoring and protective exits continue.
+The two Global service descriptions must explicitly list the two report-linked next actions: a prefilled Agentic-Wallet-signed Spot Market order or Spot Limit order. Both Base/Quick and Premium/Pro expose those choices; Premium adds analysis depth rather than exclusive permission to trade. Autopilot starts independently through one of its three dedicated duration services and does not require a Global report.
+
+Each Start Autopilot service mirrors the web six-step flow. The caller's Agentic Wallet owns and signs vault creation/selection, pair/route verification, strategy policy, capital deposit, registration and resume/start; PULSE never receives the private key. The duration-specific endpoint is the final x402 activation step. Pause freezes unused paid time; renewal extends it. Expiry blocks new AI-confirmed entries while deterministic monitoring, protective exits and owner withdrawals continue. Provider billing, permission or quota errors open a six-hour retry circuit instead of consuming calls every worker tick.
 
 Do not place Base, Arbitrum, or Arc payment endpoints under an OKX-settled service description. Those networks use their own providers and discovery channels.
 

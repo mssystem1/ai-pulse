@@ -14,7 +14,7 @@ This file is the canonical, copy-ready submission package for Circle's Agent Mar
 | OpenAPI specification | https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml |
 | Logo | https://pulse-api-production-7aae.up.railway.app/brand/logo.png |
 
-The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a complementary JSON-RPC agent interface and is not counted as one of the five marketplace services. The per-vault Autopilot AI Pass is an in-product mainnet execution entitlement, not a Circle marketplace analysis endpoint.
+The complete PULSE execution-mainnet catalog contains eight services. Circle/Arc intentionally lists only the five analysis/risk HTTP resources because Arc Testnet has no Spot or Autopilot execution. The MCP endpoint is complementary and is not counted in the Arc subset.
 
 ## Form answers
 
@@ -30,7 +30,7 @@ The Circle marketplace lists x402 HTTP resources. The MCP endpoint is a compleme
 
 ### Description
 
-PULSE is a focused Analyze → Act intelligence workflow for humans and AI agents. Global Market turns live OKX evidence into Quick or Pro Buy-or-Wait plans; Pro adds Fibonacci, pivots, global Elliott wave paths, DeFi extraction and report-linked Spot/Autopilot actions on supported mainnets. Prediction Market analyzes one explicitly selected Polymarket question read-only. Onchain Pre-Trade Risk Guard adds a separate PASS/WARN/FAIL review. Reports are durable and recoverable. Arc Testnet remains analysis/payment only, so this Circle listing never executes trades.
+PULSE is a focused Analyze → Act intelligence workflow for humans and AI agents. Global Market turns live OKX evidence into Quick or Pro Buy-or-Wait plans; Pro adds Fibonacci, pivots, global Elliott wave paths and DeFi extraction. On supported execution mainnets either Global tier can lead to an Agentic-Wallet-signed Spot Market or Limit order, while Autopilot starts independently through one of three duration services. Prediction Market analyzes one explicitly selected Polymarket question read-only. Onchain Pre-Trade Risk Guard adds a separate PASS/WARN/FAIL review. Arc Testnet remains analysis/payment only, so this Circle listing publishes only the five analysis/risk services and never executes trades.
 
 ### Anything else?
 

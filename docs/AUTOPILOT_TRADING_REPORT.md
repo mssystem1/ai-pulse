@@ -6,7 +6,9 @@ This document is the functional and acceptance report for Autopilot. It distingu
 
 ## 2026-08-29 cost-control amendment
 
-The earlier acceptance runs used a full Premium report for every analysis cycle. That behavior is retired: it consumed roughly `$6–$9/day` in one observed active-vault run and was neither necessary nor commercially sustainable. Current code uses a deterministic new-candle gate, a strict 4,000-input/320-output-token classifier only for a surviving entry candidate, a four-hour pair/timeframe cache, atomic per-vault/global call and USD budgets, and a manually prepaid vault-bound AI pass. Historical transaction evidence below remains valid, but historical references to a full Premium cycle describe the tested release at that time, not the current scheduler.
+The earlier acceptance runs used a full Premium report for every analysis cycle. That behavior is retired: it consumed roughly `$6–$9/day` in one observed active-vault run and was neither necessary nor commercially sustainable. Current code uses a deterministic new-candle gate with a hard 15-minute scheduler floor, a strict 4,000-input/320-output-token classifier only for a surviving entry candidate, a four-hour pair/timeframe cache, atomic per-vault/global call and USD budgets, and a manually prepaid vault-bound AI Entry Pass. The attempt timestamp is persisted before calling xAI; a rejected request therefore cannot bypass the cooldown, and billing/auth/quota failures open a six-hour circuit breaker. Historical transaction evidence below remains valid, but historical references to a full Premium cycle describe the tested release at that time, not the current scheduler.
+
+Paid time is active-runtime time. Pausing the on-chain vault freezes the pass deadline and Telegram warning clock; resuming extends expiry by the paused duration. The unified Autopilot dashboard owns Pause/Resume, top-up, per-asset withdrawal/Max, close-and-withdraw-all and 24h/7d/30d x402 renewal. Strategy decisions explain why PULSE waited, bought or sold; reconciled on-chain activity separately records wallet confirmations and fills. The export format is CSV for spreadsheet/audit use rather than the former JSON download.
 
 ## Trading workflow
 
@@ -108,7 +110,7 @@ Each cycle updates lifetime evaluation/Buy/Sell/Hold/failure counters and retain
 - evidence hash and transaction hash;
 - current settlement/target balances, mark-to-market value and cash-flow-adjusted P&L.
 
-The Autopilot runtime UI exposes this as **Detailed trading report**. Contract addresses remain under **Technical proof** so a trader does not need to enter them.
+The Autopilot runtime UI exposes this as a **Strategy journal** with a plain-language current state, PASS/WAIT rule evidence and a separate on-chain activity ledger. Contract addresses remain under **Technical proof** so a trader does not need to enter them.
 
 ## Verification status
 

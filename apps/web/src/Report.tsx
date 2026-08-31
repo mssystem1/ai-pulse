@@ -217,7 +217,7 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
   );
 }
 
-export function AnalysisReport({ data, nfa, onTrade, onAutopilot }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void; onAutopilot?: (intent: ReportTradeIntent) => void }) {
+export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {
   const a = (data.analysis as AnyRec) || {};
   const bias = String(a.bias || "—");
   const badgeClass = bias === "bearish" ? "bad" : bias === "neutral" ? "mid" : "good";
@@ -237,7 +237,7 @@ export function AnalysisReport({ data, nfa, onTrade, onAutopilot }: { data: AnyR
   const riskExit = (execution.riskExit as AnyRec) || (execution.sell as AnyRec) || {};
   const pair = String(execution.pair || data.instId || "");
   const reportTimeframe = String(execution.timeframe || data.timeframe || "");
-  const [executionChoice, setExecutionChoice] = useState<"market" | "limit" | "autopilot">(buyPlan.orderType === "limit" ? "limit" : "market");
+  const [executionChoice, setExecutionChoice] = useState<"market" | "limit">(buyPlan.orderType === "limit" ? "limit" : "market");
   const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, entryPrice: Number(buyPlan.trigger) || undefined, takeProfit: Number(buyPlan.takeProfit) || undefined, stopLoss: Number(buyPlan.stopLoss) || undefined, rationale: String(buyPlan.scenario || recommendation.reason || "Report buy setup"), sourceTier: tier });
   return (
     <div className={`sr tiered-report ${premium ? "premium-report" : "base-report"}`}>
@@ -267,9 +267,8 @@ export function AnalysisReport({ data, nfa, onTrade, onAutopilot }: { data: AnyR
           <div className="report-execution-choice" role="group" aria-label="Choose how to use this report">
             <button type="button" className={executionChoice === "market" ? "active" : ""} onClick={() => setExecutionChoice("market")}><b>Market buy</b><span>Fresh quote · buy now</span></button>
             <button type="button" className={executionChoice === "limit" ? "active" : ""} onClick={() => setExecutionChoice("limit")}><b>Limit buy</b><span>Wait for report entry</span></button>
-            {onAutopilot && <button type="button" className={executionChoice === "autopilot" ? "active" : ""} onClick={() => setExecutionChoice("autopilot")}><b>Autopilot</b><span>Use Premium signals</span></button>}
           </div>
-          <button className="trade-action buy" type="button" disabled={String(recommendation.action) !== "buy"} onClick={() => executionChoice === "autopilot" && onAutopilot ? onAutopilot(buyIntent("limit")) : onTrade(buyIntent(executionChoice === "limit" ? "limit" : "market"))}><span>{String(recommendation.action) === "buy" ? executionChoice === "autopilot" ? "Configure Autopilot from this report" : `Open prefilled ${executionChoice} buy` : "Wait · no valid buy setup"}</span><small>Pair · timeframe · entry · TP · SL stay connected</small></button>
+          <button className="trade-action buy" type="button" disabled={String(recommendation.action) !== "buy"} onClick={() => onTrade(buyIntent(executionChoice === "limit" ? "limit" : "market"))}><span>{String(recommendation.action) === "buy" ? `Open prefilled ${executionChoice} buy` : "Wait · no valid buy setup"}</span><small>Pair · timeframe · entry · TP · SL stay connected</small></button>
         </div>}
       </section>}
 
