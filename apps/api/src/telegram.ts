@@ -9,6 +9,31 @@ type DeliveryTask = { id:string;delivery:string;text:string;reportUrl:string;att
 const memoryDeliveries = new Map<string, DeliveryTask>();
 const memoryUpdates = new Set<number>();
 
+type TelegramEnvironment = Partial<Record<"TELEGRAM_BOT_TOKEN" | "TELEGRAM_BOT_USERNAME" | "TELEGRAM_WEBHOOK_SECRET" | "TELEGRAM_MINI_APP_URL", string | undefined>>;
+
+export function inspectTelegramConfiguration(env: TelegramEnvironment = process.env) {
+  const botToken = env.TELEGRAM_BOT_TOKEN?.trim() || "";
+  const botUsername = (env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
+  const webhookSecret = env.TELEGRAM_WEBHOOK_SECRET?.trim() || "";
+  const miniAppUrl = env.TELEGRAM_MINI_APP_URL?.trim() || "";
+  const missing = [
+    !botToken && "TELEGRAM_BOT_TOKEN",
+    !botUsername && "TELEGRAM_BOT_USERNAME",
+    !webhookSecret && "TELEGRAM_WEBHOOK_SECRET",
+    !miniAppUrl && "TELEGRAM_MINI_APP_URL",
+  ].filter((value): value is string => Boolean(value));
+  let miniAppUrlError: string | null = null;
+  if (miniAppUrl) {
+    try {
+      const parsed = new URL(miniAppUrl);
+      if (parsed.protocol !== "https:") miniAppUrlError = "TELEGRAM_MINI_APP_URL must use HTTPS";
+    } catch {
+      miniAppUrlError = "TELEGRAM_MINI_APP_URL is not a valid absolute URL";
+    }
+  }
+  return { botToken, botUsername, webhookSecret, miniAppUrl, missing, miniAppUrlError, complete: missing.length === 0 && !miniAppUrlError };
+}
+
 async function kv(command: unknown[]) {
   return runKvCommand(command,"Telegram delivery");
 }
@@ -49,18 +74,16 @@ async function releaseTelegramUpdate(updateId:number|undefined){if(updateId===un
 
 export function createTelegramRouter(cfg: AppConfig) {
   const router = Router();
-  const token = process.env.TELEGRAM_BOT_TOKEN?.trim() || "";
-  const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim() || "";
-  const miniAppUrl = process.env.TELEGRAM_MINI_APP_URL?.trim() || process.env.BASE_URL || "";
+  const telegramConfig = inspectTelegramConfiguration();
+  const { botToken: token, botUsername, webhookSecret, miniAppUrl } = telegramConfig;
 
   const enabled = cfg.FEATURE_TELEGRAM;
   router.get("/v1/telegram/status", (_req, res) => {
-    const botUsername = (process.env.TELEGRAM_BOT_USERNAME || "").replace(/^@/, "").trim();
-    res.json({ enabled, configured: Boolean(enabled && token && webhookSecret && miniAppUrl), botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) });
+    res.json({ enabled, configured: Boolean(enabled && telegramConfig.complete), missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError, botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) });
   });
   router.post("/v1/telegram/webhook", asyncRoute(async (req, res) => {
     if (!enabled) return res.status(404).json({ error: "Telegram bot is disabled" });
-    if (!token || !webhookSecret) return res.status(503).json({ error: "Telegram bot is not configured" });
+    if (!telegramConfig.complete) return res.status(503).json({ error: "Telegram bot is not configured", missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError });
     if (req.header("x-telegram-bot-api-secret-token") !== webhookSecret) return res.status(401).json({ error: "Invalid Telegram webhook secret" });
     const update = req.body as TelegramUpdate;
     if (!(await firstTelegramUpdate(update.update_id))) return res.status(200).json({ ok: true, duplicate: true });
