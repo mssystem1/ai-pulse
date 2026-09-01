@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 
 test("reports effective Autopilot runtime separately from durable registration", () => {
   const expiredPass = { expiresAt: "2026-08-31T00:00:00.000Z", signalLimit: 3, signalsUsed: 0 };
@@ -9,6 +9,36 @@ test("reports effective Autopilot runtime separately from durable registration",
   assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 1n, pass: expiredPass, now: Date.parse("2026-09-01T00:00:00.000Z") }), "protecting_position");
   assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 0n, pass: { expiresAt: "2026-09-02T00:00:00.000Z", signalLimit: 3, signalsUsed: 3 }, now: Date.parse("2026-09-01T00:00:00.000Z") }), "entry_signals_exhausted");
   assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 0n, pass: { expiresAt: "2026-09-02T00:00:00.000Z", signalLimit: 3, signalsUsed: 1 }, now: Date.parse("2026-09-01T00:00:00.000Z") }), "running");
+});
+
+test("confirmed execution activity repairs missing or stale lifetime fill counters", () => {
+  const strategy = { id: "xlayer:vault", vault: "0x1111111111111111111111111111111111111111", evaluationCount: 155, holdCount: 111, filledBuyCount: 0, filledSellCount: 0, failureCount: 44 };
+  const activity = [
+    { id: "buy-1", status: "confirmed", source: "autopilot", kind: "buy_filled", account: strategy.vault, txHash: "0xbuy" },
+    { id: "buy-duplicate", status: "confirmed", source: "autopilot", kind: "buy_filled", account: strategy.vault, txHash: "0xbuy" },
+    { id: "partial", status: "confirmed", source: "autopilot", kind: "sell_partial_filled", account: strategy.vault, txHash: "0xpartial" },
+    { id: "sell", status: "confirmed", source: "autopilot", kind: "sell_filled", account: strategy.vault, txHash: "0xsell" },
+  ];
+  assert.deepEqual(reconcileAutopilotLifetimeStats(strategy, activity, Array.from({ length: 100 }, (_, index) => ({ id: String(index), action: index < 56 ? "hold" : "hold", status: index < 56 ? "held" : "failed" }))), {
+    evaluationCount: 155,
+    holdCount: 111,
+    filledBuyCount: 1,
+    filledSellCount: 2,
+    failureCount: 44,
+    detailedEvaluationCount: 100,
+    evaluationHistoryComplete: false,
+    lifetimeStatsComplete: true,
+  });
+});
+
+test("legacy strategies without counters expose minimums instead of invented lifetime totals", () => {
+  const strategy = { id: "xlayer:legacy", vault: "0x2222222222222222222222222222222222222222" };
+  const evaluations = [{ id: "hold", action: "hold", status: "held" }];
+  const result = reconcileAutopilotLifetimeStats(strategy, [], evaluations);
+  assert.equal(result.evaluationCount, 1);
+  assert.equal(result.holdCount, 1);
+  assert.equal(result.evaluationHistoryComplete, false);
+  assert.equal(result.lifetimeStatsComplete, false);
 });
 
 test("decodes both Upstash HGETALL response shapes", () => {

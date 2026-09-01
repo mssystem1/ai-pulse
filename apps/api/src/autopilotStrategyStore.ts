@@ -2,6 +2,7 @@ export const AUTOPILOT_STRATEGY_HASH_KEY = "pulse:v6:autopilot:strategy-map";
 
 type StrategyRecord = { id: string } & Record<string, unknown>;
 type ExecutionActivity = {
+  id?: string;
   status?: string;
   source?: string;
   kind?: string;
@@ -10,6 +11,12 @@ type ExecutionActivity = {
   createdAt?: string;
   amount?: string;
   fillPrice?: number;
+};
+
+type EvaluationRecord = {
+  id?: string;
+  action?: string;
+  status?: string;
 };
 
 export type AutopilotRuntimeState =
@@ -45,6 +52,61 @@ export function deriveAutopilotRuntimeState(input: {
   if (!passActive) return "entry_pass_expired";
   if (input.pass!.signalsUsed >= input.pass!.signalLimit) return "entry_signals_exhausted";
   return "running";
+}
+
+/**
+ * Detailed strategy rows and confirmed execution rows have different retention
+ * histories. Lifetime execution totals therefore use the confirmed activity
+ * ledger as their floor, while Hold/failure totals use the durable counters and
+ * every surviving evaluation. This heals pre-counter strategies without
+ * inventing events that are no longer recoverable.
+ */
+export function reconcileAutopilotLifetimeStats(
+  strategy: StrategyRecord,
+  activity: readonly ExecutionActivity[],
+  evaluations: readonly EvaluationRecord[],
+) {
+  const vault = typeof strategy.vault === "string" ? strategy.vault.toLowerCase() : "";
+  const confirmed = activity.filter((item) => item.status === "confirmed"
+    && item.source === "autopilot"
+    && item.account?.toLowerCase() === vault);
+  const uniqueExecutions = (kinds: readonly string[]) => new Set(confirmed
+    .filter((item) => kinds.includes(item.kind || ""))
+    .map((item, index) => item.txHash?.toLowerCase() || item.id || `${item.kind}:${item.createdAt || index}`)).size;
+  const observed = {
+    evaluations: evaluations.length,
+    holds: evaluations.filter((item) => item.action === "hold" && item.status === "held").length,
+    failures: evaluations.filter((item) => item.status === "failed").length,
+    buys: Math.max(
+      evaluations.filter((item) => item.action === "buy" && item.status === "filled").length,
+      uniqueExecutions(["buy_filled"]),
+    ),
+    sells: Math.max(
+      evaluations.filter((item) => item.action === "sell" && item.status === "filled").length,
+      uniqueExecutions(["sell_partial_filled", "sell_filled"]),
+    ),
+  };
+  const stored = (field: string) => {
+    const value = Number(strategy[field]);
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+  };
+  const storedEvaluationCount = Number(strategy.evaluationCount);
+  const hasStoredEvaluationCount = Number.isFinite(storedEvaluationCount) && storedEvaluationCount >= 0;
+  const lifetimeStatsComplete = ["evaluationCount", "holdCount", "failureCount"].every((field) => {
+    const value = Number(strategy[field]);
+    return Number.isFinite(value) && value >= 0;
+  });
+  const evaluationCount = Math.max(hasStoredEvaluationCount ? Math.floor(storedEvaluationCount) : 0, observed.evaluations);
+  return {
+    evaluationCount,
+    holdCount: Math.max(stored("holdCount"), observed.holds),
+    filledBuyCount: Math.max(stored("filledBuyCount"), observed.buys),
+    filledSellCount: Math.max(stored("filledSellCount"), observed.sells),
+    failureCount: Math.max(stored("failureCount"), observed.failures),
+    detailedEvaluationCount: evaluations.length,
+    evaluationHistoryComplete: hasStoredEvaluationCount && evaluationCount === evaluations.length,
+    lifetimeStatsComplete,
+  };
 }
 
 export function cashFlowAdjustedPnl(
@@ -112,6 +174,7 @@ const RUNTIME_FIELDS = [
   "filledBuyCount",
   "filledSellCount",
   "failureCount",
+  "evaluationJournalInitialized",
   "updatedAt",
 ] as const;
 

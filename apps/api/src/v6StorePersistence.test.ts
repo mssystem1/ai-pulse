@@ -25,3 +25,13 @@ test("the newest activity update wins across API workers", () => {
   assert.equal(mergeActivityRecords([newer], [older])[0]?.account, newer.account);
   assert.equal(mergeActivityRecords([older], [newer])[0]?.account, newer.account);
 });
+
+test("the activity ledger does not discard rows after the former 500-row window", () => {
+  const rows = Array.from({ length: 501 }, (_value, index) => ({
+    ...JSON.parse(activity),
+    id: `activity-${index}`,
+    createdAt: new Date(Date.parse("2026-08-26T00:00:00.000Z") + index).toISOString(),
+    updatedAt: new Date(Date.parse("2026-08-26T00:00:00.000Z") + index).toISOString(),
+  }));
+  assert.equal(mergeActivityRecords(rows, []).length, 501);
+});

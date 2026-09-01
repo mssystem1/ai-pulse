@@ -23,7 +23,7 @@ import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
-import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
 import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
@@ -103,6 +103,7 @@ type Strategy = {
   filledBuyCount?: number;
   filledSellCount?: number;
   failureCount?: number;
+  evaluationJournalInitialized?: boolean;
 };
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const NATIVE_TOKEN = /^0x[eE]{40}$/;
@@ -781,8 +782,11 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
         const strategyCashFlows = (activityByNetwork.get(strategy.network) || [])
           .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
+        const networkActivity = activityByNetwork.get(strategy.network) || [];
         const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
-        const reconciled = reconcileStrategyExecution(strategy, activityByNetwork.get(strategy.network) || [], targetBalance);
+        const evaluations = await listEvaluationHistory(strategy);
+        const lifetime = reconcileAutopilotLifetimeStats(strategy, networkActivity, evaluations);
+        const reconciled = { ...reconcileStrategyExecution(strategy, networkActivity, targetBalance), ...lifetime, evaluations };
         const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance, pass: aiPass });
         return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
@@ -883,7 +887,41 @@ async function evidence(strategy: Strategy, payload: unknown) {
   await kv(["SET", key, body, "EX", 31_536_000]);
   return { hash, url: `kv:${key}` };
 }
-function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
+function evaluationHistoryKey(strategyId: string) {
+  return `pulse:autopilot:evaluations:${strategyId}`;
+}
+
+function decodeEvaluationHistory(raw: unknown): StrategyEvaluation[] {
+  const values = Array.isArray(raw)
+    ? raw.filter((_value, index) => index % 2 === 1)
+    : raw && typeof raw === "object"
+      ? Object.values(raw as Record<string, unknown>)
+      : [];
+  return values.flatMap((value) => {
+    if (typeof value !== "string") return [];
+    try {
+      const parsed = JSON.parse(value) as StrategyEvaluation;
+      return parsed && typeof parsed.id === "string" ? [parsed] : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+async function listEvaluationHistory(strategy: Strategy) {
+  const embedded = strategy.evaluations || [];
+  if (!kvConfigured()) return embedded;
+  try {
+    const persisted = decodeEvaluationHistory(await kv(["HGETALL", evaluationHistoryKey(strategy.id)]));
+    const byId = new Map<string, StrategyEvaluation>();
+    for (const evaluation of [...persisted, ...embedded]) byId.set(evaluation.id, evaluation);
+    return [...byId.values()].sort((left, right) => Date.parse(left.evaluatedAt) - Date.parse(right.evaluatedAt));
+  } catch {
+    return embedded;
+  }
+}
+
+async function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
   const previous = strategy.evaluations || [];
   strategy.evaluationCount = (strategy.evaluationCount ?? previous.length) + 1;
   strategy.holdCount = (strategy.holdCount ?? previous.filter((entry) => entry.action === "hold" && entry.status === "held").length)
@@ -894,7 +932,20 @@ function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
     + (evaluation.action === "sell" && evaluation.status === "filled" ? 1 : 0);
   strategy.failureCount = (strategy.failureCount ?? previous.filter((entry) => entry.status === "failed").length)
     + (evaluation.status === "failed" ? 1 : 0);
+  // The embedded window is a resilient fallback for short KV outages. The
+  // append-only hash is the complete journal used by the API and CSV export.
   strategy.evaluations = [...previous, evaluation].slice(-100);
+  if (kvConfigured()) {
+    try {
+      const journalRows = strategy.evaluationJournalInitialized ? [evaluation] : [...previous, evaluation];
+      await kv(["HSET", evaluationHistoryKey(strategy.id), ...journalRows.flatMap((item) => [item.id, JSON.stringify(item)])]);
+      strategy.evaluationJournalInitialized = true;
+    } catch {
+      // The strategy snapshot still retains this row and execution remains
+      // fail-closed. A journal transport outage must never reclassify a mined
+      // transaction as a failed trade.
+    }
+  }
 }
 export async function runAutopilotCycle(cfg: AppConfig) {
   {
@@ -1227,7 +1278,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           s.evidenceUrl = proof.url;
           s.evidenceHash = proof.hash;
           s.lastError = undefined;
-          appendEvaluation(s, { ...evaluationBase, status: "held", evidenceHash: proof.hash });
+          await appendEvaluation(s, { ...evaluationBase, status: "held", evidenceHash: proof.hash });
           continue;
         }
         const actionLease = mode === "analysis"
@@ -1284,7 +1335,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
             s.lastDecision = "hold_action_cooldown";
             if (mode === "analysis") s.lastRunAt = new Date().toISOString();
             s.lastError = undefined;
-            appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: `A policy action is active; waiting ${cooldownRemaining}s for the on-chain cooldown.` });
+            await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: `A policy action is active; waiting ${cooldownRemaining}s for the on-chain cooldown.` });
             continue;
           }
         const price = parseUnits(executionPrice.toFixed(18), 18);
@@ -1297,7 +1348,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           s.lastDecision = "hold_no_executable_amount";
           s.lastRunAt = new Date().toISOString();
           s.lastError = undefined;
-          appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "The strategy exit is valid, but no target amount fits the signed per-trade cap." });
+          await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "The strategy exit is valid, but no target amount fits the signed per-trade cap." });
           continue;
         }
         const balance = decision.action === "buy" ? settlementBalance : targetBalance;
@@ -1305,7 +1356,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           s.lastDecision = "hold_insufficient_vault_balance";
           s.lastRunAt = new Date().toISOString();
           s.lastError = undefined;
-          appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: `The vault balance is below the configured ${decision.action} size.` });
+          await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: `The vault balance is below the configured ${decision.action} size.` });
           continue;
         }
         const prepared = await getGenericOkxSwap(cfg, {
@@ -1428,7 +1479,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
             s.activeStopLoss = undefined;
           }
         }
-        appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
+        await appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
         await recordV6Activity({
           owner: s.owner,
           network: s.network,
@@ -1466,7 +1517,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           ? "hold_dependency_retry"
           : "hold_failed_closed";
         if (analysisAttempted) s.lastRunAt = new Date().toISOString();
-        appendEvaluation(s, {
+        await appendEvaluation(s, {
           id: crypto.randomUUID(),
           evaluatedAt: new Date().toISOString(),
           strategyType: s.strategyType || identifyAutopilotStrategy(s.policy.strategy),

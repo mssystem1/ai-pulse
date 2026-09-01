@@ -373,7 +373,9 @@ const ZH_EXACT: Record<string, string> = {
   "Filled sells": "已成交卖出",
   "Holds": "持有决定",
   "Failures": "失败次数",
+  "available minimum": "可用最低值",
   "Failure incidents": "失败事件",
+  "All available decisions · newest first · CSV includes on-chain activity": "全部可用决策 · 最新优先 · CSV 包含链上活动",
   "AI today": "今日 AI",
   "Last cycle": "最近周期",
   "Next AI eligible": "下次可用 AI 时间",
@@ -963,6 +965,10 @@ const ZH_PRODUCT: Record<string, string> = {
 };
 
 const ZH_PHRASES: Array<[RegExp, string]> = [
+  [/^(\d+) distinct incidents in the available journal$/, "可用日志中有 $1 个不同的失败事件"],
+  [/^(\d+) visible incidents · available minimum$/, "可见 $1 个事件 · 可用最低值"],
+  [/^Historical detail is partial: (.+) of (.+) evaluation rows survive from the former retention window\. Lifetime evaluation, Hold and failure counters remain available\. Confirmed on-chain Buy\/Sell totals remain authoritative; future rows are retained in the complete journal\.$/, "历史详情不完整：旧保留窗口中仍有 $1 / $2 条评估记录。累计评估、Hold 和失败计数仍然可用；已确认的链上买入/卖出总数仍为权威数据，未来记录将完整保留。"],
+  [/^Historical detail is partial: (.+) evaluation rows survive, but the legacy total is unknown\. The displayed evaluation, Hold and failure values are minimums, not invented lifetime totals\. Confirmed on-chain Buy\/Sell totals remain authoritative; future rows are retained in the complete journal\.$/, "历史详情不完整：仍有 $1 条评估记录，但旧版总数未知。显示的评估、Hold 和失败值是可验证最低值，而不是虚构的累计总数；已确认的链上买入/卖出总数仍为权威数据，未来记录将完整保留。"],
   [/^(\d+)d (\d+)h remaining$/, "剩余 $1 天 $2 小时"],
   [/^(\d+)h remaining$/, "剩余 $1 小时"],
   [/^(\d+) compact AI confirmations? remaining$/, "剩余 $1 次精简 AI 确认"],

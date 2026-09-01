@@ -34,6 +34,9 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "Exit protection only"), "仅执行退出保护");
   assert.equal(localizeUiText("zh", "Entry pass expired"), "入场通行证已到期");
   assert.equal(localizeUiText("zh", "PAUSED · no monitoring or entry checks"), "已暂停 · 不监控或检查入场");
+  assert.equal(localizeUiText("zh", "All available decisions · newest first · CSV includes on-chain activity"), "全部可用决策 · 最新优先 · CSV 包含链上活动");
+  assert.match(localizeUiText("zh", "Historical detail is partial: 100 of 155 evaluation rows survive from the former retention window. Lifetime evaluation, Hold and failure counters remain available. Confirmed on-chain Buy/Sell totals remain authoritative; future rows are retained in the complete journal."), /100 \/ 155/);
+  assert.match(localizeUiText("zh", "Historical detail is partial: 100 evaluation rows survive, but the legacy total is unknown. The displayed evaluation, Hold and failure values are minimums, not invented lifetime totals. Confirmed on-chain Buy/Sell totals remain authoritative; future rows are retained in the complete journal."), /旧版总数未知/);
   assert.equal(localizeUiText("zh", "Global Quick → Spot Market or Limit"), "全球市场快速分析 → 现货市价或限价交易");
   assert.equal(localizeUiText("zh", "Close above SMA20; SMA20 below SMA50"), "收盘价高于 SMA20；SMA20 低于 SMA50");
   assert.equal(localizeUiText("zh", "Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes."), "可直接选择。只有通过免费技术门槛后，预付通行证才会提供精简 AI 入场确认。");

@@ -198,6 +198,9 @@ type AutopilotStrategyView = {
   filledBuyCount?: number;
   filledSellCount?: number;
   failureCount?: number;
+  detailedEvaluationCount?: number;
+  evaluationHistoryComplete?: boolean;
+  lifetimeStatsComplete?: boolean;
   evaluations?: Array<{
     id: string;
     evaluatedAt: string;
@@ -6325,11 +6328,7 @@ export function AutopilotWorkspace({
                   && Date.parse(entry.evaluatedAt) - Date.parse(previous.evaluatedAt) < 6 * 60 * 60_000;
                 return count + (sameBurst ? 0 : 1);
               }, 0);
-              const recentDecisions = [...evaluations].reverse().filter((entry, index, all) => {
-                if (index === 0) return true;
-                const previous = all[index - 1];
-                return `${entry.action}:${entry.status}:${entry.reason}:${entry.error || ""}` !== `${previous.action}:${previous.status}:${previous.reason}:${previous.error || ""}`;
-              }).slice(0, 20);
+              const decisionRows = [...evaluations].reverse();
               const providerBlocked = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(latest?.error || "");
               return (
                 <details key={`${item.id}-report`}>
@@ -6340,17 +6339,18 @@ export function AutopilotWorkspace({
                       "Strategy"}
                   </summary>
                   <div className="autopilot-report-toolbar">
-                    <div><span>Evaluations</span><strong>{evaluationCount}</strong><small>lifetime</small></div>
+                    <div><span>Evaluations</span><strong>{evaluationCount}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
                     <div><span>Filled buys</span><strong>{filledBuys}</strong></div>
                     <div><span>Filled sells</span><strong>{filledSells}</strong></div>
-                    <div><span>Holds</span><strong>{holds}</strong></div>
-                    <div><span>Failure incidents</span><strong>{failureIncidents}</strong><small>{failures} raw failed attempts retained</small></div>
+                    <div><span>Holds</span><strong>{holds}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
+                    <div><span>Failures</span><strong>{failures}</strong><small>{item.lifetimeStatsComplete === false ? `${failureIncidents} visible incidents · available minimum` : `${failureIncidents} distinct incidents in the available journal`}</small></div>
                     <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
                     <div><span>Last cycle</span><strong>{latest ? new Date(latest.evaluatedAt).toLocaleTimeString() : "—"}</strong><small>{latest ? new Date(latest.evaluatedAt).toLocaleDateString() : "awaiting"}</small></div>
                     <div><span>Next AI eligible</span><strong>{item.aiNextEligibleAt ? new Date(item.aiNextEligibleAt).toLocaleTimeString() : "Candidate driven"}</strong><small>{item.aiBudgetStatus?.replaceAll("_", " ") || "free gate first"}</small></div>
                     <div><span>Position basis</span><strong>{item.positionEntryPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No open entry"}</strong><small>mark {item.markPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "—"}</small></div>
                     <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export CSV activity</button>
                   </div>
+                  {item.evaluationHistoryComplete === false && <div className="capital-inline-warning">{item.lifetimeStatsComplete === false ? `Historical detail is partial: ${evaluations.length.toLocaleString()} evaluation rows survive, but the legacy total is unknown. The displayed evaluation, Hold and failure values are minimums, not invented lifetime totals.` : `Historical detail is partial: ${evaluations.length.toLocaleString()} of ${evaluationCount.toLocaleString()} evaluation rows survive from the former retention window. Lifetime evaluation, Hold and failure counters remain available.`} Confirmed on-chain Buy/Sell totals remain authoritative; future rows are retained in the complete journal.</div>}
                   <div className={`strategy-now ${autopilotRuntimeClass(item)}`}>
                     <div><span>WHAT IT IS DOING NOW</span><strong>{item.runtimeState === "paused" || item.paused ? "PAUSED · no monitoring or entry checks" : item.runtimeState === "protecting_position" ? "PROTECTING · exits only" : item.runtimeState === "entry_pass_expired" ? "DORMANT · entry pass expired" : item.runtimeState === "entry_signals_exhausted" ? "DORMANT · confirmations used" : item.runtimeState === "telemetry_unavailable" ? "UNKNOWN · refresh runtime" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>
                     <p>{item.runtimeState === "paused" || item.paused ? "The on-chain vault is paused. It cannot trade, and any active AI Entry Pass timer is held until you resume." : item.runtimeState === "protecting_position" ? "No new Buy is allowed without an active pass. Deterministic TP/SL and authorized exits continue for the invested asset." : item.runtimeState === "entry_pass_expired" ? "The vault has no invested position and cannot open a new one. Renew the AI Entry Pass to resume entry evaluation." : item.runtimeState === "entry_signals_exhausted" ? "The prepaid compact confirmations are used. Renew the AI Entry Pass to allow another qualified entry check." : item.runtimeState === "telemetry_unavailable" ? "PULSE could not verify the current on-chain runtime. No running claim is made until the next successful refresh." : providerBlocked ? `No assets moved. New AI requests are blocked until ${item.aiRetryAt ? new Date(item.aiRetryAt).toLocaleString() : "the provider retry window"}; deterministic position protection remains available.` : latest?.reason || "PULSE is waiting for the next eligible candle."}</p>
@@ -6443,8 +6443,8 @@ export function AutopilotWorkspace({
                     </section>
                   </div>
                   <section className="autopilot-evaluation-log">
-                    <div className="dashboard-head"><div><span className="eyebrow">STRATEGY DECISIONS</span><h4>Why PULSE waited, bought or sold</h4></div><small>Newest first · repeated identical failures are collapsed · CSV includes on-chain activity</small></div>
-                    {recentDecisions.length ? recentDecisions.map((entry) => (
+                    <div className="dashboard-head"><div><span className="eyebrow">STRATEGY DECISIONS</span><h4>Why PULSE waited, bought or sold</h4></div><small>All available decisions · newest first · CSV includes on-chain activity</small></div>
+                    {decisionRows.length ? decisionRows.map((entry) => (
                       <div className="evaluation-log-row" key={entry.id}>
                         <span className={`status-chip ${entry.status}`}>{entry.status}</span>
                         <strong>{entry.action.toUpperCase()}</strong>
@@ -6463,7 +6463,7 @@ export function AutopilotWorkspace({
         <section className="autopilot-chain-activity">
           <div className="dashboard-head"><div><span className="eyebrow">ON-CHAIN ACTIVITY</span><h4>Wallet confirmations, fills and owner actions</h4></div><small>Separate from strategy decisions · newest first</small></div>
           {activitySyncNotice && <div className="capital-inline-warning">{activitySyncNotice}</div>}
-          {activity.filter((entry) => entry.source === "autopilot").length ? activity.filter((entry) => entry.source === "autopilot").slice().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 30).map((entry) => (
+          {activity.filter((entry) => entry.source === "autopilot").length ? activity.filter((entry) => entry.source === "autopilot").slice().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map((entry) => (
             <div className="chain-activity-row" key={entry.id}>
               <span className={`status-chip ${entry.status}`}>{entry.status}</span>
               <strong>{entry.kind.replaceAll("_", " ")}</strong>
@@ -8054,9 +8054,9 @@ export function DocsWorkspace() {
                 means it did not. Buy requires every entry row to pass; Sell
                 needs one exit row. Hold never sends a transaction. A filled row
                 includes the evidence hash and explorer transaction. Strategy
-                decisions are separate from wallet/on-chain activity, repeated
-                identical failures are collapsed, and Export CSV activity joins
-                both streams for auditing. Its first row is a current runtime
+                decisions are separate from wallet/on-chain activity, and Export
+                CSV activity joins every available row from both streams for
+                auditing. Its first row is a current runtime
                 snapshot with network, pass expiry and confirmation counters, so
                 a registered strategy is never mistaken for a running vault.
               </span>

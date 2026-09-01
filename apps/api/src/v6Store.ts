@@ -137,8 +137,7 @@ export function mergeActivityRecords(remote: Activity[], cached: Activity[]) {
     if (!current || Date.parse(item.updatedAt) > Date.parse(current.updatedAt)) byId.set(item.id, item);
   }
   return [...byId.values()]
-    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt))
-    .slice(0, 500);
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
 }
 
 async function upstash(command: unknown[]): Promise<unknown> {
@@ -176,7 +175,7 @@ export async function recordV6Activity(input: Omit<Activity, "id" | "createdAt" 
   const now = new Date().toISOString();
   const item: Activity = { ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
   const storageKey = key(input.owner, input.network);
-  const items = [item, ...(await listV6Activity(input.owner, input.network))].slice(0, 500);
+  const items = [item, ...(await listV6Activity(input.owner, input.network))];
   memory.set(storageKey, items);
   if (kvConfigured()) {
     try { await writeActivityHash(input.owner, input.network, [item]); }
@@ -192,7 +191,7 @@ async function writeActivityHash(owner: string, network: string, items: Activity
 
 async function writeActivities(owner: string, network: string, items: Activity[]) {
   const storageKey = key(owner, network);
-  const next = items.slice(0, 500);
+  const next = items;
   memory.set(storageKey, next);
   if (kvConfigured()) {
     try { await writeActivityHash(owner, network, next); }
