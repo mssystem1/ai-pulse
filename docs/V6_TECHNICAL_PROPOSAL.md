@@ -976,7 +976,7 @@ Railway Trading Worker
   -> receipt indexer -> OKX order reconciler -> TP/SL trigger evaluator -> transaction tracker
 
 Railway Autopilot Worker
-  -> policy scheduler -> evidence -> optional Premium analysis -> risk engine -> simulation -> executor
+  -> policy scheduler -> deterministic candidate gate -> compact AI entry confirmation under an active pass -> risk engine -> simulation -> executor
 
 Railway Telegram Worker
   -> webhook jobs -> checkout/report status -> Telegram delivery
@@ -1172,9 +1172,9 @@ The vault verifies the current policy version, nonce, deadline, asset/adapter al
 
 Only the owner changes policy, executor, or allocated capital. The executor cannot loosen policy, pay arbitrary recipients, or withdraw. Owner pause and withdrawal remain independent of the worker.
 
-### 20.7 Premium-analysis billing from Autopilot
+### 20.7 Prepaid AI Entry Pass for Autopilot
 
-An optional policy budget permits Premium analysis. The worker creates a bounded invoice containing route, pair, timeframe, price, nonce, and expiry. The vault may pay only the configured PULSE seller, no more than the published route price and remaining daily service budget. The payment receipt and analysis job are bound to the invoice hash. If payment or report generation fails, no trade is authorized; recovery follows the existing paid-job receipt rules.
+Autopilot does not buy or reuse Global reports. Its owner manually purchases a vault-bound 24h, 7d, or 30d AI Entry Pass through the duration-specific x402 service. Free deterministic monitoring rejects most cycles before AI; only a surviving new-entry candidate may consume one of the pass's compact confirmations. Pausing freezes unused runtime. If the pass expires, runs out of confirmations, or an AI request fails, new entries fail closed to Hold while deterministic exits, TP/SL, pause, close, and owner withdrawal remain available.
 
 ## 21. RPC, indexing, and finality architecture
 
@@ -1427,7 +1427,7 @@ User creates isolated vault and funds it
   -> policy finalizes on-chain and is indexed to KV
   -> scheduler enqueues evaluation when cadence/rules permit
   -> worker gathers market, route, oracle, balance, and risk evidence
-  -> optional policy-bounded Premium analysis is paid/generated
+  -> active AI Entry Pass permits a compact entry confirmation only for a surviving candidate
   -> model proposes; deterministic risk engine may reduce or reject
   -> exact transaction is quoted and simulated
   -> executor submits action with policy version + evidence hash
@@ -1772,7 +1772,7 @@ Reconcilers scan by finalized block ranges with overlap, deduplicate by `chainId
 2. UI validates the policy, displays worst-case authority, and prepares deployment/initialization of an isolated vault or selection of an existing compatible vault.
 3. The connected wallet creates/configures the policy and separately funds the vault. No Spot position or wallet-wide allowance becomes Autopilot capital.
 4. After finality, the scheduler begins evaluations only while policy, chain, oracle, executor, and provider health pass.
-5. Each evaluation creates an immutable decision ID, captures evidence, optionally buys a Premium analysis within the on-chain budget, and produces a typed proposal.
+5. Each evaluation creates an immutable decision ID and captures evidence. Free deterministic gates reject ineligible entries; a surviving candidate may request one compact confirmation under the active prepaid AI Entry Pass and then produce a typed proposal.
 6. A deterministic risk engine rejects or bounds the proposal. The exact route is quoted, decoded, simulated, and submitted by the restricted executor.
 7. The vault independently revalidates the policy version, caps, nonce, deadline, assets, adapter, oracle, drawdown, cooldown, recipient, and minimum output.
 8. The dashboard shows evaluation, rejection, trade, fee, balance, P&L, and evidence states independently from Spot.

@@ -7,7 +7,7 @@ This file is the canonical, copy-ready submission package for Circle's Agent Mar
 | Field | Value |
 |---|---|
 | Website | https://www.ai-pulse.tech |
-| Repository | https://github.com/mssystem1/ai-pulse |
+| Repository | https://github.com/mssystem1/Pulse |
 | API origin | https://pulse-api-production-7aae.up.railway.app |
 | MCP endpoint | https://pulse-api-production-7aae.up.railway.app/mcp |
 | Machine-readable metadata | https://pulse-api-production-7aae.up.railway.app/v1/metadata |
@@ -26,7 +26,7 @@ The complete PULSE execution-mainnet catalog contains eight services. Circle/Arc
 | Number of Endpoints | 5 |
 | Pricing Model | Usage-based through x402: Onchain Pre-Trade Risk Guard $0.15, Quick reports $0.20, Pro reports $0.30 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
 | Contact Name | Enter the legal or operational contact responsible for PULSE. |
-| Endpoints Documentation URL | https://github.com/mssystem1/ai-pulse/blob/main/docs/circle-marketplace-openapi.yaml |
+| Endpoints Documentation URL | https://github.com/mssystem1/Pulse/blob/main/docs/circle-marketplace-openapi.yaml |
 
 ### Description
 
@@ -34,7 +34,7 @@ PULSE is a focused Analyze → Act intelligence workflow for humans and AI agent
 
 ### Anything else?
 
-PULSE is submitted as an Arc Testnet service using test USDC through Circle Gateway. Arc is clearly identified as a test environment throughout the payment and report lifecycle. Paid analysis is delivered as a durable asynchronous job with authenticated recovery, so a caller can retrieve a settled report without paying twice. Prediction markets are explicitly selected by the caller and reloaded server-side; PULSE uses public read-only evidence and never submits orders. The project also exposes an MCP server for agent clients at `https://pulse-api-production-7aae.up.railway.app/mcp` and source code at `https://github.com/mssystem1/ai-pulse`.
+PULSE is submitted as an Arc Testnet service using test USDC through Circle Gateway. Arc is clearly identified as a test environment throughout the payment and report lifecycle. Paid analysis is delivered as a durable asynchronous job with authenticated recovery, so a caller can retrieve a settled report without paying twice. Prediction markets are explicitly selected by the caller and reloaded server-side; PULSE uses public read-only evidence and never submits orders. The project also exposes an MCP server for agent clients at `https://pulse-api-production-7aae.up.railway.app/mcp` and source code at `https://github.com/mssystem1/Pulse`.
 
 ## Published Arc service endpoints
 

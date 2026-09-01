@@ -46,7 +46,7 @@ Confirm Arc returns Spot and Autopilot hidden/disabled. Mainnet capabilities mus
 ## 3. Global Market
 
 1. Confirm the navigation and hero say Global Market, not Crypto Market.
-2. Confirm the product journey visibly explains `Analyze -> Spot trade` or `Analyze -> Autopilot`, and the Opportunity Radar appears in Global Market as research rather than a Buy recommendation.
+2. Confirm the product journeys stay separate and first-class: Global intelligence may prefill Spot, while Autopilot shows `Configure -> Fund & protect -> Activate` and explicitly requires no Global report. Opportunity Radar must remain a shortlist rather than a Buy recommendation or activation gate.
 3. Search BTC, ETH and an xStock/RWA exposed by the live OKX SPOT catalog.
 4. Open the custom timeframe picker. Confirm it shows the meaning of 15m, 1H, 4H, 1D and 1W, uses the selected RPC theme/logo, closes with Escape/outside click, and becomes a touch-friendly panel on mobile.
 5. Change pair and timeframe; confirm the chart and previous report clear.

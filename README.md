@@ -4,7 +4,7 @@
 
 <h1 align="center">PULSE</h1>
 
-<p align="center"><strong>Analyze first, then Spot trade or run a guarded Autopilot on your selected network.</strong></p>
+<p align="center"><strong>Global & Prediction intelligence. Wallet-signed Spot execution. Independent guarded Autopilot.</strong></p>
 
 PULSE combines live OKX Global Market evidence—including crypto, xStocks, and RWA instruments—with explicitly selected Polymarket data. A valid Global report can prefill an Agentic-Wallet-signed Market or Limit Spot ticket, including optional TP/SL. Guarded Autopilot starts separately through its own pair, strategy, capital/risk, owner-vault and duration workflow; it never requires or reuses a paid report as its live signal. Reports are private, recoverable across devices through wallet proof, and paid per request through network-aware x402 settlement on X Layer, Base, Arbitrum One, and Arc Testnet.
 
@@ -57,7 +57,7 @@ The browser keeps funding in context: connect once, inspect the selected chain�
 | Lost result after refresh | Receipt-bound durable job and private report recovery |
 | Separate wallet and funding journey | Network-aware balances and funding inside PULSE |
 | Hidden network assumptions | Explicit chain, token, provider, amount, payee, and receipt metadata |
-| Analysis disconnected from execution | One guided Analyze → Spot or Autopilot journey |
+| Analysis disconnected from execution | Global intelligence → Spot, plus an independent Configure → Fund & protect → Activate Autopilot journey |
 | Ticker assumed to equal a chain token | Identity-safe representations such as BTC → cbBTC/WBTC and ETH → WETH, followed by a live-route check |
 
 ## Experience
@@ -743,8 +743,8 @@ The architecture detail in this README reflects implemented modules. The deeper 
 - A funded test wallet only when intentionally running real-payment tests
 
 ```bash
-git clone https://github.com/mssystem1/ai-pulse.git
-cd ai-pulse
+git clone https://github.com/mssystem1/Pulse.git
+cd Pulse
 copy .env.local.example .env
 npm install
 npm run build

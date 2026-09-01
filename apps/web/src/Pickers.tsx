@@ -224,12 +224,14 @@ export function TimeframePicker({
   value,
   networkKey,
   values,
+  purpose = "analysis",
   onChange,
 }: {
   id: string;
   value: string;
   networkKey: WebNetworkKey;
   values?: readonly string[];
+  purpose?: "analysis" | "strategy";
   onChange: (value: string) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -279,16 +281,16 @@ export function TimeframePicker({
       ref={popoverRef}
       className="timeframe-popover"
       role="listbox"
-      aria-label="Analysis timeframe"
+      aria-label={purpose === "strategy" ? "Strategy decision timeframe" : "Analysis timeframe"}
     >
       <header>
         <span className={`timeframe-network-logo ${networkKey}`}>
           <NetworkLogo network={networkKey} />
         </span>
         <span>
-          <small>ANALYSIS CONTEXT</small>
+          <small>{purpose === "strategy" ? "AUTOPILOT CONTEXT" : "ANALYSIS CONTEXT"}</small>
           <strong>Choose timeframe</strong>
-          <em>{network.label} theme · report and chart update together</em>
+          <em>{purpose === "strategy" ? `${network.label} · candidate and strategy update together` : `${network.label} theme · report and chart update together`}</em>
         </span>
       </header>
       <div className="timeframe-options">
@@ -314,8 +316,9 @@ export function TimeframePicker({
         ))}
       </div>
       <footer>
-        <i /> Selected timeframe controls candles, indicators and Premium chart
-        overlays.
+        <i /> {purpose === "strategy"
+          ? "Selected timeframe controls the candidate candle and strategy decision cadence."
+          : "Selected timeframe controls candles, indicators and Premium chart overlays."}
       </footer>
     </div>
   ) : null;
@@ -326,7 +329,7 @@ export function TimeframePicker({
         id={id}
         type="button"
         className="timeframe-trigger"
-        title={`Analysis timeframe · ${selected.value} · ${selected.label}`}
+        title={`${purpose === "strategy" ? "Strategy decision timeframe" : "Analysis timeframe"} · ${selected.value} · ${selected.label}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((current) => !current)}
@@ -598,7 +601,7 @@ export function ExecutionPairPicker({
     </button>
     <PickerDialog open={open} title={`Choose a live pair on ${network.label}`} lead={`PULSE verifies the identity-safe token and a live OKX Onchain OS route before accepting your choice. A token contract by itself is not enough.`} closeLabel="Close" onClose={() => setOpen(false)}>
       <div className="picker-search-wrap"><span aria-hidden="true">⌕</span><input autoFocus className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, DOGE or token name…" aria-label="Search executable pairs"/></div>
-      <div className="picker-disclosure">The left name is the Global Market pair. The right name is the candidate on-chain representation. Select it to run the final live route check; unavailable choices remain unselected.</div>
+      <div className="picker-disclosure">The left name is the market symbol. The right name is its verified on-chain representation. Select it to run the final live route check; unavailable choices remain unselected.</div>
       <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{items.length} results</span></div>
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}

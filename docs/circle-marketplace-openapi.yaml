@@ -15,7 +15,7 @@ info:
     identifier: MIT
 externalDocs:
   description: PULSE source repository
-  url: https://github.com/mssystem1/ai-pulse
+  url: https://github.com/mssystem1/Pulse
 servers:
   - url: https://pulse-api-production-7aae.up.railway.app
     description: Production API origin; Arc routes use Arc Testnet payments

@@ -16,6 +16,7 @@ import {
   type WebNetworkKey,
 } from "./networks";
 import type { ReportTradeIntent } from "./Report";
+import type { Lang } from "./i18n";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
 import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
 import {
@@ -343,6 +344,14 @@ export function OpportunityRadar({
   const [items, setItems] = useState<PotentialGainer[]>([]);
   const [status, setStatus] = useState("Scanning live market structure…");
   const [expanded, setExpanded] = useState(false);
+  const [compactMobile, setCompactMobile] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 650px)");
+    const update = () => setCompactMobile(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
   useEffect(() => {
     if (["15m", "1H", "4H", "1D"].includes(initialTimeframe))
       setRadarTimeframe(initialTimeframe);
@@ -356,9 +365,9 @@ export function OpportunityRadar({
       if (!current) return;
       if (!response.ok) {
         setItems([]);
-        setStatus(
-          "Opportunity scan is temporarily unavailable. Pair search and analysis remain available.",
-        );
+        setStatus(context === "autopilot"
+          ? "Market shortlist is temporarily unavailable. Configure any supported pair directly below."
+          : "Opportunity scan is temporarily unavailable. Pair search and analysis remain available.");
         return;
       }
       setItems(
@@ -366,20 +375,27 @@ export function OpportunityRadar({
           (response.data as { candidates?: PotentialGainer[] }).candidates || []
         ).slice(0, 8),
       );
-      setStatus(
-        "Technical shortlist from live OKX candles. Premium analysis decides whether a valid Buy setup exists.",
-      );
+      setStatus(context === "autopilot"
+        ? "Live OKX candle shortlist. Selecting a card only prepares a draft; Autopilot evaluates fresh entry conditions after activation."
+        : "Technical shortlist from live OKX candles. Global analysis can add research context before a Spot trade.");
     });
     return () => {
       current = false;
     };
-  }, [radarTimeframe]);
+  }, [context, radarTimeframe]);
   const title =
     context === "global"
       ? "Markets worth analyzing now"
       : context === "spot"
         ? "Find a setup before opening a trade"
-        : "Markets worth evaluating for Autopilot";
+        : "Choose a market for Autopilot";
+  const eyebrow = context === "autopilot"
+    ? "MARKET SHORTLIST · AUTOPILOT SETUP"
+    : context === "spot"
+      ? "MARKET SHORTLIST · SPOT OR GLOBAL"
+      : "OPPORTUNITY RADAR · RESEARCH FIRST";
+  const collapsedCount = compactMobile ? 2 : 4;
+  const visibleItems = items.slice(0, expanded ? 8 : collapsedCount);
   return (
     <section
       className={`card potential-gainers opportunity-radar ${context}`}
@@ -387,7 +403,7 @@ export function OpportunityRadar({
     >
       <div className="dashboard-head">
         <div>
-          <span className="eyebrow">OPPORTUNITY RADAR · RESEARCH FIRST</span>
+          <span className="eyebrow">{eyebrow}</span>
           <h3>{title}</h3>
           <p>{status}</p>
         </div>
@@ -398,6 +414,7 @@ export function OpportunityRadar({
             value={radarTimeframe}
             networkKey={networkKey}
             values={["15m", "1H", "4H", "1D"]}
+            purpose={context === "autopilot" ? "strategy" : "analysis"}
             onChange={setRadarTimeframe}
           />
         </div>
@@ -405,7 +422,7 @@ export function OpportunityRadar({
       {items.length ? (
         <>
           <div className="potential-gainer-grid">
-            {items.slice(0, expanded ? 8 : 4).map((candidate) => (
+            {visibleItems.map((candidate) => (
               <article
                 key={`${context}:${candidate.pair}:${candidate.timeframe}`}
               >
@@ -431,39 +448,34 @@ export function OpportunityRadar({
                   {candidate.volumeRatio.toFixed(2)}×
                 </small>
                 <div className="candidate-actions">
-                  <button
-                    type="button"
-                    className="btn btn-primary"
-                    onClick={() => onAnalyze(candidate)}
-                  >
-                    {context === "global"
-                      ? "Select for analysis"
-                      : "Analyze first"}
-                  </button>
-                  {onPrepare && (
+                  {context === "autopilot" && onPrepare ? <>
                     <button
                       type="button"
-                      className="btn btn-soft"
+                      className="btn btn-primary"
                       onClick={() => onPrepare(candidate)}
                     >
-                      {context === "spot"
-                        ? "Preview pair"
-                        : "Prepare Autopilot"}
+                      Use for Autopilot
                     </button>
-                  )}
+                    <button type="button" className="btn btn-soft" onClick={() => onAnalyze(candidate)}>Open Global analysis</button>
+                  </> : <>
+                    <button type="button" className="btn btn-primary" onClick={() => onAnalyze(candidate)}>
+                      {context === "global" ? "Select for analysis" : "Open Global analysis"}
+                    </button>
+                    {onPrepare && <button type="button" className="btn btn-soft" onClick={() => onPrepare(candidate)}>Preview pair</button>}
+                  </>}
                 </div>
               </article>
             ))}
           </div>
-          {items.length > 4 && (
+          {items.length > collapsedCount && (
             <button
               type="button"
               className="radar-more"
               onClick={() => setExpanded((value) => !value)}
             >
               {expanded
-                ? "Show top 4"
-                : `Show ${items.length - 4} more candidates`}
+                ? `Show top ${collapsedCount}`
+                : `Show ${items.length - collapsedCount} more candidates`}
             </button>
           )}
         </>
@@ -474,12 +486,11 @@ export function OpportunityRadar({
         </div>
       )}
       <div className="candidate-disclaimer">
-        <b>How to use this:</b> choose a candidate → either buy Base/Premium
-        analysis for a prefilled Spot Market/Limit ticket, or prepare a separate
-        Autopilot that evaluates fresh strategy signals. Score alone never
-        authorizes a trade. Execution also requires a verified representation,
-        live route and sufficient wallet balance on{" "}
-        {WEB_NETWORKS[networkKey].label}.
+        {context === "autopilot" ? <>
+          <b>Two separate actions:</b> Use for Autopilot prefills pair, timeframe and strategy without buying a report. Open Global analysis starts the full Quick/Pro intelligence workflow. Neither action starts or authorizes a vault; fresh runtime gates, a verified route, owner-approved capital and an active AI Entry Pass are still required on {WEB_NETWORKS[networkKey].label}.
+        </> : <>
+          <b>How to use this:</b> choose a candidate for Global intelligence or a Spot ticket. A shortlist score never authorizes a trade; execution still requires a verified representation, live route, sufficient wallet balance and your signature on {WEB_NETWORKS[networkKey].label}.
+        </>}
       </div>
     </section>
   );
@@ -3961,11 +3972,13 @@ function AutopilotAccountPicker({
 export function AutopilotWorkspace({
   networkKey,
   wallet,
+  lang,
   initialTrade,
   onAnalyzeCandidate,
 }: {
   networkKey: WebNetworkKey;
   wallet: string | null;
+  lang: Lang;
   initialTrade?: ReportTradeIntent | null;
   onAnalyzeCandidate?: (pair: string, timeframe: string) => void;
 }) {
@@ -4038,7 +4051,7 @@ export function AutopilotWorkspace({
   const [passBusy, setPassBusy] = useState(false);
   const [selectedPassPlan, setSelectedPassPlan] = useState<"24h" | "7d" | "30d">("24h");
   const [preparedCandidate, setPreparedCandidate] = useState("");
-  const builderRef = useRef<HTMLElement>(null);
+  const preparedNoticeRef = useRef<HTMLDivElement>(null);
   const [closeConfirming, setCloseConfirming] = useState(false);
   const [message, setMessage] = useState("");
   const settlementDecimals = WEB_NETWORKS[networkKey].payment.decimals;
@@ -5282,6 +5295,22 @@ export function AutopilotWorkspace({
       note: "Bullish compact signal near support/RSI pullback in a range or transition.",
     },
   ];
+  const localizedStrategyValue = lang === "zh"
+    ? strategy === strategyPresets[0].value
+      ? "趋势跟踪并由精简 AI 确认；达到当日亏损上限后停止。"
+      : strategy === strategyPresets[1].value
+        ? "仅在精简 AI 确认动量与成交量时延续突破；否则持有。"
+        : strategy === strategyPresets[2].value
+          ? "仅在精简信号确认的支撑区域进行均值回归入场；达到当日亏损上限后停止。"
+          : strategy
+    : strategy;
+  const riskProfileLabel = lang === "zh"
+    ? riskProfile === "conservative"
+      ? "保守型"
+      : riskProfile === "active"
+        ? "积极型"
+        : "均衡型"
+    : riskProfile[0].toUpperCase() + riskProfile.slice(1);
   const selectedStrategy =
     strategyPresets.find((item) => item.value === strategy) ||
     strategyPresets[0];
@@ -5352,13 +5381,13 @@ export function AutopilotWorkspace({
       <section className="v6-heading">
         <div>
           <span className="eyebrow">
-            COST-CAPPED AI SIGNALS · ON-CHAIN GUARDRAILS
+            SIX-STEP SETUP · OWNER CONTROLLED
           </span>
           <h2>Autopilot</h2>
           <p>
-            Choose the market, capital and risk level. PULSE handles route
-            sizing and contract configuration; you keep pause and withdrawal
-            control.
+            Configure a pair, strategy, initial deposit, risk policy and prepaid
+            runtime. Monitoring begins only after you review and activate step 6;
+            you keep pause and withdrawal control.
           </p>
         </div>
         <CapabilityNotice capability={capability} type="autopilot" />
@@ -5382,15 +5411,15 @@ export function AutopilotWorkspace({
                 : "Trend-following with compact AI confirmation; stop after daily loss cap.",
           );
           setPreparedCandidate(`${candidate.pair} · ${candidate.timeframe} · ${candidate.strategyType.replaceAll("_", " ")}`);
-          requestAnimationFrame(() => builderRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
+          requestAnimationFrame(() => preparedNoticeRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
         }}
       />
-      {preparedCandidate && <div className="prepared-autopilot-notice" role="status"><strong>Autopilot draft prepared</strong><span>{preparedCandidate}. Review capital, risk and AI Entry Pass below; no transaction has been sent.</span></div>}
+      {preparedCandidate && <div className="prepared-autopilot-notice" ref={preparedNoticeRef} role="status"><strong>Autopilot draft prepared</strong><span>{preparedCandidate}. Only pair, timeframe and strategy were prefilled. Review every step below; no report was purchased and no transaction was sent.</span></div>}
 
       <div className="autopilot-onboarding">
-        <section className="card autopilot-builder" ref={builderRef}>
+        <section className="card autopilot-builder">
           <div className="setup-target-field">
-            <span>Configure</span>
+            <span>SETUP TARGET</span>
             <AutopilotAccountPicker value={selectedVault} options={vaultPickerOptions} onChange={(vault) => { createNewVaultRef.current = !vault; setSelectedVault(vault); setCloseConfirming(false); }} />
             <small>{selectedVault ? "Editing only the selected account. Runtime controls remain in the dashboard." : "A new isolated owner-controlled vault will be created."}</small>
           </div>
@@ -5403,7 +5432,7 @@ export function AutopilotWorkspace({
           </div>
           <div className="friendly-fields">
             <div className="friendly-field">
-              <span>Global Market pair</span>
+              <span>Trading pair</span>
               <ExecutionPairPicker
                 id="autopilot-execution-pair"
                 networkKey={networkKey}
@@ -5414,12 +5443,13 @@ export function AutopilotWorkspace({
               <small>Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes.</small>
             </div>
             <div className="friendly-field">
-              <span>Analysis timeframe</span>
+              <span>Decision timeframe</span>
               <TimeframePicker
                 id="autopilot-timeframe"
                 value={timeframe}
                 networkKey={networkKey}
                 values={["15m", "1H", "4H", "1D"]}
+                purpose="strategy"
                 onChange={setTimeframe}
               />
             </div>
@@ -5453,7 +5483,7 @@ export function AutopilotWorkspace({
                 </p>
               ) : (
                 <p>
-                  Keep the report for analysis and trade this pair on{" "}
+                  Choose another supported pair below, or trade this pair manually on{" "}
                   <a
                     href={`https://www.okx.com/trade-spot/${pair.toLowerCase()}`}
                     target="_blank"
@@ -5579,7 +5609,13 @@ export function AutopilotWorkspace({
                   className={riskProfile === profile ? "active" : ""}
                   onClick={() => applyRiskProfile(profile)}
                 >
-                  <b>{profile[0].toUpperCase() + profile.slice(1)}</b>
+                  <b data-no-localize>{lang === "zh"
+                    ? profile === "conservative"
+                      ? "保守型"
+                      : profile === "active"
+                        ? "积极型"
+                        : "均衡型"
+                    : profile[0].toUpperCase() + profile.slice(1)}</b>
                   <span>
                     {profile === "conservative"
                       ? "Up to 25% per Buy · strictest signals"
@@ -5712,7 +5748,7 @@ export function AutopilotWorkspace({
               <span>Custom instructions</span>
               <textarea
                 rows={3}
-                value={strategy}
+                value={localizedStrategyValue}
                 onChange={(event) => setStrategy(event.target.value)}
               />
             </label>
@@ -5735,7 +5771,7 @@ export function AutopilotWorkspace({
             </div>}
             <div className="pass-explainer">
               <strong>Prepaid x402 payment · no auto-renewal</strong>
-              <span>Only compact AI checks for valid entry candidates consume the pass. Pausing the Autopilot freezes the time remaining. TP/SL, exits and withdrawals never require a pass.</span>
+              <span>This is Autopilot runtime—not a Global Quick or Pro report. Only compact AI checks for candidates that pass the free technical gate use the pass. Pausing freezes the time remaining. TP/SL, exits and withdrawals never require a pass.</span>
               <small>{selectedVault && passActive ? "The existing pass remains bound to this vault." : "PULSE creates and registers a new vault first when needed, requests this payment in step 6, then starts it. Renew later from the dashboard."}</small>
             </div>
             {passFundingInsufficient && <div className="capital-inline-warning">The connected wallet needs {requiredWalletFunds.toFixed(2)} {activeSettlementSymbol} for {reusingFundedVault ? "this pass" : "the initial deposit plus this pass"}; available {fundingWalletBalance?.toLocaleString("en-US", { maximumFractionDigits: 6 })}.</div>}
@@ -5753,12 +5789,9 @@ export function AutopilotWorkspace({
               <h3>
                 {selectedStrategy.label} · {pair} · {timeframe}
               </h3>
-              <p>
-                PULSE starts with free deterministic monitoring and requests a compact AI entry signal only when a setup candidate exists,
-                trades only{" "}
-                {targetToken?.symbol || "the verified asset"}, and enforce the{" "}
-                {riskProfile} limits above on-chain.
-              </p>
+              <p data-no-localize>{lang === "zh"
+                ? `不会购买或复用全球市场报告。PULSE 先运行免费的确定性监控，仅在出现符合设置的候选机会时请求精简 AI 入场信号；仅交易 ${targetToken?.symbol || "已验证资产"}，并在链上强制执行上述${riskProfileLabel}风险限额。`
+                : `No Global report is bought or reused. PULSE starts with free deterministic monitoring and requests a compact AI entry signal only when a setup candidate exists, trades only ${targetToken?.symbol || "the verified asset"}, and enforces the ${riskProfileLabel} limits above on-chain.`}</p>
             </div>
             <ul>
               <li>You approve the setup in your wallet.</li>
@@ -6061,8 +6094,8 @@ export function AutopilotWorkspace({
             <div className="empty-dashboard compact">
               <strong>No Autopilot yet</strong>
               <span>
-                Complete the three choices on the left. PULSE checks on-chain
-                before offering creation.
+                Complete setup steps 1–6 above. PULSE will verify the route,
+                capital, policy and pass before offering activation.
               </span>
             </div>
           )}
@@ -6244,7 +6277,7 @@ export function AutopilotWorkspace({
           <div className="empty-dashboard">
             <strong>No active strategy</strong>
             <span>
-              Choose a market, capital and risk profile above to start.
+              Complete steps 1–6 above to create and activate an Autopilot.
             </span>
           </div>
         )}
@@ -7211,10 +7244,10 @@ export function DocsWorkspace() {
               <div className="docs-callout">
                 <b>How the visible workflow works</b>
                 <span>
-                  The journey bar keeps Analyze → Spot trade / Autopilot
-                  visible. Spot also repeats the radar when no report is loaded
-                  and sends you back to analysis instead of leaving an empty
-                  ticket unexplained.
+                  Global Market intelligence has its own Global → Spot path:
+                  a Quick or Pro report can prefill a ticket, while direct Spot
+                  configuration remains available. Autopilot has a separate Configure → Fund &amp;
+                  protect → Activate path and never requires a Global report.
                 </span>
               </div>
               <div className="docs-callout">
@@ -8000,10 +8033,13 @@ export function DocsWorkspace() {
             <div className="docs-callout">
               <b>Opportunity Radar</b>
               <span>
-                Global Market, empty Spot and Autopilot share the same read-only
-                OKX candle shortlist. It is not a recommendation: the
-                deterministic setup, compact AI confirmation, token identity,
-                selected-network route and wallet balance must still pass.
+                Global Market, empty Spot and Autopilot can display the same
+                read-only OKX candle shortlist, but the actions are different.
+                On Autopilot, Use for Autopilot only prefills pair, timeframe
+                and strategy; Open Global analysis starts its separate Quick/Pro report flow.
+                Neither action starts a vault. The deterministic setup, compact
+                AI confirmation, token identity, selected-network route, owner
+                capital and active pass must still pass.
               </span>
             </div>
             <div className="docs-callout">
@@ -8081,7 +8117,7 @@ export function DocsWorkspace() {
               <i>→</i>
               <b>5 · Evaluate and execute</b>
               <span>
-                The detailed report shows every PASS/WAIT rule. Buy broadcasts
+                The Strategy journal shows every PASS/WAIT rule. Buy broadcasts
                 only after every entry rule passes. Hold keeps monitoring
                 without a trade. An owned position exits on TP, SL, bearish
                 confirmation or its strategy structure rule, after which the

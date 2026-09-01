@@ -778,7 +778,7 @@ export function App() {
           </div>
           <canvas id="pulse-chart" className="chart" />
           {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
-          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
+          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
         </div>
       </section>
 
@@ -805,24 +805,31 @@ export function App() {
                 </button>
               ))}
             </div>
-            <p>Analysis creates the plan. Spot Trading executes it once, while Autopilot follows your signed rules.</p>
+            <p>Global analysis can prefill a Spot order. Autopilot starts independently from its own signed strategy, capital and runtime pass.</p>
           </section>
         </div>}
       </div>
 
-      {networkKey !== "arc-testnet" && (["analyze", "spot", "autopilot"] as Tab[]).includes(tab) && <section className="product-journey" aria-label="Analyze, trade and automate workflow">
-        <div className="journey-copy"><span className="eyebrow">YOUR PATH</span><strong>{analysisReady ? "Analysis ready — choose how to act" : "Start with evidence, then execute"}</strong><small>{analysisReady ? `${instId} · ${timeframe} is linked to the next step.` : "A report is what carries pair, timeframe, entry, TP and SL into execution."}</small></div>
-        <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Analyze</b><small>{analysisReady ? "Report ready" : "Start here"}</small></span></button>
+      {networkKey !== "arc-testnet" && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
+        <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready — review the Spot action" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
+        <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Global intelligence</b><small>{analysisReady ? "Report ready" : "Quick or Pro"}</small></span></button>
         <span className="journey-arrow">→</span>
-        <button type="button" className={tab === "spot" ? "active" : ""} onClick={() => navigateTo("spot")}><i>2</i><span><b>Spot trade</b><small>Review and sign</small></span></button>
-        <span className="journey-or">or</span>
-        <button type="button" className={tab === "autopilot" ? "active" : ""} onClick={() => navigateTo("autopilot")}><i>3</i><span><b>Autopilot</b><small>Set rules and capital</small></span></button>
+        <button type="button" className={tab === "spot" ? "active" : ""} onClick={() => navigateTo("spot")}><i>2</i><span><b>Spot Market or Limit</b><small>Review and sign</small></span></button>
+      </section>}
+
+      {networkKey !== "arc-testnet" && tab === "autopilot" && <section className="product-journey autopilot-journey" aria-label="Independent Autopilot activation workflow">
+        <div className="journey-copy"><span className="eyebrow">AUTOPILOT PATH</span><strong>Configure once, then let PULSE evaluate</strong><small>No Global report is required or reused. The prepaid pass covers eligible compact entry checks after activation.</small></div>
+        <div className="journey-step"><i>1</i><span><b>Configure</b><small>Pair and strategy</small></span></div>
+        <span className="journey-arrow">→</span>
+        <div className="journey-step"><i>2</i><span><b>Fund &amp; protect</b><small>Capital, risk and pass</small></span></div>
+        <span className="journey-arrow">→</span>
+        <div className="journey-step"><i>3</i><span><b>Activate</b><small>Review and approve</small></span></div>
       </section>}
 
       {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
 
       {tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
-        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace />
         : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>
@@ -1004,7 +1011,9 @@ export function App() {
 
       <footer className="footer">
         <div>PULSE · Signal when you need it. Proof when it matters.</div>
-        <div>OKX + Polymarket data · {network.provider} on {network.label}</div>
+        <div data-no-localize>{lang === "zh"
+          ? `OKX + Polymarket 数据 · ${network.label} 上的 ${network.provider}`
+          : `OKX + Polymarket data · ${network.provider} on ${network.label}`}</div>
       </footer>
       <SwapPanel
         lang={lang}

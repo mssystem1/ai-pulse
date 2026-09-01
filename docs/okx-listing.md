@@ -9,7 +9,7 @@ Use this document as the single copy source when registering the A2MCP service. 
 | Name | **PULSE** |
 | Type | **A2MCP** |
 | Category | **Trading** |
-| Tagline | **Analyze first. Spot trade or run a guarded Autopilot.** |
+| Tagline | **Global & Prediction intelligence. Spot execution. Independent guarded Autopilot.** |
 | One-liner | Global and Prediction Market intelligence connected to owner-signed Spot execution, guarded Autopilot, and Onchain Pre-Trade Risk Guard. |
 | Networks | X Layer · Base · Arbitrum One · Arc Testnet payments; Spot and Autopilot are hidden on Arc Testnet |
 | Settlement | USDT0 on X Layer · native USDC on Base/Arbitrum · test USDC on Arc Testnet |
@@ -30,7 +30,7 @@ radar artwork or a rounded-corner export.
 
 ## Short description
 
-PULSE is an Analyze -> Spot or Autopilot workflow for traders and AI agents. Preview live OKX markets for free, buy a focused Global report and use its plan for an Agentic-Wallet-signed Spot Market or Limit order, or start a separately guarded Autopilot without a report. Payments use USDT0 on X Layer or USDC on Base and Arbitrum through x402; Arc Testnet supports analysis payment testing.
+PULSE provides distinct first-class workflows for traders and AI agents. Global Quick or Pro produces focused intelligence that can prefill an Agentic-Wallet-signed Spot Market or Limit order. Autopilot starts separately from its own pair, strategy, capital, risk and duration without requiring a Global report. Payments use USDT0 on X Layer or USDC on Base and Arbitrum through x402; Arc Testnet supports analysis payment testing.
 
 ## Full description
 

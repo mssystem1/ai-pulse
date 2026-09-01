@@ -32,5 +32,8 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "AUTOPILOT DASHBOARD"), "自动驾驶仪表板");
   assert.equal(localizeUiText("zh", "Pause · hold pass timer"), "暂停 · 停止通行证计时");
   assert.equal(localizeUiText("zh", "Global Quick → Spot Market or Limit"), "全球市场快速分析 → 现货市价或限价交易");
+  assert.equal(localizeUiText("zh", "Close above SMA20; SMA20 below SMA50"), "收盘价高于 SMA20；SMA20 低于 SMA50");
+  assert.equal(localizeUiText("zh", "Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes."), "可直接选择。只有通过免费技术门槛后，预付通行证才会提供精简 AI 入场确认。");
+  assert.equal(localizeUiText("zh", "connect to check"), "连接钱包后查看");
   assert.match(localizeUiText("zh", "The same eight services are advertised under the selected network prefix with typed schemas. Agentic Wallet signs Spot and Autopilot contract calls; payment uses native USDC."), /八项服务/);
 });
