@@ -23,7 +23,7 @@ import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
-import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
 import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
@@ -783,9 +783,10 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
           .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
         const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
         const reconciled = reconcileStrategyExecution(strategy, activityByNetwork.get(strategy.network) || [], targetBalance);
-        return { ...reconciled, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
+        const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance, pass: aiPass });
+        return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
-        return { ...strategy, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
+        return { ...strategy, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
       }
     }));
     res.json({

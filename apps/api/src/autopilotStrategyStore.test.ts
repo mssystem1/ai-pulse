@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeStrategyHash, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+
+test("reports effective Autopilot runtime separately from durable registration", () => {
+  const expiredPass = { expiresAt: "2026-08-31T00:00:00.000Z", signalLimit: 3, signalsUsed: 0 };
+  assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: true, targetBalance: 0n, pass: null }), "paused");
+  assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 0n, pass: null }), "entry_pass_expired");
+  assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 1n, pass: expiredPass, now: Date.parse("2026-09-01T00:00:00.000Z") }), "protecting_position");
+  assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 0n, pass: { expiresAt: "2026-09-02T00:00:00.000Z", signalLimit: 3, signalsUsed: 3 }, now: Date.parse("2026-09-01T00:00:00.000Z") }), "entry_signals_exhausted");
+  assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: false, targetBalance: 0n, pass: { expiresAt: "2026-09-02T00:00:00.000Z", signalLimit: 3, signalsUsed: 1 }, now: Date.parse("2026-09-01T00:00:00.000Z") }), "running");
+});
 
 test("decodes both Upstash HGETALL response shapes", () => {
   const one = JSON.stringify({ id: "xlayer:one", pair: "SOL-USDT" });

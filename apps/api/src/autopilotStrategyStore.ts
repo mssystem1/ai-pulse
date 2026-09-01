@@ -12,6 +12,41 @@ type ExecutionActivity = {
   fillPrice?: number;
 };
 
+export type AutopilotRuntimeState =
+  | "running"
+  | "paused"
+  | "protecting_position"
+  | "entry_pass_expired"
+  | "entry_signals_exhausted"
+  | "telemetry_unavailable"
+  | "failed"
+  | "inactive";
+
+/**
+ * Strategy registration and live vault state are deliberately separate. The
+ * durable strategy may remain registered as `active` while its on-chain vault
+ * is paused or while its prepaid entry entitlement has expired. Expose one
+ * unambiguous effective state to dashboards and audit exports without
+ * rewriting the owner's signed strategy configuration.
+ */
+export function deriveAutopilotRuntimeState(input: {
+  configuredStatus?: string;
+  paused: boolean;
+  targetBalance: bigint;
+  pass?: { expiresAt: string; pausedAt?: string; signalLimit: number; signalsUsed: number } | null;
+  now?: number;
+}): AutopilotRuntimeState {
+  if (input.configuredStatus === "failed") return "failed";
+  if (input.paused) return "paused";
+  if (input.configuredStatus !== "active") return "inactive";
+  const reference = input.pass?.pausedAt ? Date.parse(input.pass.pausedAt) : input.now ?? Date.now();
+  const passActive = Boolean(input.pass && Number.isFinite(reference) && Date.parse(input.pass.expiresAt) > reference);
+  if (input.targetBalance > 0n) return passActive ? "running" : "protecting_position";
+  if (!passActive) return "entry_pass_expired";
+  if (input.pass!.signalsUsed >= input.pass!.signalLimit) return "entry_signals_exhausted";
+  return "running";
+}
+
 export function cashFlowAdjustedPnl(
   portfolioValueAtomic: bigint,
   baselineValueAtomic: bigint,

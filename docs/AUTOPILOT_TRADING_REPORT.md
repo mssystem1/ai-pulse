@@ -1,6 +1,6 @@
 # PULSE Autopilot Trading Report
 
-Updated: 2026-08-29
+Updated: 2026-09-01
 
 This document is the functional and acceptance report for Autopilot. It distinguishes strategy evaluation from vault administration. Creating, funding, pausing, resuming or withdrawing a vault proves owner control, but does **not** prove automated trading. A complete trading acceptance run must also prove a fresh compact signal when an entry candidate exists, a deterministic decision, guarded execution, position reconciliation and an exit.
 
@@ -9,6 +9,12 @@ This document is the functional and acceptance report for Autopilot. It distingu
 The earlier acceptance runs used a full Premium report for every analysis cycle. That behavior is retired: it consumed roughly `$6–$9/day` in one observed active-vault run and was neither necessary nor commercially sustainable. Current code uses a deterministic new-candle gate with a hard 15-minute scheduler floor, a strict 4,000-input/320-output-token classifier only for a surviving entry candidate, a four-hour pair/timeframe cache, atomic per-vault/global call and USD budgets, and a manually prepaid vault-bound AI Entry Pass. The attempt timestamp is persisted before calling xAI; a rejected request therefore cannot bypass the cooldown, and billing/auth/quota failures open a six-hour circuit breaker. Historical transaction evidence below remains valid, but historical references to a full Premium cycle describe the tested release at that time, not the current scheduler.
 
 Paid time is active-runtime time. Pausing the on-chain vault freezes the pass deadline and Telegram warning clock; resuming extends expiry by the paused duration. The unified Autopilot dashboard owns Pause/Resume, top-up, per-asset withdrawal/Max, close-and-withdraw-all and 24h/7d/30d x402 renewal. Strategy decisions explain why PULSE waited, bought or sold; reconciled on-chain activity separately records wallet confirmations and fills. The export format is CSV for spreadsheet/audit use rather than the former JSON download.
+
+Strategy registration and effective runtime are different facts. A durable strategy can remain registered while the on-chain vault is paused or its Entry Pass has expired. The API therefore derives one effective state from the pause flag, invested balance and pass: `running`, `paused`, `protecting_position`, `entry_pass_expired`, `entry_signals_exhausted`, `telemetry_unavailable`, `failed`, or `inactive`. New CSV exports begin with a `runtime_snapshot` row and include pass expiry/usage columns before the historical decision and confirmed on-chain activity rows.
+
+## 2026-09-01 owner-closure audit
+
+The two legacy strategies supplied for review belong to different networks, not two Base vaults. BTC-USDT `0xa24A…7fda` is on Arbitrum; DOGE-USDT `0x2DD4…bBEE` is on Base. Read-only durable and activity-log reconciliation confirmed an owner pause followed by an owner withdrawal for both vaults on 2026-09-01. Neither supplied CSV contains a filled Buy or Sell. The BTC log's 44 retained failures are the historical xAI 403 credit-exhaustion incident from 2026-08-29; its current failure streak is zero. The DOGE CSV contains three retained transient request failures (the live durable record contains four), with no fill. These facts are historical audit evidence and do not imply that either vault is still running.
 
 ## Trading workflow
 
@@ -23,7 +29,7 @@ Paid time is active-runtime time. Pausing the on-chain vault freezes the pass de
 9. The vault independently enforces executor, adapter, asset, nonce, policy version, expiry, cooldown, per-trade value, daily turnover, exposure, slippage and daily-loss bounds.
 10. The runtime reads the actual settlement and target balances from the vault. A sell uses the actual target balance received, not a setup-time estimate. If its oracle value exceeds the signed per-trade cap, PULSE sells a bounded chunk and retains the exit state for later cooldown-qualified chunks.
 11. A separate one-minute deterministic risk monitor checks the live OKX mark against the active TP/SL and completes latched partial exits. It does not wait for an AI signal. A touched exit is latched while the on-chain cooldown runs, then uses the same guarded oracle, quote, router allowlist, simulation, policy version and nonce path as every other execution.
-12. The UI displays decision statistics, each passed/waiting rule, compact-signal source/confidence, token/cost budget, pass expiry, TP/SL, evidence hash, transactions, cash-flow-adjusted P&L and a downloadable JSON log.
+12. The UI displays decision statistics, each passed/waiting rule, compact-signal source/confidence, token/cost budget, pass expiry, TP/SL, evidence hash, transactions, cash-flow-adjusted P&L and a downloadable CSV audit log.
 
 ## Strategy rules
 

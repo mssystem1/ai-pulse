@@ -139,6 +139,7 @@ type AutomationOrder = {
 };
 type AutopilotStrategyView = {
   id: string;
+  network?: "xlayer" | "base" | "arbitrum";
   vault: string;
   settlementAsset?: string;
   targetAsset?: string;
@@ -146,6 +147,8 @@ type AutopilotStrategyView = {
   timeframe: string;
   strategyType?: "trend_following" | "breakout" | "mean_reversion";
   status: string;
+  registrationStatus?: string;
+  runtimeState?: "running" | "paused" | "protecting_position" | "entry_pass_expired" | "entry_signals_exhausted" | "telemetry_unavailable" | "failed" | "inactive";
   paused?: boolean;
   lastDecision?: string;
   lastRunAt?: string;
@@ -218,6 +221,29 @@ type AutopilotStrategyView = {
     error?: string;
   }>;
 };
+
+function autopilotRuntimeLabel(item?: AutopilotStrategyView, fallbackPaused?: boolean | null) {
+  const state = item?.runtimeState || ((item?.paused ?? fallbackPaused) ? "paused" : item?.status === "active" ? "running" : item?.status || "inactive");
+  switch (state) {
+    case "running": return "Running";
+    case "paused": return "Paused";
+    case "protecting_position": return "Exit protection only";
+    case "entry_pass_expired": return "Entry pass expired";
+    case "entry_signals_exhausted": return "Entry confirmations used";
+    case "telemetry_unavailable": return "Runtime unavailable";
+    case "failed": return "Failed";
+    default: return "Inactive";
+  }
+}
+
+function autopilotRuntimeClass(item?: AutopilotStrategyView, fallbackPaused?: boolean | null) {
+  const state = item?.runtimeState || ((item?.paused ?? fallbackPaused) ? "paused" : item?.status || "inactive");
+  if (state === "running") return "active";
+  if (state === "protecting_position") return "protecting-position";
+  if (state === "paused") return "paused";
+  if (state === "failed" || state === "telemetry_unavailable") return "failed";
+  return "entry-pass-expired";
+}
 type AutopilotStrategyCatalogItem = {
   id: string;
   label: string;
@@ -5142,11 +5168,14 @@ export function AutopilotWorkspace({
       || (!entry.account && entry.pair === item.pair)
     ));
     const escape = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const headings = ["record_type", "timestamp", "pair", "timeframe", "decision_or_event", "status", "bias", "confidence_pct", "reason", "error", "tx_hash", "vault", "network"];
-    const rows = [
-      ...(item.evaluations || []).map((entry) => ["strategy_decision", entry.evaluatedAt, item.pair, item.timeframe, entry.action, entry.status, entry.bias, entry.confidence, entry.reason, entry.error, entry.txHash, item.vault, networkKey]),
-      ...relatedActivity.map((entry) => ["onchain_activity", entry.createdAt, entry.pair || item.pair, item.timeframe, entry.kind, entry.status, "", "", "", "", entry.txHash, entry.account || item.vault, networkKey]),
+    const exportNetwork = item.network || item.id.split(":")[0] || networkKey;
+    const headings = ["record_type", "timestamp", "pair", "timeframe", "decision_or_event", "status", "bias", "confidence_pct", "reason", "error", "tx_hash", "vault", "network", "runtime_state", "pass_expires_at", "pass_signals_used", "pass_signal_limit"];
+    const runtimeSnapshot = ["runtime_snapshot", new Date().toISOString(), item.pair, item.timeframe, "effective_runtime", item.runtimeState || "unknown", "", "", `Registration: ${item.registrationStatus || item.status}; effective runtime: ${autopilotRuntimeLabel(item)}.`, item.telemetryError, "", item.vault, exportNetwork, item.runtimeState || "unknown", item.aiPass?.expiresAt, item.aiPass?.signalsUsed, item.aiPass?.signalLimit];
+    const historyRows = [
+      ...(item.evaluations || []).map((entry) => ["strategy_decision", entry.evaluatedAt, item.pair, item.timeframe, entry.action, entry.status, entry.bias, entry.confidence, entry.reason, entry.error, entry.txHash, item.vault, exportNetwork, "", "", "", ""]),
+      ...relatedActivity.map((entry) => ["onchain_activity", entry.createdAt, entry.pair || item.pair, item.timeframe, entry.kind, entry.status, "", "", "", "", entry.txHash, entry.account || item.vault, exportNetwork, "", "", "", ""]),
     ].sort((left, right) => Date.parse(String(left[1])) - Date.parse(String(right[1])));
+    const rows = [runtimeSnapshot, ...historyRows];
     const csv = [headings, ...rows].map((row) => row.map(escape).join(",")).join("\r\n");
     const blob = new Blob([`\ufeff${csv}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -5205,12 +5234,10 @@ export function AutopilotWorkspace({
         value: vault,
         label: `Autopilot ${index + 1}`,
         address: `${vault.slice(0, 8)}…${vault.slice(-6)}`,
-        status: paused
-          ? "Paused"
-          : strategyView?.exitPending
+        status: strategyView?.exitPending
             ? "Closing position"
             : strategyView
-              ? "Running"
+              ? autopilotRuntimeLabel(strategyView, paused)
               : vaultView?.paused === false
                 ? "On-chain active"
                 : "Ready to configure",
@@ -5872,13 +5899,9 @@ export function AutopilotWorkspace({
                   }
                 >
                   {activeStrategy
-                    ? activeStrategy.paused
-                      ? "Paused"
-                      : activeStrategy.exitPending
+                    ? activeStrategy.exitPending
                         ? "Closing position"
-                      : activeStrategy.status === "active"
-                        ? "Running"
-                        : activeStrategy.status
+                        : autopilotRuntimeLabel(activeStrategy, activeVault?.paused)
                     : activeVault?.paused === false
                       ? "On-chain active · registration needed"
                       : "Ready to configure"}
@@ -6134,8 +6157,8 @@ export function AutopilotWorkspace({
             </div>
             <div className="autopilot-status-card">
               <span>Runtime</span>
-              <strong className={(activeStrategy?.paused ?? activeVault?.paused) ? "warning" : "positive"}>
-                {(activeStrategy?.paused ?? activeVault?.paused) ? "Paused" : activeStrategy?.exitPending ? "Closing position" : "Running"}
+              <strong className={autopilotRuntimeClass(activeStrategy, activeVault?.paused) === "active" ? "positive" : "warning"}>
+                {activeStrategy?.exitPending ? "Closing position" : autopilotRuntimeLabel(activeStrategy, activeVault?.paused)}
               </strong>
               <small>{activeStrategy?.lastDecision?.replaceAll("_", " ") || "Awaiting first decision"}</small>
             </div>
@@ -6191,7 +6214,7 @@ export function AutopilotWorkspace({
             <strong>
               {
                 strategies.filter(
-                  (item) => item.status === "active" && !item.paused,
+                  (item) => item.runtimeState === "running" || item.runtimeState === "protecting_position" || (!item.runtimeState && item.status === "active" && !item.paused),
                 ).length
               }
             </strong>
@@ -6223,9 +6246,9 @@ export function AutopilotWorkspace({
             {strategies.map((item) => (
               <div className="order-monitor-row autopilot-row" key={item.id}>
                 <span
-                  className={`status-chip ${item.paused ? "paused" : item.status}`}
+                  className={`status-chip ${autopilotRuntimeClass(item)}`}
                 >
-                  {item.paused ? "paused" : item.status}
+                  {autopilotRuntimeLabel(item)}
                 </span>
                 <div>
                   <strong>
@@ -6328,9 +6351,9 @@ export function AutopilotWorkspace({
                     <div><span>Position basis</span><strong>{item.positionEntryPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No open entry"}</strong><small>mark {item.markPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "—"}</small></div>
                     <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export CSV activity</button>
                   </div>
-                  <div className={`strategy-now ${item.paused ? "paused" : latest?.status || "held"}`}>
-                    <div><span>WHAT IT IS DOING NOW</span><strong>{item.paused ? "PAUSED · no entry checks" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>
-                    <p>{item.paused ? "The vault cannot trade and the AI Entry Pass timer is on hold. Resume when you want monitoring to continue." : providerBlocked ? `No assets moved. New AI requests are blocked until ${item.aiRetryAt ? new Date(item.aiRetryAt).toLocaleString() : "the provider retry window"}; deterministic position protection remains available.` : latest?.reason || "PULSE is waiting for the next eligible candle."}</p>
+                  <div className={`strategy-now ${autopilotRuntimeClass(item)}`}>
+                    <div><span>WHAT IT IS DOING NOW</span><strong>{item.runtimeState === "paused" || item.paused ? "PAUSED · no monitoring or entry checks" : item.runtimeState === "protecting_position" ? "PROTECTING · exits only" : item.runtimeState === "entry_pass_expired" ? "DORMANT · entry pass expired" : item.runtimeState === "entry_signals_exhausted" ? "DORMANT · confirmations used" : item.runtimeState === "telemetry_unavailable" ? "UNKNOWN · refresh runtime" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>
+                    <p>{item.runtimeState === "paused" || item.paused ? "The on-chain vault is paused. It cannot trade, and any active AI Entry Pass timer is held until you resume." : item.runtimeState === "protecting_position" ? "No new Buy is allowed without an active pass. Deterministic TP/SL and authorized exits continue for the invested asset." : item.runtimeState === "entry_pass_expired" ? "The vault has no invested position and cannot open a new one. Renew the AI Entry Pass to resume entry evaluation." : item.runtimeState === "entry_signals_exhausted" ? "The prepaid compact confirmations are used. Renew the AI Entry Pass to allow another qualified entry check." : item.runtimeState === "telemetry_unavailable" ? "PULSE could not verify the current on-chain runtime. No running claim is made until the next successful refresh." : providerBlocked ? `No assets moved. New AI requests are blocked until ${item.aiRetryAt ? new Date(item.aiRetryAt).toLocaleString() : "the provider retry window"}; deterministic position protection remains available.` : latest?.reason || "PULSE is waiting for the next eligible candle."}</p>
                   </div>
                   <div className="autopilot-report-grid">
                     <section>
@@ -8025,14 +8048,17 @@ export function DocsWorkspace() {
               <b>How to read the trading report</b>
               <span>
                 Open the Strategy journal. “What it is doing now” translates
-                runtime state into Wait, Buy, Sell, Paused or provider outage.
+                runtime state into Running, Paused, Exit protection only, Entry
+                pass expired, Entry confirmations used, or Runtime unavailable.
                 PASS means the observed market value met that signed rule. WAIT
                 means it did not. Buy requires every entry row to pass; Sell
                 needs one exit row. Hold never sends a transaction. A filled row
                 includes the evidence hash and explorer transaction. Strategy
                 decisions are separate from wallet/on-chain activity, repeated
                 identical failures are collapsed, and Export CSV activity joins
-                both streams for auditing.
+                both streams for auditing. Its first row is a current runtime
+                snapshot with network, pass expiry and confirmation counters, so
+                a registered strategy is never mistaken for a running vault.
               </span>
             </div>
             <div className="docs-callout">

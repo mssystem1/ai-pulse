@@ -31,6 +31,9 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "Export CSV activity"), "导出 CSV 活动记录");
   assert.equal(localizeUiText("zh", "AUTOPILOT DASHBOARD"), "自动驾驶仪表板");
   assert.equal(localizeUiText("zh", "Pause · hold pass timer"), "暂停 · 停止通行证计时");
+  assert.equal(localizeUiText("zh", "Exit protection only"), "仅执行退出保护");
+  assert.equal(localizeUiText("zh", "Entry pass expired"), "入场通行证已到期");
+  assert.equal(localizeUiText("zh", "PAUSED · no monitoring or entry checks"), "已暂停 · 不监控或检查入场");
   assert.equal(localizeUiText("zh", "Global Quick → Spot Market or Limit"), "全球市场快速分析 → 现货市价或限价交易");
   assert.equal(localizeUiText("zh", "Close above SMA20; SMA20 below SMA50"), "收盘价高于 SMA20；SMA20 低于 SMA50");
   assert.equal(localizeUiText("zh", "Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes."), "可直接选择。只有通过免费技术门槛后，预付通行证才会提供精简 AI 入场确认。");
