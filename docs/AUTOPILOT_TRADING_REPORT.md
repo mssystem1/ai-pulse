@@ -106,7 +106,7 @@ Registry administration controls approved executors, adapters, keepers and the g
 
 ## Evidence and reporting
 
-Each cycle updates lifetime evaluation/Buy/Sell/Hold/failure counters and appends its detailed decision to a private per-vault KV journal. The latest 100 rows also remain embedded in the strategy snapshot as an outage fallback, but they are not the source of lifetime fill statistics. Confirmed on-chain activity repairs missing or stale Buy/Sell counters on legacy strategies. The UI and CSV expose every available journal/activity row and label any unrecoverable pre-journal detail gap explicitly. An execution evidence payload is stored before a trade and its hash is committed in the vault transaction. The report contains:
+Each cycle updates lifetime evaluation/Buy/Sell/Hold/failure counters and appends its detailed decision to a private per-vault KV journal. The latest 100 rows also remain embedded in the strategy snapshot as an outage fallback, but they are not the source of lifetime fill statistics. Confirmed on-chain activity repairs missing or stale Buy/Sell counters on legacy strategies in both the API and dashboard. Each strategy journal contains a dedicated Confirmed trading ledger with Buy, partial Sell and full Sell rows linked to their transactions. The UI and CSV expose every available journal/activity row and label any unrecoverable pre-journal detail gap explicitly. An execution evidence payload is stored before a trade and its hash is committed in the vault transaction. The report contains:
 
 - exact strategy and market/timeframe;
 - action (`Buy`, `Sell` or `Hold`) and reason;

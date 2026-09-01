@@ -58,6 +58,31 @@ type ActivityMetric = {
   txHash?: string;
 };
 
+type AutopilotActivityMetric = ActivityMetric & {
+  id?: string;
+  source?: string;
+  account?: string;
+  createdAt?: string;
+};
+
+/** Reconciles stale API counters from the confirmed vault activity already loaded by the dashboard. */
+export function confirmedAutopilotExecutionCounts<T extends AutopilotActivityMetric>(activity: T[], vault: string) {
+  const matching = activity.filter((item) => item.status === "confirmed"
+    && item.source === "autopilot"
+    && item.account?.toLowerCase() === vault.toLowerCase()
+    && /^(buy_filled|sell_partial_filled|sell_filled)$/.test(item.kind));
+  const unique = new Map<string, T>();
+  for (const [index, item] of matching.entries()) {
+    unique.set(item.txHash?.toLowerCase() || item.id || `${item.kind}:${item.createdAt || index}`, item);
+  }
+  const executions = [...unique.values()].sort((left, right) => Date.parse(right.createdAt || "") - Date.parse(left.createdAt || ""));
+  return {
+    buyCount: executions.filter((item) => item.kind === "buy_filled").length,
+    sellCount: executions.filter((item) => item.kind === "sell_partial_filled" || item.kind === "sell_filled").length,
+    executions,
+  };
+}
+
 export function hasProtectedAutopilotPosition(item: StrategyMetric) {
   if (item.status !== "active" || item.paused) return false;
   try {

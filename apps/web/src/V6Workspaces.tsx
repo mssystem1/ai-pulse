@@ -18,7 +18,7 @@ import {
 import type { ReportTradeIntent } from "./Report";
 import type { Lang } from "./i18n";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
-import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
+import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
 import {
   DEFAULT_AUTOPILOT_CAPITAL,
   DEFAULT_TRADE_AMOUNT,
@@ -6246,8 +6246,11 @@ export function AutopilotWorkspace({
         </div>
         {strategies.length ? (
           <div className="order-monitor">
-            {strategies.map((item) => (
-              <div className="order-monitor-row autopilot-row" key={item.id}>
+            {strategies.map((item) => {
+              const confirmedExecution = confirmedAutopilotExecutionCounts(activity, item.vault);
+              const filledBuys = Math.max(item.filledBuyCount ?? 0, item.evaluations?.filter((entry) => entry.action === "buy" && entry.status === "filled").length ?? 0, confirmedExecution.buyCount);
+              const filledSells = Math.max(item.filledSellCount ?? 0, item.evaluations?.filter((entry) => entry.action === "sell" && entry.status === "filled").length ?? 0, confirmedExecution.sellCount);
+              return <div className="order-monitor-row autopilot-row" key={item.id}>
                 <span
                   className={`status-chip ${autopilotRuntimeClass(item)}`}
                 >
@@ -6278,6 +6281,10 @@ export function AutopilotWorkspace({
                       : "—"}
                   </strong>
                 </div>
+                <div className="monitor-fill-counts">
+                  <small>Confirmed fills</small>
+                  <strong><span className="buy-count">{filledBuys} Buy</span> · <span className="sell-count">{filledSells} Sell</span></strong>
+                </div>
                 {item.lastTxHash ? (
                   <a
                     href={`${WEB_NETWORKS[networkKey].explorer}/tx/${item.lastTxHash}`}
@@ -6296,8 +6303,8 @@ export function AutopilotWorkspace({
                       : "A dependency check failed closed. Open the Strategy journal for details."}
                   </small>
                 )}
-              </div>
-            ))}
+              </div>;
+            })}
           </div>
         ) : (
           <div className="empty-dashboard">
@@ -6316,8 +6323,14 @@ export function AutopilotWorkspace({
               const latest = item.evaluations?.at(-1);
               const evaluations = item.evaluations || [];
               const evaluationCount = item.evaluationCount ?? evaluations.length;
-              const filledBuys = item.filledBuyCount ?? evaluations.filter((entry) => entry.action === "buy" && entry.status === "filled").length;
-              const filledSells = item.filledSellCount ?? evaluations.filter((entry) => entry.action === "sell" && entry.status === "filled").length;
+              const confirmedExecution = confirmedAutopilotExecutionCounts(activity, item.vault);
+              const retainedBuyCount = evaluations.filter((entry) => entry.action === "buy" && entry.status === "filled").length;
+              const retainedSellCount = evaluations.filter((entry) => entry.action === "sell" && entry.status === "filled").length;
+              const apiBuyCount = item.filledBuyCount ?? 0;
+              const apiSellCount = item.filledSellCount ?? 0;
+              const filledBuys = Math.max(apiBuyCount, retainedBuyCount, confirmedExecution.buyCount);
+              const filledSells = Math.max(apiSellCount, retainedSellCount, confirmedExecution.sellCount);
+              const countersRepairedFromLedger = confirmedExecution.buyCount > apiBuyCount || confirmedExecution.sellCount > apiSellCount;
               const holds = item.holdCount ?? evaluations.filter((entry) => entry.action === "hold" && entry.status === "held").length;
               const failures = item.failureCount ?? evaluations.filter((entry) => entry.status === "failed").length;
               const failureIncidents = evaluations.reduce((count, entry, index) => {
@@ -6333,15 +6346,16 @@ export function AutopilotWorkspace({
               return (
                 <details key={`${item.id}-report`}>
                   <summary>
-                    Strategy journal · {item.pair} ·{" "}
-                    {definition?.label ||
-                      item.strategyType?.replaceAll("_", " ") ||
-                      "Strategy"}
+                    <span>Strategy journal · {item.pair} ·{" "}
+                      {definition?.label ||
+                        item.strategyType?.replaceAll("_", " ") ||
+                        "Strategy"}</span>
+                    <span className="journal-fill-summary">{filledBuys} buys · {filledSells} sells</span>
                   </summary>
                   <div className="autopilot-report-toolbar">
                     <div><span>Evaluations</span><strong>{evaluationCount}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
-                    <div><span>Filled buys</span><strong>{filledBuys}</strong></div>
-                    <div><span>Filled sells</span><strong>{filledSells}</strong></div>
+                    <div className="confirmed-stat"><span>Filled buys</span><strong>{filledBuys}</strong><small>confirmed on-chain</small></div>
+                    <div className="confirmed-stat"><span>Filled sells</span><strong>{filledSells}</strong><small>partial + full fills</small></div>
                     <div><span>Holds</span><strong>{holds}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
                     <div><span>Failures</span><strong>{failures}</strong><small>{item.lifetimeStatsComplete === false ? `${failureIncidents} visible incidents · available minimum` : `${failureIncidents} distinct incidents in the available journal`}</small></div>
                     <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
@@ -6350,6 +6364,17 @@ export function AutopilotWorkspace({
                     <div><span>Position basis</span><strong>{item.positionEntryPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "No open entry"}</strong><small>mark {item.markPrice?.toLocaleString(undefined, { maximumFractionDigits: 8 }) || "—"}</small></div>
                     <button type="button" className="btn btn-soft" onClick={() => exportAutopilotLog(item)}>Export CSV activity</button>
                   </div>
+                  {confirmedExecution.executions.length > 0 && <section className="strategy-execution-ledger">
+                    <div className="dashboard-head"><div><span className="eyebrow">CONFIRMED TRADING</span><h4>{confirmedExecution.buyCount} Buy fill{confirmedExecution.buyCount === 1 ? "" : "s"} · {confirmedExecution.sellCount} Sell fill{confirmedExecution.sellCount === 1 ? "" : "s"}</h4></div><small>{countersRepairedFromLedger ? "Dashboard counters repaired from confirmed activity" : "Verified from confirmed activity"}</small></div>
+                    <div className="strategy-execution-rows">
+                      {confirmedExecution.executions.map((entry) => <div className="strategy-execution-row" key={entry.id}>
+                        <span className={`execution-side ${entry.kind === "buy_filled" ? "buy" : "sell"}`}>{entry.kind === "buy_filled" ? "BUY" : entry.kind === "sell_partial_filled" ? "PARTIAL SELL" : "SELL"}</span>
+                        <strong>{entry.fillPrice ? `Fill ${entry.fillPrice.toLocaleString(undefined, { maximumFractionDigits: 8 })}` : "Confirmed fill"}</strong>
+                        <time>{new Date(entry.fillObservedAt || entry.createdAt).toLocaleString()}</time>
+                        {entry.txHash ? <a href={`${WEB_NETWORKS[item.network || networkKey].explorer}/tx/${entry.txHash}`} target="_blank" rel="noreferrer">Transaction ↗</a> : <span />}
+                      </div>)}
+                    </div>
+                  </section>}
                   {item.evaluationHistoryComplete === false && <div className="capital-inline-warning">{item.lifetimeStatsComplete === false ? `Historical detail is partial: ${evaluations.length.toLocaleString()} evaluation rows survive, but the legacy total is unknown. The displayed evaluation, Hold and failure values are minimums, not invented lifetime totals.` : `Historical detail is partial: ${evaluations.length.toLocaleString()} of ${evaluationCount.toLocaleString()} evaluation rows survive from the former retention window. Lifetime evaluation, Hold and failure counters remain available.`} Confirmed on-chain Buy/Sell totals remain authoritative; future rows are retained in the complete journal.</div>}
                   <div className={`strategy-now ${autopilotRuntimeClass(item)}`}>
                     <div><span>WHAT IT IS DOING NOW</span><strong>{item.runtimeState === "paused" || item.paused ? "PAUSED · no monitoring or entry checks" : item.runtimeState === "protecting_position" ? "PROTECTING · exits only" : item.runtimeState === "entry_pass_expired" ? "DORMANT · entry pass expired" : item.runtimeState === "entry_signals_exhausted" ? "DORMANT · confirmations used" : item.runtimeState === "telemetry_unavailable" ? "UNKNOWN · refresh runtime" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>

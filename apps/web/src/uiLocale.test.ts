@@ -29,6 +29,8 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "2d 3h remaining"), "剩余 2 天 3 小时");
   assert.equal(localizeUiText("zh", "3 compact AI confirmations remaining"), "剩余 3 次精简 AI 确认");
   assert.equal(localizeUiText("zh", "Export CSV activity"), "导出 CSV 活动记录");
+  assert.equal(localizeUiText("zh", "Confirmed fills"), "已确认成交");
+  assert.equal(localizeUiText("zh", "2 buys · 2 sells"), "2 次买入 · 2 次卖出");
   assert.equal(localizeUiText("zh", "AUTOPILOT DASHBOARD"), "自动驾驶仪表板");
   assert.equal(localizeUiText("zh", "Pause · hold pass timer"), "暂停 · 停止通行证计时");
   assert.equal(localizeUiText("zh", "Exit protection only"), "仅执行退出保护");

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics.js";
+import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics.js";
 
 const protectedStrategy = {
   status: "active",
@@ -40,6 +40,20 @@ test("a partial exit does not relabel the still-protected entry as executed", ()
     { status: "confirmed", kind: "buy_filled", txHash: "0xbuy" },
     { status: "confirmed", kind: "sell_partial_filled", txHash: "0xpartial-sell" },
   ], [partiallyExited]), 0);
+});
+
+test("confirmed vault activity repairs stale Autopilot Buy and Sell counters in the UI", () => {
+  const vault = "0x1111111111111111111111111111111111111111";
+  const counts = confirmedAutopilotExecutionCounts([
+    { id: "buy", source: "autopilot", account: vault, status: "confirmed", kind: "buy_filled", txHash: "0xbuy", createdAt: "2026-08-01T00:00:00.000Z" },
+    { id: "buy-copy", source: "autopilot", account: vault, status: "confirmed", kind: "buy_filled", txHash: "0xbuy", createdAt: "2026-08-01T00:00:01.000Z" },
+    { id: "partial", source: "autopilot", account: vault, status: "confirmed", kind: "sell_partial_filled", txHash: "0xpartial", createdAt: "2026-08-01T00:01:00.000Z" },
+    { id: "sell", source: "autopilot", account: vault, status: "confirmed", kind: "sell_filled", txHash: "0xsell", createdAt: "2026-08-01T00:02:00.000Z" },
+    { id: "other", source: "autopilot", account: "0x2222222222222222222222222222222222222222", status: "confirmed", kind: "buy_filled", txHash: "0xother", createdAt: "2026-08-01T00:03:00.000Z" },
+  ], vault);
+  assert.equal(counts.buyCount, 1);
+  assert.equal(counts.sellCount, 2);
+  assert.deepEqual(counts.executions.map((item) => item.txHash), ["0xsell", "0xpartial", "0xbuy"]);
 });
 
 test("dashboard PnL includes every known Spot and Autopilot value", () => {

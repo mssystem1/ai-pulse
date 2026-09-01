@@ -371,6 +371,16 @@ const ZH_EXACT: Record<string, string> = {
   "Evaluations": "评估次数",
   "Filled buys": "已成交买入",
   "Filled sells": "已成交卖出",
+  "Confirmed fills": "已确认成交",
+  "confirmed on-chain": "链上已确认",
+  "partial + full fills": "部分卖出 + 全部卖出成交",
+  "CONFIRMED TRADING": "已确认交易",
+  "Dashboard counters repaired from confirmed activity": "已根据确认活动修复仪表板计数",
+  "Verified from confirmed activity": "已通过确认活动验证",
+  "Confirmed fill": "已确认成交",
+  "BUY": "买入",
+  "SELL": "卖出",
+  "PARTIAL SELL": "部分卖出",
   "Holds": "持有决定",
   "Failures": "失败次数",
   "available minimum": "可用最低值",
@@ -965,6 +975,11 @@ const ZH_PRODUCT: Record<string, string> = {
 };
 
 const ZH_PHRASES: Array<[RegExp, string]> = [
+  [/^(\d+) Buy fills? · (\d+) Sell fills?$/, "$1 次买入成交 · $2 次卖出成交"],
+  [/^(\d+) buys · (\d+) sells$/, "$1 次买入 · $2 次卖出"],
+  [/^(\d+) Buy$/, "$1 次买入"],
+  [/^(\d+) Sell$/, "$1 次卖出"],
+  [/^Fill (.+)$/, "成交价 $1"],
   [/^(\d+) distinct incidents in the available journal$/, "可用日志中有 $1 个不同的失败事件"],
   [/^(\d+) visible incidents · available minimum$/, "可见 $1 个事件 · 可用最低值"],
   [/^Historical detail is partial: (.+) of (.+) evaluation rows survive from the former retention window\. Lifetime evaluation, Hold and failure counters remain available\. Confirmed on-chain Buy\/Sell totals remain authoritative; future rows are retained in the complete journal\.$/, "历史详情不完整：旧保留窗口中仍有 $1 / $2 条评估记录。累计评估、Hold 和失败计数仍然可用；已确认的链上买入/卖出总数仍为权威数据，未来记录将完整保留。"],
