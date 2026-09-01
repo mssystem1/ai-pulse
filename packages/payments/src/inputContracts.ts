@@ -375,7 +375,6 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
         aiPass: { type: "object", description: "Vault-bound duration, expiry, remaining compact confirmations and pause-aware runtime state." },
         behavior: { type: "object", description: "New-entry and expiry behavior. Agentic Wallet still owns resume/start and every later state change." },
       },
-      { name: "lang", carrier: "body", type: "string", required: false, default: "en", enum: ["en", "zh"], description: "Report language." },
     } } : {}),
   };
 }
