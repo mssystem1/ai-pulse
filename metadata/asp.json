@@ -70,7 +70,7 @@
     "spotPremium": 0.30,
     "predictionStandard": 0.20,
     "predictionPremium": 0.30,
-    "preflight": 0.15,
+    "preflight": 0.20,
     "autopilotPass24h": 1.50,
     "autopilotPass7d": 10.50,
     "autopilotPass30d": 45.00
@@ -79,7 +79,7 @@
     "freeTeaser": 0,
     "analysisBase": 0.20,
     "analysisPremium": 0.30,
-    "preflight": 0.15,
+    "preflight": 0.20,
     "predictionStandard": 0.20,
     "predictionPremium": 0.30,
     "autopilotPass24h": 1.50,
@@ -191,7 +191,7 @@
     { "name": "Global Pro → Spot Market or Limit", "path": "/v1/analysis/spot/premium", "priceUsd": 0.30, "nextActions": ["wallet-signed Spot Market order", "wallet-signed Spot Limit order"] },
     { "name": "Prediction Quick", "path": "/v1/analysis/prediction/standard", "priceUsd": 0.20 },
     { "name": "Prediction Pro", "path": "/v1/analysis/prediction/premium", "priceUsd": 0.30 },
-    { "name": "Onchain Pre-Trade Risk Guard", "path": "/v1/preflight", "priceUsd": 0.15 },
+    { "name": "Token Risk Guard", "path": "/v1/preflight", "priceUsd": 0.20, "evidence": "OKX API on X Layer; Blockscout API on Base/Arbitrum; DexScreener market, website, X-profile and promotion metadata; Grok scored synthesis" },
     { "name": "Start Autopilot · 24h", "path": "/v1/autopilot/pass/24h", "priceUsd": 1.50, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" },
     { "name": "Start Autopilot · 7d", "path": "/v1/autopilot/pass/7d", "priceUsd": 10.50, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" },
     { "name": "Start Autopilot · 30d", "path": "/v1/autopilot/pass/30d", "priceUsd": 45.00, "availability": ["xlayer", "base", "arbitrum"], "paidStep": "AI runtime activation after Agentic Wallet vault setup" }

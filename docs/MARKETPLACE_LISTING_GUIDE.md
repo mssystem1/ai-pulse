@@ -122,7 +122,7 @@ Recommended OKX.AI service rows should use X Layer URLs because OKX’s x402 fac
 - Global Pro → Spot Market or Limit — `/xlayer/v1/analysis/spot/premium` — $0.30.
 - Prediction Quick — `/xlayer/v1/analysis/prediction/standard` — $0.20.
 - Prediction Pro — `/xlayer/v1/analysis/prediction/premium` — $0.30.
-- Onchain Pre-Trade Risk Guard — `/xlayer/v1/preflight` — $0.15.
+- Token Risk Guard — `/xlayer/v1/preflight` — $0.20.
 - Start Autopilot · 24h — `/xlayer/v1/autopilot/pass/24h` — $1.50.
 - Start Autopilot · 7d — `/xlayer/v1/autopilot/pass/7d` — $10.50.
 - Start Autopilot · 30d — `/xlayer/v1/autopilot/pass/30d` — $45.00.

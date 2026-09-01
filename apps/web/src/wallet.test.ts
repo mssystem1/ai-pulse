@@ -19,6 +19,27 @@ test("validates the exact network, native-USDC asset, route, and approved price"
   }, "http://localhost:4000/base/v1/analysis/fused/standard", "base", network));
 });
 
+test("requires the $0.20 Token Risk Guard price before wallet signing", () => {
+  const network = WEB_NETWORKS.xlayer;
+  const resource = "http://localhost:4000/xlayer/v1/preflight";
+  const challenge = {
+    x402Version: 2,
+    resource: { url: resource },
+    accepts: [{
+      scheme: "exact",
+      network: network.caip2,
+      asset: network.payment.address,
+      amount: "200000",
+      payTo: "0x0000000000000000000000000000000000000001",
+    }],
+  };
+  assert.doesNotThrow(() => validatePaymentChallenge(challenge, resource, "xlayer", network));
+  assert.throws(() => validatePaymentChallenge({
+    ...challenge,
+    accepts: [{ ...challenge.accepts[0], amount: "150000" }],
+  }, resource, "xlayer", network));
+});
+
 test("rejects a substituted chain, token, price, or resource before wallet signing", () => {
   const network = WEB_NETWORKS.arbitrum;
   const base = { x402Version: 2, resource: { url: "/arbitrum/v1/token/scan" }, accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "200000" }] };

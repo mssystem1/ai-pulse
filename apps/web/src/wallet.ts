@@ -75,7 +75,7 @@ const EXPECTED_ROUTE_AMOUNTS: Readonly<Record<string, string>> = Object.freeze({
   "/v1/analysis/fused/standard": "250000", "/v1/analysis/fused/premium": "400000",
   "/v1/analysis/divergence": "200000", "/v1/preflight/event-risk": "300000",
   "/v1/token/scan": "200000", "/v1/wallet/scan": "110000", "/v1/market/pulse": "110000",
-  "/v1/swap/quote": "120000", "/v1/preflight": "150000",
+  "/v1/swap/quote": "120000", "/v1/preflight": "200000",
   "/v1/autopilot/pass/24h": "1500000", "/v1/autopilot/pass/7d": "10500000", "/v1/autopilot/pass/30d": "45000000",
 });
 

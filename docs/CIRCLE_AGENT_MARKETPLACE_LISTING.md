@@ -24,7 +24,7 @@ The complete PULSE execution-mainnet catalog contains eight services. Circle/Arc
 | Website | https://www.ai-pulse.tech |
 | Primary Service Category | Financial analysis / market intelligence; if unavailable, choose Data & Analytics |
 | Number of Endpoints | 5 |
-| Pricing Model | Usage-based through x402: Onchain Pre-Trade Risk Guard $0.15, Quick reports $0.20, Pro reports $0.30 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
+| Pricing Model | Usage-based through x402: Token Risk Guard $0.20, Quick reports $0.20, Pro reports $0.30 in Arc Testnet USDC. Public metadata and paid-job recovery are free. |
 | Contact Name | Enter the legal or operational contact responsible for PULSE. |
 | Endpoints Documentation URL | https://github.com/mssystem1/Pulse/blob/main/docs/circle-marketplace-openapi.yaml |
 
@@ -42,7 +42,7 @@ PULSE is submitted as an Arc Testnet service using test USDC through Circle Gate
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/spot/premium` — $0.30
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/standard` — $0.20
 - `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/analysis/prediction/premium` — $0.30
-- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/preflight` — $0.15
+- `POST https://pulse-api-production-7aae.up.railway.app/arc/v1/preflight` — $0.20
 
 All five declare Arc Testnet `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, the `exact` x402 scheme, and Circle Gateway in public metadata. Fused, divergence, event-risk and execution internals are intentionally excluded from the public service catalog.
 

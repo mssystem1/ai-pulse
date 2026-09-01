@@ -96,11 +96,13 @@ Paid reports use the configured public Vercel Blob transport, but only as authen
 
 ### Risk Guard
 
-- **X Layer token discovery · free:** OKX Onchain OS catalog with X Layer-only enrichment and manual-address fallback.
-- **Contract evidence · free:** chain/block/code/balance/nonce reads, bytecode fingerprint, and common proxy detection.
-- **Token risk:** deterministic component scores and explicit limitations.
-- **Composite preflight:** PASS/WARN/FAIL report, grade, checklist, recommendations, and report identity.
-- **Transaction simulation:** network-scoped evidence that never broadcasts a transaction.
+- **Raw contract evidence · free:** an explicitly user-triggered selected-network RPC diagnostic. It is not the paid report and never runs automatically during report generation.
+- **Token Risk Guard · $0.20:** Grok synthesizes a scored due-diligence report from bounded provider evidence. X Layer on-chain facts come from authenticated OKX Onchain OS APIs; Base and Arbitrum on-chain facts come from Blockscout APIs. DexScreener supplies market/liquidity, declared website/X links, boosts, ads and community-promotion observations only.
+- **Project context:** PULSE fetches only a declared public HTTPS project website through a bounded SSRF-resistant reader. Missing, inaccessible or contradictory data remains an explicit unknown and reduces confidence.
+- **Report:** source coverage, lower-risk score, grade, PASS/WARN/FAIL verdict, contract/market/holder/project/promotion breakdown, critical risks, positive signals, unknowns, likely loss scenario and recommendation.
+- **Transaction simulation · free:** an optional, explicitly user-triggered selected-network diagnostic that never broadcasts a transaction.
+
+The paid path does not issue automatic RPC `eth_call` traffic. `BLOCKSCOUT_API_KEY` is an optional server-only setting for Base/Arbitrum rate limits; add it to Railway when available, never to Vercel browser variables.
 
 Catalog presence, price, liquidity, and market probability are evidence—not endorsement, fact, or a safety guarantee.
 
@@ -118,7 +120,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 - **Global Market:** live OKX crypto, xStocks/RWA instruments, candles, Opportunity Radar, and Base/Premium reports with Elliott-aware execution plans.
 - **Prediction Markets:** active crypto price/direction markets only, explicit single-market selection, order books, probability history, liquidity and evidence quality, followed by base or premium prediction analysis.
-- **Risk Guard:** network-scoped contract evidence and transaction simulation on every supported network; legacy heuristic scores remain clearly identified.
+- **Risk Guard:** free raw evidence and optional simulation are separate from the $0.20 Grok Token Risk report; the paid report uses OKX for X Layer on-chain evidence, Blockscout for Base/Arbitrum, and DexScreener for market/social/promotion evidence.
 - **Spot Trading:** connected-wallet Market, Limit, integrated TP/SL, route/balance checks, account discovery, and reconciled lifecycle dashboard.
 - **Autopilot:** separate owner-controlled vault capital, strategy presets, enforceable policy limits, autonomous Buy/Hold/Sell lifecycle, and shared dashboard semantics.
 - **Human web app:** one responsive Global Market / Prediction Market / Risk Guard / Spot Trading / Autopilot / Telegram / Docs workspace; persistent network selection; X Layer, Base, Arbitrum and Arc-specific themes; direct OKX Wallet preference plus EIP-6963/WalletConnect compatibility; balances, funding, payment progress, private report history, and readable reports.
@@ -154,7 +156,7 @@ The web UI uses the familiar **Base** and **Premium** tier labels. Public agent 
 | Global Pro → Spot Market or Limit | $0.30 |
 | Prediction Quick | $0.20 |
 | Prediction Pro | $0.30 |
-| Onchain Pre-Trade Risk Guard | $0.15 |
+| Token Risk Guard | $0.20 |
 
 ### Public Autopilot start services
 
@@ -708,17 +710,18 @@ Spot Trading and Autopilot are independent systems. A Spot report action never a
 │           ├── tradeAutomation.ts   deterministic Spot reconciliation/trigger worker
 │           ├── autopilotPolicy.ts   explicit entry, Hold and exit rule engine
 │           ├── autopilotAutomation.ts strategy/evidence/simulation/execution loop
+│           ├── tokenRiskEvidence.ts bounded OKX/Blockscout/DexScreener/project evidence
 │           ├── reportHistoryAuth.ts wallet challenge and scoped report recovery sessions
 │           ├── resilientKv.ts       bounded retry and recovering KV circuit
 │           ├── automationTick.ts    secret serverless scheduler entry and lease
 │           └── telegram.ts          webhook, checkout handoff and durable delivery
 ├── packages/
 │   ├── contracts/                   Solidity, artifacts, deployments, config and tests
-│   ├── analysis/                    structured Global/Prediction analysis and Elliott logic
+│   ├── analysis/                    structured Global/Prediction/Token Risk Grok analysis and Elliott logic
 │   ├── market/                      OKX and public Polymarket evidence clients
 │   ├── payments/                    OKX, CDP, Circle and mock x402 adapters
 │   ├── buyer/                       controlled x402 buyer utilities
-│   ├── domain/                      Risk Guard and deterministic preflight logic
+│   ├── domain/                      legacy compatibility heuristics and shared scoring helpers
 │   ├── schemas/                     versioned Zod API/report contracts
 │   ├── config/                      networks, feature gates, prices and metadata
 │   └── sdk/                         typed PULSE client and job polling

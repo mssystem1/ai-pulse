@@ -117,7 +117,7 @@ export function App() {
     "/v1/analysis/base": .20, "/v1/analysis/premium": .30,
     "/v1/analysis/spot/standard": .20, "/v1/analysis/spot/premium": .30,
     "/v1/analysis/prediction/standard": .20, "/v1/analysis/prediction/premium": .30,
-    "/v1/token/scan": .20, "/v1/preflight": .15,
+    "/v1/token/scan": .20, "/v1/preflight": .20,
   });
 
   const [wallet, setWallet] = useState<string | null>(null);
@@ -600,17 +600,16 @@ export function App() {
   }
 
   async function runSafety(kind: "token" | "preflight") {
+    const prefix = networkKey === "xlayer" ? "" : `/${network.route}`;
     if (kind === "token") {
-      await paidPost("/v1/token/scan", { address: tokenAddr, chainId: "196" }, "token");
+      await paidPost(`${prefix}/v1/token/scan`, { address: tokenAddr, lang }, "token");
     } else {
       await paidPost(
-        "/v1/preflight",
+        `${prefix}/v1/preflight`,
         {
-          intent: "swap",
+          intent: "generic",
           tokenAddress: tokenAddr,
-          toToken: tokenAddr,
-          fromToken: "0x0000000000000000000000000000000000000000",
-          amount: "1",
+          lang,
         },
         "preflight",
       );
@@ -665,6 +664,7 @@ export function App() {
   }
 
   const analysisReady = Boolean(result) && ["analysis_base", "analysis_premium", "spot_analysis_standard", "spot_analysis_premium"].includes(service);
+  const riskOnchainSource = networkKey === "xlayer" ? "OKX API" : networkKey === "base" || networkKey === "arbitrum" ? "Blockscout API" : "available indexed chain evidence";
   const experience = tab === "analyze"
     ? { title: "Global market intelligence", lead: "Explore every live OKX spot instrument—including crypto, xStocks and RWA—then choose Base or Premium analysis." }
     : tab === "prediction"
@@ -677,7 +677,7 @@ export function App() {
             ? { title: "PULSE in Telegram", lead: "Deliver paid Global and Prediction reports in chat without giving the bot custody." }
             : tab === "docs"
               ? { title: "Product documentation", lead: "Understand every workflow, safety boundary, network and production test." }
-              : { title: "Risk Guard", lead: `Discover tokens, verify contract evidence and simulate an exact transaction on ${network.label} before signing.` };
+              : { title: lang === "zh" ? "风险卫士" : "Risk Guard", lead: lang === "zh" ? `在 ${network.label} 上查看免费原始证据，或生成由多来源证据支持的 Grok 代币风险报告，再决定是否签名。` : `View free raw evidence or generate a multi-source Grok Token Risk report on ${network.label} before deciding whether to sign.` };
   const navigationTabs: Array<{ id: Tab; label: string; hint: string }> = [
     { id: "analyze", label: "Global Market", hint: "Research and reports" },
     { id: "prediction", label: "Prediction Market", hint: "Evidence and probabilities" },
@@ -922,14 +922,14 @@ export function App() {
             </>
           ) : (
             <>
-              <div className="section">RISK GUARD · {network.label}</div>
+              <div className="section">{lang === "zh" ? "风险卫士" : "RISK GUARD"} · {network.label}</div>
               <p className="lead" style={{ marginTop: 0 }}>
-                Check the exact network token and transaction before your wallet asks for a signature.
+                {lang === "zh" ? "先检查准确的链上代币，再决定是否签署交易。" : "Inspect the exact on-chain token before deciding whether to sign a transaction."}
               </p>
               <div className="safety-scope">
-                <div><span className="scope-dot" />Selected chain · {network.label}</div>
-                <strong>Identity → contract evidence → exact transaction simulation</strong>
-                <p>Risk Guard reads the selected chain directly. Missing ownership, audit or liquidity evidence remains unknown instead of becoming a fabricated score.</p>
+                <div><span className="scope-dot" />{lang === "zh" ? "已选网络" : "Selected chain"} · {network.label}</div>
+                <strong>{lang === "zh" ? "免费事实证据 → 付费代币风险报告 → 可选交易模拟" : "Free factual evidence → paid Token Risk report → optional transaction simulation"}</strong>
+                <p>{lang === "zh" ? `免费检查显示原始 RPC 事实。0.20 美元的报告使用 ${riskOnchainSource} 作为链上权威来源，并汇总 DexScreener 市场、项目网站、X 社交资料和推广证据，再由 Grok 给出可追溯评分。缺失证据保持未知。` : `The free check shows raw RPC facts. The $0.20 report uses ${riskOnchainSource} as its on-chain authority, adds DexScreener market, project-site, X-profile and promotion evidence, then Grok produces a traceable score. Missing evidence stays unknown.`}</p>
               </div>
               {!wallet && <p className="wallet-guidance">↑ {d.headerWalletHint}</p>}
               <div className="field" style={{ marginTop: 12 }}>
@@ -953,16 +953,23 @@ export function App() {
                   disabled={loading || health !== "ONLINE"}
                   onClick={() => void inspectContract()}
                 >
-                  {busyAction === "contract" ? d.loading : "Inspect token & contract evidence · Free"}
+                  {busyAction === "contract" ? d.loading : lang === "zh" ? "查看原始代币与合约证据 · 免费" : "View raw token & contract evidence · Free"}
+                </button>
+                <div className="paid-risk-card">
+                  <div><span>{lang === "zh" ? "完整尽调" : "FULL DUE DILIGENCE"}</span><strong>{lang === "zh" ? "代币风险报告" : "Token Risk report"}</strong><p>{lang === "zh" ? "市场与流动性、持币者、合约、项目网站、X 社交资料和推广活动，附来源覆盖、损失情景、评分与未知项。" : "Market/liquidity, holders, contract, project website, X profile and promotion activity—with source coverage, loss scenario, score and explicit unknowns."}</p></div>
+                  <b>$0.20 {network.payment.symbol}</b>
+                </div>
+                <button type="button" className="btn btn-primary full" disabled={loading || health !== "ONLINE" || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddr)} onClick={() => void runSafety("preflight")}>
+                  {busyAction === "preflight" ? d.loading : lang === "zh" ? "生成完整代币风险报告 · $0.20" : "Generate full Token Risk report · $0.20"}
                 </button>
                 <details className="raw-details">
-                  <summary>Exact transaction simulation · Free</summary>
+                  <summary>{lang === "zh" ? "可选：准确交易模拟 · 免费" : "Optional: exact transaction simulation · Free"}</summary>
                   <div className="field"><label htmlFor="simulation-data">Calldata</label><input id="simulation-data" className="mono" value={simulationData} onChange={(event) => setSimulationData(event.target.value)} placeholder="0x" /></div>
                   <div className="field"><label htmlFor="simulation-value">Native value (hex wei)</label><input id="simulation-value" className="mono" value={simulationValue} onChange={(event) => setSimulationValue(event.target.value)} placeholder="0x0" /></div>
                   <button type="button" className="btn btn-soft full" disabled={loading || health !== "ONLINE" || !wallet} onClick={() => void simulateTransaction()}>{busyAction === "simulate" ? d.loading : "Simulate without broadcasting"}</button>
                   <p className="hint">Uses the connected address as sender and the contract field as recipient. Success proves executability only—not safety or future inclusion.</p>
                 </details>
-                <div className="risk-guard-guide"><article><b>1 · Choose</b><span>Browse contracts available on {network.label}, or paste a verified address.</span></article><article><b>2 · Inspect</b><span>Read bytecode, ERC-20 identity, proxy observations and explicit unknowns.</span></article><article><b>3 · Simulate</b><span>Open Exact transaction simulation and test the real calldata without broadcasting.</span></article></div>
+                <div className="risk-guard-guide"><article><b>{lang === "zh" ? "1 · 选择" : "1 · Choose"}</b><span>{lang === "zh" ? `浏览 ${network.label} 代币或粘贴准确合约地址。` : `Browse ${network.label} tokens or paste the exact contract address.`}</span></article><article><b>{lang === "zh" ? "2 · 核实" : "2 · Verify"}</b><span>{lang === "zh" ? "先免费查看原始链上事实；需要综合判断时再购买完整报告。" : "Read raw on-chain facts for free; buy the full report when you need a synthesized decision."}</span></article><article><b>{lang === "zh" ? "3 · 决定" : "3 · Decide"}</b><span>{lang === "zh" ? "检查来源、评分、红旗和未知项；仅在需要时模拟准确 calldata。" : "Review sources, score, red flags and unknowns; simulate exact calldata only when needed."}</span></article></div>
               </div>
             </>
           )}

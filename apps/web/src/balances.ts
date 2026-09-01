@@ -64,7 +64,7 @@ export const PRICE_USDT0: Record<string, number> = {
   base: 0.20,
   premium: 0.30,
   token: 0.20,
-  preflight: 0.15,
+  preflight: 0.20,
 };
 
 export function assertUsdt0Enough(

@@ -44,7 +44,7 @@ PULSE turns live OKX Global Market and explicitly selected Polymarket evidence i
 | Global Pro → Spot Market or Limit | $0.30 | pair, timeframe, language, optional focus | Chart, Elliott paths and DeFi context, then a prefilled Agentic-Wallet-signed Spot Market or Limit order |
 | Prediction Quick | $0.20 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
 | Prediction Pro | $0.30 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
-| Onchain Pre-Trade Risk Guard | $0.15 | network, intent, token/transaction context | PASS/WARN/FAIL with live RPC evidence and explicit unknowns |
+| Token Risk Guard | $0.20 | network and exact token contract | Grok-scored due diligence from OKX/Blockscout on-chain facts plus DexScreener market, project, X-profile and promotion evidence |
 | Start Autopilot · 24h | $1.50 | owner, vault and six-step strategy setup | Agentic Wallet creates/configures/funds/registers the vault; x402 activates 24 active-runtime hours |
 | Start Autopilot · 7d | $10.50 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with seven active-runtime days |
 | Start Autopilot · 30d | $45.00 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with 30 active-runtime days |
@@ -76,7 +76,7 @@ The web and REST API also expose `GET /v1/xlayer/tokens` for chain-196 discovery
 2. Confirm `/healthz` reports `paymentMode: "okx"`, `hasOkxCredentials: true`, and `hasXaiKey: true`.
 3. Confirm `/v1/metadata` uses **PULSE**, the final HTTPS URLs, and the intended non-zero `payTo` address.
 4. Call a paid route without payment and inspect the HTTP 402 challenge.
-5. Confirm each advertised GET probe reports `input_required`, then complete one advertised paid POST replay (for example Risk Guard at $0.15) and retain `replayBody`, `PAYMENT-RESPONSE`, and the saved deliverable path.
+5. Confirm each advertised GET probe reports `input_required`, then complete one advertised paid POST replay (for example Token Risk Guard at $0.20) and retain `replayBody`, `PAYMENT-RESPONSE`, and the saved deliverable path.
 6. Verify `tools/list` and one free plus one paid `tools/call` through `/mcp`.
 7. Test the market picker, X Layer token catalog/manual input, report-preserving chart refresh, wallet drawer, balance guard, native OKB → USDT0 flow, and free contract inspector on desktop and mobile.
 8. Update the service URL on existing OKX Agent Identity #8355.

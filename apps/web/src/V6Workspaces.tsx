@@ -7411,7 +7411,7 @@ export function DocsWorkspace() {
             <span className="docs-number">03</span>
             <div className="docs-copy">
               <span className="eyebrow">RISK GUARD</span>
-              <h3>Check before execution—not after it</h3>
+              <h3>Separate raw evidence from a complete risk report</h3>
               <ol>
                 <li>
                   Select X Layer, Base, Arbitrum or Arc Testnet in Network &amp;
@@ -7422,11 +7422,16 @@ export function DocsWorkspace() {
                   contract address.
                 </li>
                 <li>
-                  Inspect live bytecode, proxy and ERC-20 interface evidence.
+                  View raw RPC contract evidence for free, or buy the $0.20
+                  Token Risk report for a sourced Grok assessment.
                 </li>
                 <li>
-                  For an exact action, expand simulation, provide calldata and
-                  simulate without broadcasting.
+                  The paid report uses OKX API on X Layer, Blockscout API on
+                  Base/Arbitrum and DexScreener for market, website, X-profile
+                  and promotion observations. It does not run automatic RPC calls.
+                </li>
+                <li>
+                  If you have exact calldata, optionally simulate it without broadcasting.
                 </li>
               </ol>
               <ul className="check-list">
@@ -7446,9 +7451,9 @@ export function DocsWorkspace() {
               </div>
               <i>→</i>
               <div>
-                <small>2 · LIVE EVIDENCE</small>
-                <b>Bytecode &amp; interface</b>
-                <span>Proxy and ERC-20 checks</span>
+                <small>2 · TOKEN RISK · $0.20</small>
+                <b>Provider evidence + Grok</b>
+                <span>Score · sources · risks · unknowns</span>
               </div>
               <i>→</i>
               <div>
@@ -8179,7 +8184,7 @@ export function DocsWorkspace() {
                 <div><b>Global Premium</b><span>$0.30 per report</span></div>
                 <div><b>Prediction Base</b><span>$0.20 per report</span></div>
                 <div><b>Prediction Premium</b><span>$0.30 per report</span></div>
-                <div><b>Pre-Trade Risk Guard</b><span>$0.15 per check</span></div>
+                <div><b>Token Risk Guard</b><span>$0.20 per report</span></div>
               </div>
               <div className="docs-callout">
                 <b>Report fee, trading capital and gas are separate</b>
@@ -8220,7 +8225,7 @@ export function DocsWorkspace() {
               <article><b>Global Pro → Spot Market or Limit</b><span>$0.30 В· deeper chart and Elliott plan, then Agentic Wallet execution</span></article>
               <article><b>Prediction Quick</b><span>$0.20 В· selected-market evidence</span></article>
               <article><b>Prediction Pro</b><span>$0.30 В· deeper evidence and 4H underlying chart</span></article>
-              <article><b>Risk Guard</b><span>$0.15 В· PASS/WARN/FAIL before signing</span></article>
+              <article><b>Token Risk Guard</b><span>$0.20 В· OKX/Blockscout + DexScreener evidence, Grok score</span></article>
               <article><b>Start Autopilot В· 24h</b><span>$1.50 В· six-step owner-wallet setup and active runtime</span></article>
               <article><b>Start Autopilot В· 7d</b><span>$10.50 В· same workflow for seven active-runtime days</span></article>
               <article><b>Start Autopilot В· 30d</b><span>$45.00 В· same workflow for 30 active-runtime days</span></article>

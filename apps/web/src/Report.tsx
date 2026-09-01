@@ -87,6 +87,7 @@ export function SafetyTokenReport({ data }: { data: AnyRec }) {
   const score = data.riskScore;
   const components = Array.isArray(data.components) ? (data.components as AnyRec[]) : [];
   const flags = Array.isArray(data.flags) ? (data.flags as string[]) : [];
+  const knownNumber = (value: unknown) => typeof value === "number" && Number.isFinite(value);
 
   return (
     <div className="sr">
@@ -106,10 +107,10 @@ export function SafetyTokenReport({ data }: { data: AnyRec }) {
           </div>
           <p className="sr-sub mono">{String(data.address || "")}</p>
           <div className="sr-meta">
-            <span>Liquidity ≈ ${Number(data.liquidityUsd || 0).toLocaleString()}</span>
-            <span>Holders ≈ {Number(data.holdersEstimate || 0).toLocaleString()}</span>
-            <span>Age ≈ {Number(data.contractAgeDays || 0)}d</span>
-            <span>{data.isVerified ? "Verified signal" : "Unverified"}</span>
+            <span>Liquidity {knownNumber(data.liquidityUsd) ? `$${Number(data.liquidityUsd).toLocaleString()}` : "unknown"}</span>
+            <span>Holders {knownNumber(data.holdersEstimate) ? Number(data.holdersEstimate).toLocaleString() : "unknown"}</span>
+            <span>Pair age {knownNumber(data.contractAgeDays) ? `${Number(data.contractAgeDays)}d` : "unknown"}</span>
+            <span>{data.isVerified === true ? "Source verified" : data.isVerified === false ? "Source unverified" : "Verification unknown"}</span>
           </div>
         </div>
       </div>
@@ -160,6 +161,11 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
   const score = data.overallScore;
   const checklist = Array.isArray(data.checklist) ? (data.checklist as AnyRec[]) : [];
   const recs = Array.isArray(data.recommendations) ? (data.recommendations as string[]) : [];
+  const intelligence = (data.intelligence || {}) as AnyRec;
+  const sources = Array.isArray(data.sourceCoverage) ? data.sourceCoverage as AnyRec[] : [];
+  const risks = Array.isArray(intelligence.criticalRisks) ? intelligence.criticalRisks as string[] : [];
+  const positives = Array.isArray(intelligence.positiveSignals) ? intelligence.positiveSignals as string[] : [];
+  const unknowns = Array.isArray(intelligence.unknowns) ? intelligence.unknowns as string[] : [];
 
   return (
     <div className="sr">
@@ -179,6 +185,27 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
           </div>
         </div>
       </div>
+
+      {String(data.summary || "") && <p className="sr-summary">{String(data.summary)}</p>}
+
+      {sources.length > 0 && <>
+        <div className="sr-section">Source coverage</div>
+        <div className="risk-source-grid">
+          {sources.map((source) => <div key={String(source.name)} className={`risk-source ${String(source.status)}`}><span>{String(source.status).replaceAll("_", " ")}</span><b>{String(source.name)}</b>{source.detail ? <small>{String(source.detail)}</small> : null}</div>)}
+        </div>
+      </>}
+
+      {(risks.length > 0 || positives.length > 0 || unknowns.length > 0) && <div className="risk-findings-grid">
+        <section><b>Critical risks</b><ul className="sr-list">{risks.length ? risks.map((item) => <li key={item}>{item}</li>) : <li>None observed in available evidence.</li>}</ul></section>
+        <section><b>Positive signals</b><ul className="sr-list">{positives.length ? positives.map((item) => <li key={item}>{item}</li>) : <li>No positive signal was strong enough to claim.</li>}</ul></section>
+        <section><b>Unknowns</b><ul className="sr-list">{unknowns.length ? unknowns.map((item) => <li key={item}>{item}</li>) : <li>No material unknown was returned.</li>}</ul></section>
+      </div>}
+
+      {data.mostLikelyLossScenario ? <div className="risk-loss-scenario"><span>Most likely loss scenario</span><strong>{String(data.mostLikelyLossScenario)}</strong></div> : null}
+      {Boolean(intelligence.projectAssessment || intelligence.promotionAssessment) && <div className="risk-assessment-grid">
+        <section><span>Project and website</span><p>{String(intelligence.projectAssessment || "Unknown")}</p></section>
+        <section><span>Social and promotion</span><p>{String(intelligence.promotionAssessment || "Unknown")}</p></section>
+      </div>}
 
       <div className="sr-section">Checklist</div>
       <div className="sr-checks">
@@ -209,7 +236,7 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
 
       {data.token != null && typeof data.token === "object" ? (
         <>
-          <div className="sr-section">Embedded token scan</div>
+          <div className="sr-section">Evidence-backed risk breakdown</div>
           <SafetyTokenReport data={data.token as AnyRec} />
         </>
       ) : null}

@@ -39,6 +39,10 @@ async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
 describe("PULSE API", () => {
   before(async () => {
     process.env.X402_MOCK = "1";
+    process.env.NODE_ENV = "test";
+    process.env.XAI_API_KEY = "";
+    process.env.PRICE_TOKEN_SCAN = "0.20";
+    process.env.PRICE_PREFLIGHT = "0.20";
     const cfg = {
       ...loadConfig(),
       X402_MOCK: true,
@@ -248,7 +252,7 @@ describe("PULSE API", () => {
     });
     assert.equal(res.status, 400);
     assert.equal(json.status, "input_required");
-    assert.match(json.validationErrors[0].message, /X Layer chain 196 only/);
+    assert.match(json.validationErrors[0].message, /Selected X Layer route requires chain 196/);
     assert.equal(res.headers.get("payment-required"), null);
   });
 

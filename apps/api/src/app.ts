@@ -28,7 +28,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit } from "@pulse/analysis";
+import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -42,6 +42,8 @@ import {
   marketPulse,
   resolveQuery,
   runPreflight,
+  scoreToGrade,
+  scoreToVerdict,
   scanToken,
   scanWallet,
   swapQuote,
@@ -79,6 +81,7 @@ import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryC
 import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } from "./resilientKv.js";
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
+import { collectTokenRiskEvidence } from "./tokenRiskEvidence.js";
 
 const AnalysisBodySchema = z.object({
   instId: z.string().min(3).max(32),
@@ -981,20 +984,26 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (!parsed.success) {
       return res.status(400).json(buildX402InputRequired("/v1/token/scan", parsed.error.issues));
     }
-    if ((parsed.data.chainId ?? "196") !== "196") {
+    const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+    const expectedChainId = String(getNetwork(key).chainId);
+    if (parsed.data.chainId && parsed.data.chainId !== expectedChainId) {
       return res.status(400).json(
         buildX402InputRequired("/v1/token/scan", [
-          { path: ["chainId"], message: "Token Risk Scan is available on X Layer chain 196 only." },
+          { path: ["chainId"], message: `Selected ${getNetwork(key).label} route requires chain ${expectedChainId}.` },
         ]),
       );
     }
-    req.body = parsed.data;
+    req.body = { ...parsed.data, chainId: expectedChainId };
     next();
   });
   app.post("/v1/preflight", (req, res, next) => {
     const parsed = PreflightRequestSchema.safeParse(req.body);
     if (!parsed.success)
       return res.status(400).json(buildX402InputRequired("/v1/preflight", parsed.error.issues));
+    const inspectedAddress = parsed.data.tokenAddress || parsed.data.toToken || parsed.data.fromToken;
+    if (!inspectedAddress) return res.status(400).json(buildX402InputRequired("/v1/preflight", [
+      { path: ["tokenAddress"], message: "Risk Guard requires the exact token contract address." },
+    ]));
     const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
     req.body = { ...parsed.data, chainId: String(getNetwork(key).chainId) };
     next();
@@ -1648,12 +1657,85 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const mv = cfg.methodologyVersion;
 
-  app.post("/v1/token/scan", (req, res) => {
+  const buildPaidTokenRisk = async (req: express.Request, address: string, lang: "en" | "zh") => {
+    const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+    const network = getNetwork(key);
+    const evidence = cfg.NODE_ENV === "test"
+      ? { observedAt: new Date().toISOString(), network: { key, label: network.label, chainId: String(network.chainId) }, tokenAddress: address.toLowerCase(), sources: [{ source: key === "xlayer" ? "OKX Onchain OS" : "Blockscout API", status: "observed", data: { testFixture: true } }], onchainAuthority: key === "xlayer" ? "OKX Onchain OS API" : "Blockscout API", sourcePolicy: "Test fixture" }
+      : await collectTokenRiskEvidence({ cfg, networkKey: key, network, address });
+
+    let ai: Awaited<ReturnType<typeof runGrokTokenRiskAnalysis>> | null = null;
+    if (cfg.hasXaiKey) {
+      ai = await observeProvider("xai", "token_risk", () => runGrokTokenRiskAnalysis(grokCfg, { evidence, lang, maxOutputTokens: cfg.GROK_MAX_OUTPUT_STANDARD }));
+      if (ai.usage) {
+        const cost = estimateAiCostUsd(cfg, ai.usage);
+        recordAiUsage(ai.usage.promptTokens, ai.usage.completionTokens, cost, ai.usage.cachedTokens, 0);
+      }
+    } else if (cfg.NODE_ENV !== "test") {
+      throw new Error("XAI_API_KEY is required for the paid Token Risk report");
+    }
+
+    const fixtureScan = cfg.NODE_ENV === "test" ? scanToken(address, String(network.chainId), mv) : null;
+    const analysis = ai?.analysis || {
+      headline: `TEST FIXTURE · ${fixtureScan?.symbol || "Token"} token risk`, summary: "Deterministic test-only report; production requires Grok and live source collection.",
+      riskScore: fixtureScan?.riskScore || 0, confidence: 0,
+      components: (fixtureScan?.components || []).slice(0, 5).map((component, index) => ({ ...component, key: ["contract", "market", "holders", "project", "promotion"][index] || component.key, evidence: ["Test fixture"] })),
+      criticalRisks: fixtureScan?.flags || [], positiveSignals: [], unknowns: ["Live sources are disabled in the test fixture"],
+      mostLikelyLossScenario: "Not evaluated in fixture mode.", recommendedAction: "Do not use fixture output for a real transaction.", maxExposurePct: 0,
+      projectAssessment: "Not evaluated.", promotionAssessment: "Not evaluated.", disclaimer: "TEST FIXTURE · NFA / DYOR",
+    };
+    const score = Math.round(analysis.riskScore * 10) / 10;
+    const verdict = scoreToVerdict(score);
+    const grade = scoreToGrade(score);
+    const evidenceSources = evidence.sources as Array<{ source: string; status: string; error?: string; data?: unknown }>;
+    const sources = evidenceSources.map((source) => ({ name: source.source, status: source.status, detail: source.error || null }));
+    const sourceData = (name: string) => evidenceSources.find((source) => source.source === name)?.data;
+    const pairs = (sourceData("DexScreener pairs") || []) as Array<Record<string, unknown>>;
+    const pair = pairs[0] || {};
+    const pairToken = (pair.token || {}) as Record<string, unknown>;
+    const okxTokens = (sourceData("OKX Onchain OS") || []) as Array<Record<string, unknown>>;
+    const okxToken = okxTokens[0] || {};
+    const blockToken = (sourceData("Blockscout token") || {}) as Record<string, unknown>;
+    const verifiedContract = (sourceData("Blockscout verified contract") || {}) as Record<string, unknown>;
+    const liquidityUsd = Number(((pair.liquidity as Record<string, unknown> | undefined)?.usd) ?? okxToken.liquidityUsd);
+    const holders = Number(blockToken.holders ?? okxToken.holders);
+    const pairCreatedAt = Number(pair.pairCreatedAt);
+    const ageDays = Number.isFinite(pairCreatedAt) && pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 86_400_000)) : null;
+    const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "1" | "56" | "137" | "8453" | "42161", lang }, mv);
+    const token = {
+      service: "token_scan", methodology_version: mv, chainId: String(network.chainId), address: address.toLowerCase(),
+      symbol: String(blockToken.symbol || okxToken.symbol || pairToken.symbol || fixtureScan?.symbol || "Unknown"),
+      name: String(blockToken.name || okxToken.name || pairToken.name || fixtureScan?.name || "Unknown token"),
+      riskScore: score, grade, verdict,
+      components: analysis.components.map(({ evidence: _evidence, ...component }) => component), flags: analysis.criticalRisks,
+      liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
+      holdersEstimate: Number.isFinite(holders) ? holders : null,
+      contractAgeDays: ageDays,
+      isVerified: typeof verifiedContract.isVerified === "boolean" ? verifiedContract.isVerified : null,
+      limitations: [...analysis.unknowns, analysis.disclaimer],
+      intelligence: analysis, generatedAt: new Date().toISOString(),
+    };
+    return {
+      service: "preflight" as const, serviceName: "PULSE Token Risk Guard", methodology_version: mv,
+      intent: "token_due_diligence", chainId: String(network.chainId), networkKey: key, network: network.caip2,
+      address: address.toLowerCase(), overallScore: score, riskScore: score, grade, verdict, headline: analysis.headline,
+      summary: analysis.summary, confidence: analysis.confidence,
+      checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
+      token, intelligence: analysis, recommendations: [analysis.recommendedAction], mostLikelyLossScenario: analysis.mostLikelyLossScenario,
+      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + DexScreener market/social/promotion + bounded project website + Grok synthesis; no automatic RPC eth_call",
+      analysisProfile: { mode: ai ? "live" : "fixture", model: ai?.model || "fixture", reasoningEffort: ai ? "low" : "none" },
+      aiUsage: ai?.usage, shareId: legacy.shareId, limitations: analysis.unknowns, generatedAt: new Date().toISOString(),
+    };
+  };
+
+  app.post("/v1/token/scan", async (req, res) => {
     try {
       const body = TokenScanRequestSchema.parse(req.body);
-      res.json(scanToken(body.address, body.chainId ?? "196", mv));
+      const report = await buildPaidTokenRisk(req, body.address, body.lang);
+      saveReport(report);
+      res.json({ ...report.token, report });
     } catch (e) {
-      res.status(400).json({ error: String(e) });
+      res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });
     }
   });
 
@@ -1687,19 +1769,13 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.post("/v1/preflight", async (req, res) => {
     try {
       const body = PreflightRequestSchema.parse(req.body);
-      const report = runPreflight(body, mv);
-      const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
-      const network = getNetwork(key);
       const inspectedAddress = body.tokenAddress || body.toToken || body.fromToken;
-      const liveEvidence = inspectedAddress
-        ? await collectLiveContractEvidence({ rpcUrl: configuredRpcUrls(key), address: inspectedAddress, expectedChainHex: `0x${network.chainId.toString(16)}`, chainId: String(network.chainId), network: `${network.label} ${network.environment}` })
-            .catch((error) => ({ evidenceStatus: "unavailable", safetyVerdict: "unknown", error: error instanceof Error ? error.message : String(error) }))
-        : { evidenceStatus: "not-requested", safetyVerdict: "unknown" };
-      const guardedReport = { ...report, serviceName: "Onchain Pre-Trade Risk Guard", networkKey: key, network: network.caip2, evidenceMethod: "live RPC evidence plus deterministic bounded heuristics", liveEvidence };
-      saveReport(guardedReport);
-      res.json(guardedReport);
+      if (!inspectedAddress) return res.status(400).json({ error: "Risk Guard requires an exact token contract address" });
+      const report = await buildPaidTokenRisk(req, inspectedAddress, body.lang);
+      saveReport(report);
+      res.json(report);
     } catch (e) {
-      res.status(400).json({ error: String(e) });
+      res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });
     }
   });
 

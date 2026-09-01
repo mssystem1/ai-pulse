@@ -48,6 +48,8 @@ The current Circle Console template editor labels its OTP variables `{{code}}` a
 
 `OKX_BASE_URL` is the Exchange OS API origin. DEX quote/swap calls use the documented four authentication headers derived from the existing API key, secret, and passphrase; no separate project-ID environment variable is required. `OKX_FACILITATOR_URL` is independently configurable for x402 verify/settle routing; both origins currently default to `https://web3.okx.com`. A facilitator failure is not proof that the credentials are invalid: DEX and x402 are separate OKX services, so inspect the exact route, signed path, request body, network, and SDK response.
 
+`BLOCKSCOUT_API_KEY` is an optional server-only key used by the paid Token Risk Guard on Base and Arbitrum. Without it PULSE uses Blockscout's public limits and reports rate-limited sources as unavailable. Set it on Railway when available; never expose it as a `VITE_*` browser variable. The paid report uses OKX indexed APIs on X Layer and Blockscout indexed APIs on Base/Arbitrum for on-chain facts. It does not automatically execute RPC `eth_call`; the free raw contract inspector remains a separate user-triggered diagnostic.
+
 ## Network activation model
 
 `ENABLED_NETWORKS` is the server allowlist. `VITE_ENABLED_NETWORKS` is the public web-build allowlist. Supported values are:
@@ -181,12 +183,12 @@ The environment contains several price classes. Eight rows are public on X Layer
 ```env
 PRICE_ANALYSIS_BASE=0.20
 PRICE_ANALYSIS_PREMIUM=0.30
-PRICE_PREFLIGHT=0.15
+PRICE_PREFLIGHT=0.20
 PRICE_ANALYSIS_PREDICTION_STANDARD=0.20
 PRICE_ANALYSIS_PREDICTION_PREMIUM=0.30
 ```
 
-These are Global Market Quick/Pro, Prediction Market Quick/Pro, and Onchain Pre-Trade Risk Guard. They must remain wired to REST routes, browser pre-sign checks, MCP/SDK metadata, and marketplace replay.
+These are Global Market Quick/Pro, Prediction Market Quick/Pro, and the $0.20 Token Risk Guard. Risk Guard must remain wired to REST, the browser, MCP/SDK metadata and marketplace replay. Its X Layer on-chain source is OKX API; its Base/Arbitrum source is Blockscout API; DexScreener supplies market/social/promotion evidence; Grok performs the final scored synthesis.
 
 ### Public Autopilot start services
 

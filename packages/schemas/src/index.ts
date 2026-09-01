@@ -159,6 +159,7 @@ export const ResolveRequestSchema = z.object({
 export const TokenScanRequestSchema = z.object({
   address: AddressSchema,
   chainId: ChainIdSchema.optional(),
+  lang: z.enum(["en", "zh"]).default("en"),
 });
 
 export const WalletScanRequestSchema = z.object({
@@ -192,6 +193,7 @@ export const PreflightRequestSchema = z.object({
   amount: z.string().optional(),
   chainId: ChainIdSchema.optional(),
   notes: z.string().max(500).optional(),
+  lang: z.enum(["en", "zh"]).default("en"),
 });
 
 export const RiskGradeSchema = z.enum(["A", "B", "C", "D", "F"]);

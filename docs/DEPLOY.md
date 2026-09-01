@@ -70,6 +70,7 @@ Before either deployment, prepare:
 - an Upstash database dedicated to production;
 - a private Vercel Blob store, or the documented encrypted-public-store fallback;
 - production OKX, xAI, CDP/Circle and Telegram credentials required by enabled features;
+- a Blockscout API key for production Base/Arbitrum Token Risk reports (public rate limits remain a best-effort fallback until the key is added);
 - the already deployed and verified PULSE contract addresses for each enabled chain;
 - a dedicated automation signer whose address has the required on-chain roles and native gas.
 
@@ -96,6 +97,9 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=4000
 BASE_URL=https://api.example.com
+
+# Server-only Token Risk provider key. Optional during initial setup, recommended before public Base/Arbitrum traffic.
+BLOCKSCOUT_API_KEY=<BLOCKSCOUT_API_KEY>
 
 X402_MOCK=0
 ENABLE_SERVER_PAY=0
@@ -124,6 +128,8 @@ AUTOPILOT_AI_MAX_USD_GLOBAL_DAY=2.00
 PRICE_AUTOPILOT_PASS_24H=1.50
 PRICE_AUTOPILOT_PASS_7D=10.50
 PRICE_AUTOPILOT_PASS_30D=45.00
+PRICE_PREFLIGHT=0.20
+PRICE_TOKEN_SCAN=0.20
 ```
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
@@ -139,6 +145,7 @@ verify any override against the intended chain before deployment.
 Important Railway rules:
 
 - Do not set any private value with a `VITE_` prefix.
+- Keep `BLOCKSCOUT_API_KEY` on Railway only. Vercel does not need it because the web build calls the Railway API.
 - Do not deploy `TEST_WALLET_PRIVATE_KEY`, even when the test wallet was used for local mainnet acceptance.
 - Keep `ENABLE_SERVER_PAY=0`; production users sign payment and trading transactions in their own wallets.
 - Keep `X402_MOCK=0`.

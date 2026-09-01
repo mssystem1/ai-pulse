@@ -100,7 +100,7 @@ const routeInputs: Record<string, RouteInputDefinition> = {
     ],
   },
   "/v1/token/scan": {
-    message: "Provide the X Layer token contract address to scan.",
+    message: "Provide the exact token contract address on the selected payment-network route.",
     requiredArgs: ["address"],
     requiredAnyOf: ["address"],
     fields: [
@@ -110,7 +110,7 @@ const routeInputs: Record<string, RouteInputDefinition> = {
         type: "string",
         required: true,
         pattern: EVM_ADDRESS_PATTERN,
-        description: "EVM token contract address on X Layer.",
+        description: "Exact EVM token contract address on the selected network.",
       },
       {
         name: "chainId",
@@ -118,13 +118,16 @@ const routeInputs: Record<string, RouteInputDefinition> = {
         type: "string",
         required: false,
         default: "196",
-        enum: ["196"],
-        description: "X Layer chain ID. PULSE token safety is scoped to chain 196.",
+        enum: ["196", "8453", "42161"],
+        description: "Chain ID must match the selected X Layer, Base or Arbitrum route.",
       },
+      { name: "lang", carrier: "body", type: "string", required: false, default: "en", enum: ["en", "zh"], description: "Report language." },
     ],
   },
   "/v1/preflight": {
-    message: "Provide the intended X Layer action and any available trade context.",
+    message: "Provide the exact token contract address for the paid Token Risk Guard report.",
+    requiredArgs: ["tokenAddress"],
+    requiredAnyOf: ["tokenAddress", "toToken", "fromToken"],
     fields: [
       {
         name: "intent",
@@ -140,7 +143,7 @@ const routeInputs: Record<string, RouteInputDefinition> = {
           name,
           carrier: "body",
           type: "string",
-          required: false,
+          required: name === "tokenAddress",
           pattern: EVM_ADDRESS_PATTERN,
           description: `${name} EVM address when relevant.`,
         }),
@@ -158,8 +161,8 @@ const routeInputs: Record<string, RouteInputDefinition> = {
         type: "string",
         required: false,
         default: "196",
-        enum: ["196"],
-        description: "X Layer chain ID.",
+        enum: ["196", "8453", "42161"],
+        description: "Chain ID is derived from and must match the selected payment-network route.",
       },
       {
         name: "notes",
@@ -372,6 +375,7 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
         aiPass: { type: "object", description: "Vault-bound duration, expiry, remaining compact confirmations and pause-aware runtime state." },
         behavior: { type: "object", description: "New-entry and expiry behavior. Agentic Wallet still owns resume/start and every later state change." },
       },
+      { name: "lang", carrier: "body", type: "string", required: false, default: "en", enum: ["en", "zh"], description: "Report language." },
     } } : {}),
   };
 }
