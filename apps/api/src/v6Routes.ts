@@ -156,10 +156,12 @@ export function createV6Router(cfg: AppConfig) {
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
     const aliases = executionAssetAliases(baseSymbol, chain.chainId);
     try {
-      const [baseCandidates, quoteCandidates] = await Promise.all([
-        getOkxTradeTokens(cfg, chain.chainId, baseSymbol, 100),
+      const [baseCandidateGroups, quoteCandidates] = await Promise.all([
+        Promise.all(aliases.map((alias) => getOkxTradeTokens(cfg, chain.chainId, alias, 100))),
         getOkxTradeTokens(cfg, chain.chainId, settlementSymbol, 100),
       ]);
+      const baseCandidates = baseCandidateGroups.flat()
+        .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
       const baseOptions = aliases.flatMap((alias) => baseCandidates.filter((token) => token.symbol.toUpperCase() === alias))
         .filter((token) => !erc20Custody || token.address.toLowerCase() !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
         .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);

@@ -324,6 +324,8 @@ A split web/API/worker deployment is supported operationally, but it is not requ
 
 Analysis coverage and on-chain executability are intentionally separate. Every valid OKX Global Market instrument may be analyzed, including crypto, xStocks, and RWA products. Spot or Autopilot is enabled only after a second pipeline resolves an identity-safe token representation and verifies a live route on the selected execution network.
 
+The explicit Base mappings include Coinbase-wrapped `cbBTC`, `cbDOGE`, `cbXRP`, `cbLTC`, `cbADA`, `cbZEC`, and `cbHYPE`. The current Coinbase Tokenized Stock set maps OKX `XNVDA`, `XMETA`, `XAAPL`, and `XGOOGL` analysis instruments to `NVDAc`, `METAc`, `AAPLc`, and `GOOGLc` on Base. Every mapping still requires an amount-sized live OKX Onchain OS quote before Spot or Autopilot can use it. PAXG and XAUT remain analysis-only until an identity-safe token plus settlement route is verified on the selected execution network.
+
 ```mermaid
 flowchart LR
   PICK[Selected pair and timeframe] --> OKXDATA[OKX instrument, ticker and OHLCV]

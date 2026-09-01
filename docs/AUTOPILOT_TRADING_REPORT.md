@@ -143,7 +143,7 @@ The opportunity prefilter scanned 16 OKX pairs across 15m and 1H and additionall
 
 ### Qualified candidate found on 2026-08-25
 
-The expanded scan tested high-volume gainers and changed timeframes as requested. `HYPE-USDT 4H` produced a valid Trend Following Buy, but PULSE correctly rejected it for execution because no identity-safe HYPE representation plus settlement route exists on X Layer, Base or Arbitrum. The analysis remains useful; the unsupported asset is not silently substituted.
+The expanded scan tested high-volume gainers and changed timeframes as requested. `HYPE-USDT 4H` produced a valid Trend Following Buy, but PULSE correctly rejected it at the time because no identity-safe HYPE representation plus settlement route existed on X Layer, Base or Arbitrum. Coinbase later launched `cbHYPE` on Base; the current resolver maps `HYPE-USDT` to `cbHYPE/USDC` only after a fresh OKX Onchain OS quote succeeds. The historical Hold was correct for the evidence available during this run.
 
 `SOL-USDT 1D` then produced a fresh Premium bullish report with 60% confidence and a `trend_up` regime. X Layer independently resolved the live execution pair as `SOL/USDT0`. The test-wallet preflight found `2.630502 USDT0`, `0.002823311971309224 OKB`, no existing X Layer Autopilot vault and a live SOL/USDT0 route.
 

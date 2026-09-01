@@ -7526,6 +7526,14 @@ export function DocsWorkspace() {
                 identity-safe representation exists, PULSE checks the other
                 supported networks and does not invent one.
               </p>
+              <p>
+                Current Base routes include ZEC to cbZEC, HYPE to cbHYPE, and
+                the OKX XNVDA, XMETA, XAAPL and XGOOGL analysis instruments to
+                Coinbase&apos;s NVDAc, METAc, AAPLc and GOOGLc tokens. Each one
+                remains disabled until its exact USDC route passes a fresh
+                quote. PAXG and XAUT are analysis-only while no verified route
+                exists on X Layer, Base or Arbitrum.
+              </p>
               <div className="docs-order-types">
                 <article>
                   <b>Market</b>

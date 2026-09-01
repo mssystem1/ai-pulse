@@ -44,4 +44,6 @@ test("localizes reports, recovery, docs and Autopilot runtime copy", () => {
   assert.equal(localizeUiText("zh", "Choose directly. A prepaid pass supplies compact AI entry confirmation only after the free technical gate passes."), "可直接选择。只有通过免费技术门槛后，预付通行证才会提供精简 AI 入场确认。");
   assert.equal(localizeUiText("zh", "connect to check"), "连接钱包后查看");
   assert.match(localizeUiText("zh", "The same eight services are advertised under the selected network prefix with typed schemas. Agentic Wallet signs Spot and Autopilot contract calls; payment uses native USDC."), /八项服务/);
+  const routeCoverage = "Current Base routes include ZEC to cbZEC, HYPE to cbHYPE, and the OKX XNVDA, XMETA, XAAPL and XGOOGL analysis instruments to Coinbase's NVDAc, METAc, AAPLc and GOOGLc tokens. Each one remains disabled until its exact USDC route passes a fresh quote. PAXG and XAUT are analysis-only while no verified route exists on X Layer, Base or Arbitrum.";
+  assert.notEqual(localizeUiText("zh", routeCoverage), routeCoverage);
 });
