@@ -604,6 +604,13 @@ const erc20Abi = [
   },
   {
     type: "function",
+    name: "name",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "string" }],
+  },
+  {
+    type: "function",
     name: "decimals",
     stateMutability: "view",
     inputs: [],
@@ -676,7 +683,7 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
     signature: input.authorization.signature as `0x${string}`,
   });
   if (!signatureValid) throw new Error("Invalid connected-wallet authorization");
-  const [owner, settlement, policyHash, allowed, factoryVaults, targetSymbol, settlementSymbol] = await publicClient.multicall({ contracts: [
+  const [owner, settlement, policyHash, allowed, factoryVaults, targetSymbol, settlementSymbol, targetName, settlementName] = await publicClient.multicall({ contracts: [
     { address, abi: vaultReadAbi, functionName: "owner" },
     { address, abi: vaultReadAbi, functionName: "settlementAsset" },
     { address, abi: vaultReadAbi, functionName: "policyHash" },
@@ -684,6 +691,8 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
     { address: factory as `0x${string}`, abi: vaultFactoryAbi, functionName: "vaultsOf", args: [input.owner as `0x${string}`] },
     { address: input.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
     { address: input.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
+    { address: input.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
+    { address: input.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
   ], allowFailure: false });
   if (
     owner.toLowerCase() !== input.owner.toLowerCase() ||
@@ -696,8 +705,8 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
   if (!factoryVaults.some((vault) => vault.toLowerCase() === input.vault.toLowerCase()))
     throw new Error("Vault was not created by the configured Autopilot factory");
   const [base, quote, extra] = input.pair.toUpperCase().split("-");
-  const normalizeForChain = (symbol: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[input.network].id)));
-  if (!base || !quote || extra || normalizeForChain(targetSymbol) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol) !== normaliseRouteSymbol(quote))
+  const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[input.network].id), name));
+  if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
     throw new Error(`On-chain tokens ${targetSymbol}/${settlementSymbol} do not match ${input.pair}`);
   if (keccak256(toHex(JSON.stringify(input.policy))) !== policyHash)
     throw new Error(
@@ -729,14 +738,16 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         publicClient.multicall({ allowFailure: false, contracts: [
           { address: targetAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
           { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
+          { address: targetAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
+          { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
         ] }),
       ]);
       if (!settlementCode || settlementCode === "0x" || !targetCode || targetCode === "0x")
         throw new Error("The selected Autopilot route contains a non-contract token representation");
-      const [targetSymbol, settlementSymbol] = metadata.map(String);
+      const [targetSymbol, settlementSymbol, targetName, settlementName] = metadata.map(String);
       const [base, quote, extra] = pair.toUpperCase().split("-");
-      const normalizeForChain = (symbol: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[network].id)));
-      if (!base || !quote || extra || normalizeForChain(targetSymbol) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol) !== normaliseRouteSymbol(quote))
+      const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[network].id), name));
+      if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
         throw new Error(`Contract route ${targetSymbol}/${settlementSymbol} does not represent ${pair}`);
       await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic, slippagePercent: "1.5" });
       res.json({ ready: true, pair, executionPair: `${targetSymbol}/${settlementSymbol}`, targetAsset, settlementAsset });

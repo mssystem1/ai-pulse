@@ -117,10 +117,10 @@ const ownerAbi = [{
   type: "function", name: "owner", stateMutability: "view", inputs: [],
   outputs: [{ name: "", type: "address" }],
 }] as const;
-const erc20MetadataAbi = [{
-  type: "function", name: "symbol", stateMutability: "view", inputs: [],
-  outputs: [{ name: "", type: "string" }],
-}] as const;
+const erc20MetadataAbi = [
+  { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "string" }] },
+  { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ name: "", type: "string" }] },
+] as const;
 const erc20DecimalsAbi = [{ type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] }] as const;
 const positionClosedEventAbi = [{
   type: "event", name: "PositionClosed",
@@ -234,6 +234,17 @@ async function readTokenSymbol(
   });
   if (!symbol || symbol.length > 32) throw new Error("Token has invalid ERC-20 metadata");
   return symbol;
+}
+async function readTokenMetadata(
+  publicClient: ReturnType<typeof clients>["publicClient"],
+  token: `0x${string}`,
+) {
+  const [symbol, name] = await publicClient.multicall({ allowFailure: false, contracts: [
+    { address: token, abi: erc20MetadataAbi, functionName: "symbol" },
+    { address: token, abi: erc20MetadataAbi, functionName: "name" },
+  ] });
+  if (!symbol || symbol.length > 32 || !name || name.length > 128) throw new Error("Token has invalid ERC-20 metadata");
+  return { symbol, name };
 }
 async function kv(command: unknown[]) {
   return runKvCommand(command, "trade automation");
@@ -416,18 +427,20 @@ async function verifyRegistration(input: z.infer<typeof schema>) {
     state !== 1
   ) throw new Error("Registered order does not match an active on-chain order");
 
-  const [sellSymbol, buySymbol] = await Promise.all([
-    readTokenSymbol(publicClient, actualSell as `0x${string}`),
-    readTokenSymbol(publicClient, actualBuy as `0x${string}`),
+  const [sellMetadata, buyMetadata] = await Promise.all([
+    readTokenMetadata(publicClient, actualSell as `0x${string}`),
+    readTokenMetadata(publicClient, actualBuy as `0x${string}`),
   ]);
+  const { symbol: sellSymbol, name: sellName } = sellMetadata;
+  const { symbol: buySymbol, name: buyName } = buyMetadata;
   const [pairBase, pairQuote, extra] = input.instId.toUpperCase().split("-");
   if (!pairBase || !pairQuote || extra) throw new Error("Instrument must be BASE-QUOTE");
   const triggerAbove = input.version === "bracket-v1" ? Boolean(record[12]) : Boolean(record[9]);
   const expected = input.version === "oco-v1" || triggerAbove
     ? [pairBase, pairQuote]
     : [pairQuote, pairBase];
-  const normalizeForChain = (symbol: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(networks[input.network].id)));
-  if (normalizeForChain(sellSymbol) !== normaliseRouteSymbol(expected[0]) || normalizeForChain(buySymbol) !== normaliseRouteSymbol(expected[1]))
+  const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(networks[input.network].id), name));
+  if (normalizeForChain(sellSymbol, sellName) !== normaliseRouteSymbol(expected[0]) || normalizeForChain(buySymbol, buyName) !== normaliseRouteSymbol(expected[1]))
     throw new Error(`On-chain tokens ${sellSymbol}/${buySymbol} do not match ${input.instId}`);
   const executionPair = input.version === "oco-v1" || triggerAbove
     ? `${sellSymbol}-${buySymbol}`

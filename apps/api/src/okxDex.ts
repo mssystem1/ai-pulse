@@ -429,15 +429,20 @@ const EXECUTION_ASSET_ALIASES: Record<string, Record<string, string[]>> = {
   },
 };
 
-export function executionAssetAliases(symbol: string, chainId: string) {
+export function executionAssetAliases(symbol: string, chainId: string, assetClass?: "crypto" | "tokenized_stock" | "tokenized_etf" | "rwa") {
   const normalized = symbol.trim().toUpperCase();
+  const xStock = (chainId === "196" || chainId === "42161")
+    && (assetClass === "tokenized_stock" || assetClass === "tokenized_etf")
+    && normalized.startsWith("X") && normalized.length > 1
+    ? [`${normalized.slice(1)}X`]
+    : [];
   const official = (OFFICIAL_WRAPPED_ASSETS[chainId] || [])
     .map((item) => String(item.tokenSymbol || "").toUpperCase())
     .filter((candidate) => candidate === normalized || candidate === `CB${normalized}` || candidate === `W${normalized}`);
-  return [...new Set([...(EXECUTION_ASSET_ALIASES[chainId]?.[normalized] || []), ...official, normalized])];
+  return [...new Set([...(EXECUTION_ASSET_ALIASES[chainId]?.[normalized] || []), ...xStock, ...official, normalized])];
 }
 
-export function analysisSymbolForExecutionToken(symbol: string, chainId?: string) {
+export function analysisSymbolForExecutionToken(symbol: string, chainId?: string, tokenName?: string) {
   const normalized = symbol.trim().toUpperCase().replaceAll("₮", "T").replace(/\.E$/, "");
   for (const [analysis, aliases] of Object.entries(EXECUTION_ASSET_ALIASES[chainId || ""] || {}))
     if (aliases.includes(normalized)) return analysis;
@@ -445,8 +450,26 @@ export function analysisSymbolForExecutionToken(symbol: string, chainId?: string
     .map((item) => String(item.tokenSymbol || "").toUpperCase());
   if (official.includes(normalized) && normalized.startsWith("CB") && normalized.length > 2)
     return normalized.slice(2);
+  if ((chainId === "196" || chainId === "42161") && /xstock/i.test(tokenName || "") && normalized.endsWith("X") && normalized.length > 1)
+    return `X${normalized.slice(0, -1)}`;
   if (normalized === "USDBC") return "USDC";
   return normalized;
+}
+
+export function executionSymbolRepresentsAnalysis(
+  executionSymbol: string,
+  analysisSymbol: string,
+  chainId: string,
+  assetClass?: "crypto" | "tokenized_stock" | "tokenized_etf" | "rwa",
+  tokenName?: string,
+) {
+  const execution = executionSymbol.trim().toUpperCase();
+  const analysis = analysisSymbol.trim().toUpperCase();
+  return (chainId === "196" || chainId === "42161")
+    && (assetClass === "tokenized_stock" || assetClass === "tokenized_etf")
+    && /xstock/i.test(tokenName || "")
+    && analysis.startsWith("X") && analysis.length > 1
+    && execution === `${analysis.slice(1)}X`;
 }
 
 /** Chain-specific token contracts supported by OKX Onchain OS swap routing. */

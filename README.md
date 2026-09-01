@@ -324,7 +324,11 @@ A split web/API/worker deployment is supported operationally, but it is not requ
 
 Analysis coverage and on-chain executability are intentionally separate. Every valid OKX Global Market instrument may be analyzed, including crypto, xStocks, and RWA products. Spot or Autopilot is enabled only after a second pipeline resolves an identity-safe token representation and verifies a live route on the selected execution network.
 
-The explicit Base mappings include Coinbase-wrapped `cbBTC`, `cbDOGE`, `cbXRP`, `cbLTC`, `cbADA`, `cbZEC`, and `cbHYPE`. The current Coinbase Tokenized Stock set maps OKX `XNVDA`, `XMETA`, `XAAPL`, and `XGOOGL` analysis instruments to `NVDAc`, `METAc`, `AAPLc`, and `GOOGLc` on Base. Every mapping still requires an amount-sized live OKX Onchain OS quote before Spot or Autopilot can use it. PAXG and XAUT remain analysis-only until an identity-safe token plus settlement route is verified on the selected execution network.
+The explicit Base mappings include Coinbase-wrapped `cbBTC`, `cbDOGE`, `cbXRP`, `cbLTC`, `cbADA`, `cbZEC`, and `cbHYPE`. The current [Base tokenized-stock set](https://brand.base.org/stocks) maps OKX `XNVDA`, `XMETA`, `XAAPL`, and `XGOOGL` analysis instruments to `NVDAc`, `METAc`, `AAPLc`, and `GOOGLc` on Base.
+
+On X Layer and Arbitrum, PULSE resolves the live OKX category-3 `X<ticker>` analysis symbol to the exact `<ticker>x` execution token only when the OKX chain catalog identifies that contract as an xStock. This follows the [OKX Unified Tokenized Stock](https://www.okx.com/en-gb/help/okx-to-list-unified-tokenized-stocks-xibm-xhood-and-more-for-spot-trading) and [xStocks multichain](https://docs.xstocks.fi/docs) naming model without treating ordinary crypto symbols ending in `X` as equities. The inventory is dynamic: a token representation may be present while a requested amount has no executable liquidity.
+
+The 2026-09-01 catalog audit found matching representations for 90 of 93 live OKX stock/ETF analysis instruments on X Layer and 76 of 93 on Arbitrum. `XPOPMART`, `XTESTA`, and `XXIAOMI` had no matching xStock on either chain; Arbitrum additionally lacked `XAMAT`, `XAPLD`, `XDELL`, `XGEV`, `XKLAC`, `XLITE`, `XLRCX`, `XSMCI`, `XSMH`, `XSNDK`, `XTER`, `XUSAR`, `XVRT`, and `XXLE`. These counts describe representation, not guaranteed execution. Every Spot or Autopilot action still requires an amount-sized live OKX Onchain OS quote on the selected chain. PAXG and XAUT remain analysis-only until an identity-safe token plus settlement route is verified.
 
 ```mermaid
 flowchart LR

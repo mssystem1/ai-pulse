@@ -119,7 +119,7 @@ type GlobalInstrument = SpotInstrument & {
 };
 ```
 
-Classification must use provider metadata when available and a tested fallback classifier for known OKX unified tokenized-stock symbols. Unknown instruments remain visible and are not mislabelled as crypto.
+Classification uses authoritative provider metadata (`instCategory=3`) for OKX Unified Tokenized Stocks and ETFs. Symbol shape alone must never classify or map an instrument because ordinary crypto symbols can overlap the `X<ticker>`/`<ticker>x` pattern. Unknown instruments remain visible without receiving a fabricated equity route.
 
 ### 4.3 Picker UX
 

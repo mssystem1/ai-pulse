@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { z } from "zod";
 import type { AppConfig } from "@pulse/config";
-import { analysisSymbolForExecutionToken, executionAssetAliases, getGenericOkxQuote, getGenericOkxSwap, getOkxTradeTokens, searchOkxDefiOpportunities } from "./okxDex.js";
+import { listSpotInstruments, searchSpotInstruments } from "@pulse/market";
+import { analysisSymbolForExecutionToken, executionAssetAliases, executionSymbolRepresentsAnalysis, getGenericOkxQuote, getGenericOkxSwap, getOkxTradeTokens, searchOkxDefiOpportunities } from "./okxDex.js";
 import { reconcileV6Activity, recordV6Activity, v6ActivityPersistenceStatus } from "./v6Store.js";
 import { asyncRoute } from "./httpResilience.js";
 import { kvCircuitStatus } from "./resilientKv.js";
@@ -113,14 +114,24 @@ export function createV6Router(cfg: AppConfig) {
     const settlementSymbol = network === "xlayer" ? "USDT0" : "USDC";
     const excluded = new Set(["USDC", "USDT", "USDT0", "USDBC", "DAI", "USDS", "USD+", "USD₮0"]);
     try {
-      const tokens = await getOkxTradeTokens(cfg, chain.chainId, "", 1_000);
-      const ranked = tokens.flatMap((token) => {
+      const [tokens, xStocks, instruments] = await Promise.all([
+        getOkxTradeTokens(cfg, chain.chainId, "", 1_000),
+        getOkxTradeTokens(cfg, chain.chainId, "xStock", 1_000),
+        listSpotInstruments(5_000),
+      ]);
+      const chainTokens = [...tokens, ...xStocks]
+        .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
+      const liveUsdt = new Map(instruments.filter((instrument) => instrument.quoteCcy === "USDT")
+        .map((instrument) => [instrument.baseCcy.toUpperCase(), instrument]));
+      const ranked = chainTokens.flatMap((token) => {
         if (erc20Custody && token.address.toLowerCase() === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee") return [];
-        const analysisBase = analysisSymbolForExecutionToken(token.symbol, chain.chainId);
+        const analysisBase = analysisSymbolForExecutionToken(token.symbol, chain.chainId, token.name);
+        const instrument = liveUsdt.get(analysisBase.toUpperCase());
+        if (!instrument) return [];
         if (!analysisBase || excluded.has(analysisBase.toUpperCase())) return [];
         const analysisPair = `${analysisBase}-USDT`;
         if (query && ![analysisPair, analysisBase, token.symbol, token.name].some((value) => String(value).toUpperCase().includes(query))) return [];
-        const aliases = executionAssetAliases(analysisBase, chain.chainId);
+        const aliases = executionAssetAliases(analysisBase, chain.chainId, instrument.assetClass);
         const aliasRank = aliases.indexOf(token.symbol.toUpperCase());
         return [{
           pair: analysisPair,
@@ -154,8 +165,12 @@ export function createV6Router(cfg: AppConfig) {
       return res.status(400).json({ error: "Valid execution network and BASE-QUOTE pair are required" });
     const settlementSymbol = network === "xlayer" ? "USDT0" : "USDC";
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
-    const aliases = executionAssetAliases(baseSymbol, chain.chainId);
     try {
+      const instrument = (await searchSpotInstruments(pair, 20))
+        .find((candidate) => candidate.instId.toUpperCase() === pair && candidate.quoteCcy === "USDT");
+      if (!instrument)
+        return res.json({ network, pair, available: false, aliasesChecked: [], custody: erc20Custody ? "erc20" : "wallet", reason: `${pair} is not a live OKX Global Market instrument.` });
+      const aliases = executionAssetAliases(baseSymbol, chain.chainId, instrument.assetClass);
       const [baseCandidateGroups, quoteCandidates] = await Promise.all([
         Promise.all(aliases.map((alias) => getOkxTradeTokens(cfg, chain.chainId, alias, 100))),
         getOkxTradeTokens(cfg, chain.chainId, settlementSymbol, 100),
@@ -164,6 +179,9 @@ export function createV6Router(cfg: AppConfig) {
         .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
       const baseOptions = aliases.flatMap((alias) => baseCandidates.filter((token) => token.symbol.toUpperCase() === alias))
         .filter((token) => !erc20Custody || token.address.toLowerCase() !== "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee")
+        .filter((token) => !((chain.chainId === "196" || chain.chainId === "42161")
+          && (instrument.assetClass === "tokenized_stock" || instrument.assetClass === "tokenized_etf"))
+          || executionSymbolRepresentsAnalysis(token.symbol, baseSymbol, chain.chainId, instrument.assetClass, token.name))
         .filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
       const base = baseOptions[0] || null;
       const quote = quoteCandidates.find((token) => token.address.toLowerCase() === (network === "xlayer"

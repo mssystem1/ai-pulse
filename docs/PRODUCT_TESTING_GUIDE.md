@@ -55,8 +55,9 @@ Confirm Arc returns Spot and Autopilot hidden/disabled. Mainnet capabilities mus
 8. Without changing the pair, buy Premium. The report must immediately enter Premium loading, create a new paid job, then render a PREMIUM mark.
 9. Confirm Premium includes attached candles, Fibonacci levels, pivots, Elliott candidate/invalidation, bullish/bearish moves and explanation.
 10. Confirm DeFi uses the selected RPC's identity-safe representation (`BTC -> cbBTC`, `ETH -> WETH`, etc.). If no exact product is verified, it must say unavailable and never invent APY.
-11. From either Base/Quick or Premium/Pro Buy report choose Market or Limit and verify pair, timeframe, entry, TP and SL carry forward together. Then open Autopilot separately and confirm no report, entry, TP or SL is inherited; Opportunity Radar may prefill only pair/timeframe as a fresh strategy draft.
-12. Refresh during generation and confirm job recovery does not charge again.
+11. For a live category-3 stock/ETF instrument, confirm X Layer/Arbitrum resolve only the matching OKX-catalog xStock (`XAAPL -> AAPLx`, for example). Confirm a same-shaped ordinary crypto symbol is not remapped, and that the action remains unavailable when the amount-sized quote has no route.
+12. From either Base/Quick or Premium/Pro Buy report choose Market or Limit and verify pair, timeframe, entry, TP and SL carry forward together. Then open Autopilot separately and confirm no report, entry, TP or SL is inherited; Opportunity Radar may prefill only pair/timeframe as a fresh strategy draft.
+13. Refresh during generation and confirm job recovery does not charge again.
 
 ## 4. Prediction Market
 

@@ -9,6 +9,7 @@ export type SpotInstrument = {
   baseCcy: string;
   quoteCcy: string;
   state: string;
+  instCategory?: string;
   assetClass: GlobalAssetClass;
 };
 
@@ -16,17 +17,26 @@ export type GlobalAssetClass = "crypto" | "tokenized_stock" | "tokenized_etf" | 
 
 const TOKENIZED_ETF_TICKERS = new Set(["ARKK", "DIA", "GLD", "IBIT", "IWM", "QQQ", "SLV", "SPY", "TLT", "VOO"]);
 const NON_EQUITY_RWA = new Set(["PAXG", "XAUT"]);
-const CRYPTO_X_TICKERS = new Set(["XEC", "XEM", "XLM", "XMR", "XNO", "XRP", "XTZ"]);
-
 /** Classify a live OKX instrument without implying an on-chain execution route. */
-export function classifyGlobalInstrument(baseCcy: string): GlobalAssetClass {
+export function classifyGlobalInstrument(baseCcy: string, instCategory?: string): GlobalAssetClass {
   const symbol = baseCcy.trim().toUpperCase();
   if (NON_EQUITY_RWA.has(symbol)) return "rwa";
-  if (!CRYPTO_X_TICKERS.has(symbol) && /^X[A-Z0-9]{1,10}$/.test(symbol)) {
-    const underlying = symbol.slice(1);
+  if (instCategory === "3") {
+    const underlying = symbol.startsWith("X") ? symbol.slice(1) : symbol;
     return TOKENIZED_ETF_TICKERS.has(underlying) ? "tokenized_etf" : "tokenized_stock";
   }
   return "crypto";
+}
+
+type RawSpotInstrument = { instId: string; baseCcy: string; quoteCcy: string; state: string; instCategory?: string };
+let instrumentCache: { expiresAt: number; data: RawSpotInstrument[] } | null = null;
+
+async function liveSpotInstruments() {
+  if (instrumentCache && instrumentCache.expiresAt > Date.now()) return instrumentCache.data;
+  const data = await okxGet<RawSpotInstrument[]>("/api/v5/public/instruments?instType=SPOT");
+  const live = data.filter((instrument) => instrument.state === "live");
+  instrumentCache = { expiresAt: Date.now() + 60_000, data: live };
+  return live;
 }
 
 export type SpotTicker = {
@@ -101,18 +111,16 @@ export function toOkxBar(tf: string): string {
 }
 
 export async function listSpotInstruments(limit = 200): Promise<SpotInstrument[]> {
-  const data = await okxGet<
-    Array<{ instId: string; baseCcy: string; quoteCcy: string; state: string }>
-  >("/api/v5/public/instruments?instType=SPOT");
+  const data = await liveSpotInstruments();
   return data
-    .filter((i) => i.state === "live")
     .slice(0, limit)
     .map((i) => ({
       instId: i.instId,
       baseCcy: i.baseCcy,
       quoteCcy: i.quoteCcy,
       state: i.state,
-      assetClass: classifyGlobalInstrument(i.baseCcy),
+      instCategory: i.instCategory,
+      assetClass: classifyGlobalInstrument(i.baseCcy, i.instCategory),
     }));
 }
 
@@ -122,11 +130,8 @@ export async function searchSpotInstruments(q: string, limit = 30): Promise<Spot
     "BTC-USDT", "ETH-USDT", "OKB-USDT", "SOL-USDT", "XRP-USDT",
     "DOGE-USDT", "SUI-USDT", "PEPE-USDT", "ADA-USDT", "LINK-USDT",
   ];
-  const data = await okxGet<
-    Array<{ instId: string; baseCcy: string; quoteCcy: string; state: string }>
-  >("/api/v5/public/instruments?instType=SPOT");
+  const data = await liveSpotInstruments();
   return data
-    .filter((i) => i.state === "live")
     .filter(
       (i) =>
         !query ||
@@ -152,7 +157,8 @@ export async function searchSpotInstruments(q: string, limit = 30): Promise<Spot
       baseCcy: i.baseCcy,
       quoteCcy: i.quoteCcy,
       state: i.state,
-      assetClass: classifyGlobalInstrument(i.baseCcy),
+      instCategory: i.instCategory,
+      assetClass: classifyGlobalInstrument(i.baseCcy, i.instCategory),
     }));
 }
 

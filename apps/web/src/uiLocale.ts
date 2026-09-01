@@ -7,6 +7,7 @@ import type { Lang } from "./i18n";
  * Global Market shell) so EN/中文 remains one application-level decision.
  */
 const ZH_EXACT: Record<string, string> = {
+  "On X Layer and Arbitrum, PULSE maps a live OKX category-3 X-ticker analysis instrument to the matching ticker-x token only when the OKX chain catalog identifies it as an xStock. Seeing a token in the pair selector proves representation, not liquidity: Market, Limit and Autopilot still require a fresh amount-sized route quote, so availability can differ by chain.": "在 X Layer 和 Arbitrum 上，只有当 OKX 链上代币目录将合约识别为 xStock 时，PULSE 才会把实时 OKX category-3 的 X-ticker 分析品种映射到对应的 ticker-x 代币。代币出现在交易对选择器中只证明链上表示存在，并不证明有流动性；市价、限价和 Autopilot 仍须通过按实际金额请求的最新路线报价，因此不同链上的可用性可能不同。",
   "Current Base routes include ZEC to cbZEC, HYPE to cbHYPE, and the OKX XNVDA, XMETA, XAAPL and XGOOGL analysis instruments to Coinbase's NVDAc, METAc, AAPLc and GOOGLc tokens. Each one remains disabled until its exact USDC route passes a fresh quote. PAXG and XAUT are analysis-only while no verified route exists on X Layer, Base or Arbitrum.": "Base 当前支持 ZEC 到 cbZEC、HYPE 到 cbHYPE，并将 OKX 的 XNVDA、XMETA、XAAPL 和 XGOOGL 分析品种映射到 Coinbase 的 NVDAc、METAc、AAPLc 和 GOOGLc 代币。每条路线只有在其精确的 USDC 路线通过最新报价验证后才会启用。在 X Layer、Base 或 Arbitrum 上尚无已验证路线时，PAXG 和 XAUT 仅支持分析。",
   "Network & payment": "网络与支付",
   "Choose network": "选择网络",

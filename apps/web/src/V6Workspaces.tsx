@@ -7534,6 +7534,14 @@ export function DocsWorkspace() {
                 quote. PAXG and XAUT are analysis-only while no verified route
                 exists on X Layer, Base or Arbitrum.
               </p>
+              <p>
+                On X Layer and Arbitrum, PULSE maps a live OKX category-3
+                X-ticker analysis instrument to the matching ticker-x token
+                only when the OKX chain catalog identifies it as an xStock.
+                Seeing a token in the pair selector proves representation, not
+                liquidity: Market, Limit and Autopilot still require a fresh
+                amount-sized route quote, so availability can differ by chain.
+              </p>
               <div className="docs-order-types">
                 <article>
                   <b>Market</b>

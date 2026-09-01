@@ -1198,14 +1198,18 @@ export function createApp(cfg: AppConfig, dependencies: {
       // Reuse the same identity-preserving chain aliases as Spot and
       // Autopilot. This makes BTC -> cbBTC and DOGE -> cbDOGE on Base visible
       // in DeFi without ever substituting an unrelated derivative.
+      const exactInstrument = (await searchSpotInstruments(body.instId, 20))
+        .find((instrument) => instrument.instId.toUpperCase() === body.instId.toUpperCase());
       const defiAliases = defiChainId
-        ? executionAssetAliases(assetSymbol, defiChainId)
+        ? executionAssetAliases(assetSymbol, defiChainId, exactInstrument?.assetClass)
         : [assetSymbol];
       let defiAsset = defiAliases[0] || assetSymbol;
       let defiTokenAddress = "";
       let opportunities: Awaited<ReturnType<typeof searchOkxDefiOpportunities>> = [];
       if (defiChainId && assetSymbol) {
-        const tokenCandidates = await getOkxTradeTokens(cfg, defiChainId, assetSymbol, 100).catch(() => []);
+        const tokenCandidates = (await Promise.all(defiAliases.map((alias) =>
+          getOkxTradeTokens(cfg, defiChainId, alias, 100).catch(() => []),
+        ))).flat().filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
         const bySymbol = new Map(tokenCandidates.map((token) => [token.symbol.toUpperCase(), token]));
         const executionToken = defiAliases.map((alias) => bySymbol.get(alias.toUpperCase())).find(Boolean);
         if (executionToken) {
