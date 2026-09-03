@@ -1,6 +1,7 @@
-export type PulseTab = "analyze" | "prediction" | "spot" | "autopilot" | "telegram" | "docs" | "safety";
+export type PulseTab = "overview" | "analyze" | "prediction" | "spot" | "autopilot" | "telegram" | "docs" | "safety";
 
 const PATH_BY_TAB: Record<PulseTab, string> = {
+  overview: "/overview",
   analyze: "/global",
   prediction: "/prediction",
   safety: "/safety",
@@ -15,6 +16,7 @@ const TAB_BY_PATH = Object.fromEntries(
 ) as Record<string, PulseTab>;
 
 const LEGACY_SERVICE: Record<string, PulseTab> = {
+  overview: "overview",
   global: "analyze",
   prediction: "prediction",
   reports: "telegram",
@@ -30,7 +32,7 @@ export function tabFromHref(href: string): PulseTab {
   const pathname = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : url.pathname;
   return TAB_BY_PATH[pathname]
     || LEGACY_SERVICE[url.searchParams.get("service") || ""]
-    || "analyze";
+    || "overview";
 }
 
 export function hrefForTab(href: string, tab: PulseTab) {

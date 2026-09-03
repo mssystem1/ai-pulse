@@ -26,6 +26,7 @@ import { NetworkLogo } from "./NetworkLogo";
 import { ReportHistory } from "./ReportHistory";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
+import { OverviewWorkspace } from "./OverviewWorkspace";
 import {
   clearWalletDisconnected,
   connectWallet,
@@ -679,15 +680,16 @@ export function App() {
               ? { title: "Product documentation", lead: "Understand every workflow, safety boundary, network and production test." }
               : { title: lang === "zh" ? "风险卫士" : "Risk Guard", lead: lang === "zh" ? `在 ${network.label} 上查看免费原始证据，或生成由多来源证据支持的 Grok 代币风险报告，再决定是否签名。` : `View free raw evidence or generate a multi-source Grok Token Risk report on ${network.label} before deciding whether to sign.` };
   const navigationTabs: Array<{ id: Tab; label: string; hint: string }> = [
-    { id: "analyze", label: "Global Market", hint: "Research and reports" },
-    { id: "prediction", label: "Prediction Market", hint: "Evidence and probabilities" },
-    { id: "safety", label: "Risk Guard", hint: "Inspect before signing" },
+    { id: "overview", label: lang === "zh" ? "概览" : "Overview", hint: lang === "zh" ? "钱包和活动摘要" : "Wallet and activity summary" },
+    { id: "analyze", label: lang === "zh" ? "全球市场" : "Global Market", hint: lang === "zh" ? "研究和报告" : "Research and reports" },
+    { id: "prediction", label: lang === "zh" ? "预测市场" : "Prediction Market", hint: lang === "zh" ? "证据和概率" : "Evidence and probabilities" },
+    { id: "safety", label: lang === "zh" ? "风险卫士" : "Risk Guard", hint: lang === "zh" ? "签名前检查" : "Inspect before signing" },
     ...(networkKey === "arc-testnet" ? [] : [
-      { id: "spot" as Tab, label: "Spot Trading", hint: "Trade from a report" },
-      { id: "autopilot" as Tab, label: "Autopilot", hint: "Automate with guardrails" },
+      { id: "spot" as Tab, label: lang === "zh" ? "现货交易" : "Spot Trading", hint: lang === "zh" ? "市价单和限价单" : "Market and Limit orders" },
+      { id: "autopilot" as Tab, label: "Autopilot", hint: lang === "zh" ? "在限制内自动运行" : "Automate with guardrails" },
     ]),
-    { id: "telegram", label: "Telegram", hint: "Reports in chat" },
-    { id: "docs", label: "Docs", hint: "Guides and examples" },
+    { id: "telegram", label: "Telegram", hint: lang === "zh" ? "在聊天中接收报告" : "Reports in chat" },
+    { id: "docs", label: lang === "zh" ? "文档" : "Docs", hint: lang === "zh" ? "指南和示例" : "Guides and examples" },
   ];
   const activeNavigationTab = navigationTabs.find((item) => item.id === tab) || navigationTabs[0];
 
@@ -723,14 +725,14 @@ export function App() {
         </div>
         <div className="nav-right">
           <div className="network-popover">
-            <button type="button" className="network-picker" title={`Network & payment · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)}>
+            <button type="button" className="network-picker" title={`${lang === "zh" ? "网络与支付" : "Network & payment"} · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)}>
               <span className={`network-symbol ${networkKey}`}><NetworkLogo network={networkKey} /></span>
-              <span className="network-picker-copy"><small>Network & payment</small><b>{network.label}</b></span><span className="network-picker-state"><i />{network.payment.symbol}</span><span className="chevron">⌄</span>
+              <span className="network-picker-copy"><small>{lang === "zh" ? "网络与支付" : "Network & payment"}</small><b>{network.label}</b></span><span className="network-picker-state"><i />{network.payment.symbol}</span><span className="chevron">⌄</span>
             </button>
-            {networkMenuOpen && <div className="network-menu" role="listbox" aria-label="Choose payment network">
-              <div className="network-menu-head"><span className="eyebrow">EXECUTION CONTEXT</span><strong>Choose network</strong><p>The choice sets payment asset, wallet chain, on-chain liquidity and product theme.</p></div>
-              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} via {item.provider}</small><em>{mainnet ? "Analysis · Spot · Autopilot" : "Analysis · payment test"}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
-              <div className="network-menu-foot"><span><i /> Selected theme updates instantly</span><span>{networkKey === "arc-testnet" ? "Trading hidden on Arc Testnet" : "Mainnet execution available"}</span></div>
+            {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"}>
+              <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "此选择会设置支付资产、钱包链、链上流动性和产品主题。" : "The choice sets payment asset, wallet chain, on-chain liquidity and product theme."}</p></div>
+              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
+              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "所选主题会立即更新" : "Selected theme updates instantly"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "主网执行可用" : "Mainnet execution available")}</span></div>
             </div>}
           </div>
           <div className="lang-switch" aria-label="Language">
@@ -763,7 +765,7 @@ export function App() {
       </nav>
 
       <main>
-      <section className="hero">
+      {tab !== "overview" && <section className="hero">
         <div className="card hero-copy">
           <h2>{experience.title}</h2>
           <p className="lead">{experience.lead}</p>
@@ -780,7 +782,7 @@ export function App() {
           {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
           </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
         </div>
-      </section>
+      </section>}
 
       <div className="tabs desktop-service-tabs" role="tablist" aria-label="PULSE services">
         {navigationTabs.map((item) => (
@@ -792,12 +794,12 @@ export function App() {
 
       <div className="mobile-service-nav">
         <button type="button" className="mobile-service-trigger" aria-haspopup="dialog" aria-expanded={mobileNavOpen} onClick={() => setMobileNavOpen(true)}>
-          <span><small>CURRENT SERVICE</small><strong>{activeNavigationTab.label}</strong></span>
-          <span className="mobile-service-trigger-action">Switch <i aria-hidden>⌄</i></span>
+          <span><small>{lang === "zh" ? "当前页面" : "CURRENT PAGE"}</small><strong>{activeNavigationTab.label}</strong></span>
+          <span className="mobile-service-trigger-action">{lang === "zh" ? "切换" : "Switch"} <i aria-hidden>⌄</i></span>
         </button>
         {mobileNavOpen && <div className="mobile-service-layer" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setMobileNavOpen(false)}>
           <section className="mobile-service-sheet" role="dialog" aria-modal="true" aria-label="Choose a PULSE service">
-            <header><div><small>PULSE NAVIGATION</small><h2>Where do you want to go?</h2></div><button type="button" aria-label="Close service navigation" onClick={() => setMobileNavOpen(false)}>×</button></header>
+            <header><div><small>{lang === "zh" ? "PULSE 导航" : "PULSE NAVIGATION"}</small><h2>{lang === "zh" ? "你想去哪里？" : "Where do you want to go?"}</h2></div><button type="button" aria-label="Close service navigation" onClick={() => setMobileNavOpen(false)}>×</button></header>
             <div className="mobile-service-grid" role="tablist" aria-label="PULSE services">
               {navigationTabs.map((item, index) => (
                 <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={tab === item.id ? "active" : ""} onClick={() => navigateTo(item.id)}>
@@ -805,7 +807,7 @@ export function App() {
                 </button>
               ))}
             </div>
-            <p>Global analysis can prefill a Spot order. Autopilot starts independently from its own signed strategy, capital and runtime pass.</p>
+            <p>{lang === "zh" ? "全球市场分析可以预填现货订单。Autopilot 使用独立的已签名策略、资金和运行通行证启动。" : "Global analysis can prefill a Spot order. Autopilot starts independently from its own signed strategy, capital and runtime pass."}</p>
           </section>
         </div>}
       </div>
@@ -828,7 +830,8 @@ export function App() {
 
       {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
 
-      {tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+      {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
+        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace />

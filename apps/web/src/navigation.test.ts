@@ -3,9 +3,15 @@ import assert from "node:assert/strict";
 import { hrefForTab, tabFromHref } from "./navigation.js";
 
 test("direct service URLs survive refresh and trailing slashes", () => {
+  assert.equal(tabFromHref("https://pulse.test/overview"), "overview");
   assert.equal(tabFromHref("https://pulse.test/autopilot"), "autopilot");
   assert.equal(tabFromHref("https://pulse.test/spot/"), "spot");
   assert.equal(tabFromHref("https://pulse.test/safety"), "safety");
+});
+
+test("the application root opens the overview", () => {
+  assert.equal(tabFromHref("https://pulse.test/"), "overview");
+  assert.equal(hrefForTab("https://pulse.test/", "overview"), "/overview");
 });
 
 test("legacy service links remain compatible and canonicalize", () => {
