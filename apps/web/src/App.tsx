@@ -765,25 +765,6 @@ export function App() {
       </nav>
 
       <main>
-      {tab !== "overview" && <section className="hero">
-        <div className="card hero-copy">
-          <h2>{experience.title}</h2>
-          <p className="lead">{experience.lead}</p>
-          <div className="nfa">{d.nfa}</div>
-          <div className="hero-proof"><span><i /> {d.proofLive}</span><span>{d.proofPay}</span><span>{d.proofKeys}</span></div>
-        </div>
-        <div className={`card chart-card ${tab !== "analyze" ? "experience-card" : ""}`}>
-          {tab === "analyze" ? <>
-          <div className="chart-head">
-            <span>{ticker ? String(ticker.instId) : "—"}</span>
-            <span className="muted">{timeframe} · OKX</span>
-          </div>
-          <canvas id="pulse-chart" className="chart" />
-          {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
-          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
-        </div>
-      </section>}
-
       <div className="tabs desktop-service-tabs" role="tablist" aria-label="PULSE services">
         {navigationTabs.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`tab ${tab === item.id ? "active" : ""}`} onClick={() => navigateTo(item.id)}>
@@ -811,6 +792,25 @@ export function App() {
           </section>
         </div>}
       </div>
+
+      {tab !== "overview" && <section className="hero">
+        <div className="card hero-copy">
+          <h2>{experience.title}</h2>
+          <p className="lead">{experience.lead}</p>
+          <div className="nfa">{d.nfa}</div>
+          <div className="hero-proof"><span><i /> {d.proofLive}</span><span>{d.proofPay}</span><span>{d.proofKeys}</span></div>
+        </div>
+        <div className={`card chart-card ${tab !== "analyze" ? "experience-card" : ""}`}>
+          {tab === "analyze" ? <>
+          <div className="chart-head">
+            <span>{ticker ? String(ticker.instId) : "—"}</span>
+            <span className="muted">{timeframe} · OKX</span>
+          </div>
+          <canvas id="pulse-chart" className="chart" />
+          {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
+          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
+        </div>
+      </section>}
 
       {networkKey !== "arc-testnet" && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
         <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready — review the Spot action" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
