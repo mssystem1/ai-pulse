@@ -24,6 +24,11 @@ export type PulseSettlement = Readonly<{
 
 export type SettlementRequest = Request & { pulseNetworkKey?: NetworkKey; pulseSettlement?: PulseSettlement };
 
+export function canonicalPaymentResource(cfg: Pick<AppConfig, "BASE_URL">, network: NetworkKey, path: string) {
+  const prefix = network === "arc-testnet" ? "arc" : network;
+  return new URL(`/${prefix}${path}`, cfg.BASE_URL).href;
+}
+
 function decodePayment(header: string): PaymentPayload {
   const parsed = JSON.parse(Buffer.from(header, "base64").toString("utf8")) as PaymentPayload;
   if (!parsed || typeof parsed !== "object" || parsed.x402Version !== 2 || !parsed.accepted) {
@@ -51,7 +56,7 @@ export function validateSignedPayment(cfg: AppConfig, req: SettlementRequest, pa
   if (!sameAddress(accepted.payTo, expectedPayee)) throw new Error("Payment payee mismatch");
   if (typeof payload.resource?.url !== "string") throw new Error("Payment resource URL missing");
   const resource = new URL(payload.resource.url, cfg.BASE_URL);
-  const allowedPaths = new Set([req.path, req.originalUrl.split("?")[0]]);
+  const allowedPaths = new Set([req.path, req.originalUrl.split("?")[0], new URL(canonicalPaymentResource(cfg, key, req.path)).pathname]);
   if (resource.origin !== new URL(cfg.BASE_URL).origin || !allowedPaths.has(resource.pathname)) {
     throw new Error("Payment resource mismatch");
   }

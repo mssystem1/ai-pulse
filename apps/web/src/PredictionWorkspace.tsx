@@ -135,7 +135,7 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
     const route = `/v1/analysis/prediction/${tier}`;
     setBusy(tier); setError(""); setResult(null);
     try {
-      const [balances, gateway] = await Promise.all([fetchNetworkBalances(wallet, networkKey), networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null)]);
+      const [balances, gateway] = await Promise.all([fetchNetworkBalances(wallet, networkKey, true), networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null)]);
       assertPaymentBalance(networkKey === "arc-testnet" ? gateway : balances.payment, prices[route], network.payment.symbol, network.label);
       const paidFetch = await createWalletPaidFetch(wallet, networkKey);
       const telegramDelivery = new URLSearchParams(window.location.search).get("tg");

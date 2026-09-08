@@ -155,6 +155,8 @@ const RUNTIME_FIELDS = [
   "realizedPositionPnlPct",
   "exitPending",
   "lastRiskCheckAt",
+  "riskCheckCount",
+  "sameCandleSkipCount",
   "lastEvaluatedCandleTs",
   "lastAiSignalAt",
   "lastAiAttemptAt",
@@ -175,6 +177,8 @@ const RUNTIME_FIELDS = [
   "filledSellCount",
   "failureCount",
   "evaluationJournalInitialized",
+  "evaluationPending",
+  "evaluationJournalError",
   "updatedAt",
 ] as const;
 
@@ -264,8 +268,7 @@ export function reconcileStrategyExecution<T extends StrategyRecord>(strategy: T
 
   const currentRunAt = Date.parse(typeof strategy.lastRunAt === "string" ? strategy.lastRunAt : "");
   const executionAt = Date.parse(latest.createdAt);
-  const currentIsSameOrNewerExecution = strategy.lastDecision === latest.kind
-    && Number.isFinite(currentRunAt)
+  const currentIsSameOrNewerExecution = Number.isFinite(currentRunAt)
     && currentRunAt >= executionAt;
   const reconciled = (currentIsSameOrNewerExecution ? { ...strategy } : {
     ...strategy,

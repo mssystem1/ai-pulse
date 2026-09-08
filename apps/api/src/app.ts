@@ -82,10 +82,11 @@ import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } f
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
 import { collectTokenRiskEvidence } from "./tokenRiskEvidence.js";
+import { optionalNumber } from "./geckoEvidence.js";
 
 const AnalysisBodySchema = z.object({
-  instId: z.string().min(3).max(32),
-  timeframe: z.string().optional().default("1H"),
+  instId: z.string().min(3).max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/, "Use an OKX instrument such as BTC-USDT"),
+  timeframe: z.enum(["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"]).default("1H"),
   lang: z.enum(["en", "zh"]).optional().default("en"),
   chartImageBase64: z.string().optional(),
   chartImageMime: z.string().optional(),
@@ -134,6 +135,8 @@ export function createApp(cfg: AppConfig, dependencies: {
   persistence?: ReturnType<typeof createPersistence>;
   arcBudget?: ArcBudgetStore;
   spotContext?: typeof buildMarketContext;
+  spotInstrumentExists?: (instId: string) => Promise<boolean>;
+  passTargetExists?: typeof autopilotPassTargetExists;
   automationTick?: Partial<AutomationTickDependencies>;
   startDurableWorker?: boolean;
 } = {}) {
@@ -145,6 +148,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     observer: recordProvider,
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
+  const passTargetExists = dependencies.passTargetExists || autopilotPassTargetExists;
+  const spotInstrumentExists = dependencies.spotInstrumentExists || (async (instId: string) =>
+    (await searchSpotInstruments(instId, 100)).some(instrument => instrument.instId === instId));
   const shouldRunDurableWorker = dependencies.startDurableWorker !== false;
   let durableWorker: DurableJobWorker | undefined;
   const wakeWorker = () => {
@@ -1005,11 +1011,20 @@ export function createApp(cfg: AppConfig, dependencies: {
       { path: ["tokenAddress"], message: "Risk Guard requires the exact token contract address." },
     ]));
     const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
-    req.body = { ...parsed.data, chainId: String(getNetwork(key).chainId) };
+    const expectedChainId = String(getNetwork(key).chainId);
+    if (parsed.data.chainId && parsed.data.chainId !== expectedChainId) return res.status(400).json(buildX402InputRequired("/v1/preflight", [
+      { path: ["chainId"], message: `Selected ${getNetwork(key).label} route requires chain ${expectedChainId}.` },
+    ]));
+    req.body = { ...parsed.data, chainId: expectedChainId };
     next();
   });
 
   const v5InputSchemas = new Map<string, z.ZodType>([
+    ["/v1/analysis/base", AnalysisBodySchema],
+    ["/v1/analysis/premium", AnalysisBodySchema],
+    ["/v1/wallet/scan", WalletScanRequestSchema],
+    ["/v1/market/pulse", MarketPulseRequestSchema],
+    ["/v1/swap/quote", SwapQuoteRequestSchema],
     ["/v1/analysis/spot/standard", AnalysisBodySchema],
     ["/v1/analysis/spot/premium", AnalysisBodySchema],
     ["/v1/analysis/prediction/standard", PredictionAnalysisRequestSchema],
@@ -1027,6 +1042,17 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (!parsed.success) return res.status(400).json(buildX402InputRequired(req.path, parsed.error.issues));
     req.body = parsed.data;
     return next();
+  });
+
+  const spotEvidencePaths = new Set(["/v1/analysis/base", "/v1/analysis/premium", "/v1/analysis/spot/standard", "/v1/analysis/spot/premium", "/v1/analysis/fused/standard", "/v1/analysis/fused/premium", "/v1/analysis/divergence"]);
+  app.use(async (req, res, next) => {
+    if (req.method !== "POST" || !spotEvidencePaths.has(req.path)) return next();
+    try {
+      if (!(await spotInstrumentExists(req.body.instId))) return res.status(422).json({ error: "Selected instrument is not a live OKX Spot market", code: "spot_instrument_unavailable" });
+      return next();
+    } catch {
+      return res.status(503).json({ error: "Live instrument availability could not be verified; no payment requested", code: "spot_instrument_lookup_unavailable" });
+    }
   });
 
   // Validate the primary prediction-market evidence before presenting a 402
@@ -1098,8 +1124,12 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
     if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
-    if (!(await autopilotPassTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
-      return res.status(404).json({ error: "This wallet does not own the selected Autopilot on the selected network" });
+    try {
+      if (!(await passTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
+        return res.status(404).json({ error: "This wallet does not own the selected Autopilot on the selected network" });
+      }
+    } catch {
+      return res.status(503).json({ error: "Vault ownership could not be verified; no payment requested", code: "autopilot_ownership_unavailable", recoverable: true });
     }
     return next();
   });
@@ -1700,21 +1730,25 @@ export function createApp(cfg: AppConfig, dependencies: {
     const okxTokens = (sourceData("OKX Onchain OS") || []) as Array<Record<string, unknown>>;
     const okxToken = okxTokens[0] || {};
     const blockToken = (sourceData("Blockscout token") || {}) as Record<string, unknown>;
+    const geckoToken = (sourceData("GeckoTerminal token") || {}) as Record<string, unknown>;
     const verifiedContract = (sourceData("Blockscout verified contract") || {}) as Record<string, unknown>;
-    const liquidityUsd = Number(((pair.liquidity as Record<string, unknown> | undefined)?.usd) ?? okxToken.liquidityUsd);
-    const holders = Number(blockToken.holders ?? okxToken.holders);
+    const liquidityUsd = optionalNumber(((pair.liquidity as Record<string, unknown> | undefined)?.usd) ?? geckoToken.liquidityUsd ?? okxToken.liquidityUsd);
+    const holders = optionalNumber(blockToken.holders ?? okxToken.holders);
     const pairCreatedAt = Number(pair.pairCreatedAt);
     const ageDays = Number.isFinite(pairCreatedAt) && pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 86_400_000)) : null;
     const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "1" | "56" | "137" | "8453" | "42161", lang }, mv);
     const token = {
       service: "token_scan", methodology_version: mv, chainId: String(network.chainId), address: address.toLowerCase(),
-      symbol: String(blockToken.symbol || okxToken.symbol || pairToken.symbol || fixtureScan?.symbol || "Unknown"),
-      name: String(blockToken.name || okxToken.name || pairToken.name || fixtureScan?.name || "Unknown token"),
+      symbol: String(blockToken.symbol || okxToken.symbol || pairToken.symbol || geckoToken.symbol || fixtureScan?.symbol || "Unknown"),
+      name: String(blockToken.name || okxToken.name || pairToken.name || geckoToken.name || fixtureScan?.name || "Unknown token"),
       riskScore: score, grade, verdict,
       components: analysis.components.map(({ evidence: _evidence, ...component }) => component), flags: analysis.criticalRisks,
       liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
       holdersEstimate: Number.isFinite(holders) ? holders : null,
-      contractAgeDays: ageDays,
+      contractAgeDays: null,
+      poolAgeDays: ageDays,
+      marketCapUsd: optionalNumber(pair.marketCap ?? geckoToken.marketCapUsd ?? okxToken.marketCapUsd),
+      fdvUsd: optionalNumber(pair.fdv ?? geckoToken.fdvUsd),
       isVerified: typeof verifiedContract.isVerified === "boolean" ? verifiedContract.isVerified : null,
       limitations: [...analysis.unknowns, analysis.disclaimer],
       intelligence: analysis, generatedAt: new Date().toISOString(),
@@ -1726,7 +1760,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       summary: analysis.summary, confidence: analysis.confidence,
       checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
       token, intelligence: analysis, recommendations: [analysis.recommendedAction], mostLikelyLossScenario: analysis.mostLikelyLossScenario,
-      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + DexScreener market/social/promotion + bounded project website + Grok synthesis; no automatic RPC eth_call",
+      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + DexScreener with GeckoTerminal token/pool/profile fallback + bounded project website + Grok synthesis; no automatic RPC eth_call",
       analysisProfile: { mode: ai ? "live" : "fixture", model: ai?.model || "fixture", reasoningEffort: ai ? "low" : "none" },
       aiUsage: ai?.usage, shareId: legacy.shareId, limitations: analysis.unknowns, generatedAt: new Date().toISOString(),
     };
@@ -1783,7 +1817,24 @@ export function createApp(cfg: AppConfig, dependencies: {
     }
   });
 
-  const mcp = createMcpHandler(cfg);
+  const mcp = createMcpHandler(cfg, (req, res, route, args, id, tool, method = "POST") => {
+    const network = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+    const prefix = network === "xlayer" ? "" : network === "arc-testnet" ? "/arc" : `/${network}`;
+    const json = res.json.bind(res);
+    res.json = (payload: unknown) => {
+      // Restore before Express serializes; preserve HTTP status and settlement headers.
+      res.json = json;
+      if (res.statusCode === 402) return json({ ...(payload as object), tool });
+      if (res.statusCode >= 400) return json({ jsonrpc: "2.0", id, error: { code: res.statusCode < 500 ? -32602 : -32000, message: "PULSE request rejected", data: payload } });
+      return json({ jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(payload) }], structuredContent: payload } });
+    };
+    req.url = `${prefix}${route}`;
+    req.method = method;
+    req.body = args;
+    app(req, res, (error?: unknown) => {
+      if (!res.headersSent) res.status(error ? 500 : 404).json({ error: error ? "MCP service routing failed" : "MCP service is unavailable" });
+    });
+  });
   app.all("/mcp", mcp);
   app.all("/mcp/", mcp);
 

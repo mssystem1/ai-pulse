@@ -340,7 +340,12 @@ routeInputs["/v1/preflight/event-risk"] = {
 };
 
 export function getX402InputDefinition(path: string): RouteInputDefinition | undefined {
-  return routeInputs[path];
+  const definition = routeInputs[path];
+  if (!definition) return undefined;
+  if (!/^\/v1\/analysis\/(base|premium|spot\/standard|spot\/premium)$/.test(path)) return definition;
+  return { ...definition, fields: definition.fields.map((field) => field.name === "instId"
+    ? { ...field, pattern: "^[A-Z0-9]+-[A-Z0-9]+$" }
+    : field.name === "timeframe" ? { ...field, enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] } : field) };
 }
 
 export function getX402OutputSchema(path: string): X402InputContract | undefined {

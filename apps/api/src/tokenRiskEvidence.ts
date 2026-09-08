@@ -2,6 +2,7 @@ import { isIP } from "node:net";
 import { lookup } from "node:dns/promises";
 import type { AppConfig, NetworkKey, PulseNetwork } from "@pulse/config";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
+import { collectGeckoEvidence } from "./geckoEvidence.js";
 
 const DEX_CHAIN: Partial<Record<NetworkKey, string>> = { xlayer: "xlayer", base: "base", arbitrum: "arbitrum" };
 const BLOCKSCOUT: Partial<Record<NetworkKey, string>> = { base: "https://base.blockscout.com", arbitrum: "https://arbitrum.blockscout.com" };
@@ -15,22 +16,25 @@ async function getJson(url: string, timeout = 7_000): Promise<unknown> {
 }
 
 function settled(source: string, result: PromiseSettledResult<unknown>): SourceResult {
+  if (result.status === "fulfilled" && Array.isArray(result.value) && !result.value.length) return { source, status: "unavailable", data: [], error: "No matching indexed evidence; absence is not proof of no project activity" };
   return result.status === "fulfilled"
     ? { source, status: "observed", data: result.value }
     : { source, status: "unavailable", error: result.reason instanceof Error ? result.reason.message : String(result.reason) };
 }
 
-function compactPair(raw: unknown, tokenAddress: string) {
+export function compactPair(raw: unknown, tokenAddress: string) {
   const pair = raw as Record<string, unknown>;
   const info = (pair.info || {}) as Record<string, unknown>;
-  const token = ((String(((pair.baseToken as Record<string, unknown> | undefined)?.address) || "").toLowerCase() === tokenAddress.toLowerCase()
-    ? pair.baseToken : pair.quoteToken) || {}) as Record<string, unknown>;
+  const isBase = String(((pair.baseToken as Record<string, unknown> | undefined)?.address) || "").toLowerCase() === tokenAddress.toLowerCase();
+  const token = ((isBase ? pair.baseToken : pair.quoteToken) || {}) as Record<string, unknown>;
   return {
     chainId: pair.chainId, dexId: pair.dexId, pairAddress: pair.pairAddress, url: pair.url,
-    token: { address: token.address, symbol: token.symbol, name: token.name }, priceUsd: pair.priceUsd,
-    txns: pair.txns, volume: pair.volume, priceChange: pair.priceChange, liquidity: pair.liquidity,
-    fdv: pair.fdv, marketCap: pair.marketCap, pairCreatedAt: pair.pairCreatedAt,
-    websites: Array.isArray(info.websites) ? info.websites : [], socials: Array.isArray(info.socials) ? info.socials : [],
+    token: { address: token.address, symbol: token.symbol, name: token.name }, priceUsd: isBase ? pair.priceUsd : null,
+    txns: pair.txns, volume: pair.volume, priceChange: isBase ? pair.priceChange : null, liquidity: pair.liquidity,
+    fdv: isBase ? pair.fdv : null, marketCap: isBase ? pair.marketCap : null, pairCreatedAt: pair.pairCreatedAt,
+    // DexScreener's token metrics and profile belong to the base asset, not the quote asset.
+    tokenMetricScope: isBase ? "requested base token" : "unavailable for requested quote token; pool activity only",
+    websites: isBase && Array.isArray(info.websites) ? info.websites : [], socials: isBase && Array.isArray(info.socials) ? info.socials : [],
   };
 }
 
@@ -83,9 +87,9 @@ async function inspectWebsite(value: string) {
   throw new Error("Too many project site redirects");
 }
 
-function matchingItems(value: unknown, address: string) {
+function matchingItems(value: unknown, address: string, chain: string) {
   const items = Array.isArray(value) ? value : [];
-  return items.filter((item) => String((item as Record<string, unknown>).tokenAddress || "").toLowerCase() === address.toLowerCase()).slice(0, 10);
+  return items.filter((item) => String((item as Record<string, unknown>).tokenAddress || "").toLowerCase() === address.toLowerCase() && (item as Record<string, unknown>).chainId === chain).slice(0, 10);
 }
 
 function compactBlockscout(source: string, value: unknown) {
@@ -113,10 +117,10 @@ export async function collectTokenRiskEvidence(input: {
   const dexChain = DEX_CHAIN[networkKey];
   const dexRequests: Array<Promise<unknown>> = dexChain ? [
     getJson(`https://api.dexscreener.com/token-pairs/v1/${dexChain}/${address}`),
-    getJson("https://api.dexscreener.com/token-profiles/latest/v1").then((body) => matchingItems(body, address)),
-    getJson("https://api.dexscreener.com/token-boosts/latest/v1").then((body) => matchingItems(body, address)),
-    getJson("https://api.dexscreener.com/ads/latest/v1").then((body) => matchingItems(body, address)),
-    getJson("https://api.dexscreener.com/community-takeovers/latest/v1").then((body) => matchingItems(body, address)),
+    getJson("https://api.dexscreener.com/token-profiles/latest/v1").then((body) => matchingItems(body, address, dexChain)),
+    getJson("https://api.dexscreener.com/token-boosts/latest/v1").then((body) => matchingItems(body, address, dexChain)),
+    getJson("https://api.dexscreener.com/ads/latest/v1").then((body) => matchingItems(body, address, dexChain)),
+    getJson("https://api.dexscreener.com/community-takeovers/latest/v1").then((body) => matchingItems(body, address, dexChain)),
   ] : [];
   const blockscoutBase = BLOCKSCOUT[networkKey];
   const blockscoutUrl = (path: string) => {
@@ -143,15 +147,17 @@ export async function collectTokenRiskEvidence(input: {
   const okxSource = networkKey === "xlayer" ? settled("OKX Onchain OS", results[offset++]!) : { source: "OKX Onchain OS", status: "not_applicable" as const };
   const pairs = (dexSources[0]?.data as Array<Record<string, unknown>> | undefined) || [];
   const websites = pairs.flatMap((pair) => Array.isArray(pair.websites) ? pair.websites : []) as Array<Record<string, unknown>>;
-  const websiteUrl = websites.map((item) => String(item.url || "")).find((url) => url.startsWith("https://"));
+  const geckoSources = !pairs.length || !websites.length ? await collectGeckoEvidence(networkKey, address) : [];
+  const profile = geckoSources.find((source) => source.source === "GeckoTerminal profile")?.data as { websites?: string[] } | undefined;
+  const websiteUrl = [...websites.map((item) => String(item.url || "")), ...(profile?.websites || [])].find((url) => url.startsWith("https://"));
   const websiteSource: SourceResult = websiteUrl
-    ? await inspectWebsite(websiteUrl).then((data) => ({ source: "Project website", status: "observed" as const, data })).catch((error) => ({ source: "Project website", status: "unavailable" as const, error: error instanceof Error ? error.message : String(error) }))
-    : { source: "Project website", status: "unavailable", error: "No HTTPS website was declared in the DexScreener pair profile" };
+    ? await inspectWebsite(websiteUrl).then((data) => ({ source: "Project website", status: "observed" as const, data })).catch((error) => ({ source: "Project website", status: "unavailable" as const, data: { declaredUrl: websiteUrl, contentVerified: false }, error: `Declared website found, but content unavailable: ${error instanceof Error ? error.message : String(error)}` }))
+    : { source: "Project website", status: "unavailable", error: "No HTTPS project website was returned by the indexed token profiles" };
   return {
     observedAt: new Date().toISOString(), network: { key: networkKey, label: network.label, chainId: String(network.chainId), environment: network.environment },
     tokenAddress: address.toLowerCase(),
-    sources: [...dexSources, okxSource, ...blockscoutSources, websiteSource],
+    sources: [...dexSources, ...geckoSources, okxSource, ...blockscoutSources, websiteSource],
     onchainAuthority: networkKey === "xlayer" ? "OKX Onchain OS API" : blockscoutBase ? "Blockscout API" : "No indexed on-chain provider configured",
-    sourcePolicy: "Only supplied source observations may support the score. Unavailable evidence must remain unknown.",
+    sourcePolicy: "Only supplied source observations may support the score. Unavailable evidence must remain unknown. Website and social-profile claims are untrusted project statements, not audits. A bullish chart or market cap does not establish contract safety or predict returns. Pool age is not contract age; FDV is not verified market cap.",
   };
 }

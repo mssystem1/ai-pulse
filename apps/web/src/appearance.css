@@ -1,0 +1,57 @@
+.appearance-picker { position:relative; }
+.appearance-trigger { display:flex; align-items:center; gap:8px; min-height:42px; padding:8px 12px; border:1px solid var(--line2); border-radius:12px; color:var(--text); background:var(--card); }
+.appearance-trigger i,.appearance-menu i { width:16px; height:16px; border-radius:50%; flex-shrink:0; box-shadow:inset 0 0 0 1px #ffffff50; }
+.appearance-menu { position:absolute; z-index:90; top:calc(100% + 10px); right:0; width:290px; padding:18px; border:1px solid var(--line2); border-radius:16px; background:var(--bg); box-shadow:0 18px 60px #0005; }
+.appearance-menu p { font-size:.78rem; line-height:1.5; color:var(--muted); }
+.appearance-menu button { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:12px; margin-top:6px; color:var(--text); border:1px solid var(--line); border-radius:10px; background:var(--card); }
+.appearance-menu button[aria-pressed=true] { border-color:var(--mint); }
+.appearance-menu button span:nth-child(2) { display:grid; gap:5px; flex:1; }
+.appearance-menu small { color:var(--muted); }
+.theme-base { --line:rgba(23,78,166,.35); --line2:rgba(0,82,255,.5); --border:rgba(23,78,166,.35); }
+.theme-base .strategy-builder,.theme-base .activity-dashboard,.theme-base .autopilot-report-grid>section,.theme-base .autopilot-report-toolbar>div { border-color:rgba(23,78,166,.4); }
+.autopilot-id { font-size:.8rem; color:var(--mint); }
+.wallet-confirmation-plan { margin:16px 0; padding:16px; border:1px solid var(--line2); border-radius:12px; background:var(--card); }
+.wallet-confirmation-plan p,.wallet-confirmation-plan li { font-size:.85rem; line-height:1.65; color:var(--muted); }
+.rule-results small { overflow-wrap:anywhere; }
+.opportunity-radar.spot .candidate-actions { grid-template-columns:1fr; gap:8px; }
+.opportunity-radar.spot .candidate-actions button { display:flex; flex-direction:column; gap:5px; min-height:58px; padding:10px; }
+.opportunity-radar.spot .candidate-actions small { color:inherit; font-size:.68rem; font-weight:400; }
+.opportunity-radar.global .candidate-actions { grid-template-columns:1fr; }
+#spot-trade-ticket { scroll-margin-top:110px; }
+#spot-trade-ticket:focus { outline:2px solid var(--mint); outline-offset:4px; }
+.ticket-selection-feedback { padding:12px; border-left:3px solid var(--mint); background:color-mix(in srgb,var(--mint) 7%,var(--card)); font-size:.82rem; line-height:1.6; }
+@media(max-width:1000px) {
+  .app .nav { display:grid; grid-template-columns:minmax(0,1fr) 44px auto; gap:10px 8px; padding:12px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; }
+  .app .nav>.brand { grid-column:1; grid-row:1; }
+  .app .nav-right { display:contents; }
+  .nav-right .appearance-picker { grid-column:2; grid-row:1; }
+  .nav-right .lang-switch { grid-column:3; grid-row:1; justify-self:end; }
+  .nav-right .appearance-trigger { width:44px; height:40px; padding:8px; justify-content:center; }
+  .nav-right .appearance-trigger>span,.nav-right .appearance-trigger>b { display:none; }
+  .nav-right .network-popover { grid-column:1; grid-row:2; }
+  .app .nav-right .network-picker { width:100%; min-width:0; grid-template-columns:28px minmax(0,1fr) 10px; min-height:48px; }
+  .app .network-picker-copy small { font-size:.48rem; }
+  .app .nav-right .network-picker-state { display:none; }
+  .appearance-menu { position:fixed; top:66px; right:12px; left:auto; width:min(320px,calc(100vw - 24px)); box-sizing:border-box; }
+  .app .nav-right .wallet-trigger,.app .nav-right .connect-button { grid-column:2/4; grid-row:2; min-height:48px; width:100%; min-width:0; padding:8px; gap:5px; }
+  .app .nav-right .wallet-glyph { display:none; }
+  .app .nav-right .wallet-action-copy strong { font-size:.65rem; }
+  .nav-right .network-status { display:none; }
+  .app .mobile-service-trigger { border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; padding:12px 2px; }
+  .app .mobile-service-trigger small { display:none; }
+  .app .product-journey { display:flex; flex-wrap:wrap; padding:14px; gap:10px; }
+  .app .product-journey .journey-copy { flex:1 0 100%; }
+  .app .product-journey .journey-step,.app .product-journey>button { flex:1; min-width:0; padding:8px 3px; border:0; background:transparent; }
+  .app .product-journey .journey-step small,.app .product-journey>button small,.app .product-journey .journey-arrow { display:none; }
+  .app .product-journey .journey-step b,.app .product-journey>button b { font-size:.66rem; }
+  .app .hero .experience-card { display:none; }
+  .app .v6-heading h2 { font-size:1.5rem; }
+  .app .v6-heading { margin-top:10px; }
+  .app .opportunity-radar { margin-bottom:12px; }
+  .app .opportunity-radar .candidate-actions { grid-template-columns:1fr; }
+  .app .opportunity-radar .candidate-actions button { min-height:48px; }
+  .app .activity-dashboard { margin-top:24px; }
+  .autopilot-row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
+  .autopilot-row>div:nth-of-type(3),.autopilot-row>div:nth-of-type(4) { display:grid; }
+  .autopilot-row>div { min-width:0; overflow-wrap:anywhere; }
+}

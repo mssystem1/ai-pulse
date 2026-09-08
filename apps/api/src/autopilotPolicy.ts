@@ -1,6 +1,16 @@
 import type { Candle } from "@pulse/market";
 
 export type AutopilotStrategyType = "trend_following" | "breakout" | "mean_reversion";
+
+/** Ignore only a residual worth less than one settlement atomic unit, not small real positions.
+ * Raw custody balances remain unchanged; invalid valuation always fails conservatively.
+ */
+export function valuedPositionBalance(balance: bigint, priceE18: bigint, targetDecimals: number, settlementDecimals: number) {
+  if (balance <= 0n) return 0n;
+  if (priceE18 <= 0n || ![targetDecimals, settlementDecimals].every((n) => Number.isInteger(n) && n >= 0 && n <= 36)) return balance;
+  const value = balance * priceE18 * 10n ** BigInt(settlementDecimals) / 10n ** BigInt(targetDecimals) / 10n ** 18n;
+  return value === 0n ? 0n : balance;
+}
 export type AutopilotRuleResult = {
   id: string;
   label: string;
@@ -16,21 +26,21 @@ export const AUTOPILOT_STRATEGY_CATALOG = [
     label: "Trend following",
     purpose: "Join a confirmed directional trend and leave when trend structure fails.",
     entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Regime is trend-up", "Close is above SMA20", "SMA20 is above SMA50"],
-    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Close falls below SMA20"],
+    exitRules: ["Take-profit or stop-loss is reached", "Close falls below SMA20", "Complete a previously triggered partial exit"],
   },
   {
     id: "breakout" as const,
     label: "Breakout",
     purpose: "Enter only after price and volume confirm a break of the prior range.",
     entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Close exceeds the previous 20-candle high", "Latest volume is at least 1.15x its 20-candle average", "Regime is trend-up or transition"],
-    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Close loses SMA20"],
+    exitRules: ["Take-profit or stop-loss is reached", "Close loses SMA20", "Complete a previously triggered partial exit"],
   },
   {
     id: "mean_reversion" as const,
     label: "Mean reversion",
     purpose: "Buy a confirmed pullback near support and exit after reversion or invalidation.",
     entryRules: ["Compact AI bias is bullish", "Confidence meets the signed threshold", "Price is within 1% of signal support or RSI14 is 42 or lower", "Regime is range or transition"],
-    exitRules: ["Take-profit or stop-loss is reached", "Compact AI bias turns bearish at the threshold", "Price reverts to SMA20"],
+    exitRules: ["Take-profit or stop-loss is reached", "Price reverts to SMA20", "Complete a previously triggered partial exit"],
   },
 ] as const;
 
@@ -70,6 +80,15 @@ export function boundedTargetSellAmount(input: {
   const chunkCount = (totalValue + input.maxTradeValue - 1n) / input.maxTradeValue;
   const balancedChunk = (input.targetBalance + chunkCount - 1n) / chunkCount;
   return balancedChunk < capacity ? balancedChunk : capacity;
+}
+
+/** Contract-equivalent minimum output implied by the guarded oracle price. */
+export function boundedBuyAmount(input: { requested: bigint; balance: bigint; maxTrade: bigint; exposureHeadroom: bigint; quotedValue: bigint; quotedInput: bigint }) {
+  const { requested, balance, maxTrade, exposureHeadroom, quotedValue, quotedInput } = input;
+  if ([requested, balance, maxTrade, exposureHeadroom, quotedValue, quotedInput].some((value) => value <= 0n)) return 0n;
+  // Leave 0.5% headroom for quote/oracle rounding. Signed caps are never enlarged.
+  const exposureBound = quotedInput * exposureHeadroom * 9950n / quotedValue / 10000n;
+  return [requested, balance, maxTrade, exposureBound].reduce((a, b) => a < b ? a : b);
 }
 
 /** Contract-equivalent minimum output implied by the guarded oracle price. */
@@ -193,6 +212,8 @@ export function evaluateAutopilotPolicy(input: {
   report: { analysis?: Record<string, unknown>; executionPlan?: { buy?: { takeProfit?: unknown; stopLoss?: unknown } } };
   minConfidence: number;
   hasPosition: boolean;
+  /** False for a deterministic check, not a 0%-confidence AI opinion. */
+  aiEvaluated?: boolean;
   exitPending?: boolean;
   activeTakeProfit?: number | null;
   activeStopLoss?: number | null;
@@ -207,7 +228,8 @@ export function evaluateAutopilotPolicy(input: {
   const volumeAverage20 = average(prior.slice(-20).map((candle) => candle.volume));
   const volumeRatio = volumeAverage20 > 0 ? input.candles.at(-1)!.volume / volumeAverage20 : 0;
   const rsi14 = rsi(input.candles);
-  const bias = String(analysis.bias || "neutral");
+  const aiEvaluated = input.aiEvaluated !== false;
+  const bias = aiEvaluated ? String(analysis.bias || "neutral") : "not_evaluated";
   const regime = String(analysis.regime || "transition");
   const confidence = Number(analysis.confidence || 0);
   const supports = Array.isArray((analysis.keyLevels as { support?: unknown } | undefined)?.support)
@@ -227,7 +249,7 @@ export function evaluateAutopilotPolicy(input: {
     const exitCompletion = input.exitPending === true;
     add("take_profit", "Take-profit reached", tpReached, `${close}`, takeProfit === null ? "not configured" : `>= ${takeProfit}`, "exit");
     add("stop_loss", "Stop-loss reached", slReached, `${close}`, stopLoss === null ? "not configured" : `<= ${stopLoss}`, "exit");
-    add("bearish_report", "Compact AI bearish exit", bearishExit, `${bias} ${confidence}%`, `bearish and >= ${input.minConfidence}%`, "exit");
+    if (aiEvaluated) add("bearish_report", "Compact AI bearish exit", bearishExit, `${bias} ${confidence}%`, `bearish and >= ${input.minConfidence}%`, "exit");
     add("structure_exit", input.strategyType === "mean_reversion" ? "Reversion reached SMA20" : "Trend lost SMA20", structureExit, `close ${close}; SMA20 ${sma20}`, input.strategyType === "mean_reversion" ? "close >= SMA20" : "close < SMA20", "exit");
     add("exit_completion", "Complete triggered bounded exit", exitCompletion, exitCompletion ? "partial exit remains" : "not pending", "a previous policy exit left target balance", "exit");
     const trigger = rules.find((rule) => rule.passed);
@@ -248,7 +270,11 @@ export function evaluateAutopilotPolicy(input: {
     add("pullback", "Pullback at support", nearSupport || rsi14 <= 42, `support ${nearestSupport ?? "none"}; RSI ${rsi14.toFixed(1)}`, "within 1% of support or RSI <= 42", "entry");
     add("range_regime", "Mean-reversion regime", regime === "range" || regime === "transition", regime, "range or transition", "entry");
   }
-  const passed = rules.every((rule) => rule.passed);
+  if (!aiEvaluated) {
+    const aiRules = new Set(["bullish_bias", "confidence", "trend_regime", "breakout_regime", "range_regime"]);
+    for (let i = rules.length - 1; i >= 0; i--) if (aiRules.has(rules[i].id)) rules.splice(i, 1);
+  }
+  const passed = aiEvaluated && rules.every((rule) => rule.passed);
   const failed = rules.filter((rule) => !rule.passed).map((rule) => rule.label).join(", ");
-  return { action: passed ? "buy" as const : "hold" as const, reason: passed ? `${AUTOPILOT_STRATEGY_CATALOG.find((item) => item.id === input.strategyType)!.label} entry rules passed.` : `Hold: ${failed}.`, strategyType: input.strategyType, bias, confidence, metrics: { close, sma20, sma50, previous20High, volumeRatio, rsi14, nearestSupport, takeProfit, stopLoss }, rules };
+  return { action: passed ? "buy" as const : "hold" as const, reason: passed ? `${AUTOPILOT_STRATEGY_CATALOG.find((item) => item.id === input.strategyType)!.label} entry rules passed.` : !aiEvaluated ? `Waiting: ${failed || "AI confirmation is required"}. AI was not evaluated; no entry was authorized.` : `Hold: ${failed}.`, strategyType: input.strategyType, bias, confidence, metrics: { close, sma20, sma50, previous20High, volumeRatio, rsi14, nearestSupport, takeProfit, stopLoss }, rules };
 }

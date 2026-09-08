@@ -102,11 +102,11 @@ onchainos agent x402-check \
 node scripts/asp-compliance.mjs "$PULSE_URL"
 ```
 
-The first `x402-check` should report `inputRequired: true`. The second should report `valid: true`, `amountHuman: "0.01"`, X Layer, USDT0, and a non-empty `acceptsJson`.
+The first `x402-check` should report `inputRequired: true`. The second should report `valid: true`, the currently advertised route price, X Layer, USDT0, and a non-empty `acceptsJson`. Do not reuse the historical $0.01 amount below. The public Token Risk Guard service is `/v1/preflight`, priced at $0.20; `/v1/token/scan` is a legacy API capability, not an additional public marketplace service.
 
 ## One controlled paid proof
 
-Only run the task payment command inside a real test task after checking the job ID, provider ID, `acceptsJson`, endpoint, recipient, asset, and `0.01` amount. It signs and spends funds.
+Only run a task payment command inside a real test task after checking the job ID, provider ID, `acceptsJson`, endpoint, recipient, asset, current amount and explicit authorization. It signs and spends funds. The following token-scan result describes a historical acceptance run, not a current price or a new payment instruction.
 
 The important argument is:
 
@@ -133,13 +133,13 @@ Production settlement proof completed on 2026-07-23:
   `0x58283dc47cd8285a5e8a3ec99b10697482004bd09fb488dfee11ef1fe2e4aab2`
 - X Layer block: `66052371`
 
-For a direct x402 proof outside a marketplace task, deliberately enable the repository's single-payment check:
+For current non-spending REST/MCP validation:
 
 ```bash
-RUN_LIVE_PAY=1 node scripts/asp-compliance.mjs "$PULSE_URL"
+node scripts/asp-compliance.mjs "$PULSE_URL"
 ```
 
-That path performs one `$0.01` token scan. It no longer spends on both analysis tiers or invokes the server checkout.
+This checks all eight public services without spending. It no longer loads wallet credentials or supports live-payment flags. Provide an active `--market-id` and registered `--owner` / `--vault-xlayer` / `--vault-base` / `--vault-arbitrum` for the valid-input challenge probes. Unpaid challenges do not prove paid delivery; perform that acceptance step separately with a freshly verified quote and explicit authorization.
 
 ## Resubmission gate for agent #8355
 

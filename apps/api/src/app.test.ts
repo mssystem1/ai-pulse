@@ -70,7 +70,13 @@ describe("PULSE API", () => {
         return { asset_id: tokenId, bids: [], asks: [] };
       },
     } as unknown as PolymarketClient;
-    const app = createApp(cfg, { polymarket });
+    const app = createApp(cfg, { polymarket, passTargetExists: async ({ vault }) => {
+      if (vault === `0x${"4".repeat(40)}`) throw new Error("Fixture storage unavailable");
+      return false;
+    }, spotInstrumentExists: async (id) => {
+      if (id === "UNAVAILABLE-USDT") throw new Error("Provider unavailable");
+      return ["BTC-USDT", "ETH-USDT"].includes(id);
+    } });
     await new Promise<void>((resolve) => {
       server = app.listen(0, "127.0.0.1", () => resolve());
     });
@@ -97,6 +103,30 @@ describe("PULSE API", () => {
       }),
     });
     assert.equal(res.status, 400);
+  });
+
+  it("rejects malformed inputs before challenging OR verifying payment on every Global route", async () => {
+    for (const prefix of ["", "/xlayer", "/base", "/arbitrum"]) {
+      for (const route of ["/v1/analysis/base", "/v1/analysis/premium", "/v1/analysis/spot/standard", "/v1/analysis/spot/premium"]) {
+        for (const body of [{}, { instId: "BTC-USDT", timeframe: "garbage" }, { instId: "BTC", timeframe: "4H" }]) {
+          for (const pay of [false, true]) {
+            const { res, json } = await jfetch(`${prefix}${route}`, { method: "POST", body: JSON.stringify(body), pay });
+            assert.equal(res.status, 400, `${prefix}${route}: ${JSON.stringify(body)}`);
+            assert.equal(res.headers.get("PAYMENT-REQUIRED"), null);
+            assert.equal(res.headers.get("PAYMENT-RESPONSE"), null);
+            assert.ok(json);
+          }
+        }
+      }
+    }
+  });
+
+  it("rejects missing legacy priced-service inputs before payment", async () => {
+    for (const route of ["/v1/wallet/scan", "/v1/market/pulse", "/v1/swap/quote"]) {
+      const { res } = await jfetch(route, { method: "POST", body: "{}" });
+      assert.equal(res.status, 400, route);
+      assert.equal(res.headers.get("PAYMENT-REQUIRED"), null);
+    }
   });
 
   it("rejects an invalid Autopilot pass target before x402 payment", async () => {
@@ -147,6 +177,19 @@ describe("PULSE API", () => {
     assert.ok(multichainRoute);
     assert.equal(multichainRoute.free, true);
     assert.equal(multichainRoute.priceUsd, 0);
+  });
+
+  it("ownership lookup outages reject REST and MCP before payment without hanging", async () => {
+    const args = { owner: ADDRESS, vault: `0x${"4".repeat(40)}` };
+    for (const mcp of [false, true]) {
+      const response = await fetch(`${apiUrl()}${mcp ? "/mcp" : "/v1/autopilot/pass/24h"}`, {
+        method: "POST", headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": "test-payment-signature-ok" },
+        body: JSON.stringify(mcp ? { jsonrpc: "2.0", id: 82, method: "tools/call", params: { name: "start_autopilot_24h", arguments: args } } : args),
+      });
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
+      assert.equal(response.headers.get("PAYMENT-RESPONSE"), null);
+    }
   });
 
   it("serves the selected-network token catalog without native pseudo-contracts", async () => {
@@ -453,6 +496,51 @@ describe("PULSE API", () => {
     assert.equal(response.status, 402);
     assert.equal(body.tool, "prediction_analysis_premium");
     assert.equal(body.priceUsd, testConfig.PRICE_ANALYSIS_PREDICTION_PREMIUM);
+  });
+
+  it("validates all eight published MCP service arguments before payment", async () => {
+    for (const name of ["spot_analysis_standard", "spot_analysis_premium", "prediction_analysis_standard", "prediction_analysis_premium", "preflight", "start_autopilot_24h", "start_autopilot_7d", "start_autopilot_30d"]) {
+      const response = await fetch(`${apiUrl()}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": "test-payment-signature-ok" }, body: JSON.stringify({ jsonrpc: "2.0", id: 50, method: "tools/call", params: { name, arguments: {} } }) });
+      assert.equal(response.status, 400, name);
+      assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
+      const body = await response.json() as any;
+      assert.equal(body.error.code, -32602);
+    }
+  });
+
+  it("rejects nonexistent instruments and unavailable lookups before charging REST or MCP", async () => {
+    for (const [instId, expected] of [["MISSING-USDT", 422], ["UNAVAILABLE-USDT", 503]] as const) {
+      for (const mcp of [false, true]) {
+        const response = await fetch(`${apiUrl()}${mcp ? "/mcp" : "/v1/analysis/spot/standard"}`, {
+          method: "POST", headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": "test-payment-signature-ok" },
+          body: JSON.stringify(mcp ? { jsonrpc: "2.0", id: 60, method: "tools/call", params: { name: "spot_analysis_standard", arguments: { instId } } } : { instId }),
+        });
+        assert.equal(response.status, expected);
+        assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
+        assert.equal(response.headers.get("PAYMENT-RESPONSE"), null);
+      }
+    }
+  });
+
+  it("MCP uses the same prediction-evidence checks as REST before a challenge", async () => {
+    for (const [primaryMarketId, expected] of [["pm:closed", 422], ["pm:missing-book", 503]] as const) {
+      const response = await fetch(`${apiUrl()}/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 61, method: "tools/call", params: { name: "prediction_analysis_standard", arguments: { primaryMarketId } } }) });
+      assert.equal(response.status, expected);
+      assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
+    }
+  });
+
+  it("MCP preserves Base/Arbitrum payment networks and refuses mismatched Risk Guard chains", async () => {
+    for (const [prefix, chain] of [["base", "8453"], ["arbitrum", "42161"]]) {
+      const request = (chainId: string) => fetch(`${apiUrl()}/${prefix}/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 62, method: "tools/call", params: { name: "preflight", arguments: { tokenAddress: ADDRESS, chainId } } }) });
+      const bad = await request("196");
+      assert.equal(bad.status, 400);
+      assert.equal(bad.headers.get("PAYMENT-REQUIRED"), null);
+      const good = await request(chain);
+      assert.equal(good.status, 402);
+      const challenge = JSON.parse(Buffer.from(good.headers.get("PAYMENT-REQUIRED")!, "base64").toString());
+      assert.equal(challenge.accepts[0].network, `eip155:${chain}`);
+    }
   });
 
   it("preserves MCP x402 challenge headers and replay shape", async () => {

@@ -255,7 +255,7 @@ node scripts/asp-compliance.mjs https://API_DOMAIN
 
 `readiness:okx` performs authenticated read-only catalog/quote checks and does not sign or broadcast a wallet transaction. Provider access can differ by deployment region, so verify it from the Railway environment as well. A business code such as `50125` means OKX received the request; investigate account/service/region authorization instead of rewriting it as a missing credential.
 
-Keep `RUN_LIVE_PAY=0` for non-spending checks. Set it to `1` only for a deliberate, low-value final payment acceptance run after independently checking the seller, network, token and price.
+`asp-compliance.mjs` is strictly non-spending: it never loads `.env`, a private key or a paid-fetch client. It rejects legacy live-payment flags. It checks the eight public services over REST and MCP on X Layer, Base and Arbitrum. Supply `--market-id`, `--owner` and `--vault-xlayer` / `--vault-base` / `--vault-arbitrum` to check valid unpaid challenges as well as invalid inputs. Paid delivery requires a separate, explicitly authorized replay after independently checking the seller, network, token, amount and request body.
 
 ## 5. Verify the complete browser workflow
 

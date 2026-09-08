@@ -5,7 +5,7 @@ import { paymentMiddleware, x402ResourceServer } from "@okxweb3/x402-express";
 import { ExactEvmScheme } from "@okxweb3/x402-evm/exact/server";
 import { OKXFacilitatorClient } from "@okxweb3/x402-core";
 import { buildX402PaymentRequiredBody } from "./inputContracts.js";
-import { inlineSettlement } from "./inlineSettlement.js";
+import { canonicalPaymentResource, inlineSettlement } from "./inlineSettlement.js";
 
 /**
  * Official OKX x402 seller middleware.
@@ -44,6 +44,7 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
         extra: { decimals: number; symbol: string };
       }>;
       description: string;
+      resource: string;
       mimeType: string;
       unpaidResponseBody: () => {
         contentType: string;
@@ -55,6 +56,7 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
   for (const [routeKey, info] of Object.entries(cfg.routes)) {
     if (info.free || info.priceUsd <= 0) continue;
     routes[routeKey] = {
+      resource: canonicalPaymentResource(cfg, "xlayer", routeKey.split(" ")[1]),
       accepts: [
         {
           scheme: "exact",

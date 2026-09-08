@@ -1,5 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { boundedBuyAmount, valuedPositionBalance } from "./autopilotPolicy.js";
+
+test("sub-atomic settlement residuals cannot trap a vault in a phantom position", () => {
+  assert.equal(valuedPositionBalance(1n, 250n * 10n ** 18n, 18, 6), 0n);
+  assert.equal(valuedPositionBalance(4_000_000_000n, 250n * 10n ** 18n, 18, 6), 4_000_000_000n);
+  assert.equal(valuedPositionBalance(1n, 2n * 10n ** 18n, 6, 6), 1n);
+  assert.equal(valuedPositionBalance(1n, 0n, 18, 6), 1n);
+  assert.equal(valuedPositionBalance(1n, 1n, NaN, 6), 1n);
+});
 import { boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput } from "./autopilotPolicy.js";
 
 const candles = (kind: "trend" | "breakout" | "range") => Array.from({ length: 60 }, (_, index) => {
@@ -8,6 +17,25 @@ const candles = (kind: "trend" | "breakout" | "range") => Array.from({ length: 6
   return { ts: index, open: close - .2, high: close + .3, low: close - .5, close, volume: kind === "breakout" && index === 59 ? 2_000 : 1_000, volumeCcy: close * 1_000 };
 });
 const report = (bias = "bullish", confidence = 80, regime = "trend_up") => ({ analysis: { bias, confidence, regime, keyLevels: { support: [99] } }, executionPlan: { buy: { takeProfit: 120, stopLoss: 90 } } });
+
+test("absent AI remains not evaluated and cannot authorize an otherwise valid entry", () => {
+  const decision = evaluateAutopilotPolicy({ strategyType: "trend_following", candles: candles("trend"), report: report(), aiEvaluated: false, minConfidence: 60, hasPosition: false });
+  assert.equal(decision.action, "hold");
+  assert.equal(decision.bias, "not_evaluated");
+  assert.equal(decision.rules.length, 2);
+  assert.ok(decision.rules.every((rule) => rule.passed));
+  assert.match(decision.reason, /AI was not evaluated/);
+});
+
+test("buy sizing respects balance, max trade and oracle-valued quote exposure", () => {
+  const args = { requested: 500000n, balance: 500000n, maxTrade: 500000n, exposureHeadroom: 500000n, quotedValue: 501000n, quotedInput: 500000n };
+  const bounded = boundedBuyAmount(args);
+  assert.ok(bounded < 500000n);
+  assert.ok(bounded * args.quotedValue / args.quotedInput < args.exposureHeadroom);
+  assert.equal(boundedBuyAmount({ ...args, balance: 200000n }), 200000n);
+  assert.equal(boundedBuyAmount({ ...args, exposureHeadroom: 0n }), 0n);
+  assert.equal(boundedBuyAmount({ ...args, quotedValue: 0n }), 0n);
+});
 
 test("identifies every trader-facing strategy preset", () => {
   assert.equal(identifyAutopilotStrategy("Trend-following with Premium analysis"), "trend_following");

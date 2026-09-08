@@ -2,6 +2,13 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 
+test("historical fills never replace a newer scheduler decision or timestamp", () => {
+  const strategy = { id: "base:vault", vault: "0x0000000000000000000000000000000000000001", lastRunAt: "2026-09-07T10:00:00Z", lastDecision: "hold_failed_closed" };
+  const result = reconcileStrategyExecution(strategy, [{ account: strategy.vault, source: "autopilot", status: "confirmed", kind: "buy_filled", createdAt: "2026-09-03T10:00:00Z", txHash: "0xbuy" }], 1n);
+  assert.equal(result.lastRunAt, strategy.lastRunAt);
+  assert.equal(result.lastDecision, strategy.lastDecision);
+});
+
 test("reports effective Autopilot runtime separately from durable registration", () => {
   const expiredPass = { expiresAt: "2026-08-31T00:00:00.000Z", signalLimit: 3, signalsUsed: 0 };
   assert.equal(deriveAutopilotRuntimeState({ configuredStatus: "active", paused: true, targetBalance: 0n, pass: null }), "paused");
@@ -93,6 +100,14 @@ test("a current worker persists the independent fast-risk timestamp", () => {
   const current = { id: "xlayer:vault", configurationHash: "0xsame", lastRunAt: "analysis" };
   const incoming = { ...current, lastRiskCheckAt: "risk" };
   assert.deepEqual(mergeStrategyRuntime(current, incoming), incoming);
+});
+
+test("runtime saves retain unsynced journal rows and monitoring counters", () => {
+  const current = { id: "test", configurationHash: "same", evaluationPending: [] };
+  const incoming = { ...current, riskCheckCount: 12, sameCandleSkipCount: 5, evaluationPending: [{ id: "unsynced", evaluatedAt: "2026-09-08T00:00:00Z" }], evaluationJournalError: "retry pending" };
+  assert.deepEqual(mergeStrategyRuntime(current, incoming), incoming);
+  const recovered = { ...incoming, evaluationPending: [], evaluationJournalError: undefined };
+  assert.deepEqual(mergeStrategyRuntime(incoming, recovered), recovered);
 });
 
 test("provider attempt and backoff state survive runtime merges", () => {

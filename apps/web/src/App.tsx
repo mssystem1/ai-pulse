@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet, apiPost } from "./api";
+import { formatTokenBalance } from "./format";
 import {
   ENABLED_WEB_NETWORKS,
   WEB_NETWORKS,
@@ -15,10 +16,12 @@ import {
 import { t, type Lang } from "./i18n";
 import { useDocumentLocale } from "./uiLocale";
 import { formatMarketPrice } from "./format";
+import { loadMarketPreview } from "./SpotMarketPreview";
 import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport, type ReportTradeIntent } from "./Report";
 import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
 import { SwapPanel } from "./SwapPanel";
 import { PredictionWorkspace } from "./PredictionWorkspace";
+import { AppearancePicker, APPEARANCES } from "./AppearancePicker";
 import { AutopilotWorkspace, DocsWorkspace, OpportunityRadar, SpotWorkspace, TelegramWorkspace } from "./V6Workspaces";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { Tip } from "./Tip";
@@ -132,6 +135,20 @@ export function App() {
   const [neededUsdt, setNeededUsdt] = useState<number | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
+  const [appearance, setAppearance] = useState<WebNetworkKey>(() => {
+    const saved = localStorage.getItem("pulse:appearance");
+    return APPEARANCES.some((item) => item.id === saved) ? saved as WebNetworkKey : networkKey;
+  });
+  const networkPopoverRef = useRef<HTMLDivElement>(null);
+  useEffect(() => { document.documentElement.dataset.pulseTheme = appearance; }, [appearance]);
+  useEffect(() => {
+    if (!networkMenuOpen) return;
+    const dismiss = (event: PointerEvent) => { if (!networkPopoverRef.current?.contains(event.target as Node)) setNetworkMenuOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setNetworkMenuOpen(false); networkPopoverRef.current?.querySelector("button")?.focus(); } };
+    document.addEventListener("pointerdown", dismiss);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("pointerdown", dismiss); document.removeEventListener("keydown", escape); };
+  }, [networkMenuOpen]);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
@@ -170,6 +187,10 @@ export function App() {
 
   const [ticker, setTicker] = useState<Record<string, unknown> | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
+  const teaserScope = `${instId}:${timeframe}`;
+  const teaserScopeRef = useRef(teaserScope);
+  teaserScopeRef.current = teaserScope;
+  useEffect(() => { setTicker(null); setCandles([]); }, [teaserScope]);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -185,7 +206,11 @@ export function App() {
   const [simulationData, setSimulationData] = useState("0x");
   const [simulationValue, setSimulationValue] = useState("0x0");
 
+  const balanceRequestRef = useRef(0);
+  const balanceContextRef = useRef({ networkKey, wallet });
+  balanceContextRef.current = { networkKey, wallet };
   const refreshBalances = useCallback(async (addr?: string | null) => {
+    const requestId = ++balanceRequestRef.current;
     const a = addr ?? wallet;
     if (!a) {
       setBalances(null);
@@ -197,6 +222,7 @@ export function App() {
         fetchNetworkBalances(a, networkKey),
         networkKey === "arc-testnet" ? fetchArcGatewayBalance(a) : Promise.resolve(null),
       ]);
+      if (requestId !== balanceRequestRef.current || balanceContextRef.current.networkKey !== networkKey || balanceContextRef.current.wallet?.toLowerCase() !== a.toLowerCase()) return;
       setBalances(b);
       setGatewayBalance(gateway);
       const spendable = networkKey === "arc-testnet" ? gateway || 0 : b.payment;
@@ -205,9 +231,12 @@ export function App() {
         setNeededUsdt(null);
       }
     } catch (e) {
+      if (requestId !== balanceRequestRef.current || balanceContextRef.current.networkKey !== networkKey) return;
+      setBalances(null);
+      setGatewayBalance(null);
       console.warn("balance fetch", e);
     } finally {
-      setLoadingBal(false);
+      if (requestId === balanceRequestRef.current) setLoadingBal(false);
     }
   }, [wallet, neededUsdt, networkKey]);
 
@@ -388,21 +417,14 @@ export function App() {
     setBusyAction("free");
     setError(null);
     try {
-      const [tRes, cRes] = await Promise.all([
-        apiGet(`/v1/market/ticker?instId=${encodeURIComponent(instId)}`),
-        apiGet(
-          `/v1/market/candles?instId=${encodeURIComponent(instId)}&bar=${encodeURIComponent(timeframe)}&limit=100`,
-        ),
-      ]);
-      if (!tRes.ok) throw new Error(`Ticker failed (${tRes.status}). Is API on ${API_BASE}?`);
-      if (!cRes.ok) throw new Error(`Candles failed (${cRes.status})`);
-      setTicker((tRes.data as { ticker: Record<string, unknown> }).ticker);
-      setCandles((cRes.data as { candles: Candle[] }).candles || []);
+      const preview = await loadMarketPreview(instId, timeframe);
+      if (teaserScopeRef.current !== teaserScope) return;
+      setTicker(preview.ticker);
+      setCandles(preview.candles);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (teaserScopeRef.current === teaserScope) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
-      setBusyAction(null);
+      if (teaserScopeRef.current === teaserScope) { setLoading(false); setBusyAction(null); }
     }
   }
 
@@ -526,7 +548,7 @@ export function App() {
       if (!Number.isFinite(required)) throw new Error("This service has no published price and cannot be purchased.");
       // Always refresh balances right before pay
       const [bal, gateway] = await Promise.all([
-        fetchNetworkBalances(wallet, networkKey),
+        fetchNetworkBalances(wallet, networkKey, true),
         networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null),
       ]);
       setBalances(bal);
@@ -671,7 +693,7 @@ export function App() {
     : tab === "prediction"
       ? { title: "Prediction market intelligence", lead: "Choose one live Polymarket question, inspect its executable evidence, then request Base or Premium analysis." }
       : tab === "spot"
-        ? { title: "Execute a report with your wallet", lead: "Start with Global Market analysis, then review its prefilled Market or Limit buy, TP/SL and live on-chain route here." }
+        ? { title: "Trade with your wallet", lead: "Choose a pair or load a Global Market report. Review your Market or Limit ticket, amount and protection, then sign when ready." }
         : tab === "autopilot"
           ? { title: "Guarded autonomous execution", lead: "Allocate capital to an isolated vault and constrain the trading agent with an owner-signed on-chain policy." }
           : tab === "telegram"
@@ -703,7 +725,7 @@ export function App() {
   }
 
   return (
-    <div className={`app theme-${networkKey}`}>
+    <div className={`app theme-${appearance}`}>
       <nav className="nav">
         <div className="brand">
           <div className="mark">
@@ -724,17 +746,18 @@ export function App() {
           </div>
         </div>
         <div className="nav-right">
-          <div className="network-popover">
+          <div className="network-popover" ref={networkPopoverRef}>
             <button type="button" className="network-picker" title={`${lang === "zh" ? "网络与支付" : "Network & payment"} · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)}>
               <span className={`network-symbol ${networkKey}`}><NetworkLogo network={networkKey} /></span>
               <span className="network-picker-copy"><small>{lang === "zh" ? "网络与支付" : "Network & payment"}</small><b>{network.label}</b></span><span className="network-picker-state"><i />{network.payment.symbol}</span><span className="chevron">⌄</span>
             </button>
             {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"}>
-              <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "此选择会设置支付资产、钱包链、链上流动性和产品主题。" : "The choice sets payment asset, wallet chain, on-chain liquidity and product theme."}</p></div>
+              <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "设置支付资产、钱包链和链上流动性，不改变外观。" : "Sets payment asset, wallet chain and on-chain liquidity. Appearance stays unchanged."}</p></div>
               <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
-              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "所选主题会立即更新" : "Selected theme updates instantly"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "主网执行可用" : "Mainnet execution available")}</span></div>
+              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "主网执行可用" : "Mainnet execution available")}</span></div>
             </div>}
           </div>
+          <AppearancePicker value={appearance} lang={lang} onChange={(value) => { setAppearance(value); localStorage.setItem("pulse:appearance", value); }} />
           <div className="lang-switch" aria-label="Language">
             <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
             <button type="button" className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中文</button>
@@ -753,7 +776,7 @@ export function App() {
             >
               <span className="wallet-glyph" aria-hidden>↗</span>
               <span className="wallet-action-copy"><strong>{d.walletFunding}</strong><small>{shortAddr(wallet)}</small></span>
-              <span className="wallet-balance">{balances ? `${(networkKey === "arc-testnet" ? gatewayBalance || 0 : balances.payment).toFixed(2)} ${network.payment.symbol}` : "…"}</span>
+              <span className="wallet-balance">{balances ? `${formatTokenBalance(networkKey === "arc-testnet" ? gatewayBalance ?? NaN : balances.payment, lang)} ${network.payment.symbol}` : "…"}</span>
               <span className="chevron">›</span>
             </button>
           ) : (
@@ -793,24 +816,6 @@ export function App() {
         </div>}
       </div>
 
-      {tab !== "overview" && <section className="hero">
-        <div className="card hero-copy">
-          <h2>{experience.title}</h2>
-          <p className="lead">{experience.lead}</p>
-          <div className="nfa">{d.nfa}</div>
-          <div className="hero-proof"><span><i /> {d.proofLive}</span><span>{d.proofPay}</span><span>{d.proofKeys}</span></div>
-        </div>
-        <div className={`card chart-card ${tab !== "analyze" ? "experience-card" : ""}`}>
-          {tab === "analyze" ? <>
-          <div className="chart-head">
-            <span>{ticker ? String(ticker.instId) : "—"}</span>
-            <span className="muted">{timeframe} · OKX</span>
-          </div>
-          <canvas id="pulse-chart" className="chart" />
-          {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
-          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
-        </div>
-      </section>}
 
       {networkKey !== "arc-testnet" && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
         <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready — review the Spot action" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
@@ -830,11 +835,32 @@ export function App() {
 
       {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
 
+      {tab !== "overview" && <section className="hero">
+        <div className="card hero-copy">
+          {tab === "spot" && <span className="eyebrow">REPORT-DRIVEN · CONNECTED WALLET</span>}
+          {tab === "autopilot" && <span className="eyebrow">SIX-STEP SETUP · OWNER CONTROLLED</span>}
+          <h2>{experience.title}</h2>
+          <p className="lead">{experience.lead}</p>
+          <div className="nfa">{d.nfa}</div>
+          <div className="hero-proof"><span><i /> {d.proofLive}</span><span>{d.proofPay}</span><span>{d.proofKeys}</span></div>
+        </div>
+        <div className={`card chart-card ${tab !== "analyze" ? "experience-card" : ""}`}>
+          {tab === "analyze" ? <>
+          <div className="chart-head">
+            <span>{ticker ? String(ticker.instId) : "—"}</span>
+            <span className="muted">{timeframe} · OKX</span>
+          </div>
+          <canvas id="pulse-chart" className="chart" />
+          {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
+          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : tab === "spot" ? (lang === "zh" ? "选交易对、查看行情、审核订单。" : "Choose a pair. See the market. Review the order.") : tab === "telegram" ? (lang === "zh" ? "报告与提醒，送达聊天。" : "Reports and reminders, delivered in chat.") : tab === "docs" ? (lang === "zh" ? "了解功能、费用与操作权限。" : "Workflows, prices and control boundaries.") : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : tab === "spot" ? (lang === "zh" ? "行情预览免费。只有审核订单并在钱包签名后才会执行交易。" : "Market previews are free. Execution starts only after you review and sign the order in your wallet.") : tab === "telegram" ? (lang === "zh" ? "在手机打开 PULSE，连接报告通知；机器人不保管资金。" : "Open PULSE on your phone and connect report notifications. The bot does not hold your funds.") : tab === "docs" ? (lang === "zh" ? "从研究、现货与 Autopilot 指南中找到适合你的工作流程。" : "Find the relevant guide for research, Spot execution or independent Autopilot setup.") : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
+        </div>
+      </section>}
+
       {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
-        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
-        : tab === "docs" ? <DocsWorkspace />
+        : tab === "docs" ? <DocsWorkspace lang={lang} />
         : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>
         <div className="card">
           {tab === "analyze" ? (

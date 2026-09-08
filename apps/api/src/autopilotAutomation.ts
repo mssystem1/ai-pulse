@@ -16,6 +16,7 @@ import { buildMarketContext, getTicker } from "@pulse/market";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
+import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
 import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
 import { listV6Activity, recordV6Activity } from "./v6Store.js";
@@ -27,6 +28,7 @@ import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, d
 import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
 import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
+import { boundedBuyAmount, valuedPositionBalance } from "./autopilotPolicy.js";
 
 type StrategyEvaluation = {
   id: string;
@@ -38,6 +40,7 @@ type StrategyEvaluation = {
   bias: string;
   confidence: number;
   metrics: Record<string, number | null>;
+  context?: { pair?: string; strategyType?: string; timeframe: string; candleClosedAt?: string; aiSource?: string; aiStatus?: string; nextAiEligibleAt?: string; minConfidence: number; maxTradePct: number; dailyLossPct: number };
   rules: AutopilotRuleResult[];
   evidenceHash?: string;
   txHash?: string;
@@ -70,6 +73,8 @@ type Strategy = {
   updatedAt: string;
   lastRunAt?: string;
   lastRiskCheckAt?: string;
+  riskCheckCount?: number;
+  sameCandleSkipCount?: number;
   lastDecision?: string;
   lastError?: string;
   lastTxHash?: string;
@@ -104,6 +109,8 @@ type Strategy = {
   filledSellCount?: number;
   failureCount?: number;
   evaluationJournalInitialized?: boolean;
+  evaluationPending?: StrategyEvaluation[];
+  evaluationJournalError?: string;
 };
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const NATIVE_TOKEN = /^0x[eE]{40}$/;
@@ -390,7 +397,7 @@ async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D") {
             { id: "mean_reversion", score: meanScore, ready: mean.action === "buy", reason: `RSI14 ${metrics.rsi14!.toFixed(1)}; price ${metrics.close! < metrics.sma20! ? "below" : "above"} SMA20` },
           ].sort((a, b) => b.score - a.score);
           const best = ranked[0];
-          return { pair, timeframe, score: Math.min(99, best.score), strategyType: best.id, technicalReady: best.ready, reason: best.reason, mark: market.ticker.last, change24hPct: market.ticker.change24hPct, rsi14: metrics.rsi14, volumeRatio: metrics.volumeRatio, fetchedAt: market.fetchedAt };
+          return { pair, timeframe, score: Math.min(99, best.score), strategyType: best.id, technicalReady: best.ready, reason: best.reason, mark: market.ticker.last, change24hPct: market.ticker.change24hPct, rsi14: metrics.rsi14, volumeRatio: metrics.volumeRatio, fetchedAt: market.fetchedAt, priceHistory: market.candles.slice(-48).map(candle => candle.close) };
         } catch {
           return null;
         }
@@ -491,6 +498,7 @@ function clients(network: Network, key?: `0x${string}`) {
   };
 }
 const vaultReadAbi = [
+  { type: "function", name: "exposureCap", stateMutability: "view", inputs: [{ type: "address" }], outputs: [{ type: "uint256" }] },
   {
     type: "function",
     name: "owner",
@@ -720,7 +728,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     if (!parsed.success) return res.status(400).json({ error: "timeframe must be 15m, 1H, 4H or 1D" });
     const candidates = await scanPotentialGainers(parsed.data);
     res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=240");
-    res.json({ candidates, methodology: "Read-only OKX candle prefilter. Score is not a forecast and does not replace Premium analysis or selected-network route validation.", premiumRequired: true, routeCheckedAfterSelection: true });
+    res.json({ candidates, methodology: "Read-only OKX candle prefilter. Score is not a forecast or trading authorization. Global research and Autopilot setup are separate workflows; selected-network route validation is always required.", premiumRequired: false, routeCheckedAfterSelection: true });
   });
   // Product-level discovery endpoint. Keep the former path as a compatibility
   // alias for open clients and external integrations.
@@ -768,8 +776,17 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       activityByNetwork.set(network, await listV6Activity(owner, network));
     }));
     const views = await Promise.all(strategies.map(async (strategy) => {
-      const aiPass = await getAutopilotPass(strategy.network, strategy.vault);
+      let passError: unknown;
+      const aiPass = await getAutopilotPass(strategy.network, strategy.vault).catch(error => { passError = error; return null; });
+      // History is independent of today's RPC/ticker availability.
+      const history = await readJournal(strategy, kvConfigured() ? kv : undefined);
+      const evaluations = history.rows;
+      const networkActivity = activityByNetwork.get(strategy.network) || [];
+      const lifetime = reconcileAutopilotLifetimeStats(strategy, networkActivity, evaluations);
+      const historyView = { ...lifetime, evaluations, journalStorage: history.storage,
+        evaluationHistoryComplete: lifetime.evaluationHistoryComplete && history.storage !== "unavailable" };
       try {
+        if (passError) throw passError;
         const { publicClient } = clients(strategy.network);
         const [chainState, ticker] = await Promise.all([
           publicClient.multicall({
@@ -793,15 +810,13 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
         const strategyCashFlows = (activityByNetwork.get(strategy.network) || [])
           .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
-        const networkActivity = activityByNetwork.get(strategy.network) || [];
         const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
-        const evaluations = await listEvaluationHistory(strategy);
-        const lifetime = reconcileAutopilotLifetimeStats(strategy, networkActivity, evaluations);
-        const reconciled = { ...reconcileStrategyExecution(strategy, networkActivity, targetBalance), ...lifetime, evaluations };
-        const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance, pass: aiPass });
+        const policyBalance = valuedPositionBalance(targetBalance, price, Number(targetDecimals), Number(settlementDecimals));
+        const reconciled = { ...reconcileStrategyExecution(strategy, networkActivity, policyBalance), ...historyView, hasResidualDust: targetBalance > 0n && policyBalance === 0n };
+        const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance: policyBalance, pass: aiPass });
         return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
-        return { ...strategy, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
+        return { ...strategy, ...historyView, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
       }
     }));
     res.json({
@@ -849,6 +864,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         ...authorizedStrategy,
         id,
         configurationHash,
+        ...(previous?.configurationHash !== configurationHash ? { lastEvaluatedCandleTs: undefined, lastRunAt: undefined } : {}),
         exitPending:
           previous?.configurationHash === configurationHash
             ? previous.exitPending
@@ -898,41 +914,19 @@ async function evidence(strategy: Strategy, payload: unknown) {
   await kv(["SET", key, body, "EX", 31_536_000]);
   return { hash, url: `kv:${key}` };
 }
-function evaluationHistoryKey(strategyId: string) {
-  return `pulse:autopilot:evaluations:${strategyId}`;
-}
-
-function decodeEvaluationHistory(raw: unknown): StrategyEvaluation[] {
-  const values = Array.isArray(raw)
-    ? raw.filter((_value, index) => index % 2 === 1)
-    : raw && typeof raw === "object"
-      ? Object.values(raw as Record<string, unknown>)
-      : [];
-  return values.flatMap((value) => {
-    if (typeof value !== "string") return [];
-    try {
-      const parsed = JSON.parse(value) as StrategyEvaluation;
-      return parsed && typeof parsed.id === "string" ? [parsed] : [];
-    } catch {
-      return [];
-    }
-  });
-}
-
-async function listEvaluationHistory(strategy: Strategy) {
-  const embedded = strategy.evaluations || [];
-  if (!kvConfigured()) return embedded;
-  try {
-    const persisted = decodeEvaluationHistory(await kv(["HGETALL", evaluationHistoryKey(strategy.id)]));
-    const byId = new Map<string, StrategyEvaluation>();
-    for (const evaluation of [...persisted, ...embedded]) byId.set(evaluation.id, evaluation);
-    return [...byId.values()].sort((left, right) => Date.parse(left.evaluatedAt) - Date.parse(right.evaluatedAt));
-  } catch {
-    return embedded;
-  }
-}
-
 async function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
+  evaluation.context = {
+    pair: strategy.pair,
+    strategyType: strategy.strategyType,
+    timeframe: strategy.timeframe,
+    candleClosedAt: strategy.lastEvaluatedCandleTs ? new Date(strategy.lastEvaluatedCandleTs).toISOString() : undefined,
+    aiSource: strategy.aiSignalSource,
+    aiStatus: strategy.aiBudgetStatus,
+    nextAiEligibleAt: strategy.aiNextEligibleAt,
+    minConfidence: strategy.minConfidence,
+    maxTradePct: strategy.policy.maxTradePct,
+    dailyLossPct: strategy.policy.dailyLossPct,
+  };
   const previous = strategy.evaluations || [];
   strategy.evaluationCount = (strategy.evaluationCount ?? previous.length) + 1;
   strategy.holdCount = (strategy.holdCount ?? previous.filter((entry) => entry.action === "hold" && entry.status === "held").length)
@@ -943,20 +937,7 @@ async function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluati
     + (evaluation.action === "sell" && evaluation.status === "filled" ? 1 : 0);
   strategy.failureCount = (strategy.failureCount ?? previous.filter((entry) => entry.status === "failed").length)
     + (evaluation.status === "failed" ? 1 : 0);
-  // The embedded window is a resilient fallback for short KV outages. The
-  // append-only hash is the complete journal used by the API and CSV export.
-  strategy.evaluations = [...previous, evaluation].slice(-100);
-  if (kvConfigured()) {
-    try {
-      const journalRows = strategy.evaluationJournalInitialized ? [evaluation] : [...previous, evaluation];
-      await kv(["HSET", evaluationHistoryKey(strategy.id), ...journalRows.flatMap((item) => [item.id, JSON.stringify(item)])]);
-      strategy.evaluationJournalInitialized = true;
-    } catch {
-      // The strategy snapshot still retains this row and execution remains
-      // fail-closed. A journal transport outage must never reclassify a mined
-      // transaction as a failed trade.
-    }
-  }
+  await persistJournalRow(strategy, evaluation, kvConfigured() ? kv : undefined);
 }
 export async function runAutopilotCycle(cfg: AppConfig) {
   {
@@ -986,6 +967,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
       if (!lease) continue;
       let analysisAttempted = false;
       let aiAttemptedThisCycle = false;
+      let evaluatedDecision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
       try {
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
@@ -993,6 +975,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         const analysisDue = !Number.isFinite(lastAnalysis) || now - lastAnalysis >= analysisInterval;
         const riskDue = !Number.isFinite(lastRiskCheck) || now - lastRiskCheck >= riskInterval;
         if ((mode === "risk" && !riskDue) || (mode === "analysis" && !analysisDue)) continue;
+        if (mode === "risk") s.riskCheckCount = (s.riskCheckCount || 0) + 1;
         const c = configs[s.network];
         const oracle = c.oracle(),
           adapter = c.adapter(),
@@ -1062,10 +1045,12 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         }
         const strategyType = s.strategyType || identifyAutopilotStrategy(s.policy.strategy);
         s.strategyType = strategyType;
-        if (targetBalance === 0n && s.lastTxHash && s.lastDecision !== "sell_filled") {
-          Object.assign(s, reconcileStrategyExecution(s, await listV6Activity(s.owner, s.network), targetBalance));
+        const positionTicker = targetBalance > 0n ? await getTicker(s.pair) : undefined;
+        const policyBalance = valuedPositionBalance(targetBalance, positionTicker ? parseUnits(positionTicker.last.toFixed(18), 18) : 0n, Number(targetDecimals), Number(settlementDecimals));
+        if (policyBalance === 0n && s.lastTxHash && s.lastDecision !== "sell_filled") {
+          Object.assign(s, reconcileStrategyExecution(s, await listV6Activity(s.owner, s.network), policyBalance));
         }
-        if (targetBalance === 0n) {
+        if (policyBalance === 0n) {
           s.exitPending = false;
           s.activeTakeProfit = undefined;
           s.activeStopLoss = undefined;
@@ -1083,8 +1068,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         // Protection is intentionally independent of Premium analysis. A live
         // TP/SL touch is latched, so a cooldown or dependency outage cannot
         // make the strategy forget an exit that the owner already authorized.
-        if (mode === "risk" && targetBalance > 0n) {
-          const ticker = await getTicker(s.pair);
+        if (mode === "risk" && policyBalance > 0n) {
+          const ticker = positionTicker!;
           const checkedAt = new Date().toISOString();
           s.lastRiskCheckAt = checkedAt;
           const riskDecision = evaluateAutopilotRiskExit({
@@ -1114,15 +1099,13 @@ export async function runAutopilotCycle(cfg: AppConfig) {
             };
           } else if (exitTriggered && !cooldownReady) {
             s.lastDecision = "hold_exit_cooldown";
-            s.lastError = undefined;
             continue;
           } else {
-            s.lastError = undefined;
             continue;
           }
         } else if (mode === "risk") {
           s.lastRiskCheckAt = new Date().toISOString();
-          s.lastError = undefined;
+          if (targetBalance > 0n) s.lastDecision = "hold_residual_dust";
           continue;
         }
 
@@ -1132,12 +1115,13 @@ export async function runAutopilotCycle(cfg: AppConfig) {
             instId: s.pair,
             timeframe: s.timeframe,
             candleLimit: 120,
+            completedOnly: true,
           });
           const candleTs = market.candles.at(-1)?.ts || 0;
           if (s.lastEvaluatedCandleTs === candleTs) {
-            s.lastDecision = "hold_same_candle";
+            if (!s.lastError) s.lastDecision = "hold_same_candle";
+            s.sameCandleSkipCount = (s.sameCandleSkipCount || 0) + 1;
             s.lastRunAt = new Date().toISOString();
-            s.lastError = undefined;
             continue;
           }
           s.lastEvaluatedCandleTs = candleTs;
@@ -1147,16 +1131,16 @@ export async function runAutopilotCycle(cfg: AppConfig) {
 
           // An open position never needs a new AI call to remain protected or
           // to react to deterministic structure failure.
-          if (targetBalance > 0n) {
+          if (policyBalance > 0n) {
             const report = { analysis: neutralAnalysis };
-            decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report, minConfidence: s.minConfidence, hasPosition: true, exitPending: s.exitPending, activeTakeProfit: s.activeTakeProfit, activeStopLoss: s.activeStopLoss });
+            decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report, aiEvaluated: false, minConfidence: s.minConfidence, hasPosition: true, exitPending: s.exitPending, activeTakeProfit: s.activeTakeProfit, activeStopLoss: s.activeStopLoss });
             s.aiSignalSource = "deterministic";
             s.aiBudgetStatus = "not_required_for_open_position";
             evidenceContext = { mode: "deterministic_position_monitor", technical };
           } else {
             const candidate = evaluateAutopilotEntryCandidate({ strategyType, candles: market.candles });
             if (!candidate.candidate) {
-              decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, minConfidence: s.minConfidence, hasPosition: false });
+              decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, aiEvaluated: false, minConfidence: s.minConfidence, hasPosition: false });
               s.aiSignalSource = "deterministic";
               s.aiBudgetStatus = "candidate_not_ready";
               evidenceContext = { mode: "deterministic_entry_prefilter", candidate, technical };
@@ -1198,7 +1182,6 @@ export async function runAutopilotCycle(cfg: AppConfig) {
                         // request must throttle the next cycle exactly like a
                         // successful request.
                         s.lastAiAttemptAt = new Date().toISOString();
-                        aiAttemptedThisCycle = true;
                         const estimatedCost = estimatedAutopilotSignalCostUsd({
                           maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT,
                           maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT,
@@ -1224,10 +1207,12 @@ export async function runAutopilotCycle(cfg: AppConfig) {
                         }
                         s.aiCallsToday = (s.aiCallsToday || 0) + 1;
                         s.aiReservedCostTodayUsd = (s.aiReservedCostTodayUsd || 0) + reservation.reservedCostUsd;
+                        aiAttemptedThisCycle = true;
                         signal = await observeProvider("xai", "autopilot_compact_signal", () => runPreparedAutopilotSignal(
                           { apiKey: cfg.XAI_API_KEY, baseUrl: cfg.XAI_BASE_URL, model: cfg.GROK_AUTOPILOT_MODEL },
                           { instId: s.pair, timeframe: s.timeframe, strategyType, market, maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT, maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT },
                         ));
+                        aiAttemptedThisCycle = false;
                         const usage = signal.usage;
                         if (usage) {
                           const actualCost = usage.costUsd ?? actualAutopilotSignalCostUsd({ promptTokens: usage.promptTokens, completionTokens: usage.completionTokens, cachedTokens: usage.cachedTokens, inputUsdPerMillion: cfg.XAI_INPUT_COST_PER_MILLION_USD, cachedInputUsdPerMillion: cfg.XAI_CACHED_INPUT_COST_PER_MILLION_USD, outputUsdPerMillion: cfg.XAI_OUTPUT_COST_PER_MILLION_USD });
@@ -1269,7 +1254,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
                 decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: compactReport, minConfidence: s.minConfidence, hasPosition: false });
                 evidenceContext = { mode: "event_driven_compact_signal", signal, candidate, technical, executionPlan };
               } else {
-                decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, minConfidence: s.minConfidence, hasPosition: false });
+                decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: { analysis: neutralAnalysis }, aiEvaluated: false, minConfidence: s.minConfidence, hasPosition: false });
                 decision = { ...decision, reason: `Hold: AI confirmation unavailable (${s.aiBudgetStatus || "unknown"}); deterministic protection remains active.` };
                 evidenceContext = { mode: "cost_guard_hold", status: s.aiBudgetStatus, candidate, technical };
               }
@@ -1277,6 +1262,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           }
         }
 
+        evaluatedDecision = decision;
         const evaluationBase = { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(), strategyType, action: decision.action, reason: decision.reason, bias: decision.bias, confidence: decision.confidence, metrics: decision.metrics, rules: decision.rules };
         if (decision.action === "hold") {
           const proof = await evidence(s, {
@@ -1297,6 +1283,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           : null;
         if (mode === "analysis" && !actionLease) {
           s.lastDecision = "hold_execution_in_progress";
+          await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "Entry conditions were evaluated, but another protected action is in progress. No duplicate order was sent." });
           s.lastError = undefined;
           continue;
         }
@@ -1323,21 +1310,25 @@ export async function runAutopilotCycle(cfg: AppConfig) {
               s.lastDecision = "hold_paused";
               s.lastRunAt = new Date().toISOString();
               s.lastError = undefined;
+              await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "The owner paused the vault after evaluation and before execution. No order was sent." });
               continue;
             }
-            if (decision.action === "sell" && targetBalance === 0n) {
+            const freshPolicyBalance = valuedPositionBalance(targetBalance, parseUnits(executionPrice.toFixed(18), 18), Number(targetDecimals), Number(settlementDecimals));
+            if (decision.action === "sell" && freshPolicyBalance === 0n) {
               s.exitPending = false;
               s.activeTakeProfit = undefined;
               s.activeStopLoss = undefined;
               s.lastDecision = "hold_position_closed";
               s.lastRunAt = new Date().toISOString();
               s.lastError = undefined;
+              await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "The position was already closed when balances were rechecked. No additional sell was sent." });
               continue;
             }
-            if (decision.action === "buy" && targetBalance > 0n) {
+            if (decision.action === "buy" && freshPolicyBalance > 0n) {
               s.lastDecision = "hold_position_already_open";
               s.lastRunAt = new Date().toISOString();
               s.lastError = undefined;
+              await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: "A position was already open when balances were rechecked. No duplicate buy was sent." });
               continue;
             }
           }
@@ -1352,8 +1343,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         const price = parseUnits(executionPrice.toFixed(18), 18);
         const sellToken = decision.action === "buy" ? s.settlementAsset : s.targetAsset;
         const buyToken = decision.action === "buy" ? s.targetAsset : s.settlementAsset;
-        const amount = decision.action === "buy"
-          ? BigInt(s.buyAmountAtomic)
+        let amount = decision.action === "buy"
+          ? [BigInt(s.buyAmountAtomic), maxTradeValue, settlementBalance].reduce((a, b) => a < b ? a : b)
           : boundedTargetSellAmount({ targetBalance, maxTradeValue, priceE18: price, targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals) });
         if (amount <= 0n) {
           s.lastDecision = "hold_no_executable_amount";
@@ -1370,7 +1361,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           await appendEvaluation(s, { ...evaluationBase, action: "hold", status: "held", reason: `The vault balance is below the configured ${decision.action} size.` });
           continue;
         }
-        const prepared = await getGenericOkxSwap(cfg, {
+        let prepared = await getGenericOkxSwap(cfg, {
           chainId: String(c.id),
           fromTokenAddress: sellToken,
           toTokenAddress: buyToken,
@@ -1378,6 +1369,19 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           userWalletAddress: adapter!,
           slippagePercent: String(Number(slippage) / 100),
         });
+        if (decision.action === "buy") {
+          const cap = await publicClient.readContract({ address: vault, abi: vaultReadAbi, functionName: "exposureCap", args: [s.targetAsset as `0x${string}`] });
+          const valueOf = (quantity: bigint) => quantity * price * 10n ** BigInt(settlementDecimals) / 10n ** BigInt(targetDecimals) / 10n ** 18n;
+          const headroom = cap - valueOf(targetBalance);
+          const quotedValue = valueOf(BigInt(String(prepared.quote?.toTokenAmount || "0")));
+          const bounded = boundedBuyAmount({ requested: amount, balance: settlementBalance, maxTrade: maxTradeValue, exposureHeadroom: headroom, quotedValue, quotedInput: amount });
+          if (bounded <= 0n) throw new Error("EXPOSURE: no executable amount fits the signed asset exposure cap");
+          if (bounded < amount) {
+            amount = bounded;
+            prepared = await getGenericOkxSwap(cfg, { chainId: String(c.id), fromTokenAddress: sellToken, toTokenAddress: buyToken, amount: String(amount), userWalletAddress: adapter!, slippagePercent: String(Number(slippage) / 100) });
+          }
+          if (valueOf(BigInt(String(prepared.quote?.toTokenAmount || "0"))) > headroom) throw new Error("EXPOSURE: refreshed quote exceeds the signed asset exposure cap; no vault trade sent");
+        }
         if (
           prepared.tx.to.toLowerCase() !== router!.toLowerCase() ||
           BigInt(prepared.tx.value) !== 0n
@@ -1471,7 +1475,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         });
         if (receipt.status !== "success")
           throw new Error("Autopilot execution reverted");
-        const partialExit = decision.action === "sell" && amount < targetBalance;
+        const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;
         s.lastDecision = partialExit ? "sell_partial_filled" : `${decision.action}_filled`;
         s.lastRunAt = new Date().toISOString();
         s.lastRiskCheckAt = new Date().toISOString();
@@ -1537,10 +1541,10 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           reason: transient
             ? "A temporary dependency was unavailable. No assets moved; the scheduler will retry automatically."
             : "The evaluation or protected execution failed closed. No assets moved.",
-          bias: "unknown",
-          confidence: 0,
-          metrics: {},
-          rules: [],
+          bias: evaluatedDecision?.bias || "unknown",
+          confidence: evaluatedDecision?.confidence || 0,
+          metrics: evaluatedDecision?.metrics || {},
+          rules: evaluatedDecision?.rules || [],
           error: s.lastError,
         });
       } finally {

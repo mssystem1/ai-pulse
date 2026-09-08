@@ -8,9 +8,9 @@
   "shortDescription": "PULSE turns live OKX Global Market and selected Polymarket evidence into recoverable Quick or Pro reports, connects Global plans to Agentic-Wallet-signed Spot Trading, and offers separate cost-controlled Autopilot start services.",
   "description": "PULSE provides distinct first-class multichain workflows for humans and agents: Global Market intelligence can prefill an Agentic-Wallet-signed Spot Market or Limit order, Prediction Market delivers focused probability intelligence, and guarded Autopilot starts directly from its own pair, strategy, capital, risk policy and prepaid duration. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. The public execution-mainnet catalog has eight paid services: two Global tiers leading to Spot Market or Limit orders, two Prediction tiers, one Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot does not require or reuse a Global report: deterministic candidate gates decide when compact prepaid AI entry confirmation is eligible, and one owner-control dashboard covers runtime and custody. Reports are durable and wallet-recoverable. Arc Testnet exposes only the five analysis/risk services because Spot and Autopilot execution are unavailable there.",
   "website": "https://www.ai-pulse.tech",
-  "repository": "https://github.com/mssystem1/Pulse",
+  "repository": "https://github.com/mssystem1/ai-pulse",
   "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
-  "documentation": "https://github.com/mssystem1/Pulse/blob/main/docs/CIRCLE_AGENT_MARKETPLACE_LISTING.md",
+  "documentation": "https://github.com/mssystem1/ai-pulse/blob/main/docs/CIRCLE_AGENT_MARKETPLACE_LISTING.md",
   "openApiSpec": "https://raw.githubusercontent.com/mssystem1/ai-pulse/main/docs/circle-marketplace-openapi.yaml",
   "logo": {
     "svg": "assets/logo.svg",

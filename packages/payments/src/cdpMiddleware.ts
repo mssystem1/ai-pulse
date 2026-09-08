@@ -5,7 +5,7 @@ import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { createCdpAuthHeaders } from "./cdpAuth.js";
-import { inlineSettlement } from "./inlineSettlement.js";
+import { canonicalPaymentResource, inlineSettlement } from "./inlineSettlement.js";
 
 export function buildCdpDiscoveryContract(path: string) {
   const riskGuard = path === "/v1/preflight";
@@ -99,6 +99,7 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
       }) : undefined;
       middleware = paymentMiddleware({
         [`${req.method.toUpperCase()} ${req.path}`]: {
+          resource: canonicalPaymentResource(cfg, key, req.path),
           accepts: [{ scheme: "exact", price: `$${route.priceUsd.toFixed(2)}`, network, payTo: cfg.PAY_TO_ADDRESS }],
           description: route.description, mimeType: "application/json",
           ...(extensions ? { extensions } : {}),

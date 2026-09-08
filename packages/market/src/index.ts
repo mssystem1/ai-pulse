@@ -59,6 +59,7 @@ export type Candle = {
   close: number;
   volume: number;
   volumeCcy: number;
+  confirmed?: boolean;
 };
 
 export type SpotMarketContext = {
@@ -96,8 +97,15 @@ async function okxGet<T>(path: string): Promise<T> {
 export function toOkxBar(tf: string): string {
   const m: Record<string, string> = {
     "1m": "1m",
+    "3m": "3m",
     "5m": "5m",
     "15m": "15m",
+    "30m": "30m",
+    "2H": "2H",
+    "6H": "6H",
+    "12H": "12H",
+    "1Dutc": "1Dutc",
+    "1Wutc": "1Wutc",
     "1H": "1H",
     "1h": "1H",
     "4H": "4H",
@@ -211,6 +219,7 @@ export async function getCandles(
       close: Number(row[4]),
       volume: Number(row[5]),
       volumeCcy: Number(row[6]),
+      confirmed: row[8] === "1",
     }))
     .reverse(); // chronological
 }
@@ -242,12 +251,14 @@ export async function buildMarketContext(opts: {
   instId: string;
   timeframe?: string;
   candleLimit?: number;
+  completedOnly?: boolean;
 }): Promise<SpotMarketContext> {
   const bar = toOkxBar(opts.timeframe ?? "1H");
-  const [ticker, candles] = await Promise.all([
+  const [ticker, rawCandles] = await Promise.all([
     getTicker(opts.instId),
     getCandles(opts.instId, bar, opts.candleLimit ?? 100),
   ]);
+  const candles = opts.completedOnly ? rawCandles.filter((candle) => candle.confirmed === true) : rawCandles;
   return {
     source: "okx-public-spot",
     instId: opts.instId,

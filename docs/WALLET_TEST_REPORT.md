@@ -55,7 +55,7 @@ npm test
 node scripts/asp-compliance.mjs https://YOUR_DOMAIN
 ```
 
-Use `RUN_LIVE_PAY=1 node scripts/asp-compliance.mjs https://YOUR_DOMAIN` or `node scripts/e2e-paid.mjs` only with the intended controlled wallet configuration. Confirm funding, route prices, and recipient before execution.
+`asp-compliance.mjs` now performs only non-spending checks and rejects legacy live-payment flags. A separate `e2e-paid.mjs` run can spend funds: inspect the script and confirm its exact requests, current prices, wallet and recipient before executing it. Historical payment amounts below are not current quotes.
 
 ## Acceptance rule
 

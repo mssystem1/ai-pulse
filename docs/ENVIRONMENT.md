@@ -118,7 +118,7 @@ This table is the operational checklist for variables that require a choice. Fix
 | `DEFAULT_NETWORK` | One enabled network key | `xlayer` | Product choice | Initial choice only when the browser has no saved selection. The user's last selection wins thereafter. |
 | `X402_MOCK` | `0` or `1` | `0` for wallet E2E | Always `0` | `1` accepts test fixtures and must be used only by automated tests. It does not prove settlement. |
 | `ENABLE_SERVER_PAY` | `0` or `1` | `0` | `0` | Allows operator-side payment scripts. It is never needed by the web wallet. |
-| `RUN_LIVE_PAY` | `0` or `1` | `0` unless deliberately running a script | `0` | Extra guard for scripts that spend funded wallet assets. |
+| `RUN_LIVE_PAY` | Legacy script flag | Unset | Unset | Not used by the app. `asp-compliance.mjs` rejects `1` and never spends; use a separately reviewed payment workflow. |
 | `FEATURE_WALLET_APPKIT` / `VITE_FEATURE_WALLET_APPKIT` | `0` or `1` | `1` / `1` | Both equal | Enables wallet UI on server metadata and browser build. |
 | `FEATURE_BASE_PAYMENTS` | `0` or `1` | `1` | `1` after certification | Registers Base CDP x402 routes. Requires Base in `ENABLED_NETWORKS` and CDP credentials. |
 | `FEATURE_ARBITRUM_PAYMENTS` | `0` or `1` | `1` | `1` after certification | Registers Arbitrum CDP x402 routes. Requires Arbitrum in `ENABLED_NETWORKS` and CDP credentials. |

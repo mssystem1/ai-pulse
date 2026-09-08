@@ -43,10 +43,11 @@ export type CallResult =
       paymentRequired?: string | null;
     };
 
-export async function apiGet(path: string): Promise<CallResult> {
+export async function apiGet(path: string, options?: { signal?: AbortSignal }): Promise<CallResult> {
   try {
     const res = await fetch(`${API_BASE}${path}`, {
       headers: { Accept: "application/json" },
+      signal: options?.signal,
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) return { ok: false, status: res.status, data };

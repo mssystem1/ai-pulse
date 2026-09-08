@@ -13,6 +13,10 @@ import {
 } from "@pulse/domain";
 import {
   MarketPulseRequestSchema,
+  PredictionAnalysisRequestSchema,
+  FusedAnalysisRequestSchema,
+  DivergenceAnalysisRequestSchema,
+  EventRiskPreflightRequestSchema,
   PreflightRequestSchema,
   ResolveRequestSchema,
   SwapQuoteRequestSchema,
@@ -21,6 +25,7 @@ import {
 } from "@pulse/schemas";
 import { z } from "zod";
 import { saveReport } from "./store.js";
+import { autopilotPassTargetExists } from "./autopilotAutomation.js";
 
 type JsonRpc = {
   jsonrpc?: string;
@@ -134,11 +139,28 @@ const TOOLS = [
 ];
 
 const AnalysisArgs = z.object({
-  instId: z.string(),
-  timeframe: z.string().optional(),
+  instId: z.string().max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/),
+  timeframe: z.enum(["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"]).default("1H"),
   lang: z.enum(["en", "zh"]).optional(),
-  userNote: z.string().optional(),
+  userNote: z.string().max(500).optional(),
 });
+
+const passArgs = z.object({ owner: z.string().regex(/^0x[a-fA-F0-9]{40}$/), vault: z.string().regex(/^0x[a-fA-F0-9]{40}$/), telegramDelivery: z.string().max(160).optional() });
+const argumentSchemas: Record<string, z.ZodType> = {
+  analysis_base: AnalysisArgs, analysis_premium: AnalysisArgs,
+  spot_analysis_standard: AnalysisArgs, spot_analysis_premium: AnalysisArgs,
+  prediction_analysis_standard: PredictionAnalysisRequestSchema, prediction_analysis_premium: PredictionAnalysisRequestSchema,
+  fused_analysis_standard: FusedAnalysisRequestSchema, fused_analysis_premium: FusedAnalysisRequestSchema,
+  divergence_analysis: DivergenceAnalysisRequestSchema, event_risk_preflight: EventRiskPreflightRequestSchema,
+  start_autopilot_24h: passArgs, start_autopilot_7d: passArgs, start_autopilot_30d: passArgs,
+  preflight: PreflightRequestSchema.refine((value) => Boolean(value.tokenAddress || value.toToken || value.fromToken), { message: "Risk Guard requires the exact token contract address", path: ["tokenAddress"] }),
+  token_scan: TokenScanRequestSchema, wallet_scan: WalletScanRequestSchema,
+  market_pulse: MarketPulseRequestSchema, swap_quote: SwapQuoteRequestSchema,
+  resolve: ResolveRequestSchema, spot_search: z.object({ query: z.string().min(1).max(80) }),
+  spot_ticker: z.object({ instId: z.string().max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/) }),
+  job_status: z.object({ jobId: z.string().uuid(), recoveryToken: z.string().min(32).max(256) }),
+  job_report: z.object({ jobId: z.string().uuid(), recoveryToken: z.string().min(32).max(256) }),
+};
 
 function availableTools(cfg: AppConfig) {
   const published = new Set([
@@ -160,7 +182,16 @@ function availableTools(cfg: AppConfig) {
     if (tool.name === "divergence_analysis") return cfg.FEATURE_DIVERGENCE_ANALYSIS;
     if (tool.name === "event_risk_preflight") return cfg.FEATURE_EVENT_RISK_ANALYSIS;
     return true;
-  }).map((tool) => {
+  }).map((original) => {
+    const tool = original.name.startsWith("spot_analysis_") ? {
+      ...original,
+      inputSchema: { ...original.inputSchema, properties: {
+        ...original.inputSchema.properties,
+        instId: { type: "string", pattern: "^[A-Z0-9]+-[A-Z0-9]+$", maxLength: 32 },
+        timeframe: { type: "string", default: "1H", enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] },
+        userNote: { type: "string", maxLength: 500 },
+      } },
+    } : original;
     if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Quick → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise OKX-grounded Buy-or-Wait plan followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
     if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Pro → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots and Elliott paths followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
     if (tool.name === "prediction_analysis_standard") return { ...tool, description: `Prediction Quick · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_STANDARD)} · concise evidence, probability and invalidation` };
@@ -173,7 +204,22 @@ function availableTools(cfg: AppConfig) {
   });
 }
 
-export function createMcpHandler(cfg: AppConfig) {
+export type McpPaidForward = (req: Request, res: Response, route: string, args: Record<string, unknown>, id: string | number | null, tool: string, method?: "GET" | "POST") => void;
+
+function paidRestRoute(name: string): string | undefined {
+  const legacy: Record<string, string> = {
+    analysis_base: "/v1/analysis/base", analysis_premium: "/v1/analysis/premium",
+    token_scan: "/v1/token/scan", wallet_scan: "/v1/wallet/scan", market_pulse: "/v1/market/pulse",
+    swap_quote: "/v1/swap/quote", preflight: "/v1/preflight",
+    divergence_analysis: "/v1/analysis/divergence", event_risk_preflight: "/v1/preflight/event-risk",
+  };
+  if (legacy[name]) return legacy[name];
+  if (/^(spot|prediction|fused)_analysis_(standard|premium)$/.test(name)) return `/v1/analysis/${name.replace("_analysis_", "/")}`;
+  if (/^start_autopilot_(24h|7d|30d)$/.test(name)) return `/v1/autopilot/pass/${name.replace("start_autopilot_", "")}`;
+  return undefined;
+}
+
+export function createMcpHandler(cfg: AppConfig, forwardPaid?: McpPaidForward) {
   const gate = createMcpPaymentGate(cfg);
   const grokCfg = {
     apiKey: cfg.XAI_API_KEY,
@@ -214,7 +260,26 @@ export function createMcpHandler(cfg: AppConfig) {
     if (method === "tools/call") {
       const params = body.params ?? {};
       const name = String(params.name ?? "");
-      const args = (params.arguments ?? {}) as Record<string, unknown>;
+      const schema = argumentSchemas[name];
+      if (!schema) return res.status(400).json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Unknown tool" } });
+      const parsed = schema.safeParse(params.arguments ?? {});
+      if (!parsed.success) return res.status(400).json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Invalid tool arguments; no payment requested", data: parsed.error.issues } });
+      const args = parsed.data as Record<string, unknown>;
+      if (forwardPaid && (name === "job_status" || name === "job_report")) {
+        req.headers["pulse-recovery-token"] = String(args.recoveryToken);
+        return forwardPaid(req, res, `/v1/jobs/${encodeURIComponent(String(args.jobId))}${name === "job_report" ? "/report" : ""}`, {}, id, name, "GET");
+      }
+      const route = paidRestRoute(name);
+      // Production application reuses its REST validation, network gate and settlement path.
+      // No loopback/public HTTP call and no second independently configured payment challenge.
+      if (route && forwardPaid) return forwardPaid(req, res, route, args, id, name);
+      if (name.startsWith("start_autopilot_")) {
+        const network = (req as Request & { pulseNetworkKey?: string }).pulseNetworkKey || "xlayer";
+        if (network !== "xlayer" && network !== "base" && network !== "arbitrum") return res.status(422).json({ jsonrpc: "2.0", id, error: { code: -32602, message: "Autopilot is unavailable on this network" } });
+        try {
+          if (!(await autopilotPassTargetExists({ owner: String(args.owner), vault: String(args.vault), network }))) return res.status(404).json({ jsonrpc: "2.0", id, error: { code: -32602, message: "No registered Autopilot owned by this wallet on the selected network" } });
+        } catch { return res.status(503).json({ jsonrpc: "2.0", id, error: { code: -32000, message: "Vault ownership could not be verified; no payment requested" } }); }
+      }
       const paymentSig =
         (req.header("PAYMENT-SIGNATURE") || req.header("payment-signature") || "") as string;
 

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { AppConfig } from "@pulse/config";
-import { inlineSettlement, validateSignedPayment, type SettlementRequest } from "./inlineSettlement.js";
+import { canonicalPaymentResource, inlineSettlement, validateSignedPayment, type SettlementRequest } from "./inlineSettlement.js";
 
 const cfg = {
   BASE_URL: "https://pulse.example",
@@ -34,6 +34,22 @@ function request(payload = payment()) {
 }
 
 describe("inline x402 settlement", () => {
+  it("reproduces the HAR localhost rejection and binds new challenges to the configured origin", () => {
+    const local = { ...payment(), resource: { url: "http://127.0.0.1:4000/base/v1/analysis/prediction/standard" } };
+    assert.throws(() => validateSignedPayment(cfg, request(local), local), /Payment resource mismatch/);
+    const canonical = { ...payment(), resource: { url: canonicalPaymentResource(cfg, "base", "/v1/analysis/prediction/standard") } };
+    assert.doesNotThrow(() => validateSignedPayment(cfg, request(canonical), canonical));
+    assert.equal(canonical.resource.url, "https://pulse.example/base/v1/analysis/prediction/standard");
+    // A forged Host must never become an allowed payment destination.
+    const forged = { ...payment(), resource: { url: "https://attacker.example/base/v1/analysis/prediction/standard" } };
+    assert.throws(() => validateSignedPayment(cfg, request(forged), forged), /resource mismatch/);
+  });
+
+  it("keeps prefixed canonical resources compatible with the legacy X Layer alias", () => {
+    const payload = { ...payment({ network: "eip155:196", asset: cfg.X402_ASSET }), resource: { url: canonicalPaymentResource(cfg, "xlayer", "/v1/analysis/prediction/standard") } };
+    const req = { ...request(payload), pulseNetworkKey: "xlayer", originalUrl: "/v1/analysis/prediction/standard" } as SettlementRequest;
+    assert.doesNotThrow(() => validateSignedPayment(cfg, req, payload));
+  });
   it("rejects chain, asset, amount, payee, and resource substitution before facilitator calls", () => {
     assert.throws(() => validateSignedPayment(cfg, request(payment({ network: "eip155:42161" })), payment({ network: "eip155:42161" })), /network mismatch/);
     assert.throws(() => validateSignedPayment(cfg, request(payment({ asset: "0x0000000000000000000000000000000000000000" })), payment({ asset: "0x0000000000000000000000000000000000000000" })), /asset mismatch/);

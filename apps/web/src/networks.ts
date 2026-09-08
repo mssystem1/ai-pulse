@@ -1,3 +1,6 @@
+import { createBalanceReader } from "./balanceReader";
+const readBalance = createBalanceReader();
+
 export const WEB_NETWORKS = {
   xlayer: { key: "xlayer", route: "xlayer", label: "X Layer", chainId: 196, chainHex: "0xc4", caip2: "eip155:196", rpc: "https://rpc.xlayer.tech", explorer: "https://www.okx.com/web3/explorer/xlayer", native: { name: "OKB", symbol: "OKB", decimals: 18 }, payment: { symbol: "USDT0", decimals: 6, address: "0x779ded0c9e1022225f8e0630b35a9b54be713736" }, provider: "OKX x402", fundingUrl: "https://web3.okx.com/dex-swap", fundingLabel: "Swap OKB to USDT0", fundingNote: "Use native USDT0 and keep a small OKB balance for network gas." },
   base: { key: "base", route: "base", label: "Base", chainId: 8453, chainHex: "0x2105", caip2: "eip155:8453", rpc: "https://mainnet.base.org", explorer: "https://basescan.org", native: { name: "Ether", symbol: "ETH", decimals: 18 }, payment: { symbol: "USDC", decimals: 6, address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" }, provider: "CDP x402", fundingUrl: "https://bridge.base.org/deposit", fundingLabel: "Bridge or fund USDC", fundingNote: "Use native Base USDC; bridged USDbC is not the payment asset." },
@@ -44,26 +47,21 @@ export async function switchWalletNetwork(provider: { request(args: { method: st
 }
 
 function units(raw: bigint, decimals: number) { return Number(raw) / 10 ** decimals; }
-function balanceData(address: string) { return `0x70a08231${address.replace(/^0x/, "").padStart(64, "0")}`; }
+function balanceData(address: string) { return `0x70a08231${address.toLowerCase().replace(/^0x/, "").padStart(64, "0")}`; }
 
-export async function fetchTokenBalance(owner: string, token: string, decimals: number, key: WebNetworkKey): Promise<number> {
+export async function fetchTokenBalance(owner: string, token: string, decimals: number, key: WebNetworkKey, fresh = false): Promise<number> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(owner) || !/^0x[a-fA-F0-9]{40}$/.test(token)) throw new Error("Invalid balance lookup address");
-  const response = await fetch(WEB_NETWORKS[key].rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: token, data: balanceData(owner) }, "latest"] }) });
-  const body = await response.json() as { result?: string; error?: { message?: string } };
-  if (!response.ok || body.error) throw new Error(body.error?.message || `Token balance request failed (${response.status})`);
-  return units(BigInt(body.result || "0x0"), decimals);
+  return units(await readBalance(WEB_NETWORKS[key].rpc, "eth_call", [{ to: token.toLowerCase(), data: balanceData(owner) }, "latest"], fresh), decimals);
 }
 
-export async function fetchNetworkBalances(address: string, key: WebNetworkKey) {
+export async function fetchNetworkBalances(address: string, key: WebNetworkKey, fresh = false) {
   const network = WEB_NETWORKS[key];
-  const call = async (method: string, params: unknown[]) => {
-    const response = await fetch(network.rpc, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
-    const body = await response.json() as { result?: string; error?: { message?: string } };
-    if (body.error) throw new Error(body.error.message || "RPC balance request failed");
-    return BigInt(body.result || "0x0");
-  };
-  const [native, payment] = await Promise.all([call("eth_getBalance", [address, "latest"]), call("eth_call", [{ to: network.payment.address, data: balanceData(address) }, "latest"])]);
-  return { native: units(native, network.native.decimals), payment: units(payment, network.payment.decimals) };
+  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error("Invalid wallet balance address");
+  const [native, payment] = await Promise.all([
+    readBalance(network.rpc, "eth_getBalance", [address.toLowerCase(), "latest"], fresh),
+    fetchTokenBalance(address, network.payment.address, network.payment.decimals, key, fresh),
+  ]);
+  return { native: units(native, network.native.decimals), payment };
 }
 
 export async function fetchArcGatewayBalance(address: string): Promise<number> {

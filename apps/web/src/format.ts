@@ -1,5 +1,12 @@
 import type { Lang } from "./i18n";
 
+/** Token balances must not round a positive spendable amount to zero. */
+export function formatTokenBalance(value: number, lang: Lang): string {
+  if (!Number.isFinite(value) || value < 0) return "—";
+  if (value > 0 && value < 0.000001) return "<0.000001";
+  return value.toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 6 });
+}
+
 /**
  * Keep micro-priced assets readable without making BTC-sized prices noisy.
  * The precision expands through the first meaningful decimal digits and falls

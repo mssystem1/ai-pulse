@@ -27,6 +27,7 @@ it("rejects a saturated Arc IP before issuing a payment challenge", async () => 
   };
   const app = createApp(cfg, {
     polymarket: fakePolymarket,
+    spotInstrumentExists: async () => true,
     persistence: { jobs: new MemoryJobStore(), reports: new MemoryReportStore() },
     arcBudget: { async checkIp() { throw new ArcBudgetExceededError("ip_hourly"); }, async reserve() {} },
   });
@@ -70,7 +71,7 @@ describe("V5 paid job E2E", () => {
   let origin = "";
   before(async () => {
     const cfg = { ...loadConfig(), X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "fixture" as const, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true, enabledNetworks: ["xlayer", "base", "arbitrum", "arc-testnet"] as const };
-    const app = createApp(cfg, { polymarket: fakePolymarket, spotContext: fakeSpotContext, persistence: { jobs: new MemoryJobStore(), reports: new MemoryReportStore() } });
+    const app = createApp(cfg, { polymarket: fakePolymarket, spotContext: fakeSpotContext, spotInstrumentExists: async () => true, persistence: { jobs: new MemoryJobStore(), reports: new MemoryReportStore() } });
     await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });
     const address = server.address();
     origin = `http://127.0.0.1:${typeof address === "object" && address ? address.port : 0}`;
@@ -133,5 +134,35 @@ describe("V5 paid job E2E", () => {
     assert.equal(result.report?.service, "spot_analysis_standard");
     assert.equal(result.report?.fixture, true);
     assert.equal(result.report?.model, "fixture");
+  });
+
+  it("settles MCP through the canonical route and recovers its local job without a public loopback", async () => {
+    const call = (name: string, args: Record<string, unknown>, pay = false) => fetch(`${origin}/arc/mcp`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...(pay ? { "PAYMENT-SIGNATURE": "mock-mcp-local-job" } : {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 71, method: "tools/call", params: { name, arguments: args } }),
+    });
+    const accepted = await call("spot_analysis_standard", { instId: "ETH-USDT", timeframe: "4H", lang: "zh" }, true);
+    assert.equal(accepted.status, 202);
+    assert.ok(accepted.headers.get("PAYMENT-RESPONSE"));
+    const body = await accepted.json() as any;
+    const { job, recoveryToken } = body.result.structuredContent;
+    assert.ok(job.id);
+    let stage = "";
+    for (let i = 0; i < 50; i++) {
+      const response = await call("job_status", { jobId: job.id, recoveryToken });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
+      stage = (await response.json() as any).result.structuredContent.job.stage;
+      if (stage === "completed") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.equal(stage, "completed");
+    const response = await call("job_report", { jobId: job.id, recoveryToken });
+    assert.equal(response.status, 200);
+    const report = (await response.json() as any).result.structuredContent.report;
+    assert.equal(report.service, "spot_analysis_standard");
+    assert.equal(report.instId, "ETH-USDT");
+    const forbidden = await call("job_report", { jobId: job.id, recoveryToken: "x".repeat(64) });
+    assert.equal(forbidden.status, 403);
   });
 });
