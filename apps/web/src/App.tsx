@@ -27,6 +27,8 @@ import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecover
 import { Tip } from "./Tip";
 import { NetworkLogo } from "./NetworkLogo";
 import { ReportHistory } from "./ReportHistory";
+import { storeScopedReport, type ReportSlots } from "./reportScope";
+import { useExecutionAvailability } from "./executionAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import { OverviewWorkspace } from "./OverviewWorkspace";
@@ -182,6 +184,8 @@ export function App() {
   }, [mobileNavOpen]);
 
   const [instId, setInstId] = useState("BTC-USDT");
+  const executionAvailability = useExecutionAvailability(networkKey);
+  const selectedExecution = executionAvailability(instId);
   const [timeframe, setTimeframe] = useState("1H");
   const [note, setNote] = useState("");
 
@@ -191,15 +195,23 @@ export function App() {
   const teaserScopeRef = useRef(teaserScope);
   teaserScopeRef.current = teaserScope;
   useEffect(() => { setTicker(null); setCandles([]); }, [teaserScope]);
-  const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [reportSlots, setReportSlots] = useState<ReportSlots>({ global: null, risk: null });
+  const result = tab === "safety" ? reportSlots.risk : reportSlots.global;
+  const setResult = useCallback((report: Record<string, unknown> | null) => {
+    setReportSlots(slots => storeScopedReport(slots, report, tab === "safety" ? "risk" : "global"));
+  }, [tab]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [paidMeta, setPaidMeta] = useState<string | null>(null);
+  const [paidMetaSlots, setPaidMetaSlots] = useState<{ global: string | null; risk: string | null }>({ global: null, risk: null });
+  const paidMetaScope = tab === "safety" ? "risk" : "global";
+  const paidMeta = paidMetaSlots[paidMetaScope];
+  const setPaidMeta = (value: string | null) => setPaidMetaSlots(slots => ({ ...slots, [paidMetaScope]: value }));
   const [spotJob, setSpotJob] = useState<{ id: string; stage: string; startedAt: number } | null>(null);
   const [paymentProgress, setPaymentProgress] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [tradeIntent, setTradeIntent] = useState<ReportTradeIntent | null>(null);
+  const [spotPairDraft, setSpotPairDraft] = useState<string | null>(null);
   const reportRequestRef = useRef(0);
 
   const [tokenAddr, setTokenAddr] = useState("0x779ded0c9e1022225f8e0630b35a9b54be713736");
@@ -342,8 +354,10 @@ export function App() {
   useEffect(() => {
     supersedeRequests(reportRequestRef);
     setTokenAddr(WEB_NETWORKS[networkKey].payment.address);
-    setResult(null);
-    setPaidMeta(null);
+    setReportSlots({ global: null, risk: null });
+    setSpotPairDraft(null);
+    setTradeIntent(null);
+    setPaidMetaSlots({ global: null, risk: null });
     setSpotJob(null);
     setPaymentProgress(null);
     setLoading(false);
@@ -357,6 +371,7 @@ export function App() {
 
   const change = Number(ticker?.change24hPct ?? 0);
   const service = String(result?.service || "");
+  const reportExecution = executionAvailability(String((result?.executionPlan as { pair?: string } | undefined)?.pair || result?.instId || instId));
 
   async function onConnect(method: WalletConnectionMethod = "auto") {
     setError(null);
@@ -510,6 +525,7 @@ export function App() {
   }
 
   function openTradeFromReport(intent: ReportTradeIntent) {
+    if (!executionAvailability(intent.pair).mapped) return;
     setTradeIntent(intent);
     navigateTo("spot");
     window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
@@ -519,7 +535,7 @@ export function App() {
     supersedeRequests(reportRequestRef);
     setInstId(candidatePair);
     setTimeframe(candidateTimeframe);
-    setResult(null);
+    setReportSlots(slots => ({ ...slots, global: null }));
     setSpotJob(null);
     setTradeIntent(null);
     setLoading(false);
@@ -640,6 +656,7 @@ export function App() {
   }
 
   async function inspectContract() {
+    const requestId = beginLatestRequest(reportRequestRef);
     setLoading(true);
     setBusyAction("contract");
     setError(null);
@@ -653,17 +670,17 @@ export function App() {
         const detail = response.data as { error?: string };
         throw new Error(detail?.error || `Contract inspection failed (${response.status})`);
       }
-      setResult(response.data as Record<string, unknown>);
+      if (isLatestRequest(reportRequestRef, requestId)) setResult(response.data as Record<string, unknown>);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      if (isLatestRequest(reportRequestRef, requestId)) setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setLoading(false);
-      setBusyAction(null);
+      if (isLatestRequest(reportRequestRef, requestId)) { setLoading(false); setBusyAction(null); }
     }
   }
 
   async function simulateTransaction() {
     if (!wallet) return setError("Connect a wallet to set the simulation sender.");
+    const requestId = beginLatestRequest(reportRequestRef);
     setLoading(true);
     setBusyAction("simulate");
     setError(null);
@@ -677,12 +694,11 @@ export function App() {
         const detail = response.data as { error?: string };
         throw new Error(detail?.error || `Transaction simulation failed (${response.status})`);
       }
-      setResult(response.data as Record<string, unknown>);
+      if (isLatestRequest(reportRequestRef, requestId)) setResult(response.data as Record<string, unknown>);
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      if (isLatestRequest(reportRequestRef, requestId)) setError(error instanceof Error ? error.message : String(error));
     } finally {
-      setLoading(false);
-      setBusyAction(null);
+      if (isLatestRequest(reportRequestRef, requestId)) { setLoading(false); setBusyAction(null); }
     }
   }
 
@@ -818,7 +834,7 @@ export function App() {
 
 
       {networkKey !== "arc-testnet" && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
-        <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready — review the Spot action" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
+        <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? reportExecution.mapped ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : `${reportExecution.label}. Choose a mapped pair for execution.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
         <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Global intelligence</b><small>{analysisReady ? "Report ready" : "Quick or Pro"}</small></span></button>
         <span className="journey-arrow">→</span>
         <button type="button" className={tab === "spot" ? "active" : ""} onClick={() => navigateTo("spot")}><i>2</i><span><b>Spot Market or Limit</b><small>Review and sign</small></span></button>
@@ -857,7 +873,7 @@ export function App() {
       </section>}
 
       {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
-        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} initialPair={tradeIntent?.pair || instId} initialTrade={tradeIntent} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} initialPair={tradeIntent?.pair || spotPairDraft || instId} initialTrade={tradeIntent} onPairSelected={(pair) => { setTradeIntent(null); setSpotPairDraft(pair); }} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace lang={lang} />
@@ -873,10 +889,12 @@ export function App() {
                   </div>
                   <MarketPairPicker
                     id="market-pair"
+                    networkKey={networkKey}
                     lang={lang}
                     value={instId}
                     onSelect={(instrument) => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}
                   />
+                  <small className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; a mapped pair still needs a live route and wallet approval.</small>
                 </div>
                 <div className="field">
                   <label htmlFor="market-timeframe">
@@ -958,7 +976,7 @@ export function App() {
               <div className="safety-scope">
                 <div><span className="scope-dot" />{lang === "zh" ? "已选网络" : "Selected chain"} · {network.label}</div>
                 <strong>{lang === "zh" ? "免费事实证据 → 付费代币风险报告 → 可选交易模拟" : "Free factual evidence → paid Token Risk report → optional transaction simulation"}</strong>
-                <p>{lang === "zh" ? `免费检查显示原始 RPC 事实。0.20 美元的报告使用 ${riskOnchainSource} 作为链上权威来源，并汇总 DexScreener 市场、项目网站、X 社交资料和推广证据，再由 Grok 给出可追溯评分。缺失证据保持未知。` : `The free check shows raw RPC facts. The $0.20 report uses ${riskOnchainSource} as its on-chain authority, adds DexScreener market, project-site, X-profile and promotion evidence, then Grok produces a traceable score. Missing evidence stays unknown.`}</p>
+                <p>{lang === "zh" ? `免费检查显示原始事实。0.20 美元的报告使用 ${riskOnchainSource} 作为链上权威来源，结合 GeckoTerminal 市场、网站、X 资料和独立显示的供应商评分，再由 Grok 综合分析。社交链接不代表推广活跃度，数据缺失不代表已确认的缺陷。` : `The $0.20 report combines ${riskOnchainSource} on-chain facts with GeckoTerminal market data, project links and a separately attributed provider rating. Grok synthesizes the evidence. Social links do not prove promotion activity; missing data is not a confirmed defect.`}</p>
               </div>
               {!wallet && <p className="wallet-guidance">↑ {d.headerWalletHint}</p>}
               <div className="field" style={{ marginTop: 12 }}>
@@ -985,7 +1003,7 @@ export function App() {
                   {busyAction === "contract" ? d.loading : lang === "zh" ? "查看原始代币与合约证据 · 免费" : "View raw token & contract evidence · Free"}
                 </button>
                 <div className="paid-risk-card">
-                  <div><span>{lang === "zh" ? "完整尽调" : "FULL DUE DILIGENCE"}</span><strong>{lang === "zh" ? "代币风险报告" : "Token Risk report"}</strong><p>{lang === "zh" ? "市场与流动性、持币者、合约、项目网站、X 社交资料和推广活动，附来源覆盖、损失情景、评分与未知项。" : "Market/liquidity, holders, contract, project website, X profile and promotion activity—with source coverage, loss scenario, score and explicit unknowns."}</p></div>
+                  <div><span>{lang === "zh" ? "完整尽调" : "FULL DUE DILIGENCE"}</span><strong>{lang === "zh" ? "代币风险报告" : "Token Risk report"}</strong><p>{lang === "zh" ? "市场与流动性、持币者、合约、网站与社交链接，附来源覆盖、损失情景、评分与未知项。推广活跃度若未被数据源测量则保持未知。" : "Market/liquidity, holders, contract, website and social links—with source coverage, loss scenario, score and explicit unknowns. Promotion activity stays unknown when not measured."}</p></div>
                   <b>$0.20 {network.payment.symbol}</b>
                 </div>
                 <button type="button" className="btn btn-primary full" disabled={loading || health !== "ONLINE" || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddr)} onClick={() => void runSafety("preflight")}>
@@ -1020,7 +1038,10 @@ export function App() {
           {result && service === "preflight" && <SafetyPreflightReport data={result} />}
           {result && (service === "contract_inspect" || service === "live_contract_evidence") && <ContractEvidenceReport data={result} />}
           {result && (service === "analysis_base" || service === "analysis_premium" || service === "spot_analysis_standard" || service === "spot_analysis_premium") && (
-            <AnalysisReport data={result} nfa={d.nfa} onTrade={networkKey === "arc-testnet" ? undefined : openTradeFromReport} />
+            <>
+            <div className="execution-availability" data-status={reportExecution.status}>{reportExecution.label}{!reportExecution.mapped ? ". This report is research; choose a mapped pair for Spot trading on this network." : ". Review the live route and amounts before signing."}</div>
+            <AnalysisReport data={result} nfa={d.nfa} onTrade={reportExecution.mapped ? openTradeFromReport : undefined} />
+            </>
           )}
           {result &&
             service !== "token_scan" &&
@@ -1040,7 +1061,7 @@ export function App() {
               <pre className="raw">{JSON.stringify(result, null, 2)}</pre>
             </details>
           )}
-          <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={(report) => { const reportInstId = typeof report.instId === "string" ? report.instId : null; const reportTimeframe = typeof report.timeframe === "string" ? report.timeframe : null; if (reportInstId) setInstId(reportInstId); if (reportTimeframe) setTimeframe(reportTimeframe); setResult({ ...report, service: typeof report.service === "string" ? report.service : report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" }); }} />
+          {tab === "analyze" && <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={(report) => { const reportInstId = typeof report.instId === "string" ? report.instId : null; const reportTimeframe = typeof report.timeframe === "string" ? report.timeframe : null; if (reportInstId) setInstId(reportInstId); if (reportTimeframe) setTimeframe(reportTimeframe); setResult({ ...report, service: typeof report.service === "string" ? report.service : report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" }); }} />}
         </div>
       </div>}
       </main>

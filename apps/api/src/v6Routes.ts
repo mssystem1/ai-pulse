@@ -108,14 +108,14 @@ export function createV6Router(cfg: AppConfig) {
     const network = String(req.query.network || "");
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     const query = String(req.query.q || "").trim().toUpperCase().slice(0, 40);
-    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 250);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1_000);
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
     if (!chain) return res.status(400).json({ error: "Select X Layer, Base or Arbitrum" });
     const settlementSymbol = network === "xlayer" ? "USDT0" : "USDC";
     const excluded = new Set(["USDC", "USDT", "USDT0", "USDBC", "DAI", "USDS", "USD+", "USD₮0"]);
     try {
       const [tokens, xStocks, instruments] = await Promise.all([
-        getOkxTradeTokens(cfg, chain.chainId, "", 1_000),
+        getOkxTradeTokens(cfg, chain.chainId, "", 5_000),
         getOkxTradeTokens(cfg, chain.chainId, "xStock", 1_000),
         listSpotInstruments(5_000),
       ]);

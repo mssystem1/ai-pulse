@@ -1724,32 +1724,33 @@ export function createApp(cfg: AppConfig, dependencies: {
     const evidenceSources = evidence.sources as Array<{ source: string; status: string; error?: string; data?: unknown }>;
     const sources = evidenceSources.map((source) => ({ name: source.source, status: source.status, detail: source.error || null }));
     const sourceData = (name: string) => evidenceSources.find((source) => source.source === name)?.data;
-    const pairs = (sourceData("DexScreener pairs") || []) as Array<Record<string, unknown>>;
-    const pair = pairs[0] || {};
-    const pairToken = (pair.token || {}) as Record<string, unknown>;
+    const pools = (sourceData("GeckoTerminal pools") || []) as Array<Record<string, unknown>>;
+    const pool = pools[0] || {};
     const okxTokens = (sourceData("OKX Onchain OS") || []) as Array<Record<string, unknown>>;
     const okxToken = okxTokens[0] || {};
     const blockToken = (sourceData("Blockscout token") || {}) as Record<string, unknown>;
     const geckoToken = (sourceData("GeckoTerminal token") || {}) as Record<string, unknown>;
+    const geckoProfile = (sourceData("GeckoTerminal profile") || {}) as Record<string, unknown>;
     const verifiedContract = (sourceData("Blockscout verified contract") || {}) as Record<string, unknown>;
-    const liquidityUsd = optionalNumber(((pair.liquidity as Record<string, unknown> | undefined)?.usd) ?? geckoToken.liquidityUsd ?? okxToken.liquidityUsd);
-    const holders = optionalNumber(blockToken.holders ?? okxToken.holders);
-    const pairCreatedAt = Number(pair.pairCreatedAt);
+    const liquidityUsd = optionalNumber(geckoToken.liquidityUsd ?? pool.liquidityUsd ?? okxToken.liquidityUsd);
+    const holders = optionalNumber(blockToken.holders ?? (geckoProfile.holders as { count?: unknown } | undefined)?.count ?? okxToken.holders);
+    const pairCreatedAt = Date.parse(String(pool.createdAt || ""));
     const ageDays = Number.isFinite(pairCreatedAt) && pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 86_400_000)) : null;
     const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "1" | "56" | "137" | "8453" | "42161", lang }, mv);
     const token = {
       service: "token_scan", methodology_version: mv, chainId: String(network.chainId), address: address.toLowerCase(),
-      symbol: String(blockToken.symbol || okxToken.symbol || pairToken.symbol || geckoToken.symbol || fixtureScan?.symbol || "Unknown"),
-      name: String(blockToken.name || okxToken.name || pairToken.name || geckoToken.name || fixtureScan?.name || "Unknown token"),
+      symbol: String(blockToken.symbol || okxToken.symbol || geckoToken.symbol || fixtureScan?.symbol || "Unknown"),
+      name: String(blockToken.name || okxToken.name || geckoToken.name || fixtureScan?.name || "Unknown token"),
       riskScore: score, grade, verdict,
       components: analysis.components.map(({ evidence: _evidence, ...component }) => component), flags: analysis.criticalRisks,
       liquidityUsd: Number.isFinite(liquidityUsd) ? liquidityUsd : null,
       holdersEstimate: Number.isFinite(holders) ? holders : null,
       contractAgeDays: null,
       poolAgeDays: ageDays,
-      marketCapUsd: optionalNumber(pair.marketCap ?? geckoToken.marketCapUsd ?? okxToken.marketCapUsd),
-      fdvUsd: optionalNumber(pair.fdv ?? geckoToken.fdvUsd),
+      marketCapUsd: optionalNumber(geckoToken.marketCapUsd ?? okxToken.marketCapUsd),
+      fdvUsd: optionalNumber(geckoToken.fdvUsd),
       isVerified: typeof verifiedContract.isVerified === "boolean" ? verifiedContract.isVerified : null,
+      providerAssessment: { source: "GeckoTerminal", score: optionalNumber(geckoProfile.gtScore), metadataVerified: geckoProfile.gtVerified ?? null, scoreDetails: geckoProfile.gtScoreDetails, holders: geckoProfile.holders, websites: geckoProfile.websites || [], twitterHandle: geckoProfile.twitterHandle, scope: "Provider rating and metadata verification; not a contract audit or PULSE risk score" },
       limitations: [...analysis.unknowns, analysis.disclaimer],
       intelligence: analysis, generatedAt: new Date().toISOString(),
     };
@@ -1760,7 +1761,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       summary: analysis.summary, confidence: analysis.confidence,
       checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
       token, intelligence: analysis, recommendations: [analysis.recommendedAction], mostLikelyLossScenario: analysis.mostLikelyLossScenario,
-      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + DexScreener with GeckoTerminal token/pool/profile fallback + bounded project website + Grok synthesis; no automatic RPC eth_call",
+      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + GeckoTerminal token/pool/profile + bounded project website + Grok synthesis; no automatic RPC eth_call",
       analysisProfile: { mode: ai ? "live" : "fixture", model: ai?.model || "fixture", reasoningEffort: ai ? "low" : "none" },
       aiUsage: ai?.usage, shareId: legacy.shareId, limitations: analysis.unknowns, generatedAt: new Date().toISOString(),
     };

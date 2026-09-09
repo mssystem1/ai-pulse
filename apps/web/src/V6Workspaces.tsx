@@ -8,6 +8,7 @@ import {
   toHex,
 } from "viem";
 import { API_BASE, apiGet, apiPost } from "./api";
+import { useExecutionAvailability } from "./executionAvailability";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
   switchWalletNetwork,
@@ -152,6 +153,7 @@ type AutopilotStrategyView = {
   timeframe: string;
   strategyType?: "trend_following" | "breakout" | "mean_reversion";
   minConfidence?: number;
+  buyAmountAtomic?: string;
   policy?: { maxTradePct?: number; dailyLossPct?: number; strategy?: string };
   status: string;
   registrationStatus?: string;
@@ -387,6 +389,7 @@ export function OpportunityRadar({
       : "1H",
   );
   const [items, setItems] = useState<PotentialGainer[]>([]);
+  const executionAvailability = useExecutionAvailability(networkKey);
   const [status, setStatus] = useState("Scanning live market structure…");
   const [expanded, setExpanded] = useState(false);
   const [compactMobile, setCompactMobile] = useState(false);
@@ -500,6 +503,7 @@ export function OpportunityRadar({
                   <span>setup score / 100</span>
                 </div>
                 <p>{candidate.reason}</p>
+                <small className="execution-availability" data-status={executionAvailability(candidate.pair).status}>{executionAvailability(candidate.pair).label}</small>
                 <small>
                   {candidate.strategyType.replaceAll("_", " ")} · RSI{" "}
                   {candidate.rsi14.toFixed(1)} · volume{" "}
@@ -510,13 +514,14 @@ export function OpportunityRadar({
                     <button
                       type="button"
                       className="btn btn-primary"
+                      disabled={!executionAvailability(candidate.pair).mapped}
                       onClick={() => onPrepare(candidate)}
                     >
                       Use for Autopilot
                     </button>
                     <button type="button" className="btn btn-soft" onClick={() => onAnalyze(candidate)}>Open Global analysis</button>
                   </> : context === "spot" && onPrepare ? <>
-                    <button type="button" className="btn btn-primary" onClick={() => onPrepare(candidate)} aria-label={`Load ${candidate.pair} in Spot ticket`}><span>Trade this pair</span><small>Loads ticket · no trade placed</small></button>
+                    <button type="button" className="btn btn-primary" disabled={!executionAvailability(candidate.pair).mapped} onClick={() => onPrepare(candidate)} aria-label={`Load ${candidate.pair} in Spot ticket`}><span>{executionAvailability(candidate.pair).mapped ? "Trade this pair" : "Spot unavailable here"}</span><small>{executionAvailability(candidate.pair).mapped ? "Loads ticket · no trade placed" : "Choose a mapped pair or research"}</small></button>
                     <button type="button" className="btn btn-soft" onClick={() => onAnalyze(candidate)}><span>Research in Global</span><small>Choose Quick or Pro report</small></button>
                   </> : <>
                     <button type="button" className="btn btn-primary" onClick={() => onAnalyze(candidate)}>
@@ -1135,7 +1140,8 @@ export function SpotWorkspace({
   networkKey,
   wallet,
   initialPair,
-  initialTrade,
+  initialTrade: incomingTrade,
+  onPairSelected,
   onAnalyzeCandidate,
   lang = "en",
 }: {
@@ -1143,9 +1149,12 @@ export function SpotWorkspace({
   wallet: string | null;
   initialPair: string;
   initialTrade?: ReportTradeIntent | null;
+  onPairSelected?: (pair: string) => void;
   onAnalyzeCandidate?: (pair: string, timeframe: string) => void;
   lang?: Lang;
 }) {
+  const [dismissedTrade, setDismissedTrade] = useState<ReportTradeIntent | null>(null);
+  const initialTrade = incomingTrade && incomingTrade !== dismissedTrade ? incomingTrade : null;
   const [capability, setCapability] = useState<Capability | null>(null);
   const [pair, setPair] = useState(initialPair);
   const [marketTimeframe, setMarketTimeframe] = useState(initialTrade?.timeframe || "1H");
@@ -1231,6 +1240,8 @@ export function SpotWorkspace({
   const quoteRequestRef = useRef(0);
 
   function selectSpotPair(nextPair: string, scrollToTicket = false) {
+    onPairSelected?.(nextPair);
+    setDismissedTrade(incomingTrade || null);
     quoteRequestRef.current += 1;
     if (busy === "quote") setBusy("");
     setPair(nextPair);
@@ -2679,7 +2690,6 @@ export function SpotWorkspace({
   }
   return (
     <div className="v6-workspace spot-workspace">
-      {!initialTrade && (
         <OpportunityRadar
           networkKey={networkKey}
           context="spot"
@@ -2689,7 +2699,6 @@ export function SpotWorkspace({
           }
           onPrepare={(candidate) => { setMarketTimeframe(candidate.timeframe); selectSpotPair(candidate.pair, true); }}
         />
-      )}
 
       <section className="v6-heading">
         <div><h2>Trade setup</h2></div>
@@ -6495,6 +6504,7 @@ export function AutopilotWorkspace({
                     <div><span>Holds</span><strong>{holds}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
                     <div><span>Failures</span><strong>{failures}</strong><small>{item.lifetimeStatsComplete === false ? `${failureIncidents} visible incidents · available minimum` : `${failureIncidents} distinct incidents in the available journal`}</small></div>
                     <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
+                    <div><span>Configured buy amount</span><strong>{/^\d+$/.test(item.buyAmountAtomic || "") ? `${formatUnits(BigInt(item.buyAmountAtomic!), item.settlementDecimals ?? WEB_NETWORKS[networkKey].payment.decimals)} ${item.settlementSymbol || WEB_NETWORKS[networkKey].payment.symbol}` : "Unavailable"}</strong><small>Signed configuration. Adding funds alone does not increase this; review Capital & risk and approve an updated strategy.</small></div>
                     <div><span>Last cycle</span><strong>{latest ? new Date(latest.evaluatedAt).toLocaleTimeString() : "—"}</strong><small>{latest ? new Date(latest.evaluatedAt).toLocaleDateString() : "awaiting"}</small></div>
                     <div><span>Protection checks</span><strong>{item.riskCheckCount?.toLocaleString() ?? "—"}</strong><small>{item.lastRiskCheckAt ? `Last check ${new Date(item.lastRiskCheckAt).toLocaleString()}` : "No check recorded"} · since monitoring counters enabled</small></div>
                     <div><span>Repeated candle skips</span><strong>{item.sameCandleSkipCount?.toLocaleString() ?? "—"}</strong><small>Same candle was already evaluated; no extra AI call · since monitoring counters enabled</small></div>
@@ -6514,7 +6524,7 @@ export function AutopilotWorkspace({
                       </div>)}
                     </div>
                   </section>}
-                  {item.evaluationHistoryComplete === false && <div className="capital-inline-warning">{item.lifetimeStatsComplete === false ? `Historical detail is partial: ${evaluations.length.toLocaleString()} evaluation rows survive, but the legacy total is unknown. The displayed evaluation, Hold and failure values are minimums, not invented lifetime totals.` : `Historical detail is partial: ${evaluations.length.toLocaleString()} of ${evaluationCount.toLocaleString()} evaluation rows survive from the former retention window. Lifetime evaluation, Hold and failure counters remain available.`} Confirmed on-chain Buy/Sell totals remain authoritative; future rows are retained in the complete journal.</div>}
+                  {item.evaluationHistoryComplete === false && <details className="capital-inline-warning"><summary>{item.lifetimeStatsComplete === false ? `History coverage: ${evaluations.length.toLocaleString()} saved decisions · older total unknown` : `History coverage: ${evaluations.length.toLocaleString()} of ${evaluationCount.toLocaleString()} decisions · ${Math.max(0, evaluationCount - evaluations.length).toLocaleString()} older details missing`}</summary><p>The former retention window deleted older decision details. This is not a limit on the rows displayed or exported now. {item.lifetimeStatsComplete === false ? "Lifetime counters are minimums because the older total is unknown." : "Lifetime evaluation, Hold and failure counters still include those older decisions."} Confirmed on-chain Buy/Sell totals are separate and remain authoritative. New decisions are appended to the journal; check the journal storage status for synchronization problems. Missing historical reasons cannot be reconstructed without a backup.</p></details>}
                   <div className={`strategy-now ${autopilotRuntimeClass(item)}`}>
                     <div><span>WHAT IT IS DOING NOW</span><strong>{item.runtimeState === "paused" || item.paused ? "PAUSED · no monitoring or entry checks" : item.runtimeState === "protecting_position" ? "PROTECTING · exits only" : item.runtimeState === "entry_pass_expired" ? "DORMANT · entry pass expired" : item.runtimeState === "entry_signals_exhausted" ? "DORMANT · confirmations used" : item.runtimeState === "telemetry_unavailable" ? "UNKNOWN · refresh runtime" : providerBlocked ? "WAITING · AI provider unavailable" : latest ? `${latest.action.toUpperCase()} · ${latest.status}` : "WAITING · first candle"}</strong></div>
                     <p>{item.runtimeState === "paused" || item.paused ? "The on-chain vault is paused. It cannot trade, and any active AI Entry Pass timer is held until you resume." : item.runtimeState === "protecting_position" ? "No new Buy is allowed without an active pass. Deterministic TP/SL and authorized exits continue for the invested asset." : item.runtimeState === "entry_pass_expired" ? "The vault has no invested position and cannot open a new one. Renew the AI Entry Pass to resume entry evaluation." : item.runtimeState === "entry_signals_exhausted" ? "The prepaid compact confirmations are used. Renew the AI Entry Pass to allow another qualified entry check." : item.runtimeState === "telemetry_unavailable" ? "PULSE could not verify the current on-chain runtime. No running claim is made until the next successful refresh." : providerBlocked ? `No assets moved. New AI requests are blocked until ${item.aiRetryAt ? new Date(item.aiRetryAt).toLocaleString() : "the provider retry window"}; deterministic position protection remains available.` : latest?.reason || "PULSE is waiting for the next eligible candle."}</p>
@@ -7604,8 +7614,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 </li>
                 <li>
                   The paid report uses OKX API on X Layer, Blockscout API on
-                  Base/Arbitrum and DexScreener with GeckoTerminal fallback for market, website, X-profile
-                  and promotion observations. It does not run automatic RPC calls.
+                  Base/Arbitrum and GeckoTerminal for market, website, X-profile
+                  and provider-rating observations. Social links alone do not establish promotion activity. It does not run automatic RPC calls.
                 </li>
                 <li>
                   If you have exact calldata, optionally simulate it without broadcasting.
@@ -8437,7 +8447,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <article><b>Global Pro → Spot Market or Limit</b><span>$0.30 · deeper chart and Elliott plan, then Agentic Wallet execution</span></article>
               <article><b>Prediction Quick</b><span>$0.20 · selected-market evidence</span></article>
               <article><b>Prediction Pro</b><span>$0.30 · deeper evidence and 4H underlying chart</span></article>
-              <article><b>Token Risk Guard</b><span>$0.20 · OKX/Blockscout + DexScreener/GeckoTerminal evidence, Grok score</span></article>
+              <article><b>Token Risk Guard</b><span>$0.20 · OKX/Blockscout + GeckoTerminal evidence, Grok score</span></article>
               <article><b>Start Autopilot · 24h</b><span>$1.50 · six-step owner-wallet setup and active runtime</span></article>
               <article><b>Start Autopilot · 7d</b><span>$10.50 · same workflow for seven active-runtime days</span></article>
               <article><b>Start Autopilot · 30d</b><span>$45.00 · same workflow for 30 active-runtime days</span></article>

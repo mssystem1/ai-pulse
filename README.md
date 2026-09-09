@@ -97,7 +97,7 @@ Paid reports use the configured public Vercel Blob transport, but only as authen
 ### Risk Guard
 
 - **Raw contract evidence · free:** an explicitly user-triggered selected-network RPC diagnostic. It is not the paid report and never runs automatically during report generation.
-- **Token Risk Guard · $0.20:** Grok synthesizes a scored due-diligence report from bounded provider evidence. X Layer on-chain facts come from authenticated OKX Onchain OS APIs; Base and Arbitrum on-chain facts come from Blockscout APIs. DexScreener supplies market/liquidity, declared website/X links, boosts, ads and community-promotion observations only.
+- **Token Risk Guard · $0.20:** Grok synthesizes a scored due-diligence report from bounded provider evidence. X Layer on-chain facts come from authenticated OKX Onchain OS APIs; Base and Arbitrum on-chain facts come from Blockscout APIs. GeckoTerminal supplies token/pool market data, declared website/X links and an attributed provider rating. Social handles do not establish posting frequency or promotion activity.
 - **Project context:** PULSE fetches only a declared public HTTPS project website through a bounded SSRF-resistant reader. Missing, inaccessible or contradictory data remains an explicit unknown and reduces confidence.
 - **Report:** source coverage, lower-risk score, grade, PASS/WARN/FAIL verdict, contract/market/holder/project/promotion breakdown, critical risks, positive signals, unknowns, likely loss scenario and recommendation.
 - **Transaction simulation · free:** an optional, explicitly user-triggered selected-network diagnostic that never broadcasts a transaction.
@@ -120,7 +120,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 - **Global Market:** live OKX crypto, xStocks/RWA instruments, candles, Opportunity Radar, and Base/Premium reports with Elliott-aware execution plans.
 - **Prediction Markets:** active crypto price/direction markets only, explicit single-market selection, order books, probability history, liquidity and evidence quality, followed by base or premium prediction analysis.
-- **Risk Guard:** free raw evidence and optional simulation are separate from the $0.20 Grok Token Risk report; the paid report uses OKX for X Layer on-chain evidence, Blockscout for Base/Arbitrum, and DexScreener for market/social/promotion evidence.
+- **Risk Guard:** free raw evidence and optional simulation are separate from the $0.20 Grok Token Risk report; the paid report uses OKX for X Layer on-chain evidence, Blockscout for Base/Arbitrum, and GeckoTerminal for market/profile evidence. Provider outages lower evidence confidence; they are not confirmed token defects.
 - **Spot Trading:** connected-wallet Market, Limit, integrated TP/SL, route/balance checks, account discovery, and reconciled lifecycle dashboard.
 - **Autopilot:** separate owner-controlled vault capital, strategy presets, enforceable policy limits, autonomous Buy/Hold/Sell lifecycle, and shared dashboard semantics.
 - **Human web app:** one responsive Global Market / Prediction Market / Risk Guard / Spot Trading / Autopilot / Telegram / Docs workspace; persistent network selection; X Layer, Base, Arbitrum and Arc-specific themes; direct OKX Wallet preference plus EIP-6963/WalletConnect compatibility; balances, funding, payment progress, private report history, and readable reports.
@@ -505,7 +505,9 @@ Spot shortlist cards automatically display the existing OKX scan's price and rec
 
 Six Autopilot setup steps do not mean six wallet prompts. Before activation the UI explains separate contract transactions and signed authorizations. Existing vault configuration and valid passes affect the actual count. Dashboard rows and journals identify each vault as **Autopilot N**, so strategies using the same pair remain distinguishable. Confirmed fills and historical activity are separate from the latest evaluation; old fill reconciliation cannot replace a newer runtime decision.
 
-Risk Guard uses GeckoTerminal token, pool and profile data when DexScreener has no pair or declared website. This is a cached market/profile fallback, not another on-chain authority: on-chain facts still come from OKX on X Layer and Blockscout on Base/Arbitrum. Unknown market cap is not replaced by FDV, pool age is not contract age, and base-token metrics are not attributed to the quote token. A discovered website that returns an error remains listed as a declared, unverified source. A bullish chart does not justify manufacturing a high safety score.
+Risk Guard uses GeckoTerminal token, pool and profile data as its primary market/profile source, independently of website availability. Requests share a short cache; transient HTTP 5xx responses receive at most one retry and rate-limit failures are cached. On-chain authority remains OKX on X Layer and Blockscout on Base/Arbitrum. GeckoTerminal's provider score is displayed separately from PULSE's assessment; metadata verification is not a contract audit. Unknown market cap is not replaced by FDV, pool age is not contract age, and base-token price changes are not attributed to the quote token. A discovered website that returns an error remains a declared, unverified source. A bullish chart does not justify manufacturing a high safety score.
+
+Global pair search, shortlist cards and reports show selected-network Spot mapping status. Research-only pairs remain analyzable; mapped pairs still require a fresh route quote and wallet approval. Opening Spot from a report keeps the shortlist available; selecting another pair clears the previous report's trade levels. Verified fallback deployments include Base AERO ([Aerodrome](https://github.com/aerodrome-finance/contracts)), Arbitrum LINK ([Chainlink](https://docs.chain.link/resources/link-token-contracts)) and ARB ([Arbitrum Foundation](https://support.arbitrum.io/hc/en-gb/articles/19480176370459-I-ve-sent-ARB-from-a-CEX-to-my-wallet-but-I-can-t-see-it)). Catalog discovery covers up to 5,000 tokens per chain without silently truncating at 1,000; a ticker alone does not authorize a trade.
 
 All eight public MCP services and the REST analysis routes validate required arguments before an x402 challenge. Malformed instruments, unsupported candle intervals, missing token contracts and malformed vault/owner addresses return input errors without payment headers. Autopilot pass challenges additionally require a registered vault owned by the specified wallet on the selected network. See [local verification and resubmission notes](docs/UI_RUNTIME_VERIFICATION.md); local changes do not update agent 8355 or deploy the API.
 
@@ -736,7 +738,7 @@ Spot Trading and Autopilot are independent systems. A Spot report action never a
 │           ├── tradeAutomation.ts   deterministic Spot reconciliation/trigger worker
 │           ├── autopilotPolicy.ts   explicit entry, Hold and exit rule engine
 │           ├── autopilotAutomation.ts strategy/evidence/simulation/execution loop
-│           ├── tokenRiskEvidence.ts bounded OKX/Blockscout/DexScreener/project evidence
+│           ├── tokenRiskEvidence.ts bounded OKX/Blockscout/GeckoTerminal/project evidence
 │           ├── reportHistoryAuth.ts wallet challenge and scoped report recovery sessions
 │           ├── resilientKv.ts       bounded retry and recovering KV circuit
 │           ├── automationTick.ts    secret serverless scheduler entry and lease

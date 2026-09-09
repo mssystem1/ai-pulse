@@ -11,6 +11,9 @@ test("localizes shared PULSE workspaces and preserves technical identifiers", ()
 });
 
 test("localizes dynamic route and wallet copy", () => {
+  assert.equal(localizeUiText("zh", "Spot mapped · Base"), "现货已映射 · Base");
+  assert.equal(localizeUiText("zh", "Research only · not mapped on Base"), "仅供研究 · 尚未在 Base 映射");
+  assert.match(localizeUiText("zh", "History coverage: 121 of 341 decisions · 220 older details missing"), /121 \/ 341/);
   assert.equal(localizeUiText("zh", "Choose a live pair on Base"), "在 Base 上选择实时交易对");
   assert.equal(localizeUiText("zh", "Live WETH/USDC route verified"), "WETH/USDC 实时路径已验证");
   assert.equal(localizeUiText("zh", "Buy WETH"), "买入 WETH");

@@ -118,3 +118,22 @@ Remaining acceptance: controlled live payment settlement, durable paid report de
 ### Pre-commit verification (2026-09-08)
 
 The full root `npm test` run passed **254 tests**: contracts 8, config 6, domain 5, market 10, analysis 19, payments 8, SDK 2, API 146 and web 50. Contract behavior tests used a local Hardhat chain, not a funded mainnet wallet. `npm run build:vercel` completed the full dependency, API and web production build locally; it did not contact a deployment service. Existing wallet dependency and bundle-size warnings remain. The staged diff passed whitespace checks; a scoped credential-literal check found no obvious secrets, and local `.env` files remain ignored. These checks support committing the implementation, not a claim that all live acceptance items are complete.
+### Post-deployment regression fixes (2026-09-09)
+
+Local changes only; no deployment, push, marketplace update or wallet transaction.
+
+| Reported issue | Change and evidence |
+| --- | --- |
+| Global research offered an unmapped Spot action | Selected-network mapping is shown in Global pair search, shortlist cards and report handoff. Research remains available; unmapped execution buttons do not authorize a Spot ticket. Live local catalogs returned 18 Base, 98 X Layer and 99 Arbitrum pairs. WIF was not mapped on any of these networks. Mapping is distinct from fresh quote availability. |
+| Spot shortlist disappeared after a report Buy | Shortlist remains visible. Browser fixture: restore BTC report, open its Market Buy action, select XRP from the shortlist; XRP ticket and market snapshot load, BTC levels/banner clear. Direct pair selection is retained when leaving/reopening Spot. |
+| AERO Risk Guard appeared in Global | Report state and payment captions are separated by service family. Browser fixture: show AERO Risk Guard, navigate to Global without reloading; no AERO report appears there. Async free evidence is also rejected after a superseding request/network change. |
+| GeckoTerminal/Blockscout evidence gaps | GeckoTerminal is primary for token/pool/profile evidence; no DexScreener calls in paid Risk Guard, including X Layer. Shared cache, one bounded 5xx retry, no immediate quota retry, exact token/pool identity checks. Blockscout v2 contract 500 reproduced; documented legacy getsourcecode returned verified Aero source. The adapter uses that fallback only for transient failures and caches requests. Later live v2 verification also recovered. Holder endpoint still intermittently fails; this is explicitly unknown. |
+| Base Autopilot #2 behavior/history | Read-only deployed check at 2026-09-09 02:10:59 UTC: DOGE-USDT 15m Breakout running, 381 lifetime evaluations / 161 saved details, storage synced, zero confirmed buys/sells. Close 0.09026 was below required 0.09094; volume 2.29x passed 1.15x, so price still blocked AI/entry. The constant 220-row gap is legacy deletion, not current UI pagination. Configured buy amount is now visible in human units. Its earlier inspected signed amount was 0.05 USDC; no live policy was changed. |
+
+Live AERO evidence: GeckoTerminal token, pools and profile returned data, score approximately 91.04, roughly $600M circulating market cap and $27–28M liquidity during checks, declared aerodrome.finance website and holder count. Website content was fetched. Provider rating is separate from PULSE's assessment and is not a contract audit. Cached historical reports are not rewritten; new reports use the new evidence pipeline.
+
+Chrome localhost verification used 1440px desktop and 390px/320px mobile. No horizontal document overflow in tested Global/Spot/Risk Guard views. Pair-search layout conflict fixed. Report fixtures were explicitly synthetic; live market/pair requests were real. No new paid Grok report or payment settlement was performed.
+
+Deployed public metadata returned product PULSE, repository mssystem1/ai-pulse and eight featured services. Authenticated agent-8355 lookup could not complete because the OKX session expired. Codespaces login, deployment of these changes and explicit resubmission approval remain separate acceptance steps.
+
+Final local checks: **259 tests passed** (150 API, 51 web, 58 other workspace tests), `npm run build:vercel` exited 0, web type check and whitespace validation passed. Existing wallet-library `waitForTempoBlock` export and large-bundle warnings remain. Synthetic browser recovery entries were removed after verification.

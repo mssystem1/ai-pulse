@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { apiGet } from "./api";
+import { useExecutionAvailability } from "./executionAvailability";
 import type { Lang } from "./i18n";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { NetworkLogo } from "./NetworkLogo";
@@ -366,12 +367,15 @@ export function MarketPairPicker({
   lang,
   value,
   onSelect,
+  networkKey,
 }: {
   id: string;
   lang: Lang;
   value: string;
   onSelect: (instrument: SpotInstrument) => void;
+  networkKey: WebNetworkKey;
 }) {
+  const executionAvailability = useExecutionAvailability(networkKey);
   const c = copy[lang];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -533,7 +537,7 @@ export function MarketPairPicker({
                   <i>/</i>
                   {item.quoteCcy}
                 </strong>
-                <small>{item.instId} · OKX spot</small>
+                <small>{executionAvailability(item.instId).label}</small>
               </span>
               <span className="pair-item-status">
                 <small className={`asset-class-badge ${item.assetClass}`}>

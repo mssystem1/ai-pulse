@@ -962,6 +962,8 @@ body.picker-open { overflow: hidden; }
 .market-evidence-row b { text-align: right; font-size: .64rem; }
 .market-evidence-row small { grid-column: 1/-1; color: var(--muted); font-size: .56rem; }
 .picker-search-wrap { display: grid; grid-template-columns: 1fr auto; gap: .55rem; }
+.picker-search-wrap:has(> span:first-child) { grid-template-columns: auto minmax(0, 1fr); }
+.picker-search-wrap .picker-search { min-width: 0; }
 .prediction-picker-list { display: grid; gap: .4rem; max-height: min(58vh,560px); overflow-y: auto; }
 .prediction-picker-list button { display: grid; gap: .35rem; padding: .75rem; text-align: left; color: var(--text); border: 1px solid var(--line); border-radius: 11px; background: rgba(255,255,255,.025); cursor: pointer; }
 .prediction-picker-list button:hover { border-color: var(--mint); background: color-mix(in srgb,var(--mint) 8%,transparent); }
@@ -1253,3 +1255,9 @@ html[data-pulse-theme="base"] .trade-mode-tabs button.active,html[data-pulse-the
 @media(max-width:1050px){.overview-domain-grid,.overview-detail-grid{grid-template-columns:1fr}.overview-report-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:700px){.overview-workspace{gap:12px}.overview-heading{display:grid;min-height:0;padding:24px 18px}.overview-heading::after{right:-120px;bottom:-100px}.overview-heading h2{font-size:clamp(2rem,10.5vw,2.75rem);overflow-wrap:anywhere}.overview-refresh{width:100%}.overview-domain-summary .overview-metrics{grid-template-columns:1fr 1fr;gap:7px}.overview-domain-summary .overview-metrics>button{min-height:118px;padding:14px}.overview-domain-summary .overview-metrics>button:last-child{grid-column:1/-1}.overview-metrics strong{font-size:1.35rem}.overview-attention,.overview-panel,.overview-domain-summary{padding:18px}.overview-panel-head{align-items:flex-start;flex-direction:column}.overview-activity-list article{grid-template-columns:70px minmax(0,1fr)}.overview-activity-list time{grid-column:2}.overview-report-metrics{grid-template-columns:1fr 1fr}.overview-report-metrics>div:first-child{grid-column:1/-1}.overview-report-list{grid-template-columns:1fr}}
 @media(max-width:350px){.overview-metrics{grid-template-columns:1fr}.overview-metrics>button{min-height:0}.overview-strategy-list dl{grid-template-columns:1fr}}
+.execution-availability{display:block;padding:8px 10px;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:.68rem;line-height:1.5;overflow-wrap:anywhere;margin:8px 0}
+.execution-availability[data-status="mapped"]{color:var(--mint)}
+.execution-availability[data-status="research"]{color:var(--warn)}
+.provider-assessment{border:1px solid var(--line);border-radius:12px;padding:14px;margin:16px 0}
+.provider-assessment p{font-size:.75rem;line-height:1.6;color:var(--muted)}
+.provider-assessment a{display:inline-block;margin:4px 12px 4px 0;font-size:.78rem}

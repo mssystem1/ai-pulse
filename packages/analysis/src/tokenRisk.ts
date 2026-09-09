@@ -86,6 +86,8 @@ export async function runGrokTokenRiskAnalysis(
     "You are PULSE Token Risk Guard. Produce a due-diligence report from the supplied evidence only.",
     "Never invent audits, ownership state, liquidity, holder counts, social activity, partnerships, verification, or safety.",
     "Treat missing, failed, stale, or contradictory data as unknown and lower confidence. A verified source contract is not proof that a token is safe.",
+    "An unavailable provider endpoint is an evidence gap, not a confirmed contract vulnerability. Put fetch failures in unknowns, not criticalRisks unless independent observed evidence establishes a risk. Do not claim no promotion or community simply because this source set does not measure engagement.",
+    "Present GeckoTerminal gtScore/gtVerified as separate attributed provider metrics, never copy them into PULSE riskScore or treat metadata verification as a contract audit. Credit observed liquidity, verified metadata and holder evidence; explain any material score difference through actual evidence and uncertainty. Holder distribution can include exchanges, pools and treasuries.",
     "riskScore is 0-100 where 100 means lower observed risk and stronger evidence. Score each of exactly five components.",
     "Weights must be contract .30, market .25, holders .15, project .15, promotion .15. Promotion spending is not a positive safety signal by itself.",
     "Separate facts from inference. Cite source names inside evidence strings. Keep recommendations non-custodial and non-financial-advice.",
@@ -124,4 +126,3 @@ export async function runGrokTokenRiskAnalysis(
   } : undefined;
   return { analysis, usage, model: cfg.model, lang };
 }
-

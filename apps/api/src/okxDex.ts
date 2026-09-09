@@ -358,17 +358,22 @@ export async function getXLayerOkxTokens(
 }
 
 const tradeTokenCache = new Map<string, { expiresAt: number; tokens: Record<string, unknown>[] }>();
+const tradeTokenRequests = new Map<string, Promise<Record<string, unknown>[]>>();
 
 // Official wrapped assets may be routable by contract before they appear in
 // OKX's discovery catalog. These addresses are additive; a live quote is still
 // required before the UI enables a wallet transaction.
 const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
   "196": [
+    { tokenSymbol: "LINK", tokenName: "Chainlink", tokenContractAddress: "0x8af9711b44695a5a081f25ab9903ddb73acf8fa9", decimals: 18, tokenSource: "Chainlink official deployment" },
     { tokenSymbol: "USDT0", tokenName: "Tether USD0", tokenContractAddress: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, tokenSource: "X Layer official token list" },
     { tokenSymbol: "WOKB", tokenName: "Wrapped OKB", tokenContractAddress: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", decimals: 18, tokenSource: "X Layer official token list" },
     { tokenSymbol: "WETH", tokenName: "Wrapped Ether", tokenContractAddress: "0x5A77f1443D16ee5761d310e38b62f77f726bC71c", decimals: 18, tokenSource: "X Layer official token list" },
   ],
   "8453": [
+    { tokenSymbol: "LINK", tokenName: "Chainlink", tokenContractAddress: "0x88fb150bdc53a65fe94dea0c9ba0a6daf8c6e196", decimals: 18, tokenSource: "Chainlink official deployment" },
+    // Aerodrome's published deployment: github.com/aerodrome-finance/contracts
+    { tokenSymbol: "AERO", tokenName: "Aerodrome Finance", tokenContractAddress: "0x940181a94a35a4569e4529a3cdfb74e38fd98631", decimals: 18, tokenSource: "Aerodrome official deployment" },
     { tokenSymbol: "WETH", tokenName: "Wrapped Ether", tokenContractAddress: "0x4200000000000000000000000000000000000006", decimals: 18, tokenSource: "Base canonical WETH" },
     { tokenSymbol: "cbBTC", tokenName: "Coinbase Wrapped BTC", tokenContractAddress: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8, tokenSource: "Coinbase" },
     { tokenSymbol: "cbDOGE", tokenName: "Coinbase Wrapped DOGE", tokenContractAddress: "0xcbD06E5A2B0C65597161de254AA074E489dEb510", decimals: 8, tokenSource: "Coinbase" },
@@ -383,6 +388,9 @@ const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
     { tokenSymbol: "GOOGLc", tokenName: "Coinbase Tokenized Alphabet", tokenContractAddress: "0xb2000000000000000000002D0BA3164cc74f58B7", decimals: 8, tokenSource: "Coinbase" },
   ],
   "42161": [
+    // Published by Chainlink and the Arbitrum Foundation respectively.
+    { tokenSymbol: "LINK", tokenName: "Chainlink", tokenContractAddress: "0xf97f4df75117a78c1a5a0dbb814af92458539fb4", decimals: 18, tokenSource: "Chainlink official deployment" },
+    { tokenSymbol: "ARB", tokenName: "Arbitrum", tokenContractAddress: "0x912ce59144191c1204e64559fe8253a0e49e6548", decimals: 18, tokenSource: "Arbitrum Foundation" },
     { tokenSymbol: "WETH", tokenName: "Wrapped Ether", tokenContractAddress: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1", decimals: 18, tokenSource: "Arbitrum canonical WETH" },
     { tokenSymbol: "cbBTC", tokenName: "Coinbase Wrapped BTC", tokenContractAddress: "0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf", decimals: 8, tokenSource: "Coinbase" },
   ],
@@ -411,7 +419,7 @@ const EXECUTION_ASSET_ALIASES: Record<string, Record<string, string[]>> = {
   },
   "8453": {
     BTC: ["CBBTC", "WBTC", "BTC"],
-    ETH: ["WETH", "CBETH", "ETH"],
+    ETH: ["WETH", "ETH"],
     DOGE: ["CBDOGE", "DOGE"],
     XRP: ["CBXRP", "XRP"],
     LTC: ["CBLTC", "LTC"],
@@ -482,7 +490,14 @@ export async function getOkxTradeTokens(
   const cacheKey = chainId;
   let cached = tradeTokenCache.get(cacheKey);
   if (!cached || cached.expiresAt <= Date.now()) {
-    const tokens = await okxDexGetMany(cfg, "/api/v6/dex/aggregator/all-tokens", { chainIndex: chainId });
+    let request = tradeTokenRequests.get(cacheKey);
+    if (!request) {
+      request = okxDexGetMany(cfg, "/api/v6/dex/aggregator/all-tokens", { chainIndex: chainId });
+      tradeTokenRequests.set(cacheKey, request);
+    }
+    let tokens: Record<string, unknown>[];
+    try { tokens = await request; }
+    finally { if (tradeTokenRequests.get(cacheKey) === request) tradeTokenRequests.delete(cacheKey); }
     cached = { expiresAt: Date.now() + 5 * 60_000, tokens };
     tradeTokenCache.set(cacheKey, cached);
   }
@@ -495,7 +510,7 @@ export async function getOkxTradeTokens(
     .filter((item, index, all) => all.findIndex((candidate) => String(candidate.tokenContractAddress).toLowerCase() === String(item.tokenContractAddress).toLowerCase()) === index);
   return candidates.filter((item) => !query || [item.tokenSymbol, item.tokenName, item.tokenContractAddress]
     .some((value) => [...aliases].some((alias) => String(value || "").toLowerCase().includes(alias))))
-    .slice(0, Math.min(Math.max(limit, 1), 1_000))
+    .slice(0, Math.min(Math.max(limit, 1), 5_000))
     .map((item) => ({
       symbol: String(item.tokenSymbol || "TOKEN"),
       name: String(item.tokenName || item.tokenSymbol || "Token"),

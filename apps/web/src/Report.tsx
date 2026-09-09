@@ -163,6 +163,9 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
   const recs = Array.isArray(data.recommendations) ? (data.recommendations as string[]) : [];
   const intelligence = (data.intelligence || {}) as AnyRec;
   const sources = Array.isArray(data.sourceCoverage) ? data.sourceCoverage as AnyRec[] : [];
+  const tokenEvidence = (data.token || {}) as AnyRec;
+  const provider = (tokenEvidence.providerAssessment || {}) as AnyRec;
+  const dollars = (value: unknown) => typeof value === "number" && Number.isFinite(value) ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 2 }).format(value) : "Unknown";
   const risks = Array.isArray(intelligence.criticalRisks) ? intelligence.criticalRisks as string[] : [];
   const positives = Array.isArray(intelligence.positiveSignals) ? intelligence.positiveSignals as string[] : [];
   const unknowns = Array.isArray(intelligence.unknowns) ? intelligence.unknowns as string[] : [];
@@ -189,6 +192,16 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
       {String(data.summary || "") && <p className="sr-summary">{String(data.summary)}</p>}
 
       {sources.length > 0 && <>
+        {provider.source === "GeckoTerminal" && <section className="provider-assessment" aria-label="GeckoTerminal market evidence">
+          <div className="sr-section">GeckoTerminal · observed market evidence</div>
+          <div className="risk-source-grid">
+            <div className="risk-source"><span>Provider score · separate from PULSE</span><b>{typeof provider.score === "number" ? `${provider.score.toFixed(1)} / 100` : "Unavailable"}</b></div>
+            <div className="risk-source"><span>Market capitalization</span><b>{dollars(tokenEvidence.marketCapUsd)}</b></div>
+            <div className="risk-source"><span>Liquidity</span><b>{dollars(tokenEvidence.liquidityUsd)}</b></div>
+          </div>
+          <p>Market strength and a provider rating are useful evidence, not a contract audit or a guarantee. Unavailable sources are evidence gaps, not confirmed vulnerabilities.</p>
+          {Array.isArray(provider.websites) && provider.websites.filter((url: unknown) => typeof url === "string" && /^https:\/\//i.test(url)).slice(0, 3).map((url: string) => <a key={url} href={url} target="_blank" rel="noopener noreferrer">Project website ↗</a>)}
+        </section>}
         <div className="sr-section">Source coverage</div>
         <div className="risk-source-grid">
           {sources.map((source) => <div key={String(source.name)} className={`risk-source ${String(source.status)}`}><span>{String(source.status).replaceAll("_", " ")}</span><b>{String(source.name)}</b>{source.detail ? <small>{String(source.detail)}</small> : null}</div>)}

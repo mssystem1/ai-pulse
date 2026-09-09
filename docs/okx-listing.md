@@ -44,7 +44,7 @@ PULSE turns live OKX Global Market and explicitly selected Polymarket evidence i
 | Global Pro → Spot Market or Limit | $0.30 | pair, timeframe, language, optional focus | Chart, Elliott paths and DeFi context, then a prefilled Agentic-Wallet-signed Spot Market or Limit order |
 | Prediction Quick | $0.20 | one selected Polymarket market | Probability evidence, decision, risks and invalidation |
 | Prediction Pro | $0.30 | one selected Polymarket market | Deeper evidence weighting plus a mapped 4H underlying chart |
-| Token Risk Guard | $0.20 | network and exact token contract | Grok-scored due diligence from OKX/Blockscout on-chain facts plus DexScreener market, project, X-profile and promotion evidence |
+| Token Risk Guard | $0.20 | network and exact token contract | Grok-scored due diligence from OKX/Blockscout on-chain facts plus GeckoTerminal market, project links and attributed provider rating |
 | Start Autopilot · 24h | $1.50 | owner, vault and six-step strategy setup | Agentic Wallet creates/configures/funds/registers the vault; x402 activates 24 active-runtime hours |
 | Start Autopilot · 7d | $10.50 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with seven active-runtime days |
 | Start Autopilot · 30d | $45.00 | owner, vault and six-step strategy setup | Same owner-controlled start workflow with 30 active-runtime days |

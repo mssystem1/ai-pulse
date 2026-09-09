@@ -188,7 +188,7 @@ PRICE_ANALYSIS_PREDICTION_STANDARD=0.20
 PRICE_ANALYSIS_PREDICTION_PREMIUM=0.30
 ```
 
-These are Global Market Quick/Pro, Prediction Market Quick/Pro, and the $0.20 Token Risk Guard. Risk Guard must remain wired to REST, the browser, MCP/SDK metadata and marketplace replay. Its X Layer on-chain source is OKX API; its Base/Arbitrum source is Blockscout API; DexScreener supplies market/social/promotion evidence; Grok performs the final scored synthesis.
+These are Global Market Quick/Pro, Prediction Market Quick/Pro, and the $0.20 Token Risk Guard. Risk Guard remains wired to REST, browser, MCP/SDK metadata and marketplace replay. Its X Layer on-chain source is OKX API; Base/Arbitrum use Blockscout API with a bounded legacy verified-source fallback for v2 outages. GeckoTerminal supplies market/profile evidence and an attributed provider rating; Grok performs the final scored synthesis. Social links alone do not demonstrate promotion activity.
 
 ### Public Autopilot start services
 

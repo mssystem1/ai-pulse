@@ -7,6 +7,17 @@ import type { Lang } from "./i18n";
  * Global Market shell) so EN/中文 remains one application-level decision.
  */
 const ZH_EXACT: Record<string, string> = {
+  "Checking Spot availability…": "正在检查现货可用性…",
+  "Spot availability unavailable": "暂时无法查询现货可用性",
+  "Spot unavailable here": "当前网络不支持现货交易",
+  "Choose a mapped pair or research": "选择已映射交易对，或进行研究",
+  "GeckoTerminal · observed market evidence": "GeckoTerminal · 已获取的市场证据",
+  "Provider score · separate from PULSE": "供应商评分 · 独立于 PULSE 评分",
+  "Market capitalization": "流通市值",
+  "Liquidity": "流动性",
+  "Configured buy amount": "已配置的买入金额",
+  "Signed configuration. Adding funds alone does not increase this; review Capital & risk and approve an updated strategy.": "这是已签名的配置。仅追加资金不会增加该金额；请检查资金与风险设置并批准更新后的策略。",
+  "Project website ↗": "项目网站 ↗",
   "Workflow maps": "流程图",
   "WORKFLOW MAPS": "流程图",
   "See where each action leads": "了解每个操作的下一步",
@@ -1071,6 +1082,11 @@ const ZH_PRODUCT: Record<string, string> = {
 };
 
 const ZH_PHRASES: Array<[RegExp, string]> = [
+  [/^Spot mapped · (.+)$/, "现货已映射 · $1"],
+  [/^Research only · not mapped on (.+)$/, "仅供研究 · 尚未在 $1 映射"],
+  [/^Research only · Arc Testnet$/, "仅供研究 · Arc 测试网"],
+  [/^History coverage: (.+) of (.+) decisions · (.+) older details missing$/, "历史覆盖：$1 / $2 条决策 · 缺失 $3 条旧记录详情"],
+  [/^History coverage: (.+) saved decisions · older total unknown$/, "历史覆盖：$1 条已保存决策 · 旧记录总数未知"],
   [/^(.+ · .+ · )trend following$/, "$1趋势跟随"],
   [/^(.+ · .+ · )mean reversion$/, "$1均值回归"],
   [/^(.+ · .+ · )breakout$/, "$1突破"],
