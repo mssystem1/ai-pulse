@@ -41,6 +41,23 @@ async function verifiedContract(primaryUrl: string, fallbackUrl: string, address
   }
 }
 
+async function indexedToken(primary: string, fallback: string, holders: boolean) {
+  try { return await getJson(primary); }
+  catch (error) {
+    if (!/HTTP 5\d\d|timeout|aborted/i.test(String(error))) throw error;
+    const legacy = await getJson(fallback) as { status?: string; message?: string; result?: any };
+    if (legacy.status !== "1" || !legacy.result) throw new Error("Blockscout REST unavailable; legacy indexed evidence also unavailable");
+    if (holders) {
+      if (!Array.isArray(legacy.result)) throw new Error("Blockscout returned invalid holder evidence");
+      return { items: legacy.result.map((item: { address: string; value: string }) => ({ address: { hash: item.address }, value: item.value })), evidence_api: "Blockscout legacy getTokenHolders", partial: true };
+    }
+    const token = legacy.result;
+    if (!token.contractAddress || !token.symbol) throw new Error("Blockscout returned invalid token evidence");
+    return { address: token.contractAddress, symbol: token.symbol, name: token.name, decimals: token.decimals,
+      total_supply: token.totalSupply, type: token.type, evidence_api: "Blockscout legacy getToken" };
+  }
+}
+
 function settled(source: string, result: PromiseSettledResult<unknown>): SourceResult {
   if (result.status === "fulfilled" && Array.isArray(result.value) && !result.value.length) return { source, status: "unavailable", data: [], error: "No matching indexed evidence; absence is not proof of no project activity" };
   return result.status === "fulfilled"
@@ -99,6 +116,7 @@ function compactBlockscout(source: string, value: unknown) {
     address: raw.address, name: raw.name, symbol: raw.symbol, decimals: raw.decimals, totalSupply: raw.total_supply,
     holders: raw.holders, exchangeRate: raw.exchange_rate, circulatingMarketCap: raw.circulating_market_cap,
     type: raw.type, iconUrl: raw.icon_url, reputation: raw.reputation,
+    evidenceApi: raw.evidence_api || "Blockscout v2",
   };
   if (source === "Blockscout verified contract") return {
     address: raw.address, name: raw.name, compilerVersion: raw.compiler_version, language: raw.language,
@@ -108,7 +126,7 @@ function compactBlockscout(source: string, value: unknown) {
     sourceCodePresent: Boolean(raw.source_code), evidenceApi: raw.evidence_api || "Blockscout v2",
   };
   const items = Array.isArray(raw.items) ? raw.items as Array<Record<string, unknown>> : [];
-  return { holders: items.slice(0, 20).map((item) => ({ address: (item.address as Record<string, unknown> | undefined)?.hash, value: item.value, percentage: item.percentage })), nextPageParams: raw.next_page_params || null };
+  return { holders: items.slice(0, 20).map((item) => ({ address: (item.address as Record<string, unknown> | undefined)?.hash, value: item.value, percentage: item.percentage })), nextPageParams: raw.next_page_params || null, partial: true, evidenceApi: raw.evidence_api || "Blockscout v2" };
 }
 
 export async function collectTokenRiskEvidence(input: {
@@ -118,14 +136,17 @@ export async function collectTokenRiskEvidence(input: {
   const geckoPromise = collectGeckoEvidence(networkKey, address);
   const blockscoutBase = BLOCKSCOUT[networkKey];
   const blockscoutUrl = (path: string) => {
-    const url = new URL(`${blockscoutBase}${path}`);
+    // PRO keys belong to the unified gateway, not the explorer's MyAccount API.
+    const base = cfg.BLOCKSCOUT_API_KEY.trim().startsWith("proapi_")
+      ? `https://api.blockscout.com/${network.chainId}` : blockscoutBase;
+    const url = new URL(`${base}${path}`);
     if (cfg.BLOCKSCOUT_API_KEY.trim()) url.searchParams.set("apikey", cfg.BLOCKSCOUT_API_KEY.trim());
     return url.toString();
   };
   const blockscoutRequests: Array<Promise<unknown>> = blockscoutBase ? [
-    getJson(blockscoutUrl(`/api/v2/tokens/${address}`)),
+    indexedToken(blockscoutUrl(`/api/v2/tokens/${address}`), blockscoutUrl(`/api?module=token&action=getToken&contractaddress=${address}`), false),
     verifiedContract(blockscoutUrl(`/api/v2/smart-contracts/${address}`), blockscoutUrl(`/api?module=contract&action=getsourcecode&address=${address}`), address),
-    getJson(blockscoutUrl(`/api/v2/tokens/${address}/holders`)),
+    indexedToken(blockscoutUrl(`/api/v2/tokens/${address}/holders`), blockscoutUrl(`/api?module=token&action=getTokenHolders&contractaddress=${address}&page=1&offset=20`), true),
   ] : [];
   const okxPromise = networkKey === "xlayer"
     ? getXLayerOkxTokens(cfg, address, 10).then(items => items.filter(item => String(item.tokenContractAddress).toLowerCase() === address.toLowerCase()).map(item => ({

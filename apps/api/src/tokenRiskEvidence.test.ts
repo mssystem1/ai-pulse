@@ -47,3 +47,47 @@ test("Blockscout v2 failure uses one verified-source fallback and shares cached 
     assert.equal(requests.filter(url => url.includes("smart-contracts")).length, 1);
   } finally { globalThis.fetch = original; }
 });
+
+test("PRO keys use the unified gateway and recover all indexed sources through legacy APIs", async () => {
+  const original = globalThis.fetch;
+  const address = "0x0000000000000000000000000000000000000323";
+  const requests: string[] = [];
+  globalThis.fetch = async input => {
+    const url = new URL(String(input)); requests.push(url.toString());
+    if (url.hostname.includes("blockscout")) {
+      assert.equal(url.origin, "https://api.blockscout.com");
+      assert.ok(url.pathname.startsWith("/8453/"));
+      assert.equal(url.searchParams.get("apikey"), "proapi_fixture");
+      if (url.pathname.includes("/v2/")) return new Response("{}", { status: 503 });
+      const action = url.searchParams.get("action");
+      return Response.json({ status: "1", result: action === "getToken"
+        ? { contractAddress: address, symbol: "AERO", decimals: "18", totalSupply: "123" }
+        : action === "getTokenHolders" ? [{ address, value: "42" }]
+        : [{ SourceCode: "contract Aero {}", ContractName: "Aero" }] });
+    }
+    return Response.json({ data: url.pathname.endsWith("/pools") ? [] : { attributes: { address } } });
+  };
+  try {
+    const evidence = await collectTokenRiskEvidence({ cfg: { BLOCKSCOUT_API_KEY: "proapi_fixture" } as AppConfig, networkKey: "base", network: getNetwork("base"), address });
+    const sources = evidence.sources.filter(source => source.source.startsWith("Blockscout"));
+    assert.equal(sources.length, 3);
+    assert.ok(sources.every(source => source.status === "observed"));
+    assert.equal(requests.filter(url => url.includes("blockscout")).length, 6);
+    assert.equal((sources[2].data as any).partial, true);
+  } finally { globalThis.fetch = original; }
+});
+
+test("Blockscout authorization failures are not retried against legacy endpoints", async () => {
+  const original = globalThis.fetch;
+  const address = "0x0000000000000000000000000000000000000324";
+  const requests: string[] = [];
+  globalThis.fetch = async input => {
+    const url = String(input); requests.push(url);
+    return url.includes("blockscout") ? new Response("{}", { status: 401 }) : Response.json({ data: [] });
+  };
+  try {
+    const evidence = await collectTokenRiskEvidence({ cfg: { BLOCKSCOUT_API_KEY: "proapi_fixture" } as AppConfig, networkKey: "base", network: getNetwork("base"), address });
+    assert.ok(evidence.sources.filter(source => source.source.startsWith("Blockscout")).every(source => source.status === "unavailable"));
+    assert.equal(requests.filter(url => url.includes("action=")).length, 0);
+  } finally { globalThis.fetch = original; }
+});

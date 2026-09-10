@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { PaidPassResumeError, renewAndResumeAutopilot } from "./autopilotRenewal";
+import { PaidPassResumeError, renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
 
 test("successful pass purchase automatically requests resume only for a paused vault", async () => {
   const calls: string[] = [];
@@ -8,6 +8,13 @@ test("successful pass purchase automatically requests resume only for a paused v
   assert.deepEqual(calls, ["pay", "read", "resume"]);
   assert.equal(result.running, true);
   await renewAndResumeAutopilot({ pay: async () => "expiry", isPaused: async () => false, resume: async () => assert.fail("already running") });
+});
+
+test("setup preserves paid/resumed outcomes when later synchronization fails", () => {
+  assert.match(autopilotSetupFailureState({resumed:true,paid:true,safelyPaused:true}), /Resume was confirmed on-chain/);
+  assert.doesNotMatch(autopilotSetupFailureState({resumed:true,paid:true,safelyPaused:true}), /remains paused/);
+  assert.match(autopilotSetupFailureState({resumed:false,paid:true,safelyPaused:true}), /do not purchase another pass/);
+  assert.match(autopilotSetupFailureState({resumed:false,paid:false,safelyPaused:true}), /remains paused/);
 });
 test("failed payment never resumes, failed resume never repeats payment", async () => {
   await assert.rejects(renewAndResumeAutopilot({ pay: async () => { throw new Error("declined"); }, isPaused: async () => assert.fail("must not read"), resume: async () => assert.fail("must not resume") }), /declined/);

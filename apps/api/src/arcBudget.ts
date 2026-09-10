@@ -1,6 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { Redis } from "@upstash/redis";
-import { kvClientResilienceOptions } from "./resilientKv.js";
+import { StoreRedis as Redis } from "./storeRedis.js";
 
 export type ArcBudgetLimits = Readonly<{
   walletHourly: number;
@@ -63,9 +62,9 @@ export class MemoryArcBudgetStore implements ArcBudgetStore {
   }
 }
 
-export class UpstashArcBudgetStore implements ArcBudgetStore {
+export class RedisArcBudgetStore implements ArcBudgetStore {
   private redis: Redis;
-  constructor(url: string, token: string, private limits: ArcBudgetLimits, private namespace = "pulse") { this.redis = new Redis({ url, token, ...kvClientResilienceOptions() }); }
+  constructor(url: string, token: string, private limits: ArcBudgetLimits, private namespace = "pulse") { this.redis = new Redis(url, token); }
   async checkIp(ip: string, now = new Date()) {
     const { hour } = buckets(now);
     const count = Number(await this.redis.get<number>(`${this.namespace}:arc:ih:${hour}:${digest(ip)}`) || 0);
@@ -82,7 +81,8 @@ export class UpstashArcBudgetStore implements ArcBudgetStore {
   }
 }
 
-export function createArcBudgetStore(config: { QUEUE_PROVIDER: "memory" | "upstash_kv"; KV_REST_API_URL: string; KV_REST_API_TOKEN: string; PERSISTENCE_NAMESPACE?: string } & ArcBudgetLimits) {
+export function createArcBudgetStore(config: { QUEUE_PROVIDER: "memory" | "upstash_kv" | "redis"; REDIS_URL?: string; KV_REST_API_URL: string; KV_REST_API_TOKEN: string; PERSISTENCE_NAMESPACE?: string } & ArcBudgetLimits) {
   const limits: ArcBudgetLimits = { walletHourly: config.walletHourly, ipHourly: config.ipHourly, walletDaily: config.walletDaily, dailyCostMicrousd: config.dailyCostMicrousd };
-  return config.QUEUE_PROVIDER === "upstash_kv" ? new UpstashArcBudgetStore(config.KV_REST_API_URL, config.KV_REST_API_TOKEN, limits, config.PERSISTENCE_NAMESPACE || "pulse") : new MemoryArcBudgetStore(limits);
+  return config.QUEUE_PROVIDER !== "memory" ? new RedisArcBudgetStore(config.QUEUE_PROVIDER === "redis" ? config.REDIS_URL || "" : config.KV_REST_API_URL, config.KV_REST_API_TOKEN, limits, config.PERSISTENCE_NAMESPACE || "pulse") : new MemoryArcBudgetStore(limits);
 }
+export { RedisArcBudgetStore as UpstashArcBudgetStore };

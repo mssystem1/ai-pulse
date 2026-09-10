@@ -2,6 +2,7 @@ import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } fro
 import { executionPublicClient, executionRpcUrls, type ExecutionNetwork } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { keccak256, toHex } from "viem";
+import { applyConfirmedPassPause, mutateAutopilotPass } from "./autopilotPassStore.js";
 
 type Activity = {
   id: string;
@@ -21,18 +22,44 @@ type Activity = {
   fillInputSymbol?: string;
   fillOutputSymbol?: string;
   fillObservedAt?: string;
+  passTimerReconciledAt?: string;
   createdAt: string;
   updatedAt: string;
 };
 
 const TRANSFER_TOPIC = keccak256(toHex("Transfer(address,address,uint256)"));
+const PAUSED_TOPIC = keccak256(toHex("Paused(bool)"));
 const erc20MetadataAbi = [
   { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
   { type: "function", name: "decimals", stateMutability: "view", inputs: [], outputs: [{ type: "uint8" }] },
 ] as const;
 
 type ReceiptLog = { address: string; topics: readonly string[]; data: string };
-type FillReceipt = { status?: string; from?: string; to?: string | null; blockNumber?: string; logs?: ReceiptLog[] };
+type FillReceipt = { status?: string; from?: string; to?: string | null; blockNumber?: string; transactionIndex?: string | number; logs?: ReceiptLog[] };
+
+export function receiptPauseState(receipt: FillReceipt, owner: string, account: string): boolean | null {
+  if (!["0x1", "success"].includes(receipt.status || "") || receipt.from?.toLowerCase() !== owner.toLowerCase()
+    || receipt.to?.toLowerCase() !== account.toLowerCase()) return null;
+  const log = receipt.logs?.filter(log => log.address.toLowerCase() === account.toLowerCase() && log.topics[0] === PAUSED_TOPIC).at(-1);
+  if (!log || !/^0x[0-9a-f]{64}$/i.test(log.data)) return null;
+  const decoded = BigInt(log.data);
+  return decoded === 0n ? false : decoded === 1n ? true : null;
+}
+
+async function reconcilePassTimer(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
+  if (item.passTimerReconciledAt || item.source !== "autopilot" || !item.account || !item.txHash
+    || !/^vault_(pause|resume|policy_update|asset_configure|configure|limits_configure)$/.test(item.kind)
+    || !["base", "arbitrum", "xlayer"].includes(item.network)) return item;
+  const client = executionPublicClient(item.network as ExecutionNetwork);
+  const verifiedReceipt = receipt || await client.getTransactionReceipt({ hash: item.txHash as `0x${string}` }) as unknown as FillReceipt;
+  const paused = receiptPauseState(verifiedReceipt, item.owner, item.account);
+  if (paused == null || !verifiedReceipt.blockNumber) return item;
+  const block = await client.getBlock({ blockNumber: BigInt(verifiedReceipt.blockNumber) });
+  await mutateAutopilotPass(item.network as ExecutionNetwork, item.account, current =>
+    current?.owner.toLowerCase() === item.owner.toLowerCase()
+      ? applyConfirmedPassPause(current, { txHash: item.txHash!, paused, at: Number(block.timestamp) * 1000, order: Number(verifiedReceipt.transactionIndex || 0) }) : current);
+  return { ...item, passTimerReconciledAt: new Date().toISOString() };
+}
 
 function topicAddress(value?: string) {
   return value && value.length === 66 ? `0x${value.slice(-40)}`.toLowerCase() : "";
@@ -235,7 +262,9 @@ export async function reconcileV6Activity(owner: string, network: string, rpcUrl
     if (item.status !== "confirmed" || item.fillPrice) return item;
     const batchIndex = pendingByIndex.get(index);
     try {
-      const enriched = await enrichExecutionFill(item, batchIndex === undefined ? null : receipts.get(batchIndex));
+      const receipt = batchIndex === undefined ? null : receipts.get(batchIndex);
+      const timerReconciled = await reconcilePassTimer(item, receipt);
+      const enriched = await enrichExecutionFill(timerReconciled, receipt);
       if (enriched !== item) changed = true;
       return enriched;
     } catch { return item; }

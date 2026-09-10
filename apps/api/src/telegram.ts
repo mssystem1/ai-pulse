@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { AppConfig } from "@pulse/config";
-import { isKvUnavailableError, runKvCommand } from "./resilientKv.js";
+import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 
 type TelegramUpdate = { update_id?: number; message?: { chat?: { id?: number }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; message?: { chat?: { id?: number } } } };
@@ -54,23 +54,23 @@ export function isTelegramDeliveryCapability(value:string){const secret=process.
 export async function deliverTelegramReport(delivery:string, text:string, reportUrl:string){const token=process.env.TELEGRAM_BOT_TOKEN?.trim()||"";const secret=process.env.TELEGRAM_WEBHOOK_SECRET?.trim()||"";const chatId=verifiedChatId(delivery,secret);if(!token||!chatId)throw new Error("Telegram delivery capability is invalid");return telegram(token,"sendMessage",{chat_id:chatId,text:`${text.slice(0,3000)}\n\nOpen full report: ${reportUrl}`,disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"Open full PULSE report",url:reportUrl}]]}});}
 
 async function saveDelivery(task:DeliveryTask){
-  if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN){await kv(["SET",`pulse:v6:telegram:delivery:${task.id}`,JSON.stringify(task),"EX",604800]);await kv(["ZADD","pulse:v6:telegram:due",task.nextAt,task.id]);}
+  if(kvConfigured()){await kv(["SET",`pulse:v6:telegram:delivery:${task.id}`,JSON.stringify(task),"EX",604800]);await kv(["ZADD","pulse:v6:telegram:due",task.nextAt,task.id]);}
   else memoryDeliveries.set(task.id,task);
 }
-async function removeDelivery(id:string){if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN){await kv(["DEL",`pulse:v6:telegram:delivery:${id}`]);await kv(["ZREM","pulse:v6:telegram:due",id]);}else memoryDeliveries.delete(id);}
+async function removeDelivery(id:string){if(kvConfigured()){await kv(["DEL",`pulse:v6:telegram:delivery:${id}`]);await kv(["ZREM","pulse:v6:telegram:due",id]);}else memoryDeliveries.delete(id);}
 export async function deliverTelegramReportDurably(id:string,delivery:string,text:string,reportUrl:string){
   try{await deliverTelegramReport(delivery,text,reportUrl);await removeDelivery(id);return {delivered:true};}
   catch(error){const task:DeliveryTask={id,delivery,text,reportUrl,attempts:0,nextAt:Date.now()+30_000,createdAt:new Date().toISOString(),lastError:(error instanceof Error?error.message:String(error)).slice(0,300)};await saveDelivery(task);return {delivered:false,queued:true};}
 }
 async function dueDeliveries(){
-  if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN){const ids=await kv(["ZRANGEBYSCORE","pulse:v6:telegram:due",0,Date.now(),"LIMIT",0,20]);const tasks=await Promise.all((Array.isArray(ids)?ids:[]).map(async id=>{const raw=await kv(["GET",`pulse:v6:telegram:delivery:${id}`]);return typeof raw==="string"?JSON.parse(raw) as DeliveryTask:null;}));return tasks.filter((task):task is DeliveryTask=>Boolean(task));}
+  if(kvConfigured()){const ids=await kv(["ZRANGEBYSCORE","pulse:v6:telegram:due",0,Date.now(),"LIMIT",0,20]);const tasks=await Promise.all((Array.isArray(ids)?ids:[]).map(async id=>{const raw=await kv(["GET",`pulse:v6:telegram:delivery:${id}`]);return typeof raw==="string"?JSON.parse(raw) as DeliveryTask:null;}));return tasks.filter((task):task is DeliveryTask=>Boolean(task));}
   return [...memoryDeliveries.values()].filter(task=>task.nextAt<=Date.now()).slice(0,20);
 }
-async function lockDelivery(id:string){if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN)return (await kv(["SET",`pulse:v6:telegram:lock:${id}`,"1","NX","EX",60]))==="OK";return true;}
+async function lockDelivery(id:string){if(kvConfigured())return (await kv(["SET",`pulse:v6:telegram:lock:${id}`,"1","NX","EX",60]))==="OK";return true;}
 export async function runTelegramDeliveryCycle(){for(const task of await dueDeliveries()){if(!(await lockDelivery(task.id)))continue;try{await deliverTelegramReport(task.delivery,task.text,task.reportUrl);await removeDelivery(task.id);}catch(error){task.attempts+=1;task.lastError=(error instanceof Error?error.message:String(error)).slice(0,300);task.nextAt=Date.now()+Math.min(3_600_000,30_000*2**Math.min(task.attempts,7));await saveDelivery(task);}}}
 export function startTelegramDeliveryWorker(){if(process.env.FEATURE_TELEGRAM!=="1")return()=>{};const run=()=>void runTelegramDeliveryCycle().catch(error=>{if(!isKvUnavailableError(error))console.error("Telegram delivery retry failed",error);});const timer=setInterval(run,30_000);timer.unref();run();return()=>clearInterval(timer);}
-async function firstTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return true;if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN)return (await kv(["SET",`pulse:v6:telegram:update:${updateId}`,"1","NX","EX",604800]))==="OK";if(memoryUpdates.has(updateId))return false;memoryUpdates.add(updateId);return true;}
-async function releaseTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return;if(process.env.KV_REST_API_URL&&process.env.KV_REST_API_TOKEN)await kv(["DEL",`pulse:v6:telegram:update:${updateId}`]);else memoryUpdates.delete(updateId);}
+async function firstTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return true;if(kvConfigured())return (await kv(["SET",`pulse:v6:telegram:update:${updateId}`,"1","NX","EX",604800]))==="OK";if(memoryUpdates.has(updateId))return false;memoryUpdates.add(updateId);return true;}
+async function releaseTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return;if(kvConfigured())await kv(["DEL",`pulse:v6:telegram:update:${updateId}`]);else memoryUpdates.delete(updateId);}
 
 export function createTelegramRouter(cfg: AppConfig) {
   const router = Router();
@@ -79,7 +79,7 @@ export function createTelegramRouter(cfg: AppConfig) {
 
   const enabled = cfg.FEATURE_TELEGRAM;
   router.get("/v1/telegram/status", (_req, res) => {
-    res.json({ enabled, configured: Boolean(enabled && telegramConfig.complete), missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError, botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN) });
+    res.json({ enabled, configured: Boolean(enabled && telegramConfig.complete), missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError, botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && kvConfigured()) });
   });
   router.post("/v1/telegram/webhook", asyncRoute(async (req, res) => {
     if (!enabled) return res.status(404).json({ error: "Telegram bot is disabled" });

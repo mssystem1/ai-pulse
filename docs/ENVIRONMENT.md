@@ -149,7 +149,8 @@ This table is the operational checklist for variables that require a choice. Fix
 | `CDP_API_KEY_ID` / `CDP_API_KEY_SECRET` | Server secrets | Required for Base/Arbitrum | Required | CDP x402 and native-ETH-to-USDC quote authentication. |
 | `OKX_XLAYER_API_*` | Server secrets | Required for X Layer | Required | Existing OKX x402/DEX compatibility credentials. |
 | `STORAGE_PROVIDER` | `memory` or `vercel_blob` | `memory` for isolated testing, or configured Blob for recovery E2E | `vercel_blob` | Report-body persistence. Blob requires its token and KV metadata. |
-| `QUEUE_PROVIDER` | `memory` or `upstash_kv` | `memory` for one process, or Upstash for durability E2E | `upstash_kv` | Jobs, locks, receipts, idempotency, and shared budgets. |
+| `QUEUE_PROVIDER` | `memory`, `redis` or legacy `upstash_kv` | `memory` for isolated tests; separate Redis for durability E2E | `redis` after migration | Jobs, locks, receipts, idempotency, and shared budgets. |
+| `REDIS_URL` | Resolved `redis://` or `rediss://` URL | Reachable test database; never production workers | Railway private reference `${{Redis.REDIS_URL}}` | Native Redis credentials; no automatic Upstash fallback. Railway references do not resolve in local `.env`. |
 | `PERSISTENCE_NAMESPACE` | Stable unique prefix | `pulse:local` | `pulse:production` | Isolates jobs, reports, history, budgets and cron keys. Legacy trading keys use a stable prefix, so never reuse the production KV database for localhost tests. |
 | `BLOB_ACCESS` | `public` | `public` | `public` | The supplied PULSE Blob store is public; report bodies are encrypted before upload. |
 | `REPORT_ENCRYPTION_KEY` | Base64url 32-byte key | Required for the supplied public Blob | Same stable key | Encrypts report bodies stored in public Blob. Changing it makes earlier encrypted reports unreadable. |
@@ -326,7 +327,7 @@ Fused, divergence, and event-risk flags remain documented for backward-compatibl
 
 AI controls: `GROK_MAX_INPUT_STANDARD` / `GROK_MAX_INPUT_PREMIUM` are conservative hard prompt-size bounds checked before xAI is called. Prediction reports use separate `GROK_MAX_INPUT_PREDICTION_STANDARD=16000`, `GROK_MAX_INPUT_PREDICTION_PREMIUM=32000`, `GROK_MAX_OUTPUT_PREDICTION_STANDARD=1400`, and `GROK_MAX_OUTPUT_PREDICTION_PREMIUM=3200` budgets: Base stays concise, while Premium has room for deeper evidence weighting, counter-cases, catalysts, entry/no-trade conditions, and execution analysis. `GROK_MAX_INPUT_FUSED_STANDARD=13000` provides a separate ceiling for fused-standard requests, whose compact model context combines OKX spot and Polymarket features. Global Market enforces effective output floors of `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`; this prevents the strict Elliott-wave JSON object from being cut off before its closing braces. Higher configured values remain valid. `XAI_INPUT_COST_PER_MILLION_USD` and `XAI_OUTPUT_COST_PER_MILLION_USD` must contain the current contracted prices before `ARC_AI_MODE=live`; live mode fails closed at startup when either is zero.
 
-Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=upstash_kv`, these counters are shared across instances and survive deployments; `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
+Arc live-AI controls apply to every `/arc` route that can invoke xAI: legacy/canonical spot, prediction, and fused analysis. `ARC_LIVE_IP_HOURLY_LIMIT` is checked before presenting the payment flow. After the signed payer is available, PULSE atomically reserves `ARC_LIVE_WALLET_HOURLY_LIMIT`, `ARC_LIVE_WALLET_DAILY_LIMIT`, and the worst-case input/output cost against `ARC_LIVE_DAILY_COST_LIMIT_USD`. With `QUEUE_PROVIDER=redis` (or legacy `upstash_kv`), these counters are shared across instances and survive API deployments; Redis persistence must be configured separately. `memory` is suitable only for a single local process. Fixture mode bypasses the counters and never calls xAI. Limit responses use HTTP 429 and `Retry-After`.
 
 `GET /metrics` publishes Prometheus-compatible HTTP, provider, payment, job, report, queue, token, and cost series. Provider observations distinguish OKX, OKX DEX, Gamma, CLOB, Polymarket Data API, CDP Trade, and xAI. Payment middleware is measured as `challenge` or `verify_settle`; the official synchronous seller adapters do not expose truthful independent verify and settle timings. Structured JSON events carry the same `X-Correlation-ID` through payment, provider, job, xAI, and report work without logging request bodies, signatures, recovery tokens, or secrets.
 
@@ -385,31 +386,28 @@ CCTP is also not required for accepting the initial Arc Gateway payment. Add CCT
 
 ## Storage and queues
 
-The approved initial durable-storage design is:
+The selected durable-storage design is Railway Redis plus the existing Blob store.
+Follow [the migration guide](RAILWAY_REDIS_MIGRATION.md) before changing live state.
 
 ```text
-Upstash KV: job metadata, queues, locks, idempotency, receipts, rate limits
+Railway Redis: job metadata, queues, locks, idempotency, receipts, rate limits
 Vercel Blob: immutable completed report bodies and larger artifacts
 ```
 
-Configure the Blob and Upstash credentials on Railway because Railway runs the API and worker. Vercel may inject them automatically into the web project, but the browser must never receive them.
+Configure the Blob token and Redis connection on Railway because Railway runs the API and worker. The browser must never receive them.
 
 ```env
 STORAGE_PROVIDER=vercel_blob
 BLOB_READ_WRITE_TOKEN=<rotated token>
-QUEUE_PROVIDER=upstash_kv
+QUEUE_PROVIDER=redis
 PERSISTENCE_NAMESPACE=pulse:production
-KV_REST_API_TOKEN=<rotated write token>
-KV_REST_API_READ_ONLY_TOKEN=<rotated read token>
-KV_REST_API_URL=<Upstash REST URL>
-KV_URL=<Upstash Redis URL>
-REDIS_URL=<same Redis URL when required by a library>
+REDIS_URL=${{Redis.REDIS_URL}}
 DATABASE_URL=
 ```
 
-`DATABASE_URL` remains empty for this design. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Upstash job complete with the Blob URL and checksum. If that bounded Blob write fails after payment—for example, during an access-mode mismatch or transient outage—the API stores report bodies up to 512 KiB in a private, retention-bound KV fallback and still verifies the SHA-256 checksum on read. This is a paid-delivery safety net, not the normal artifact path.
+`DATABASE_URL` remains empty for this design. In local `.env`, replace Railway references with a resolved, reachable connection string. Keep legacy Upstash credentials until migration is verified; they are ignored by native Redis mode. Blob is not used as a transactional database: a worker writes the report Blob first, then atomically marks the Redis job complete with its report reference. If that bounded Blob write fails after payment, the API stores report bodies up to 512 KiB in a private, retention-bound Redis fallback and verifies the SHA-256 checksum on read.
 
-`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Use a stable value per environment; changing it intentionally creates a new recovery namespace, so keep the previous deployment online until its report-retention window expires. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain the legacy stable `pulse:v6:*` storage prefix to preserve existing mainnet continuity. Therefore local, canary, and production deployments must use separate Upstash databases; a different namespace alone is not sufficient isolation for PULSE trading tests.
+`PERSISTENCE_NAMESPACE` isolates job, idempotency, lease, report, share, wallet-history, Arc-budget, and cron keys. Keep it stable across deployments and preserve the previous namespace's data when changing it. Spot activity, deterministic order state, Autopilot strategies/evidence, and Telegram delivery state retain the legacy stable `pulse:v6:*` storage prefix to preserve existing mainnet continuity. Therefore local, canary, and production app deployments must use separate Redis databases; a different namespace alone is not sufficient isolation for PULSE trading tests. Only the explicit readiness scripts are scoped to disposable fixtures without starting workers.
 
 The supplied PULSE Blob store is public. Set `BLOB_ACCESS=public` and provide a server-only base64url encoding of 32 random bytes in `REPORT_ENCRYPTION_KEY`; PULSE stores only AES-256-GCM ciphertext in Blob and verifies the decrypted plaintext checksum. Keep the same encryption key across deployments so retained reports remain readable.
 
@@ -442,7 +440,7 @@ Environment settings for the supplied public store:
 | Location | Variables |
 |---|---|
 | Vercel web | Public `VITE_API_URL`, `VITE_REOWN_PROJECT_ID`, `VITE_CIRCLE_APP_ID`, `VITE_ENABLED_NETWORKS`, public seller addresses and browser feature flags only |
-| Railway API/worker | Automation executor, CDP, OKX, xAI, Circle, Telegram, Blob, Upstash, RPC, contracts and server feature flags |
+| Railway API/worker | Automation executor, CDP, OKX, xAI, Circle, Telegram, Blob, Railway Redis (legacy Upstash during migration), RPC, contracts and server feature flags |
 | Local `.env` | development copies only; file remains gitignored |
 
 Any credential pasted into chat, logs, screenshots, or tickets must be rotated before production use.

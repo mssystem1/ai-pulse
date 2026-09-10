@@ -4,6 +4,13 @@ export class PaidPassResumeError extends Error {
   }
 }
 
+/** A telemetry/readback failure must not misreport a confirmed resume as paused. */
+export function autopilotSetupFailureState(input: { resumed: boolean; paid: boolean; safelyPaused: boolean }) {
+  if (input.resumed) return "Resume was confirmed on-chain; dashboard synchronization is pending. Refresh the dashboard instead of repeating setup or payment.";
+  if (input.paid) return "The pass purchase succeeded, but activation is not confirmed. Refresh the selected vault and use Resume if it is paused; do not purchase another pass.";
+  return input.safelyPaused ? "The strategy wallet remains paused; funds stay owner-withdrawable." : "Pause the existing strategy before retrying any policy change.";
+}
+
 /** Payment is performed once. A rejected resume must never restart checkout. */
 export async function renewAndResumeAutopilot(actions: {
   pay: () => Promise<string | undefined>;

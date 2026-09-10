@@ -5,7 +5,7 @@ import { listSpotInstruments, searchSpotInstruments } from "@pulse/market";
 import { analysisSymbolForExecutionToken, executionAssetAliases, executionSymbolRepresentsAnalysis, getGenericOkxQuote, getGenericOkxSwap, getOkxTradeTokens, searchOkxDefiOpportunities } from "./okxDex.js";
 import { reconcileV6Activity, recordV6Activity, v6ActivityPersistenceStatus } from "./v6Store.js";
 import { asyncRoute } from "./httpResilience.js";
-import { kvCircuitStatus } from "./resilientKv.js";
+import { kvCircuitStatus, kvConfigured } from "./resilientKv.js";
 import { getOnchainAccountSnapshot } from "./onchainDiscovery.js";
 import {
   executionContractAddress,
@@ -41,7 +41,7 @@ export function createV6Router(cfg: AppConfig) {
     if (!chain) return res.status(400).json({ error: "Unsupported network" });
     const contracts = executionContracts(network as keyof typeof NETWORKS);
     const automationReady = process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY || "");
-    const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN && process.env.BLOB_READ_WRITE_TOKEN);
+    const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(kvConfigured() && process.env.BLOB_READ_WRITE_TOKEN);
     res.json({
       product: "PULSE",
       network,
@@ -52,7 +52,7 @@ export function createV6Router(cfg: AppConfig) {
       autopilot: { visible: cfg.FEATURE_AUTOPILOT, enabled: cfg.FEATURE_AUTOPILOT && autopilotRuntimeReady && Boolean(contracts.autopilotFactory && contracts.executionAdapter) && !cfg.AUTOPILOT_KILL_SWITCH },
       contracts,
       contractAddressSource: "published_release_with_environment_override",
-      persistence: process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN ? "upstash_kv" : "memory-development",
+      persistence: kvConfigured() ? kvCircuitStatus().provider : "memory-development",
       persistenceHealth: kvCircuitStatus(),
       reasons: {
         ...(!cfg.hasOkxCredentials ? { market: "Configure OKX Onchain OS credentials" } : {}),

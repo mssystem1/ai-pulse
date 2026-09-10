@@ -20,3 +20,4 @@ data/cache/
 node
 .env.cloud
 *-report.json
+DB_backup/

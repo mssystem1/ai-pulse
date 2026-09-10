@@ -577,13 +577,20 @@ The Telegram bot is a navigation and delivery adapter, not a wallet, model host,
 
 ## Data architecture: KV and Blob only
 
+For the Railway deployment, use **Railway Redis + the existing Vercel Blob**.
+Native Redis support uses `QUEUE_PROVIDER=redis` and a server-only `REDIS_URL`.
+This is not an automatic data migration: follow the [Railway Redis migration
+guide](docs/RAILWAY_REDIS_MIGRATION.md) before switching a live deployment.
+The explicit `upstash_kv` backend remains available for legacy deployments;
+native Redis never silently falls back to it during an outage.
+
 PULSE does not use PostgreSQL or another relational database. Production persistence has two internal stores plus external financial truth.
 
 | Data class | Authority | Storage and rule |
 | --- | --- | --- |
 | Chain transactions, contract state, token balances | blockchain RPC and finalized receipts/logs | strongest execution truth; reconciliation repairs cached projections |
 | OKX native route/order state and market observations | OKX provider responses | provider truth for its own route/order IDs; never accepted as permission to spend |
-| Current jobs, receipts, activity, automation and dashboard projections | Upstash KV | operational read model; updated idempotently and allowed to degrade without inventing confirmation |
+| Current jobs, receipts, activity, automation and dashboard projections | Railway Redis (legacy: Upstash KV) | operational read model; updated idempotently and allowed to degrade without inventing confirmation |
 | Private reports and large decision evidence | Vercel Blob | immutable artifact body; KV stores its small manifest/index/checksum |
 | Selected network and opaque recovery handles | browser storage | convenience only; no report body, private key, executor key, or authoritative order state |
 
@@ -622,7 +629,7 @@ pulse:v6:telegram:update:<updateId>       seven-day webhook deduplication marker
 
 Report receipt binding and queue insertion are one Redis script. Job claims, acknowledgements, lease extensions, requeues, expired-lease recovery, and report attachment are also ownership/version checked. Trading activity uses one hash field per transaction so two workers cannot overwrite the whole ledger. Autopilot configuration and runtime telemetry are merged separately: a stale worker cannot roll back a newer owner-signed policy, and concurrent evaluation histories are unioned by evaluation ID.
 
-Memory stores exist only for local/unit use. A production capability response labels persistence as `upstash_kv`; Spot/Autopilot execution that requires durable coordination fails closed when KV is unavailable. The resilience circuit bounds request time, opens after failure, retries a recovery probe, and lets read-only UI use last-known data without marking it confirmed.
+Memory stores exist only for local/unit use. A production capability response labels persistence as `redis` or legacy `upstash_kv`; Spot/Autopilot execution that requires durable coordination fails closed when Redis is unavailable. The resilience circuit bounds request time, opens after failure, and permits a recovery probe. Reads may retry; ambiguous writes are not automatically replayed. Read-only UI can use explicitly stale telemetry, but missing paid-pass state is unavailable—not proof of expiry.
 
 ### Implemented Blob model
 
@@ -856,7 +863,7 @@ The unpaid request returns a 402 response only after input and primary-market ev
 
 ## Persistence and operations
 
-- Upstash KV/Redis is the durable operational read model for payment idempotency, report queues and leases, receipt references, wallet-history authorization, Spot activity, automation projections, Autopilot strategies, worker leases, and Telegram delivery retries.
+- Railway Redis (or explicitly selected legacy Upstash KV) is the durable operational read model for payment idempotency, report queues and leases, receipt references, wallet-history authorization, Spot activity, automation projections, Autopilot strategies, worker leases, and Telegram delivery retries.
 - Vercel Blob’s public transport holds immutable AES-256-GCM report ciphertext, never readable report JSON. KV holds the owner/index/checksum manifest, the bounded paid-report fallback, and the expected Autopilot evidence fallback when the public store rejects private evidence objects. API reads bypass caches, authenticate and decrypt reports server-side, and verify the plaintext checksum.
 - Confirmed chain receipts, contract state, wallet balances, and provider-owned order state remain stronger evidence than KV. Reconciliation heals stale projections and never upgrades browser-announced activity beyond Pending without receipt evidence.
 - `PERSISTENCE_NAMESPACE` scopes report/job/history/budget/cron data. Stable `pulse:v6:*` trading keys preserve existing mainnet accounts and activity, so development, staging, and production must use separate KV databases.

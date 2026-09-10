@@ -1,6 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { Redis } from "@upstash/redis";
-import { kvClientResilienceOptions } from "./resilientKv.js";
+import { StoreRedis as Redis } from "./storeRedis.js";
 import { verifyMessage } from "viem";
 import type { AnalysisJob } from "./jobs.js";
 
@@ -15,7 +14,7 @@ export class ReportHistoryAuth {
   private challenges = new Map<string, Challenge>();
   private sessions = new Map<string, ReportHistorySession>();
   constructor(url = "", token = "", private namespace = "pulse") {
-    this.redis = url && token ? new Redis({ url, token, ...kvClientResilienceOptions() }) : null;
+    this.redis = url && (token || /^rediss?:\/\//.test(url)) ? new Redis(url, token) : null;
   }
   private challengeKey(nonce: string) { return `${this.namespace}:report-history-challenge:${digest(nonce)}`; }
   private sessionKey(token: string) { return `${this.namespace}:report-history-session:${digest(token)}`; }

@@ -2,6 +2,11 @@
 
 This is the release runbook for the checked-in production topology:
 
+**Redis migration:** use the [Railway Redis + Blob guide](RAILWAY_REDIS_MIGRATION.md)
+to prepare `QUEUE_PROVIDER=redis` and `REDIS_URL`. The existing Upstash deployment
+must be migrated and verified before cutover; a new empty Redis service is not a
+replacement for existing paid-pass and receipt records.
+
 ```text
 Browser / wallet
       |
@@ -16,7 +21,7 @@ Railway API + durable worker (one long-lived Node service)
       |-- Spot order reconciliation
       |-- Autopilot analysis, risk monitoring and execution
       |
-      +--> Upstash KV (state, queues, leases and indexes)
+      +--> Railway Redis (state, queues, leases and indexes; legacy Upstash before migration)
       +--> Vercel Blob (private report/evidence bodies)
       +--> OKX, xAI, CDP, Circle and chain RPCs
       +--> deployed PULSE contracts
@@ -67,14 +72,14 @@ Before either deployment, prepare:
 - a Vercel project connected to the same repository and branch;
 - a stable HTTPS API hostname, initially a Railway-generated domain or preferably a custom API domain;
 - a stable HTTPS web hostname, preferably a custom web domain;
-- an Upstash database dedicated to production;
+- a Railway Redis database dedicated to production, with existing records migrated before cutover;
 - a private Vercel Blob store, or the documented encrypted-public-store fallback;
 - production OKX, xAI, CDP/Circle and Telegram credentials required by enabled features;
 - a Blockscout API key for production Base/Arbitrum Token Risk reports (public rate limits remain a best-effort fallback until the key is added);
 - the already deployed and verified PULSE contract addresses for each enabled chain;
 - a dedicated automation signer whose address has the required on-chain roles and native gas.
 
-Do not share the Upstash database used by local mainnet tests with production. Several trading and Autopilot keys intentionally use stable `pulse:v6:*` namespaces for continuity; a different `PERSISTENCE_NAMESPACE` alone is not full isolation.
+Do not share a Redis database used by local mainnet trading tests with production. Several trading and Autopilot keys intentionally use stable `pulse:v6:*` namespaces for continuity; a different `PERSISTENCE_NAMESPACE` alone is not full isolation. The dedicated readiness script only writes its own random test keys and never starts workers.
 
 ## 2. Deploy Railway API and worker first
 
@@ -110,7 +115,8 @@ STORAGE_PROVIDER=vercel_blob
 # The supplied PULSE store is public transport with server-side AES-GCM.
 BLOB_ACCESS=public
 REPORT_ENCRYPTION_KEY=<BASE64URL_32_BYTE_REPORT_ENCRYPTION_KEY>
-QUEUE_PROVIDER=upstash_kv
+QUEUE_PROVIDER=redis
+REDIS_URL=${{Redis.REDIS_URL}}
 PERSISTENCE_NAMESPACE=pulse:production
 
 # PULSE Global reports require enough room to complete the strict Elliott schema.
@@ -164,7 +170,7 @@ Do not set `AUTOMATION_WORKER_ENABLED=1` merely because a syntactically valid pr
 - the address is an approved Spot keeper, Autopilot executor and oracle updater on X Layer, Base and Arbitrum if those chains are enabled;
 - every configured factory, registry, router, adapter and oracle address belongs to the selected chain;
 - the executor has a small native gas balance on every enabled chain;
-- Upstash is reachable and uses the production database;
+- Railway Redis is reachable, persistent, and contains the verified production records;
 - `AUTOPILOT_KILL_SWITCH=0` only after the above checks pass;
 - the API starts with no missing-role, missing-contract or storage-readiness warning.
 
@@ -287,7 +293,7 @@ Before launch:
 - alert on API health, worker-cycle failures, KV/Blob errors, provider errors, executor gas and repeated transaction reverts;
 - record the last known-good Railway and Vercel deployments;
 - know how to set `AUTOPILOT_KILL_SWITCH=1` and redeploy/restart Railway;
-- preserve the previous Upstash/Blob data while rolling application code back.
+- preserve the previous Redis/Blob data while rolling application code back; never point a worker at a stale pre-migration database after new writes.
 
 Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` variables requires a new web build. Treat both as release changes.
 
@@ -301,7 +307,7 @@ Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` va
 - [ ] one Railway API/worker replica and no competing Vercel cron
 - [ ] Railway service sleeping/serverless mode disabled
 - [ ] `PAY_TO_ADDRESS` independently verified
-- [ ] production Upstash database is isolated from local testing
+- [ ] production Redis database is isolated from local trading tests and the data migration is verified
 - [ ] Blob privacy/encryption mode verified
 - [ ] executor address and all three on-chain roles verified per enabled chain
 - [ ] executor native gas checked per enabled chain

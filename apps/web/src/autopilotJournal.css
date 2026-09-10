@@ -1,6 +1,13 @@
-.order-monitor .autopilot-row.identified-vault { grid-template-columns:minmax(95px,.8fr) minmax(105px,.8fr) minmax(135px,1.3fr) minmax(120px,1.2fr) minmax(80px,.8fr) minmax(90px,.8fr) minmax(110px,1fr) auto; gap:14px; padding:20px 14px; }
+.order-monitor .autopilot-row.identified-vault { grid-template-columns:95px 105px minmax(135px,1.3fr) minmax(120px,1.2fr) minmax(80px,.8fr) minmax(90px,.8fr) minmax(110px,1fr) auto; gap:14px; padding:20px 14px; }
 .identified-vault .vault-identity { display:grid; gap:6px; border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:color-mix(in srgb,var(--mint) 6%,var(--card)); text-align:left; cursor:pointer; color:var(--text); min-width:0; }
 .identified-vault .vault-identity small { font-size:.65rem; color:var(--muted); }
+.order-monitor .autopilot-row.incomplete-vault { grid-template-columns:95px 105px minmax(130px,1fr) minmax(110px,1fr) minmax(200px,2fr) auto; }
+.incomplete-vault-note,.control-help { color:var(--muted); font-size:.75rem; line-height:1.6; overflow-wrap:anywhere; }
+.control-help { margin:12px 0 0; padding:12px; border:1px solid var(--line); border-radius:10px; background:color-mix(in srgb,var(--warn) 5%,var(--card)); }
+.radar-browse-controls { display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; margin-top:14px; }
+.radar-browse-controls .radar-more { margin:0; min-height:36px; }
+.radar-browse-controls .radar-more:disabled { opacity:1; color:var(--muted); cursor:default; }
+@media(max-width:1100px) { .order-monitor .autopilot-row.incomplete-vault { grid-template-columns:95px 105px minmax(0,1fr); } .incomplete-vault-note { grid-column:1/-1; } }
 .identified-vault .vault-identity strong { color:var(--mint); font-size:1.05rem; }
 .identified-vault .vault-identity:hover,.identified-vault .vault-identity:focus-visible { border-color:var(--mint); outline:2px solid color-mix(in srgb,var(--mint) 25%,transparent); }
 .identified-vault>.status-chip { border-radius:8px; padding:8px; line-height:1.35; text-align:center; white-space:normal; }

@@ -156,10 +156,10 @@ export function createApp(cfg: AppConfig, dependencies: {
   const wakeWorker = () => {
     if (shouldRunDurableWorker) void durableWorker?.notify();
   };
-  const reportHistoryAuth = new ReportHistoryAuth(cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
+  const reportHistoryAuth = new ReportHistoryAuth(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || buildMarketContext;
   const arcBudget = dependencies.arcBudget || createArcBudgetStore({
-    QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
+    QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, REDIS_URL: cfg.REDIS_URL, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
     PERSISTENCE_NAMESPACE: cfg.PERSISTENCE_NAMESPACE,
     walletHourly: cfg.ARC_LIVE_WALLET_HOURLY_LIMIT, ipHourly: cfg.ARC_LIVE_IP_HOURLY_LIMIT,
     walletDaily: cfg.ARC_LIVE_WALLET_DAILY_LIMIT, dailyCostMicrousd: Math.floor(cfg.ARC_LIVE_DAILY_COST_LIMIT_USD * 1_000_000),
@@ -1126,7 +1126,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
     try {
       if (!(await passTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
-        return res.status(404).json({ error: "This wallet does not own the selected Autopilot on the selected network" });
+        return res.status(409).json({ error: "Strategy registration is incomplete or unavailable for this wallet and network. Finish setup before buying a pass; no payment requested.", code: "autopilot_registration_required" });
       }
     } catch {
       return res.status(503).json({ error: "Vault ownership could not be verified; no payment requested", code: "autopilot_ownership_unavailable", recoverable: true });

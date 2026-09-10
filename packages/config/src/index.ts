@@ -25,7 +25,9 @@ function loadDotenv() {
   loadEnv();
 }
 
-loadDotenv();
+// Isolated test processes must never inherit production credentials/workers
+// from the repository .env. Normal development/production loading is unchanged.
+if (!(process.env.NODE_ENV === "test" && process.env.PULSE_SKIP_DOTENV === "1")) loadDotenv();
 
 function pick(...keys: string[]): string {
   for (const k of keys) {
@@ -178,7 +180,8 @@ const EnvSchema = z.object({
   BLOB_ACCESS: z.literal("public").default("public"),
   BLOB_READ_WRITE_TOKEN: z.string().optional().default(""),
   REPORT_ENCRYPTION_KEY: z.string().optional().default(""),
-  QUEUE_PROVIDER: z.enum(["memory", "upstash_kv"]).default("memory"),
+  QUEUE_PROVIDER: z.enum(["memory", "upstash_kv", "redis"]).default("memory"),
+  REDIS_URL: z.string().optional().default(""),
   PERSISTENCE_NAMESPACE: z.string().regex(/^[a-zA-Z0-9:_-]{1,64}$/).default("pulse"),
   KV_REST_API_URL: z.string().optional().default(""),
   KV_REST_API_TOKEN: z.string().optional().default(""),
@@ -250,8 +253,14 @@ export function loadConfig(): AppConfig {
   if (parsed.QUEUE_PROVIDER === "upstash_kv" && (!parsed.KV_REST_API_URL || !parsed.KV_REST_API_TOKEN)) {
     throw new Error("QUEUE_PROVIDER=upstash_kv requires KV_REST_API_URL and KV_REST_API_TOKEN");
   }
-  if (parsed.STORAGE_PROVIDER === "vercel_blob" && (!parsed.BLOB_READ_WRITE_TOKEN || !parsed.KV_REST_API_URL || !parsed.KV_REST_API_TOKEN)) {
-    throw new Error("STORAGE_PROVIDER=vercel_blob requires BLOB_READ_WRITE_TOKEN plus Upstash KV URL and write token for private report metadata");
+  if (parsed.QUEUE_PROVIDER === "redis") {
+    let valid = false;
+    try { const url = new URL(parsed.REDIS_URL); valid = ["redis:", "rediss:"].includes(url.protocol) && Boolean(url.hostname) && !/\$\{\{|[<>\s]/.test(parsed.REDIS_URL); } catch { /* configuration error below */ }
+    if (!valid) throw new Error("QUEUE_PROVIDER=redis requires a resolved redis:// or rediss:// REDIS_URL (Railway references cannot be used in local .env)");
+  }
+  const durableMetadata = parsed.QUEUE_PROVIDER === "redis" ? Boolean(parsed.REDIS_URL) : Boolean(parsed.KV_REST_API_URL && parsed.KV_REST_API_TOKEN);
+  if (parsed.STORAGE_PROVIDER === "vercel_blob" && (!parsed.BLOB_READ_WRITE_TOKEN || !durableMetadata)) {
+    throw new Error("STORAGE_PROVIDER=vercel_blob requires BLOB_READ_WRITE_TOKEN plus Redis credentials for private report metadata");
   }
   if (parsed.STORAGE_PROVIDER === "vercel_blob" && parsed.BLOB_ACCESS === "public" && !/^[A-Za-z0-9_-]{43}=$|^[A-Za-z0-9_-]{43}$/.test(parsed.REPORT_ENCRYPTION_KEY)) {
     throw new Error("BLOB_ACCESS=public requires REPORT_ENCRYPTION_KEY containing a base64url-encoded 32-byte key");

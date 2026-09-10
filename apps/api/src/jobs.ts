@@ -1,6 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
-import { Redis } from "@upstash/redis";
-import { kvClientResilienceOptions } from "./resilientKv.js";
+import { StoreRedis as Redis } from "./storeRedis.js";
 import { put as putBlob } from "@vercel/blob";
 
 export const JOB_STAGES = [
@@ -313,10 +312,10 @@ export class MemoryJobStore implements JobStore {
   async queueStats() { return { ready: this.ready.size, leased: this.leased.size }; }
 }
 
-export class UpstashJobStore implements JobStore {
+export class RedisJobStore implements JobStore {
   private redis: Redis;
   constructor(url: string, token: string, private retentionSeconds = 15_552_000, private namespace = "pulse") {
-    this.redis = new Redis({ url, token, ...kvClientResilienceOptions() });
+    this.redis = new Redis(url, token);
   }
   private jobKey(id: string) { return `${this.namespace}:job:${id}`; }
   private idemKey(id: string) { return `${this.namespace}:idem:${id}`; }
@@ -548,7 +547,7 @@ export class VercelBlobReportStore implements ReportStore {
     private encryptionKey = "",
     dependencies: ReportStoreDependencies = {},
   ) {
-    this.redis = dependencies.redis || new Redis({ url: redisUrl, token: redisToken, ...kvClientResilienceOptions() });
+    this.redis = dependencies.redis || new Redis(redisUrl, redisToken);
     this.putBlob = dependencies.putBlob || putBlob;
     this.fetchImpl = dependencies.fetchImpl || fetch;
   }
@@ -573,7 +572,7 @@ export class VercelBlobReportStore implements ReportStore {
       if (bodyBytes > MAX_KV_REPORT_FALLBACK_BYTES) throw error;
       // Paid delivery must not be lost because a Blob store is temporarily
       // unavailable or its public/private mode was configured incorrectly.
-      // Upstash remains server-authenticated, private, checksum-verified and
+      // Redis remains server-authenticated, private, checksum-verified and
       // uses the same retention bound as the primary report record.
       await this.redis.set(this.fallbackBodyKey(id), body, { ex: this.retentionSeconds });
       persistedPath = `${KV_REPORT_FALLBACK_PREFIX}${id}`;
@@ -588,9 +587,10 @@ export class VercelBlobReportStore implements ReportStore {
   }
   async get(reportId: string) { return this.redis.get<StoredReport>(this.recordKey(reportId)); }
   async read(record: StoredReport) {
-    const payload = record.blobPath.startsWith(KV_REPORT_FALLBACK_PREFIX)
+    const storedPayload = record.blobPath.startsWith(KV_REPORT_FALLBACK_PREFIX)
       ? await this.redis.get<string>(this.fallbackBodyKey(record.id))
       : decryptReport(await this.readPublicBlob(record.blobPath), this.encryptionKey);
+    const payload = typeof storedPayload === "string" ? storedPayload : storedPayload ? canonicalJson(storedPayload) : null;
     if (!payload) return null;
     const checksum = createHash("sha256").update(payload).digest("hex");
     if (checksum !== record.checksum) throw new Error("Stored report checksum mismatch");
@@ -624,7 +624,8 @@ export class VercelBlobReportStore implements ReportStore {
 }
 
 export type PersistenceConfig = Readonly<{
-  QUEUE_PROVIDER: "memory" | "upstash_kv";
+  QUEUE_PROVIDER: "memory" | "upstash_kv" | "redis";
+  REDIS_URL?: string;
   STORAGE_PROVIDER: "memory" | "vercel_blob";
   KV_REST_API_URL: string;
   KV_REST_API_TOKEN: string;
@@ -640,9 +641,11 @@ export function createPersistence(config: PersistenceConfig): {
   jobs: JobStore;
   reports: ReportStore;
 } {
-  const jobs = config.QUEUE_PROVIDER === "upstash_kv"
-    ? new UpstashJobStore(
-        config.KV_REST_API_URL,
+  const redisUrl = config.QUEUE_PROVIDER === "redis" ? config.REDIS_URL || "" : config.KV_REST_API_URL;
+  if (config.QUEUE_PROVIDER === "redis" && !/^rediss?:\/\//.test(redisUrl)) throw new Error("QUEUE_PROVIDER=redis requires REDIS_URL");
+  const jobs = config.QUEUE_PROVIDER !== "memory"
+    ? new RedisJobStore(
+        redisUrl,
         config.KV_REST_API_TOKEN,
         config.JOB_STAGE_RETENTION_DAYS * 86_400,
         config.PERSISTENCE_NAMESPACE || "pulse",
@@ -650,7 +653,7 @@ export function createPersistence(config: PersistenceConfig): {
     : new MemoryJobStore();
   const reports = config.STORAGE_PROVIDER === "vercel_blob"
     ? new VercelBlobReportStore(
-        config.BLOB_READ_WRITE_TOKEN, config.KV_REST_API_URL, config.KV_REST_API_TOKEN,
+        config.BLOB_READ_WRITE_TOKEN, redisUrl, config.KV_REST_API_TOKEN,
         config.REPORT_RETENTION_DAYS * 86_400,
         config.PERSISTENCE_NAMESPACE || "pulse",
         config.BLOB_ACCESS || "public",
@@ -659,3 +662,6 @@ export function createPersistence(config: PersistenceConfig): {
     : new MemoryReportStore();
   return Object.freeze({ jobs, reports });
 }
+
+// Compatibility for operational scripts; accepts REST or native Redis URLs.
+export { RedisJobStore as UpstashJobStore };

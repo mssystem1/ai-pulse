@@ -21,7 +21,8 @@ import type { Lang } from "./i18n";
 import { ShortlistMarketChart, SpotMarketPreview } from "./SpotMarketPreview";
 import { AutopilotDecisionJournal, type DecisionEntry } from "./AutopilotDecisionJournal";
 import { decisionAuditColumns, serializeAuditCsv } from "./autopilotExport";
-import { renewAndResumeAutopilot } from "./autopilotRenewal";
+import { renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
+import { autopilotControlState } from "./autopilotControls";
 import { DocsWorkflowVisuals } from "./DocsWorkflowVisuals";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
 import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
@@ -241,6 +242,7 @@ type AutopilotStrategyView = {
 };
 
 function autopilotRuntimeLabel(item?: AutopilotStrategyView, fallbackPaused?: boolean | null) {
+  if (!item) return "Setup incomplete";
   const state = item?.runtimeState || ((item?.paused ?? fallbackPaused) ? "paused" : item?.status === "active" ? "running" : item?.status || "inactive");
   switch (state) {
     case "running": return "Running";
@@ -392,6 +394,9 @@ export function OpportunityRadar({
   const executionAvailability = useExecutionAvailability(networkKey);
   const [status, setStatus] = useState("Scanning live market structure…");
   const [expanded, setExpanded] = useState(false);
+  const expandedRef = useRef(expanded);
+  expandedRef.current = expanded;
+  const loadedTimeframeRef = useRef("");
   const [compactMobile, setCompactMobile] = useState(false);
   const radarRoot = useRef<HTMLElement>(null);
   const radarVisible = useRef(true);
@@ -400,7 +405,7 @@ export function OpportunityRadar({
     const observer = new IntersectionObserver(([entry]) => { radarVisible.current = entry.isIntersecting; });
     if (radarRoot.current) observer.observe(radarRoot.current);
     const timer = window.setInterval(() => {
-      if (document.visibilityState === "visible" && radarVisible.current && !document.querySelector("dialog[open]")) setScanRefresh(value => value + 1);
+      if (document.visibilityState === "visible" && radarVisible.current && !expandedRef.current && !document.querySelector("dialog[open]")) setScanRefresh(value => value + 1);
     }, 60_000);
     return () => { observer.disconnect(); window.clearInterval(timer); };
   }, []);
@@ -417,18 +422,20 @@ export function OpportunityRadar({
   }, [initialTimeframe]);
   useEffect(() => {
     let current = true;
-    setStatus("Scanning live market structure…");
+    if (!scanRefresh) setStatus("Scanning live market structure…");
     void apiGet(
       `/v1/opportunities?timeframe=${encodeURIComponent(radarTimeframe)}`,
     ).then((response) => {
       if (!current) return;
+      // A background request already in flight must not replace expanded cards.
+      if (expandedRef.current && loadedTimeframeRef.current === radarTimeframe) return;
       if (!response.ok) {
-        setItems([]);
         setStatus(context === "autopilot"
           ? "Market shortlist is temporarily unavailable. Configure any supported pair directly below."
           : "Opportunity scan is temporarily unavailable. Pair search and analysis remain available.");
         return;
       }
+      loadedTimeframeRef.current = radarTimeframe;
       setItems(
         (
           (response.data as { candidates?: PotentialGainer[] }).candidates || []
@@ -533,17 +540,20 @@ export function OpportunityRadar({
               </article>
             ))}
           </div>
-          {items.length > collapsedCount && (
+          {items.length > collapsedCount && (<div className="radar-browse-controls">
             <button
               type="button"
               className="radar-more"
-              onClick={() => setExpanded((value) => !value)}
+              aria-expanded={expanded}
+              onClick={() => setExpanded(true)}
+              disabled={expanded}
             >
               {expanded
-                ? `Show top ${collapsedCount}`
+                ? `All ${items.length} candidates shown · refresh pauses while you browse`
                 : `Show ${items.length - collapsedCount} more candidates`}
             </button>
-          )}
+            {expanded && <button type="button" className="radar-more" onClick={() => setExpanded(false)}>Show fewer candidates</button>}
+          </div>)}
         </>
       ) : (
         <div className="empty-dashboard compact">
@@ -4109,6 +4119,7 @@ export function AutopilotWorkspace({
   const [activity, setActivity] = useState<Activity[]>([]);
   const [activitySyncNotice, setActivitySyncNotice] = useState("");
   const [strategies, setStrategies] = useState<AutopilotStrategyView[]>([]);
+  const [runtimeStorageReady, setRuntimeStorageReady] = useState(false);
   const [strategyCatalog, setStrategyCatalog] = useState<
     AutopilotStrategyCatalogItem[]
   >([]);
@@ -4371,13 +4382,22 @@ export function AutopilotWorkspace({
           strategies?: AutopilotStrategyView[];
           strategyCatalog?: AutopilotStrategyCatalogItem[];
           aiPolicy?: typeof aiPolicy;
+          persistence?: { state?: string; lastError?: string };
         };
         setStrategies(runtimeData.strategies || []);
         setStrategyCatalog(runtimeData.strategyCatalog || []);
         setAiPolicy(runtimeData.aiPolicy || null);
-      } else
+        const storageState = runtimeData.persistence?.state;
+        const storageReady = storageState === "online" || storageState === "local";
+        setRuntimeStorageReady(storageReady);
+        if (!storageReady) syncNotice = /max requests limit/i.test(runtimeData.persistence?.lastError || "")
+          ? "Service storage request allowance is exhausted. Setup, pass checkout and Resume are stopped until the operator restores it. Wallet funds remain owner-controlled."
+          : "Service storage is unavailable. Pass status is unverified—not expired. Setup, checkout and Resume are temporarily stopped.";
+      } else {
+        setRuntimeStorageReady(false);
         syncNotice ||=
           "Autopilot monitoring is reconnecting. On-chain vault guardrails remain active.";
+      }
       setActivitySyncNotice(syncNotice);
       if (cap.ok) {
         const factory = (cap.data as Capability).contracts?.autopilotFactory;
@@ -4749,8 +4769,12 @@ export function AutopilotWorkspace({
     setBusy(true);
     setMessage("Preparing your guarded strategy…");
     let safelyPaused = false;
+    let passPurchased = false;
+    let resumeConfirmed = false;
     try {
       setMessage("Checking token contracts and the live route before any wallet transaction...");
+      const readiness = await apiPost("/v1/autopilot/readiness", {});
+      if (!readiness.ok) throw new Error("Service storage is unavailable. No wallet transaction or payment was requested. Retry setup after service recovery.");
       const preflight = await apiPost("/v1/autopilot/preflight", {
         network: networkKey,
         settlementAsset: settlement,
@@ -5006,6 +5030,7 @@ export function AutopilotWorkspace({
       if (!wasExisting || !passActive) {
         setMessage(`Wallet confirmation · Approve the ${selectedPassPlan} AI Entry Pass. The paid timer stops whenever this Autopilot is paused.`);
         passExpiry = await requestAutopilotPass(selectedPassPlan, vault);
+        passPurchased = true;
       } else {
         setMessage("Wallet confirmation · Existing AI Entry Pass verified; no additional payment is required.");
       }
@@ -5019,6 +5044,8 @@ export function AutopilotWorkspace({
         value: "0",
       });
       await waitForWalletReceipt(provider, resumeHash);
+      resumeConfirmed = true;
+      safelyPaused = false;
       await record("vault_resume", resumeHash, vault);
       const latestAccounts = await fetchAccountSnapshot(
         networkKey,
@@ -5032,7 +5059,7 @@ export function AutopilotWorkspace({
       await refresh();
     } catch (error) {
       setMessage(
-        `${error instanceof Error ? error.message : String(error)}${safelyPaused ? " The strategy wallet remains paused; funds stay owner-withdrawable." : " Pause the existing strategy before retrying any policy change."}`,
+        `${error instanceof Error ? error.message : String(error)} ${autopilotSetupFailureState({ resumed: resumeConfirmed, paid: passPurchased, safelyPaused })}`,
       );
       await refresh().catch(() => undefined);
     } finally {
@@ -5045,6 +5072,7 @@ export function AutopilotWorkspace({
   ) {
     if (!wallet || !ADDRESS.test(selectedVault))
       return setMessage("Connect the owner wallet and select an Autopilot");
+    if (action === "resume" && !controlState.resumeAllowed) return setMessage(controlState.reason || "This Autopilot is not paused.");
     setBusy(true);
     setMessage("");
     try {
@@ -5264,6 +5292,7 @@ export function AutopilotWorkspace({
 
   async function purchaseAutopilotPass(plan: "24h" | "7d" | "30d") {
     if (busy || passBusy || passCheckoutInFlight.current) return;
+    if (!controlState.purchaseAllowed) return setMessage(controlState.reason || "Finish setup and fund this Autopilot before purchasing a pass.");
     if (!wallet || !selectedVault) {
       setMessage("Connect your wallet and select an Autopilot before buying its pass.");
       return;
@@ -5441,6 +5470,10 @@ export function AutopilotWorkspace({
   const passRemainingMs = activePass ? Date.parse(activePass.expiresAt) - (activePass.pausedAt ? Date.parse(activePass.pausedAt) : Date.now()) : 0;
   const passSignalsRemaining = activePass ? Math.max(0, activePass.signalLimit - activePass.signalsUsed) : 0;
   const passActive = passRemainingMs > 0 && passSignalsRemaining > 0;
+  const passUnavailable = !runtimeStorageReady || activeStrategy?.runtimeState === "telemetry_unavailable";
+  const controlState = autopilotControlState({ registered: Boolean(activeStrategy), storageReady: runtimeStorageReady,
+    paused: activeVault?.paused ?? activeStrategy?.paused, funded: existingVaultCapital > 0n || BigInt(activeStrategy?.targetBalance || "0") > 0n,
+    passRemainingMs, signalsRemaining: passSignalsRemaining, hasPosition: BigInt(activeStrategy?.targetBalance || "0") > 0n });
   const passTimeLabel = passRemainingMs > 0
     ? passRemainingMs >= 86_400_000
       ? `${Math.floor(passRemainingMs / 86_400_000)}d ${Math.floor((passRemainingMs % 86_400_000) / 3_600_000)}h remaining`
@@ -6307,11 +6340,11 @@ export function AutopilotWorkspace({
               <small>{activeStrategy?.lastDecision?.replaceAll("_", " ") || "Awaiting first decision"}</small>
             </div>
             <div className={`autopilot-pass-card compact ${passActive ? "active" : "warning"}`}>
-              <div><span>AI ENTRY PASS</span><strong>{passActive ? `${passTimeLabel}${activePass?.pausedAt ? " · on hold" : ""}` : "New entries on Hold"}</strong><small>{activePass?.pausedAt ? "Timer on hold while Autopilot is paused" : passTimerState} · {passSignalsRemaining} confirmations left</small></div>
+              <div><span>AI ENTRY PASS</span><strong>{passUnavailable ? "Pass status unavailable" : passRemainingMs > 0 ? `${passTimeLabel}${activePass?.pausedAt ? " · on hold" : ""}` : "New entries on Hold"}</strong><small>{passUnavailable ? "Storage unavailable · do not pay again" : `${activePass?.pausedAt ? "Timer on hold while Autopilot is paused" : passTimerState} · ${passSignalsRemaining} confirmations left`}</small></div>
               <div className="pass-plans">
-                <button type="button" className="btn btn-accent" disabled={busy || passBusy || !selectedVault} onClick={() => void purchaseAutopilotPass("24h")}>24h · ${passPrices["24h"].toFixed(2)}</button>
-                <button type="button" className="btn btn-soft" disabled={busy || passBusy || !selectedVault} onClick={() => void purchaseAutopilotPass("7d")}>7d · ${passPrices["7d"].toFixed(2)}</button>
-                <button type="button" className="btn btn-soft" disabled={busy || passBusy || !selectedVault} onClick={() => void purchaseAutopilotPass("30d")}>30d · ${passPrices["30d"].toFixed(2)}</button>
+                <button type="button" className="btn btn-accent" disabled={busy || passBusy || !selectedVault || !controlState.purchaseAllowed} onClick={() => void purchaseAutopilotPass("24h")}>24h · ${passPrices["24h"].toFixed(2)}</button>
+                <button type="button" className="btn btn-soft" disabled={busy || passBusy || !selectedVault || !controlState.purchaseAllowed} onClick={() => void purchaseAutopilotPass("7d")}>7d · ${passPrices["7d"].toFixed(2)}</button>
+                <button type="button" className="btn btn-soft" disabled={busy || passBusy || !selectedVault || !controlState.purchaseAllowed} onClick={() => void purchaseAutopilotPass("30d")}>30d · ${passPrices["30d"].toFixed(2)}</button>
               </div>
               <small>{passBusy ? "Completing payment and checking Resume…" : "Pay & resume: after payment, a paused vault requests one wallet confirmation to resume. Running vaults need no extra transaction. Added time follows unused time; never auto-renews."}</small>
             </div>
@@ -6342,7 +6375,8 @@ export function AutopilotWorkspace({
               </section>
               <section className="runtime-controls">
                 <span className="eyebrow">OWNER CONTROLS</span>
-                <div className="manager-actions"><button className="btn btn-danger" disabled={busy || (activeStrategy?.paused ?? activeVault?.paused ?? true)} onClick={() => void operateVault("pause")}>Pause · hold pass timer</button><button className="btn btn-accent" disabled={busy || !(activeStrategy?.paused ?? activeVault?.paused ?? false)} onClick={() => void operateVault("resume")}>Resume · run timer</button></div>
+                <div className="manager-actions"><button className="btn btn-danger" disabled={busy || (activeVault?.paused ?? activeStrategy?.paused ?? true)} onClick={() => void operateVault("pause")}>Pause · hold pass timer</button><button className="btn btn-accent" disabled={busy || !controlState.resumeAllowed} onClick={() => void operateVault("resume")}>Resume · run timer</button></div>
+                {controlState.reason && <p className="control-help" role="status">{controlState.reason}</p>}
                 {closeConfirming ? <div className="account-lookup-error"><strong>Withdraw every asset and close?</strong><small>The auditable vault contract remains reusable.</small><div className="manager-actions"><button className="btn btn-soft" onClick={() => setCloseConfirming(false)}>Cancel</button><button className="btn btn-danger" disabled={busy} onClick={() => void closeAndWithdrawAutopilot()}>Confirm</button></div></div> : <button className="btn btn-danger full" disabled={busy} onClick={() => setCloseConfirming(true)}>Close &amp; withdraw all</button>}
               </section>
             </div>
@@ -6350,8 +6384,9 @@ export function AutopilotWorkspace({
         </section>}
         <div className="dashboard-metrics">
           <div>
-            <span>Strategies</span>
-            <strong>{strategies.length}</strong>
+            <span>Autopilot accounts</span>
+            <strong>{new Set([...vaults, ...strategies.map(item => item.vault)].map(address => address.toLowerCase())).size}</strong>
+            <small>{strategies.length} registered strategies · includes unfinished accounts</small>
           </div>
           <div>
             <span>Running</span>
@@ -6369,6 +6404,7 @@ export function AutopilotWorkspace({
             <small>
               {activeVault?.settlementSymbol ||
                 WEB_NETWORKS[networkKey].payment.symbol}
+              {vaults.some(vault => !strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase())) ? " · registered strategies only; other funds shown below" : ""}
             </small>
           </div>
           <div>
@@ -6386,9 +6422,22 @@ export function AutopilotWorkspace({
           </div>
         </div>
         {activeStrategy && <details className="autopilot-runtime-market"><summary>{lang === "zh" ? "所选自动驾驶的市场行情" : "Market context for selected Autopilot"} · {activeStrategy.pair} · {activeStrategy.timeframe}</summary><SpotMarketPreview key={`runtime:${activeStrategy.pair}:${activeStrategy.timeframe}`} pair={activeStrategy.pair} timeframe={activeStrategy.timeframe} lang={lang} context="autopilot" /></details>}
-        {strategies.length ? (
+        {strategies.length || vaults.length ? (
           <div className="order-monitor">
-            {strategies.map((item) => {
+            {[...vaults, ...strategies.filter(item => !vaults.some(vault => vault.toLowerCase() === item.vault.toLowerCase())).map(item => item.vault)].map(vault => {
+              const item = strategies.find(item => item.vault.toLowerCase() === vault.toLowerCase());
+              if (!item) {
+              const account = vaultDetails.find(item => item.address.toLowerCase() === vault.toLowerCase());
+              const index = vaults.findIndex(item => item.toLowerCase() === vault.toLowerCase());
+              return <div className="order-monitor-row autopilot-row identified-vault incomplete-vault" key={vault}>
+                <span className="status-chip paused">{account?.paused ? "Paused" : "Not registered"}</span>
+                <button type="button" className="vault-identity" aria-label={`Open Autopilot #${index + 1} controls`} onClick={() => { createNewVaultRef.current = false; setSelectedVault(vault); document.getElementById("autopilot-dashboard-controls")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}><small>Autopilot</small><strong>#{index + 1}</strong></button>
+                <div><strong>Setup incomplete</strong><small className="autopilot-id">{vault.slice(0, 8)}…{vault.slice(-4)}</small></div>
+                <div><small>Vault funds</small><strong>{account?.balanceAtomic != null ? `${formatUnits(BigInt(account.balanceAtomic), account.settlementDecimals ?? settlementDecimals)} ${account.settlementSymbol || activeSettlementSymbol}` : "Unavailable"}</strong></div>
+                <div className="incomplete-vault-note">This on-chain account has no saved strategy. Select it, then review setup; do not create or fund a replacement.</div>
+                <button type="button" className="btn btn-soft" onClick={() => { createNewVaultRef.current = false; setSelectedVault(vault); document.getElementById("autopilot-execution-pair")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>Review setup</button>
+              </div>;
+              }
               const confirmedExecution = confirmedAutopilotExecutionCounts(activity, item.vault);
               const filledBuys = Math.max(item.filledBuyCount ?? 0, item.evaluations?.filter((entry) => entry.action === "buy" && entry.status === "filled").length ?? 0, confirmedExecution.buyCount);
               const filledSells = Math.max(item.filledSellCount ?? 0, item.evaluations?.filter((entry) => entry.action === "sell" && entry.status === "filled").length ?? 0, confirmedExecution.sellCount);

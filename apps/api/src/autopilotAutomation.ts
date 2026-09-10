@@ -23,6 +23,8 @@ import { listV6Activity, recordV6Activity } from "./v6Store.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
+import { assertAutopilotStorageReady, getAutopilotPass, mutateAutopilotPass, extendAutopilotPass, synchronizeAutopilotPassPause, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
+export { getAutopilotPass, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
 import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
@@ -232,27 +234,9 @@ async function cacheAutopilotSignal(pair: string, timeframe: string, value: Auto
   if (kvConfigured()) await kv(["SET", key, JSON.stringify(entry), "EX", Math.max(1, Math.ceil(ttlMs / 1000))]);
 }
 let memory: Strategy[] = [];
-export type AutopilotPass = {
-  owner: string;
-  network: Network;
-  vault: string;
-  purchasedAt: string;
-  expiresAt: string;
-  signalLimit: number;
-  signalsUsed: number;
-  /** Wall-clock expiry is frozen while the owner pauses the vault. */
-  pausedAt?: string;
-  telegramDelivery?: string;
-  expiryWarningSentAt?: string;
-  expiredNoticeSentAt?: string;
-};
 export const AUTOPILOT_ANALYSIS_MIN_INTERVAL_MS = 15 * 60_000;
 export const AUTOPILOT_PROVIDER_BLOCK_BACKOFF_MS = 6 * 60 * 60_000;
 
-export function autopilotPassRemainingMs(value: AutopilotPass, now = Date.now()) {
-  const reference = value.pausedAt ? Date.parse(value.pausedAt) : now;
-  return Date.parse(value.expiresAt) - reference;
-}
 
 export function nextAutopilotAiRetryAt(input: {
   now: number;
@@ -271,85 +255,44 @@ export function nextAutopilotAiRetryAt(input: {
     providerBlocked ? AUTOPILOT_PROVIDER_BLOCK_BACKOFF_MS : transientBackoff,
   );
 }
-const localPasses = new Map<string, AutopilotPass>();
-const passKey = (network: Network, vault: string) => `pulse:v6:autopilot:pass:${network}:${vault.toLowerCase()}`;
-export async function getAutopilotPass(network: Network, vault: string): Promise<AutopilotPass | null> {
-  const key = passKey(network, vault);
-  if (!kvConfigured()) return localPasses.get(key) || null;
-  const raw = await kv(["GET", key]).catch(() => null);
-  if (typeof raw !== "string") return localPasses.get(key) || null;
-  try {
-    const parsed = JSON.parse(raw) as AutopilotPass;
-    localPasses.set(key, parsed);
-    return parsed;
-  } catch {
-    return null;
-  }
-}
 export async function autopilotPassTargetExists(input: { owner: string; network: Network; vault: string }) {
-  return (await list()).some((item) =>
+  await assertAutopilotStorageReady();
+  return (await list(false)).some((item) =>
     item.network === input.network
     && item.vault.toLowerCase() === input.vault.toLowerCase()
     && item.owner.toLowerCase() === input.owner.toLowerCase(),
   );
 }
 async function saveAutopilotPass(value: AutopilotPass) {
-  const key = passKey(value.network, value.vault);
-  localPasses.set(key, value);
-  if (kvConfigured()) {
-    // A paused pass has no moving wall-clock expiry, so its KV record must not
-    // disappear while the owner intentionally leaves a vault paused.
-    if (value.pausedAt) await kv(["SET", key, JSON.stringify(value)]);
-    else await kv(["SET", key, JSON.stringify(value), "EX", Math.max(172800, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000) + 2_592_000)]);
-  }
-}
-async function synchronizeAutopilotPassPause(value: AutopilotPass, paused: boolean, now: number) {
-  if (paused && !value.pausedAt) {
-    value.pausedAt = new Date(now).toISOString();
-    await saveAutopilotPass(value);
-  } else if (!paused && value.pausedAt) {
-    const pausedAt = Date.parse(value.pausedAt);
-    const pausedFor = Number.isFinite(pausedAt) ? Math.max(0, now - pausedAt) : 0;
-    value.expiresAt = new Date(Date.parse(value.expiresAt) + pausedFor).toISOString();
-    value.pausedAt = undefined;
-    value.expiryWarningSentAt = undefined;
-    value.expiredNoticeSentAt = undefined;
-    await saveAutopilotPass(value);
-  }
-  return value;
+  // Notification acknowledgements never overwrite entitlement or timer fields.
+  await mutateAutopilotPass(value.network, value.vault, current => current && current.purchasedAt === value.purchasedAt
+    ? { ...current, expiryWarningSentAt: value.expiryWarningSentAt, expiredNoticeSentAt: value.expiredNoticeSentAt } : current);
 }
 export async function grantAutopilotPass(input: { owner: string; network: Network; vault: string; days: 1 | 7 | 30; telegramDelivery?: string }) {
-  const strategy = (await list()).find((item) => item.network === input.network && item.vault.toLowerCase() === input.vault.toLowerCase() && item.owner.toLowerCase() === input.owner.toLowerCase());
+  const strategy = (await list(false)).find((item) => item.network === input.network && item.vault.toLowerCase() === input.vault.toLowerCase() && item.owner.toLowerCase() === input.owner.toLowerCase());
   if (!strategy) throw new Error("The selected vault is not a registered Autopilot owned by this wallet on the selected network");
-  const existing = await getAutopilotPass(input.network, input.vault);
+  const { publicClient } = clients(input.network);
+  const paused = await publicClient.readContract({ address: input.vault as `0x${string}`, abi: vaultReadAbi, functionName: "paused" });
   const now = Date.now();
-  const extendsActive = existing && autopilotPassRemainingMs(existing, now) > 0;
-  const startsAt = extendsActive ? Date.parse(existing!.expiresAt) : now;
-  const value: AutopilotPass = {
-    owner: input.owner.toLowerCase(), network: input.network, vault: input.vault.toLowerCase(),
-    purchasedAt: new Date(now).toISOString(),
-    expiresAt: new Date(startsAt + input.days * 86_400_000).toISOString(),
-    signalLimit: (extendsActive ? existing!.signalLimit - existing!.signalsUsed : 0) + input.days * 3,
-    signalsUsed: 0,
-    ...(existing?.pausedAt ? { pausedAt: existing.pausedAt } : {}),
-    ...(input.telegramDelivery ? { telegramDelivery: input.telegramDelivery } : existing?.telegramDelivery ? { telegramDelivery: existing.telegramDelivery } : {}),
-  };
-  await saveAutopilotPass(value);
+  const value = await mutateAutopilotPass(input.network, input.vault, existing => extendAutopilotPass(existing, { ...input, paused: Boolean(paused) }, now));
   strategy.lastEvaluatedCandleTs = undefined;
   strategy.lastRunAt = undefined;
   strategy.aiBudgetStatus = "ready";
   strategy.updatedAt = new Date().toISOString();
-  await save((await list()).map((item) => item.id === strategy.id ? strategy : item), "runtime");
+  // The durable entitlement is authoritative even if a telemetry reset fails.
+  try { await save((await list(false)).map((item) => item.id === strategy.id ? strategy : item), "runtime"); }
+  catch { /* A failed telemetry refresh must not turn a saved pass into a failed checkout. */ }
   return value;
 }
 async function consumeAutopilotPassSignal(strategy: Strategy) {
-  const value = await getAutopilotPass(strategy.network, strategy.vault);
   const now = Date.now();
-  if (!value || value.owner !== strategy.owner.toLowerCase() || autopilotPassRemainingMs(value, now) <= 0) return { ok: false as const, reason: "pass_expired", pass: value };
-  if (value.signalsUsed >= value.signalLimit) return { ok: false as const, reason: "signals_exhausted", pass: value };
-  value.signalsUsed += 1;
-  await saveAutopilotPass(value);
-  return { ok: true as const, pass: value };
+  let reason = "";
+  const value = await mutateAutopilotPass(strategy.network, strategy.vault, current => {
+    reason = !current || current.owner !== strategy.owner.toLowerCase() || current.pausedAt || autopilotPassRemainingMs(current, now) <= 0 ? "pass_expired"
+      : current.signalsUsed >= current.signalLimit ? "signals_exhausted" : "";
+    return reason || !current ? current : { ...current, signalsUsed: current.signalsUsed + 1 };
+  });
+  return reason ? { ok: false as const, reason, pass: value } : { ok: true as const, pass: value };
 }
 const POTENTIAL_GAINER_PAIRS = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT", "XRP-USDT", "ADA-USDT", "LTC-USDT", "PEPE-USDT", "SHIB-USDT", "WIF-USDT", "TURBO-USDT", "MOODENG-USDT"];
 const potentialGainerCache = new Map<string, { expiresAt: number; value: unknown[] }>();
@@ -413,7 +356,7 @@ async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D") {
   potentialGainerInflight.set(timeframe, request);
   return request;
 }
-async function list() {
+async function list(allowCached = true) {
   if (!kvConfigured()) return memory;
   try {
     const hashEntries = decodeStrategyHash(await kv(["HGETALL", AUTOPILOT_STRATEGY_HASH_KEY])) as Strategy[];
@@ -437,7 +380,7 @@ async function list() {
     // A last-known strategy view keeps the dashboard useful during a short KV
     // interruption. Execution still fails closed because acquiring the
     // distributed lease requires a live KV connection.
-    if (isKvUnavailableError(error) && memory.length) return memory;
+    if (allowCached && isKvUnavailableError(error) && memory.length) return memory;
     throw error;
   }
 }
@@ -723,6 +666,11 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
 }
 export function createAutopilotAutomationRouter(cfg: AppConfig) {
   const router = Router();
+  router.post("/v1/autopilot/readiness", asyncRoute(async (_req, res) => {
+    await assertAutopilotStorageReady();
+    res.setHeader("Cache-Control", "no-store");
+    res.json({ ready: true });
+  }));
   const potentialGainersHandler = asyncRoute(async (req, res) => {
     const parsed = z.enum(["15m", "1H", "4H", "1D"]).safeParse(String(req.query.timeframe || "1H"));
     if (!parsed.success) return res.status(400).json({ error: "timeframe must be 15m, 1H, 4H or 1D" });
@@ -777,7 +725,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     }));
     const views = await Promise.all(strategies.map(async (strategy) => {
       let passError: unknown;
-      const aiPass = await getAutopilotPass(strategy.network, strategy.vault).catch(error => { passError = error; return null; });
+      let aiPass = await getAutopilotPass(strategy.network, strategy.vault).catch(error => { passError = error; return null; });
       // History is independent of today's RPC/ticker availability.
       const history = await readJournal(strategy, kvConfigured() ? kv : undefined);
       const evaluations = history.rows;
@@ -804,7 +752,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
           getTicker(strategy.pair),
         ]);
         const [settlementBalance, targetBalance, settlementDecimals, targetDecimals, settlementSymbol, targetSymbol, paused] = chainState;
-        if (aiPass) await synchronizeAutopilotPassPause(aiPass, Boolean(paused), Date.now());
+        if (aiPass) aiPass = await synchronizeAutopilotPassPause(aiPass, Boolean(paused), Date.now());
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const portfolioValueAtomic = settlementBalance + targetBalance * price * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
@@ -816,7 +764,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance: policyBalance, pass: aiPass });
         return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
-        return { ...strategy, ...historyView, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, telemetryError: error instanceof Error ? error.message : String(error) };
+        return { ...strategy, ...historyView, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, passUnavailable: Boolean(passError), telemetryError: error instanceof Error ? error.message : String(error) };
       }
     }));
     res.json({
@@ -842,6 +790,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.flatten() });
     try {
+      await assertAutopilotStorageReady();
       await verifyStrategy(parsed.data);
       const items = await list();
       const id = `${parsed.data.network}:${parsed.data.vault.toLowerCase()}`;
@@ -850,13 +799,14 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       const { authorization: _authorization, ...authorizedStrategy } = parsed.data;
       const configurationHash = keccak256(toHex(JSON.stringify(authorizedStrategy)));
       const { publicClient } = clients(parsed.data.network);
-      const [settlementBalance, targetBalance, settlementDecimals, targetDecimals, ticker] = await Promise.all([
+      const [settlementBalance, targetBalance, settlementDecimals, targetDecimals] = await Promise.all([
         publicClient.readContract({ address: parsed.data.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
         publicClient.readContract({ address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
         publicClient.readContract({ address: parsed.data.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" }),
         publicClient.readContract({ address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" }),
-        getTicker(parsed.data.pair),
       ]);
+      // An empty target position needs no market dependency to value its deposit.
+      const ticker = targetBalance > 0n ? await getTicker(parsed.data.pair) : { last: 0 };
       const baselinePrice = parseUnits(ticker.last.toFixed(18), 18);
       const baselineValue = settlementBalance + targetBalance * baselinePrice * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
       const strategy: Strategy = {
@@ -1020,8 +970,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           settlementDecimals,
           settlementBalance,
         ] = await readRuntime();
-        const aiPass = await getAutopilotPass(s.network, s.vault);
-        if (aiPass) await synchronizeAutopilotPassPause(aiPass, Boolean(paused), now);
+        let aiPass = await getAutopilotPass(s.network, s.vault);
+        if (aiPass) aiPass = await synchronizeAutopilotPassPause(aiPass, Boolean(paused), Date.now());
         if (mode === "analysis") {
           if (aiPass?.telegramDelivery) {
             const remainingMs = autopilotPassRemainingMs(aiPass, now);

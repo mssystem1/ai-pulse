@@ -38,6 +38,17 @@ async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
 
 describe("PULSE API", () => {
   before(async () => {
+    // Complete, secret-free test profile; do not depend on the operator's .env.
+    Object.assign(process.env, {
+      ENABLED_NETWORKS: "xlayer,base,arbitrum,arc-testnet",
+      FEATURE_BASE_PAYMENTS: "1", FEATURE_ARBITRUM_PAYMENTS: "1", FEATURE_ARC_PAYMENTS: "1",
+      FEATURE_POLYMARKET: "1", FEATURE_PREDICTION_ANALYSIS: "1", FEATURE_JOBS: "1",
+      FEATURE_FUSED_ANALYSIS: "0", FEATURE_DIVERGENCE_ANALYSIS: "0", FEATURE_EVENT_RISK_ANALYSIS: "0",
+      CDP_API_KEY_ID: "fixture", CDP_API_KEY_SECRET: "fixture", CIRCLE_GATEWAY_ENABLED: "1", CIRCLE_GATEWAY_SELLER_ADDRESS: ADDRESS, ARC_AI_MODE: "fixture",
+      QUEUE_PROVIDER: "memory", STORAGE_PROVIDER: "memory", REDIS_URL: "", KV_REST_API_URL: "", KV_REST_API_TOKEN: "",
+      OKX_API_KEY: "", OKX_XLAYER_API_KEY: "", OKX_SECRET_KEY: "", OKX_PASSPHRASE: "",
+      AUTOMATION_WORKER_ENABLED: "0", TEST_WALLET_PRIVATE_KEY: "", AUTOMATION_EXECUTOR_PRIVATE_KEY: "",
+    });
     process.env.X402_MOCK = "1";
     process.env.NODE_ENV = "test";
     process.env.XAI_API_KEY = "";
@@ -140,7 +151,7 @@ describe("PULSE API", () => {
       method: "POST",
       body: JSON.stringify({ owner: ADDRESS, vault: `0x${"1".repeat(40)}` }),
     });
-    assert.equal(unknownVault.res.status, 404);
+    assert.equal(unknownVault.res.status, 409);
     assert.doesNotMatch(JSON.stringify(unknownVault.json), /payment required/i);
   });
 

@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { AppConfig } from "@pulse/config";
-import { isKvUnavailableError, runKvCommand } from "./resilientKv.js";
+import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { getTicker } from "@pulse/market";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
@@ -256,7 +256,7 @@ async function list() {
   return [...memory.values()];
 }
 async function save(items: RegisteredOrder[]) {
-  if (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN)
+  if (kvConfigured())
     await kv([
       "SET",
       "pulse:v6:automation:orders",
