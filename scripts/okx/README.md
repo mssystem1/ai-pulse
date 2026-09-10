@@ -1,4 +1,24 @@
-# PULSE full-payload safe review runner
+# PULSE payment verification
+
+## Current direct endpoint check
+
+Use the logged-in Codespace wallet, quote the exact service first, and obtain explicit approval of its price, network, token, recipient and business parameters. The verified Global Quick endpoint is `POST https://pulse-api-production-7aae.up.railway.app/xlayer/v1/analysis/spot/standard` (0.20 USDT0).
+
+```bash
+onchainos payment quote https://pulse-api-production-7aae.up.railway.app/xlayer/v1/analysis/spot/standard --method POST --param instId=BTC-USDT --param timeframe=4H --param lang=en
+```
+
+Important for CLI 4.5.3: REST replay drops quote-time business parameters unless they are repeated on `payment pay`. After approval, include the same `--param instId=BTC-USDT --param timeframe=4H --param lang=en` on that command. Do not change the approved request or weaken server-side input validation.
+
+The local helper `live-delivery-check.mjs <codespace> <payment-id>` defaults to a non-paying dry run. Only after verifying the quote and obtaining approval, append `--execute-approved-payment`. It submits one payment for this exact BTC-USDT/4H/English request and follows the returned durable job through authenticated GET polling to final report retrieval. Recovery credentials remain in memory. It does not update listings, create marketplace tasks or submit reviews.
+
+Never repeat payment after success, a timeout, or an uncertain settlement. Recover/check the existing job first. See [live verification evidence](../../docs/AUTOPILOT_DEPLOYED_REVIEW.md).
+
+## Historical runner notes — do not use for the current catalog
+
+The instructions and prices below describe a retired four-service workflow. They are not the current eight-service agent #8355 catalog, and the referenced runner is not present here. Do not run this workflow or use its old prices for current payments.
+
+### Original full-payload safe review runner
 
 This is the replacement for the unsafe runner that used:
 

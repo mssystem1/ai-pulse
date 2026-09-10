@@ -977,6 +977,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     "/v1/wallet/scan",
     "/v1/market/pulse",
     "/v1/swap/quote",
+    "/v1/autopilot/pass/24h",
+    "/v1/autopilot/pass/7d",
+    "/v1/autopilot/pass/30d",
   ]) {
     app.get(path, (_req, res) => {
       res.status(400).json(buildX402InputRequired(path));
@@ -1121,7 +1124,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(async (req, res, next) => {
     if (req.method !== "POST" || !autopilotPassPaths.has(req.path)) return next();
     const parsed = AutopilotPassBodySchema.safeParse(req.body);
-    if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
+    if (!parsed.success) return res.status(400).json(buildX402InputRequired(req.path, parsed.error.issues));
     const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
     if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
     try {

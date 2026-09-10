@@ -55,6 +55,16 @@ try {
     assert.equal(await page.locator(".identified-vault").count(), 4);
     assert.deepEqual(await page.locator(".identified-vault .vault-identity strong").allTextContents(), ["#1", "#2", "#3", "#4"]);
     assert.equal(await page.getByRole("button", { name: "Resume · run timer", exact: true }).isDisabled(), true, "unfinished #4 cannot resume");
+    assert.equal(await page.locator('.journal-account-links button').count(), 4, 'every vault has a journal or explicit setup status');
+    await page.getByRole('button', { name: 'Autopilot #4 · Setup status', exact: true }).click();
+    assert.equal(await page.locator(`#autopilot-journal-${addresses[3]}`).evaluate(el => el.open), true);
+    await page.locator(`#autopilot-journal-${addresses[3]}`).getByRole('button', { name: 'Finish setup for this account' }).click();
+    await page.getByRole('heading', { name: 'Finish Autopilot #4 setup', exact: true }).waitFor();
+    assert.match(await page.locator('#autopilot-setup-target').innerText(), /draft settings, not recovered trading instructions/);
+    await page.getByRole('button', { name: 'Use for Autopilot', exact: true }).first().click();
+    await page.getByRole('heading', { name: 'Finish Autopilot #4 setup', exact: true }).waitFor();
+    await page.getByRole('button', { name: 'Autopilot #2 · Strategy journal', exact: true }).click();
+    assert.equal(await page.locator(`#autopilot-journal-${addresses[1]}`).evaluate(el => el.open), true);
     await page.getByRole("button", { name: "Open Autopilot #2 controls", exact: true }).click();
     await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
     }

@@ -1,5 +1,12 @@
 export const AUTOPILOT_STRATEGY_HASH_KEY = "pulse:v6:autopilot:strategy-map";
 
+export function currentAutopilotAiUsage(value: { aiBudgetDay?: string; aiCallsToday?: number; aiActualCostTodayUsd?: number; aiReservedCostTodayUsd?: number }, now = Date.now()) {
+  const current = value.aiBudgetDay === new Date(now).toISOString().slice(0, 10);
+  return { aiCallsToday: current ? value.aiCallsToday || 0 : 0,
+    aiActualCostTodayUsd: current ? value.aiActualCostTodayUsd || 0 : 0,
+    aiReservedCostTodayUsd: current ? value.aiReservedCostTodayUsd || 0 : 0 };
+}
+
 type StrategyRecord = { id: string } & Record<string, unknown>;
 type ExecutionActivity = {
   id?: string;

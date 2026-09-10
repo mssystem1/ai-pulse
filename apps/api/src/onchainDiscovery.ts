@@ -47,8 +47,7 @@ export type OnchainAccountSnapshot = {
 const snapshots = new Map<string, { value: OnchainAccountSnapshot; expiresAt: number }>();
 const inflight = new Map<string, Promise<OnchainAccountSnapshot>>();
 
-async function readSnapshot(network: ExecutionNetwork, owner: string): Promise<OnchainAccountSnapshot> {
-  const client = executionPublicClient(network);
+export async function readSnapshot(network: ExecutionNetwork, owner: string, client: PublicClient = executionPublicClient(network)): Promise<OnchainAccountSnapshot> {
   const protectionFactory = executionContractAddress(network, "spotFactory");
   const limitFactory = executionContractAddress(network, "spotLimitFactory");
   const bracketFactory = executionContractAddress(network, "spotBracketFactory");
@@ -73,25 +72,39 @@ async function readSnapshot(network: ExecutionNetwork, owner: string): Promise<O
   let vaultAddresses: string[] = [];
   if (autopilotFactory) {
     const result = results[cursor++];
-    if (result?.status === "success" && Array.isArray(result.result)) vaultAddresses = result.result.map(String).filter((value) => ADDRESS.test(value) && !ZERO.test(value));
+    if (result?.status !== "success" || !Array.isArray(result.result)) throw new Error("Autopilot account discovery is unavailable; existing accounts must not be treated as absent.");
+    vaultAddresses = result.result.map(String).filter((value) => ADDRESS.test(value) && !ZERO.test(value));
   }
-  const vaults = await Promise.all(vaultAddresses.slice(-25).map(async (vault) => {
-    try {
-      const [settlementResult, pausedResult] = await client.multicall({ contracts: [
+  const vaults: OnchainAccountSnapshot["vaults"] = [];
+  // Bounded batches, not two concurrent RPC calls per vault. Keep factory order
+  // and every account: slicing the last 25 silently changed account numbering.
+  for (let offset = 0; offset < vaultAddresses.length; offset += 20) {
+    const addresses = vaultAddresses.slice(offset, offset + 20);
+    const state = await client.multicall({ contracts: addresses.flatMap(vault => [
         { address: vault as `0x${string}`, abi: vaultAbi, functionName: "settlementAsset" },
         { address: vault as `0x${string}`, abi: vaultAbi, functionName: "paused" },
-      ], allowFailure: false });
-      const settlementAsset = String(settlementResult);
-      const [balance, decimals, symbol] = await client.multicall({ contracts: [
-        { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [vault as `0x${string}`] },
-        { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" },
-        { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
-      ], allowFailure: false });
-      return { address: vault, settlementAsset, settlementSymbol: String(symbol), settlementDecimals: Number(decimals), balanceAtomic: String(balance), paused: Boolean(pausedResult) };
-    } catch {
-      return { address: vault, settlementAsset: null, settlementSymbol: null, settlementDecimals: null, balanceAtomic: null, paused: null };
-    }
-  }));
+      ]), allowFailure: true });
+    const group = addresses.map((address, index) => {
+      const asset = state[index * 2];
+      const pause = state[index * 2 + 1];
+      return { address, settlementAsset: asset?.status === "success" && ADDRESS.test(String(asset.result)) ? String(asset.result) : null,
+        paused: pause?.status === "success" ? Boolean(pause.result) : null,
+        settlementSymbol: null, settlementDecimals: null, balanceAtomic: null } as OnchainAccountSnapshot["vaults"][number];
+    });
+    const readable = group.filter(vault => vault.settlementAsset);
+    const balances = readable.length ? await client.multicall({ contracts: readable.flatMap(vault => [
+      { address: vault.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [vault.address as `0x${string}`] },
+      { address: vault.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" },
+      { address: vault.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
+    ]), allowFailure: true }) : [];
+    readable.forEach((vault, index) => {
+      const [balance, decimals, symbol] = balances.slice(index * 3, index * 3 + 3);
+      if (balance?.status === "success") vault.balanceAtomic = String(balance.result);
+      if (decimals?.status === "success") vault.settlementDecimals = Number(decimals.result);
+      if (symbol?.status === "success") vault.settlementSymbol = String(symbol.result);
+    });
+    vaults.push(...group);
+  }
   return { network, owner, accounts: { protection, limit, bracket }, vaults, observedAt: new Date().toISOString(), stale: false };
 }
 

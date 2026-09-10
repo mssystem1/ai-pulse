@@ -3,6 +3,7 @@ import { kvConfigured, runKvCommand } from "./resilientKv.js";
 export type AutopilotPass = {
   owner: string; network: "base" | "arbitrum" | "xlayer"; vault: string;
   purchasedAt: string; expiresAt: string; signalLimit: number; signalsUsed: number;
+  consumedSignalIds?: string[];
   pausedAt?: string; stateObservedAt?: number; telegramDelivery?: string;
   expiryWarningSentAt?: string; expiredNoticeSentAt?: string;
   timerBaseExpiresAt?: string; timerInitiallyPaused?: boolean;
@@ -12,6 +13,14 @@ const memory = new Map<string, AutopilotPass>();
 const keyFor = (network: string, vault: string) => `pulse:v6:autopilot:pass:${network}:${vault.toLowerCase()}`;
 export function autopilotPassRemainingMs(pass: AutopilotPass, now = Date.now()) {
   return Date.parse(pass.expiresAt) - (pass.pausedAt ? Date.parse(pass.pausedAt) : now);
+}
+/** Reusing the same cached AI result must not consume another confirmation. */
+export function consumePassSignal(current: AutopilotPass | null, owner: string, signalId: string, now: number) {
+  const unavailable = !current || current.owner.toLowerCase() !== owner.toLowerCase() || current.pausedAt || autopilotPassRemainingMs(current, now) <= 0;
+  if (unavailable || !current) return { pass: current, reason: "pass_expired" };
+  if (current.consumedSignalIds?.includes(signalId)) return { pass: current, reason: "" };
+  if (current.signalsUsed >= current.signalLimit) return { pass: current, reason: "signals_exhausted" };
+  return { pass: { ...current, signalsUsed: current.signalsUsed + 1, consumedSignalIds: [...(current.consumedSignalIds || []), signalId] }, reason: "" };
 }
 export async function getAutopilotPass(network: AutopilotPass["network"], vault: string): Promise<AutopilotPass | null> {
   const key = keyFor(network, vault);

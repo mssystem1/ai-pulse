@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { currentAutopilotAiUsage, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+
+test("AI today resets its display at UTC midnight without changing historical records", () => {
+  const row = { aiBudgetDay: "2026-09-09", aiCallsToday: 2, aiActualCostTodayUsd: 0.002, aiReservedCostTodayUsd: 0.01 };
+  assert.equal(currentAutopilotAiUsage(row, Date.parse("2026-09-09T23:59:59Z")).aiCallsToday, 2);
+  assert.deepEqual(currentAutopilotAiUsage(row, Date.parse("2026-09-10T00:00:00Z")), { aiCallsToday: 0, aiActualCostTodayUsd: 0, aiReservedCostTodayUsd: 0 });
+  assert.equal(row.aiCallsToday, 2);
+});
 
 test("historical fills never replace a newer scheduler decision or timestamp", () => {
   const strategy = { id: "base:vault", vault: "0x0000000000000000000000000000000000000001", lastRunAt: "2026-09-07T10:00:00Z", lastDecision: "hold_failed_closed" };

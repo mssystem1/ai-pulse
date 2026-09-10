@@ -509,6 +509,21 @@ describe("PULSE API", () => {
     assert.equal(body.priceUsd, testConfig.PRICE_ANALYSIS_PREDICTION_PREMIUM);
   });
 
+  it("discovers all three Autopilot POST contracts without payment or registration", async () => {
+    for (const prefix of ["", "/xlayer", "/base", "/arbitrum"]) for (const duration of ["24h", "7d", "30d"]) {
+      const path = `${prefix}/v1/autopilot/pass/${duration}`;
+      for (const method of ["GET", "POST"]) {
+        const { res, json } = await jfetch(path, { method, ...(method === "POST" ? { body: "{}" } : {}) });
+        assert.equal(res.status, 400, path);
+        assert.equal(res.headers.get("payment-required"), null);
+        assert.equal(json.status, "input_required");
+        assert.deepEqual(json.requiredArgs, ["owner", "vault"]);
+        assert.equal(json.outputSchema.method, "POST");
+        assert.equal(json.outputSchema.output.status, 201);
+      }
+    }
+  });
+
   it("validates all eight published MCP service arguments before payment", async () => {
     for (const name of ["spot_analysis_standard", "spot_analysis_premium", "prediction_analysis_standard", "prediction_analysis_premium", "preflight", "start_autopilot_24h", "start_autopilot_7d", "start_autopilot_30d"]) {
       const response = await fetch(`${apiUrl()}/mcp`, { method: "POST", headers: { "Content-Type": "application/json", "PAYMENT-SIGNATURE": "test-payment-signature-ok" }, body: JSON.stringify({ jsonrpc: "2.0", id: 50, method: "tools/call", params: { name, arguments: {} } }) });

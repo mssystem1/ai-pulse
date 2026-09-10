@@ -23,10 +23,10 @@ import { listV6Activity, recordV6Activity } from "./v6Store.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
-import { assertAutopilotStorageReady, getAutopilotPass, mutateAutopilotPass, extendAutopilotPass, synchronizeAutopilotPassPause, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
+import { assertAutopilotStorageReady, getAutopilotPass, mutateAutopilotPass, consumePassSignal, extendAutopilotPass, synchronizeAutopilotPassPause, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
 export { getAutopilotPass, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
 import { AUTOPILOT_STRATEGY_CATALOG, boundedTargetSellAmount, evaluateAutopilotEntryCandidate, evaluateAutopilotPolicy, evaluateAutopilotRiskExit, identifyAutopilotStrategy, minimumOracleOutput, type AutopilotRuleResult, type AutopilotStrategyType } from "./autopilotPolicy.js";
-import { AUTOPILOT_STRATEGY_HASH_KEY, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
+import { AUTOPILOT_STRATEGY_HASH_KEY, currentAutopilotAiUsage, cashFlowAdjustedPnl, decodeStrategyHash, deriveAutopilotRuntimeState, mergeStrategyRuntime, reconcileAutopilotLifetimeStats, reconcileStrategyExecution } from "./autopilotStrategyStore.js";
 import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimatedAutopilotSignalCostUsd, reserveAutopilotAiBudget } from "./autopilotAiBudget.js";
 import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
@@ -284,13 +284,13 @@ export async function grantAutopilotPass(input: { owner: string; network: Networ
   catch { /* A failed telemetry refresh must not turn a saved pass into a failed checkout. */ }
   return value;
 }
-async function consumeAutopilotPassSignal(strategy: Strategy) {
+async function consumeAutopilotPassSignal(strategy: Strategy, signal: AutopilotSignalResult) {
   const now = Date.now();
   let reason = "";
   const value = await mutateAutopilotPass(strategy.network, strategy.vault, current => {
-    reason = !current || current.owner !== strategy.owner.toLowerCase() || current.pausedAt || autopilotPassRemainingMs(current, now) <= 0 ? "pass_expired"
-      : current.signalsUsed >= current.signalLimit ? "signals_exhausted" : "";
-    return reason || !current ? current : { ...current, signalsUsed: current.signalsUsed + 1 };
+    const consumed = consumePassSignal(current, strategy.owner, `${strategy.pair}:${strategy.timeframe}:${signal.generatedAt}:${signal.candleTs}`, now);
+    reason = consumed.reason;
+    return consumed.pass;
   });
   return reason ? { ok: false as const, reason, pass: value } : { ok: true as const, pass: value };
 }
@@ -731,7 +731,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       const evaluations = history.rows;
       const networkActivity = activityByNetwork.get(strategy.network) || [];
       const lifetime = reconcileAutopilotLifetimeStats(strategy, networkActivity, evaluations);
-      const historyView = { ...lifetime, evaluations, journalStorage: history.storage,
+      const historyView = { ...lifetime, ...currentAutopilotAiUsage(strategy), evaluations, journalStorage: history.storage,
         evaluationHistoryComplete: lifetime.evaluationHistoryComplete && history.storage !== "unavailable" };
       try {
         if (passError) throw passError;
@@ -1190,7 +1190,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
               }
 
               if (signal) {
-                const entitlement = await consumeAutopilotPassSignal(s);
+                const entitlement = await consumeAutopilotPassSignal(s, signal);
                 if (!entitlement.ok) {
                   signal = null;
                   s.aiSignalSource = "deterministic";

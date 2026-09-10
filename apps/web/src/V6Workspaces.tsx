@@ -4183,6 +4183,24 @@ export function AutopilotWorkspace({
   const [message, setMessage] = useState("");
   const settlementDecimals = WEB_NETWORKS[networkKey].payment.decimals;
   const activeStrategy = selectedAutopilotStrategy(strategies, selectedVault);
+  const recoveringVault = Boolean(selectedVault && !activeStrategy);
+  const selectedVaultNumber = vaults.findIndex(vault => vault.toLowerCase() === selectedVault.toLowerCase()) + 1;
+  function reviewVaultSetup(vault: string) {
+    createNewVaultRef.current = false;
+    setSelectedVault(vault);
+    setCloseConfirming(false);
+    setPreparedCandidate("");
+    // Activity is only a market hint, never a substitute for signed trading rules.
+    const hint = [...activity].filter(item => item.account?.toLowerCase() === vault.toLowerCase() && item.status === "confirmed" && item.pair).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    if (hint?.pair) setPair(hint.pair);
+    setMessage("Finish setup for this existing account. Review the market and risk limits, then sign registration and activation. Existing vault funds are reused; no replacement account is created.");
+    requestAnimationFrame(() => document.getElementById("autopilot-setup-target")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  }
+  function openVaultJournal(vault: string) {
+    const journal = document.getElementById(`autopilot-journal-${vault.toLowerCase()}`);
+    if (journal instanceof HTMLDetailsElement) journal.open = true;
+    journal?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
   const activeVault = vaultDetails.find(
     (item) => item.address.toLowerCase() === selectedVault.toLowerCase(),
   );
@@ -4215,9 +4233,10 @@ export function AutopilotWorkspace({
   const parsedCapital = useMemo(() => {
     return positiveTokenAmount(capitalHuman, settlementDecimals) || 0n;
   }, [capitalHuman, settlementDecimals]);
+  const knownSettlementBalance = activeVault?.balanceAtomic ?? activeStrategy?.settlementBalance;
   const existingVaultCapital =
-    activeVault?.balanceAtomic && /^\d+$/.test(activeVault.balanceAtomic)
-      ? BigInt(activeVault.balanceAtomic)
+    knownSettlementBalance && /^\d+$/.test(knownSettlementBalance)
+      ? BigInt(knownSettlementBalance)
       : 0n;
   const reusingFundedVault = Boolean(
     ADDRESS.test(selectedVault) && existingVaultCapital > 0n,
@@ -5594,8 +5613,8 @@ export function AutopilotWorkspace({
           onAnalyzeCandidate?.(candidate.pair, candidate.timeframe)
         }
         onPrepare={(candidate) => {
-          createNewVaultRef.current = true;
-          setSelectedVault("");
+          createNewVaultRef.current = !recoveringVault;
+          if (!recoveringVault) setSelectedVault("");
           setPair(candidate.pair);
           setTimeframe(candidate.timeframe);
           setStrategy(
@@ -5610,17 +5629,17 @@ export function AutopilotWorkspace({
         }}
       />
       <section className="v6-heading">
-        <div><h2>Autopilot setup</h2></div>
+        <div><h2>{recoveringVault ? `Finish Autopilot #${selectedVaultNumber} setup` : "Autopilot setup"}</h2></div>
         <CapabilityNotice capability={capability} type="autopilot" unavailable={capabilityUnavailable} />
       </section>
       {preparedCandidate && <div className="prepared-autopilot-notice" ref={preparedNoticeRef} role="status"><strong>{lang === "zh" ? "自动驾驶草案已准备" : "Autopilot draft prepared"}</strong><span>{lang === "zh" ? `${preparedCandidate.replace("trend following", "趋势跟随").replace("mean reversion", "均值回归").replace("breakout", "突破")}。仅预填了交易对、周期和策略。请检查下方每个步骤；未购买报告，也未发送交易。` : `${preparedCandidate}. Only pair, timeframe and strategy were prefilled. Review every step below; no report was purchased and no transaction was sent.`}</span></div>}
 
       <div className="autopilot-onboarding">
         <section className="card autopilot-builder">
-          <div className="setup-target-field">
+          <div className="setup-target-field" id="autopilot-setup-target">
             <span>SETUP TARGET</span>
             <AutopilotAccountPicker value={selectedVault} options={vaultPickerOptions} onChange={(vault) => { createNewVaultRef.current = !vault; setSelectedVault(vault); setCloseConfirming(false); }} />
-            <small>{selectedVault ? (lang === "zh" ? "已载入此账户的交易对和策略。下方风险参数是待审核草案；签署更新前请逐项检查。暂停、充值和提现请使用仪表板。" : "The saved market and strategy are loaded for this account. Risk inputs below are a reviewable draft: check every limit before signing an update. Use the dashboard to pause, fund or withdraw.") : "A new isolated owner-controlled vault will be created."}</small>
+            <small>{recoveringVault ? "This existing account has no saved strategy registration. Select its market and review every risk limit below. These are draft settings, not recovered trading instructions. Completing setup reuses this account and its available funds." : selectedVault ? (lang === "zh" ? "已载入此账户的交易对和策略。下方风险参数是待审核草案；签署更新前请逐项检查。暂停、充值和提现请使用仪表板。" : "The saved market and strategy are loaded for this account. Risk inputs below are a reviewable draft: check every limit before signing an update. Use the dashboard to pause, fund or withdraw.") : "A new isolated owner-controlled vault will be created."}</small>
           </div>
           <div className="autopilot-step-head">
             <span>1</span>
@@ -6377,6 +6396,7 @@ export function AutopilotWorkspace({
                 <span className="eyebrow">OWNER CONTROLS</span>
                 <div className="manager-actions"><button className="btn btn-danger" disabled={busy || (activeVault?.paused ?? activeStrategy?.paused ?? true)} onClick={() => void operateVault("pause")}>Pause · hold pass timer</button><button className="btn btn-accent" disabled={busy || !controlState.resumeAllowed} onClick={() => void operateVault("resume")}>Resume · run timer</button></div>
                 {controlState.reason && <p className="control-help" role="status">{controlState.reason}</p>}
+                {recoveringVault && <button type="button" className="btn btn-accent full" disabled={busy || !runtimeStorageReady} onClick={() => reviewVaultSetup(selectedVault)}>Finish setup for Autopilot #{selectedVaultNumber}</button>}
                 {closeConfirming ? <div className="account-lookup-error"><strong>Withdraw every asset and close?</strong><small>The auditable vault contract remains reusable.</small><div className="manager-actions"><button className="btn btn-soft" onClick={() => setCloseConfirming(false)}>Cancel</button><button className="btn btn-danger" disabled={busy} onClick={() => void closeAndWithdrawAutopilot()}>Confirm</button></div></div> : <button className="btn btn-danger full" disabled={busy} onClick={() => setCloseConfirming(true)}>Close &amp; withdraw all</button>}
               </section>
             </div>
@@ -6435,7 +6455,7 @@ export function AutopilotWorkspace({
                 <div><strong>Setup incomplete</strong><small className="autopilot-id">{vault.slice(0, 8)}…{vault.slice(-4)}</small></div>
                 <div><small>Vault funds</small><strong>{account?.balanceAtomic != null ? `${formatUnits(BigInt(account.balanceAtomic), account.settlementDecimals ?? settlementDecimals)} ${account.settlementSymbol || activeSettlementSymbol}` : "Unavailable"}</strong></div>
                 <div className="incomplete-vault-note">This on-chain account has no saved strategy. Select it, then review setup; do not create or fund a replacement.</div>
-                <button type="button" className="btn btn-soft" onClick={() => { createNewVaultRef.current = false; setSelectedVault(vault); document.getElementById("autopilot-execution-pair")?.scrollIntoView({ behavior: "smooth", block: "center" }); }}>Review setup</button>
+                <button type="button" className="btn btn-soft" disabled={busy} onClick={() => reviewVaultSetup(vault)}>Finish setup</button>
               </div>;
               }
               const confirmedExecution = confirmedAutopilotExecutionCounts(activity, item.vault);
@@ -6509,6 +6529,15 @@ export function AutopilotWorkspace({
             </span>
           </div>
         )}
+        {vaults.length > 0 && <nav className="autopilot-journal-index" aria-label="Autopilot journals">
+          <h4>Journals by account</h4><p>{strategies.length} registered strategies · {vaults.filter(vault => !strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase())).length} accounts awaiting registration. Open a journal directly; no need to scroll through another account’s history.</p>
+          <div className="journal-account-links">{vaults.map((vault, index) => <button key={vault} type="button" className="btn btn-soft" onClick={() => openVaultJournal(vault)}>Autopilot #{index + 1} · {strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase()) ? "Strategy journal" : "Setup status"}</button>)}</div>
+        </nav>}
+        {vaults.filter(vault => !strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase())).map(vault => <details className="autopilot-setup-journal" id={`autopilot-journal-${vault.toLowerCase()}`} key={vault}>
+          <summary>Autopilot #{vaults.indexOf(vault) + 1} · Setup status · No registered strategy</summary>
+          <p>This vault exists on-chain, but no signed strategy registration is saved. No saved scheduler evaluations are available for this account. Funding and configuration transactions are separate from strategy registration.</p>
+          <button type="button" className="btn btn-accent" disabled={busy} onClick={() => reviewVaultSetup(vault)}>Finish setup for this account</button>
+        </details>)}
         {strategies.length > 0 && (
           <div className="autopilot-trading-reports">
             {strategies.map((item) => {
@@ -6538,7 +6567,7 @@ export function AutopilotWorkspace({
               }, 0);
               const providerBlocked = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(latest?.error || "");
               return (
-                <details key={`${item.id}-report`}>
+                <details key={`${item.id}-report`} id={`autopilot-journal-${item.vault.toLowerCase()}`}>
                   <summary>
                     <span>Autopilot {vaults.findIndex((vault) => vault.toLowerCase() === item.vault.toLowerCase()) >= 0 ? `#${vaults.findIndex((vault) => vault.toLowerCase() === item.vault.toLowerCase()) + 1}` : item.vault.slice(0, 10)} · Strategy journal · {item.pair} ·{" "}
                       {definition?.label ||
@@ -6552,7 +6581,8 @@ export function AutopilotWorkspace({
                     <div className="confirmed-stat"><span>Filled sells</span><strong>{filledSells}</strong><small>partial + full fills</small></div>
                     <div><span>Holds</span><strong>{holds}</strong><small>{item.lifetimeStatsComplete === false ? "available minimum" : "lifetime"}</small></div>
                     <div><span>Failures</span><strong>{failures}</strong><small>{item.lifetimeStatsComplete === false ? `${failureIncidents} visible incidents · available minimum` : `${failureIncidents} distinct incidents in the available journal`}</small></div>
-                    <div><span>AI today</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
+                    <div><span>AI today · UTC</span><strong>{item.aiCallsToday || 0} · ${(item.aiActualCostTodayUsd || 0).toFixed(4)}</strong><small>provider calls · USD</small></div>
+                    <div><span>Last Grok signal</span><strong>{item.lastAiSignalAt ? new Date(item.lastAiSignalAt).toLocaleTimeString() : "Not requested yet"}</strong><small>{item.lastAiSignalAt ? new Date(item.lastAiSignalAt).toLocaleDateString() : "Only requested after entry conditions pass"}</small></div>
                     <div><span>Configured buy amount</span><strong>{/^\d+$/.test(item.buyAmountAtomic || "") ? `${formatUnits(BigInt(item.buyAmountAtomic!), item.settlementDecimals ?? WEB_NETWORKS[networkKey].payment.decimals)} ${item.settlementSymbol || WEB_NETWORKS[networkKey].payment.symbol}` : "Unavailable"}</strong><small>Signed configuration. Adding funds alone does not increase this; review Capital & risk and approve an updated strategy.</small></div>
                     <div><span>Last cycle</span><strong>{latest ? new Date(latest.evaluatedAt).toLocaleTimeString() : "—"}</strong><small>{latest ? new Date(latest.evaluatedAt).toLocaleDateString() : "awaiting"}</small></div>
                     <div><span>Protection checks</span><strong>{item.riskCheckCount?.toLocaleString() ?? "—"}</strong><small>{item.lastRiskCheckAt ? `Last check ${new Date(item.lastRiskCheckAt).toLocaleString()}` : "No check recorded"} · since monitoring counters enabled</small></div>

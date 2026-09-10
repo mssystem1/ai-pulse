@@ -1,10 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { applyConfirmedPassPause, autopilotPassRemainingMs, extendAutopilotPass, transitionPassPause } from "./autopilotPassStore.js";
+import { applyConfirmedPassPause, autopilotPassRemainingMs, consumePassSignal, extendAutopilotPass, transitionPassPause } from "./autopilotPassStore.js";
 
 const input = { owner: "0xowner", network: "base" as const, vault: "0xvault", days: 1 as const, paused: false };
 const start = Date.parse("2026-09-08T18:00:00Z");
 const hour = 3_600_000;
+
+test("cached AI confirmation is consumed once; new signals still enforce the limit", () => {
+  let pass = extendAutopilotPass(null, input, start);
+  pass = consumePassSignal(pass, input.owner, "signal-a", start + hour).pass!;
+  assert.equal(pass.signalsUsed, 1);
+  assert.deepEqual(consumePassSignal(pass, input.owner, "signal-a", start + hour).pass, pass);
+  pass = consumePassSignal(pass, input.owner, "signal-b", start + hour).pass!;
+  pass = consumePassSignal(pass, input.owner, "signal-c", start + hour).pass!;
+  assert.equal(consumePassSignal(pass, input.owner, "signal-d", start + hour).reason, "signals_exhausted");
+  assert.equal(consumePassSignal(pass, "other-owner", "signal-a", start + hour).reason, "pass_expired");
+  assert.equal(consumePassSignal(pass, input.owner, "signal-a", start + 25 * hour).reason, "pass_expired");
+  assert.equal(consumePassSignal(transitionPassPause(pass, true, start + hour), input.owner, "signal-a", start + 2 * hour).reason, "pass_expired");
+});
 
 test("24 hours means elapsed runtime, not midnight or signal quota", () => {
   const pass = extendAutopilotPass(null, input, start);
