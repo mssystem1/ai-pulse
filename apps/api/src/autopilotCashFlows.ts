@@ -73,8 +73,30 @@ export async function recoverCashFlowPage(s: CashFlowStrategy, previous: CashFlo
   const pageLimit = Math.max(1, Math.min(8, Math.floor(maxPages)));
   for (let page = 0; page < pageLimit && through < target; page++) {
     const start = through + 1n, end = start + 1999n < target ? start + 1999n : target;
-    const request = (fromAddress: string | null, toAddress: string | null) => client.request({ method: "eth_getLogs", params: [{ fromBlock: toHex(start), toBlock: toHex(end), topics: [TRANSFER, fromAddress ? topic(fromAddress) : null, toAddress ? topic(toAddress) : null] }] });
-    const raw = [...await request(null, s.vault), ...await request(s.vault, null)];
+    // X Layer's public RPC accepts at most 100 blocks per eth_getLogs request.
+    // Keep the logical checkpoint page at 2,000 blocks so historical catch-up
+    // does not become 20x slower. Pace X Layer subranges to avoid public-RPC
+    // rate limits: one range / two directional reads at a time, 500ms apart.
+    // Every subrange must succeed before this page can advance its checkpoint.
+    const rangeSize = s.network === "xlayer" ? 100n : 2000n;
+    const ranges: Array<{ from: bigint; to: bigint }> = [];
+    for (let from = start; from <= end; from += rangeSize) ranges.push({ from, to: from + rangeSize - 1n < end ? from + rangeSize - 1n : end });
+    const request = (from: bigint, to: bigint, fromAddress: string | null, toAddress: string | null) => client.request({ method: "eth_getLogs", params: [{ fromBlock: toHex(from), toBlock: toHex(to), topics: [TRANSFER, fromAddress ? topic(fromAddress) : null, toAddress ? topic(toAddress) : null] }] });
+    const raw: Awaited<ReturnType<typeof request>> = [];
+    const concurrency = s.network === "xlayer" ? 1 : 4;
+    for (let offset = 0; offset < ranges.length; offset += concurrency) {
+      if (s.network === "xlayer" && offset > 0) await new Promise(resolve => setTimeout(resolve, 500));
+      const batch = await Promise.allSettled(ranges.slice(offset, offset + concurrency).map(async ({ from, to }) => {
+        // Settle both directions before returning, including on RPC failures.
+        const results = await Promise.allSettled([request(from, to, null, s.vault), request(from, to, s.vault, null)]);
+        const failure = results.find(result => result.status === "rejected");
+        if (failure?.status === "rejected") throw failure.reason;
+        return results.flatMap(result => result.status === "fulfilled" ? result.value : []);
+      }));
+      const failure = batch.find(result => result.status === "rejected");
+      if (failure?.status === "rejected") throw failure.reason;
+      raw.push(...batch.flatMap(result => result.status === "fulfilled" ? result.value : []));
+    }
     const pageFlows: RecoveredCashFlow[] = [];
     for (const entry of raw) {
       const log: ChainLog = { ...entry, blockNumber: entry.blockNumber == null ? null : BigInt(entry.blockNumber), logIndex: entry.logIndex == null ? null : Number(BigInt(entry.logIndex)) };
@@ -122,7 +144,8 @@ export async function runCashFlowRecoveryCycle(strategies: CashFlowStrategy[]) {
       try {
         if (kvConfigured() && await runKvCommand(["SET", leaseKey, lease, "NX", "EX", 120], "cash-flow proof") !== "OK") continue;
         const before = await readCashFlowCheckpoint(s);
-        const after = await recoverCashFlowPage(s, before, executionPublicClient(s.network));
+        // Leave time for paced public-RPC reads within the 120-second lease.
+        const after = await recoverCashFlowPage(s, before, executionPublicClient(s.network), s.network === "xlayer" ? 2 : 4);
         if (kvConfigured()) {
           const saved = await runKvCommand(["EVAL", "if redis.call('GET', KEYS[2]) ~= ARGV[1] then return 0 end redis.call('SET', KEYS[1], ARGV[2]); redis.call('DEL', KEYS[2]); return 1", 2, storageKey, leaseKey, lease, JSON.stringify(after)], "cash-flow proof");
           if (Number(saved) !== 1) throw new Error("Cash-flow recovery lease expired before persistence");

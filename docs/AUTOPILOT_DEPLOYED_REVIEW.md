@@ -1,5 +1,17 @@
 # PULSE deployed Autopilot review
 
+## September 12 deployment verification and local follow-up
+
+After the owner deployed `53d4ee6`, the public site and Railway health endpoint returned HTTP 200. Redis reported online, Blob configured and mock payments disabled. The chart license asset was served as text. Global, Spot and Autopilot charts rendered on the live site at 390px and 1440px, with historical navigation and no observed render exceptions or horizontal overflow. Mobile Global zoom was rechecked after its initial range settled: 29 to 38 candles in view. These were disconnected, unpaid browser checks, not wallet-signing or trade-execution tests.
+
+Read-only Redis snapshots around 08:10–08:23 UTC showed advancing Base and Arbitrum accounting checkpoints. Recovery is not complete; the legacy Arbitrum account has millions of blocks to scan. Base #1 had recent scheduler evaluations, with entry held by its signed pullback rule; its stored pass expires at 09:00:15 UTC on September 12. Base #2/#5's stored passes expired on September 11. These are dated observations, not entitlement changes.
+
+X Layer had no saved checkpoint. A read-only reproduction found `block range greater than 100 max` from its public RPC; the worker requested 2,000 blocks. A local correction retains 2,000-block logical pages but splits them into contiguous 100-block requests. Unpaced concurrent reads also hit `over rate limit`, so X Layer now scans one subrange at a time, with at most two directional reads and a 500ms gap. Its worker budget is two logical pages per cycle to leave headroom within the existing lease. A paced live scan successfully covered blocks 68,972,748–68,974,747 in 24.9 seconds. That test result was not saved. Any failed subrange prevents checkpoint advancement; in-flight requests settle before retry. The full history remains unverified until the deployed worker catches up.
+
+At the owner's request, the local UI removes the redundant **Journals by account** panel and unregistered-account **Setup status** accordions from the journal area. Actual strategy journals, trade statistics, and their native expandable headers remain. Existing-account setup/recovery stays in the account dashboard.
+
+Verification: all nine cash-flow tests pass, including X Layer boundaries, request concurrency, resumable ranges and failed-subrange preservation. The broader API/web suites passed during this follow-up; web has 68 tests. API build and web type-check passed. Six local browser cases passed at desktop/mobile widths, including the absence of setup/navigation panels in the journal area and preserved dashboard setup controls. These follow-up changes are local and require a separate owner-controlled deployment. No payments, trades, pass changes, production database writes, pushes or deployments were performed.
+
 ## Latest results — September 11, 2026
 
 Agent #8355's approved descriptions were saved and resubmitted successfully. The submission response reports approval status `2` (under review). Update transaction: `0xdd697538b37ed2fa061d866af2700958c35cc0a5f35b46e4d5baae547d91099e`. No additional paid service request accompanied the update. Earlier listing-status statements below describe their dated verification stage, not the current submission.

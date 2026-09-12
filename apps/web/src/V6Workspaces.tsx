@@ -4219,11 +4219,6 @@ export function AutopilotWorkspace({
       setMessage(error instanceof Error ? error.message : String(error));
     } finally { setBusy(false); }
   }
-  function openVaultJournal(vault: string) {
-    const journal = document.getElementById(`autopilot-journal-${vault.toLowerCase()}`);
-    if (journal instanceof HTMLDetailsElement) journal.open = true;
-    journal?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
   const activeVault = vaultDetails.find(
     (item) => item.address.toLowerCase() === selectedVault.toLowerCase(),
   );
@@ -6564,15 +6559,6 @@ export function AutopilotWorkspace({
             </span>
           </div>
         )}
-        {vaults.length > 0 && <nav className="autopilot-journal-index" aria-label="Autopilot journals">
-          <h4>Journals by account</h4><p>{strategies.length} registered strategies · {vaults.filter(vault => !strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase())).length} accounts awaiting registration. Open a journal directly; no need to scroll through another account’s history.</p>
-          <div className="journal-account-links">{vaults.map((vault, index) => <button key={vault} type="button" className="btn btn-soft" onClick={() => openVaultJournal(vault)}>Autopilot #{index + 1} · {strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase()) ? "Strategy journal" : "Setup status"}</button>)}</div>
-        </nav>}
-        {vaults.filter(vault => !strategies.some(item => item.vault.toLowerCase() === vault.toLowerCase())).map(vault => <details className="autopilot-setup-journal" id={`autopilot-journal-${vault.toLowerCase()}`} key={vault}>
-          <summary>Autopilot #{vaults.indexOf(vault) + 1} · Setup status · No registered strategy</summary>
-          <p>This vault exists on-chain, but no signed strategy registration is saved. No saved scheduler evaluations are available for this account. Funding and configuration transactions are separate from strategy registration.</p>
-          <button type="button" className="btn btn-accent" disabled={busy} onClick={() => reviewVaultSetup(vault)}>Finish setup for this account</button>
-        </details>)}
         {strategies.length > 0 && (
           <div className="autopilot-trading-reports">
             {strategies.map((item) => {

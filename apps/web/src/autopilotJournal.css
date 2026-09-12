@@ -50,18 +50,4 @@ html[data-pulse-theme="base"] .identified-vault>.status-chip.paused,html[data-pu
   .journal-entry>summary>b { grid-column:3; grid-row:1/3; }
   .journal-entry-detail dl { grid-template-columns:repeat(2,minmax(0,1fr)); }
 }
-.autopilot-journal-index, .autopilot-setup-journal {
-  margin-block: 20px;
-  padding: 16px;
-  border: 1px solid var(--border, #536b8b);
-  border-radius: 12px;
-  scroll-margin-top: 110px;
-}
-.autopilot-journal-index p, .autopilot-setup-journal p { line-height: 1.6; }
-.journal-account-links { display: flex; flex-wrap: wrap; gap: 10px; }
-.journal-account-links .btn { min-height: 44px; white-space: normal; }
 [id^="autopilot-journal-"], #autopilot-setup-target { scroll-margin-top: 110px; }
-@media (max-width: 600px) {
-  .journal-account-links { display: grid; grid-template-columns: 1fr 1fr; }
-  .journal-account-links .btn { padding: 12px; }
-}

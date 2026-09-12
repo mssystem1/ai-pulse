@@ -40,6 +40,54 @@ test("scan is bounded and resumes from the next block", async () => {
   assert.equal(queries[2].start,2011);
   assert.ok(queries.every(query=>query.end-query.start<2000));
 });
+test("X Layer splits logical pages into contiguous 100-block reads with bounded concurrency", async () => {
+  const {client,queries}=fixture([makeLog(110,true),makeLog(111),makeLog(2010)],2111);
+  const original=client.request.bind(client);
+  let active=0, maximum=0;
+  client.request=(async (args: Parameters<typeof client.request>[0]) => {
+    active++; maximum=Math.max(maximum,active);
+    try { await new Promise(resolve=>setTimeout(resolve,1)); return await original(args); }
+    finally { active--; }
+  }) as typeof client.request;
+  const s={...strategy,network:"xlayer" as const};
+  const first=await recoverCashFlowPage(s,null,client,1);
+  assert.equal(first.throughBlock,"2010");
+  assert.equal(first.flows.length,3);
+  assert.equal(queries.length,40);
+  assert.ok(maximum<=2);
+  assert.equal(active,0);
+  for(let i=0;i<20;i++) {
+    assert.deepEqual(queries[2*i],{start:11+i*100,end:110+i*100});
+    assert.deepEqual(queries[2*i+1],queries[2*i]);
+  }
+  const next=await recoverCashFlowPage(s,first,client,1);
+  assert.equal(next.throughBlock,"2047");
+  assert.equal(next.flows.length,3);
+  assert.deepEqual(queries[40],{start:2011,end:2047});
+  assert.equal(cashFlowCoverage(next,token).state,"synced");
+});
+test("failed X Layer subrange drains in-flight reads and preserves the prior checkpoint", async () => {
+  const s={...strategy,network:"xlayer" as const};
+  const first=await recoverCashFlowPage(s,null,fixture([],5000).client,1);
+  const snapshot=JSON.stringify(first);
+  const {client}=fixture([],5000);
+  const original=client.request.bind(client);
+  let active=0;
+  client.request=(async (args: Parameters<typeof client.request>[0]) => {
+    active++;
+    try {
+      await new Promise(resolve=>setTimeout(resolve,1));
+      const params=args.params as Array<{fromBlock:string}>;
+      if(params?.[0]?.fromBlock===toHex(2111)) throw new Error("RPC unavailable");
+      return await original(args);
+    } finally { active--; }
+  }) as typeof client.request;
+  await assert.rejects(recoverCashFlowPage(s,first,client,1),/RPC unavailable/);
+  assert.equal(active,0);
+  assert.equal(JSON.stringify(first),snapshot);
+  const retry=await recoverCashFlowPage(s,first,fixture([],5000).client,1);
+  assert.equal(retry.throughBlock,"4010");
+});
 test("failed receipt cannot advance checkpoint or fabricate cash-flow confirmation", async () => {
   await assert.rejects(recoverCashFlowPage(strategy,null,fixture(undefined,80,true).client),/receipt verification/);
   assert.throws(()=>decodeOwnerCashFlow({...makeLog(12),removed:true},strategy),/not confirmed/);
