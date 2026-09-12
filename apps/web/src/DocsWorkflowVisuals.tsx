@@ -25,6 +25,28 @@ const workflows = [
     note: "Pass expired or confirmations used: no new entries, but authorized protection of an existing position continues. Owner pause is different: it stops strategy trading and holds the paid timer.",
   },
   {
+    name: "Telegram", title: "A shortcut into PULSE—not a second trading interface.",
+    intro: "Start the bot once and use its buttons. The profile's generic Open App button opens PULSE but does not, by itself, link report delivery to your chat.",
+    steps: [
+      ["Open", "Tap a bot button", "Global, Prediction, Spot, Autopilot or My reports opens the matching app page."],
+      ["Choose", "Use the app", "Select the network, market and service. Free previews do not require payment."],
+      ["Authorize", "Review in your wallet", "A report purchase is not a trade. Spot needs order approval; Autopilot needs its own setup and activation."],
+      ["Return", "Read your report", "Supported Global and Prediction reports return to the linked chat. Saved research remains accessible in Portfolio and wallet-owned report history."],
+    ],
+    note: "If delivery fails, recover the existing report before considering another purchase. Never send wallet secrets to the bot. Opening a chat or an app page cannot start trading.",
+  },
+  {
+    name: "Performance", title: "Transfers are cash flows. Fills determine trading results.",
+    intro: "Spot and Autopilot have different accounting boundaries; their percentages must not be averaged together.",
+    steps: [
+      ["Verify", "Confirmed executions", "Market and Limit fills use receipt-backed token quantities and net settlement transfers. Pending orders and funding are not fills."],
+      ["Match", "Average-cost inventory", "Buy 2 units for 200; sell 1 for 110. The matched cost is 100, realized profit is 10, and remaining cost is 100."],
+      ["Value", "Open positions", "A current mark of 120 values the remaining unit at 120: open profit is 20. Missing marks or cost history stay unknown."],
+      ["Separate", "Autopilot capital", "Vault P&L = current value + withdrawals − starting value − later deposits. Gas and Entry Pass fees are not included."],
+    ],
+    note: "Autopilot recovers cash flows from chain receipts in the background. PnL stays unavailable until coverage and valuation are verified; the checkpoint time can be older than live balances. This never pauses trading or requires another payment. B/S markers are confirmed fills for the selected pair and account—not recommendations or deposits. Expand the chart to browse Older/Newer, return to Latest, or select a fill to open its time window. History depends on provider availability; missing trades are never invented.",
+  },
+  {
     name: "Payment & recovery", title: "One purchase. A clear next action.",
     intro: "Read the price and selected network before signing. PULSE validates service inputs before asking for payment; report purchases never authorize trades.",
     steps: [
@@ -59,7 +81,9 @@ export function DocsWorkflowVisuals() {
         <span><b>Owner pauses</b>Remaining time held</span><i aria-hidden="true">→</i>
         <span><b>Owner resumes</b>Countdown continues</span>
       </div>}
+      {selected === 1 && <p className="docs-flow-note">Default AI budget: at most 3 fresh confirmations per vault per UTC day, at least 4 hours apart, and 3 confirmations per purchased 24h. Eligible shared results can be reused without charging a second confirmation. These are ceilings, not a schedule: a failed technical setup causes a Hold without asking Grok. Protection checks do not consume AI confirmations. Frequency alone cannot establish profitability.</p>}
       <p className="docs-flow-note">{workflow.note}</p>
+      {selected === 3 && <p className="docs-flow-note">Market charts use free TradingView Lightweight Charts with PULSE's existing OKX data—not a TradingView subscription. Expand to inspect O/H/L/C and volume, drag or pinch to navigate, and Reset view to restore readable spacing. Times are UTC. Green/red candles keep the same meaning in every theme. B/S arrows identify a fill's candle; execution prices remain in the fill list rather than changing the chart scale.</p>}
     </figure>
   </section>;
 }

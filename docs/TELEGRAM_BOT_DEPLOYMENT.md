@@ -59,7 +59,15 @@ From the bot-management screen shown for **PULSE Market Intelligence**:
 
 Telegram's Main Mini App configuration creates the profile launch button. BotFather's **Commands** screen is not required for this workflow.
 
-PULSE adds `source=telegram`, the selected service and a signed chat-bound delivery capability to links sent by the bot. Do not add those query parameters to the URL entered in BotFather.
+PULSE sends canonical page links (`/global`, `/prediction`, `/spot`, `/autopilot`, `/overview#reports`) with `source=telegram` and a signed chat-bound delivery capability. Do not add those parameters to BotFather. A generic profile/menu launch does not carry a delivery capability: use a button from the private bot chat to link report delivery.
+
+The bot is not a chat-based market picker. The correct flow is **Start → tap destination → select market/network/tier in PULSE → review wallet payment → receive supported report in chat**. My reports opens this-device research in Portfolio; another device's history requires **Global or Prediction → Paid report history → Sync with wallet**. Spot actions remain wallet-approved; Autopilot trading is autonomous only after its separate setup and activation.
+
+New full-report buttons open the frontend's `/shared-report` reader, not a raw API JSON document. The share capability is in the URL fragment, so it is not sent to the frontend server or in referrer headers. The page does not initialize wallet connectors and offers no trade or payment action. This is a bearer share: anyone holding the link can read the report until it is revoked. `REPORT_SHARE_LINK_ENABLED=1` is required; Telegram bot configuration alone does not enable report sharing. Previously delivered API links are not rewritten retroactively.
+
+### Read-only production inspection — September 11, 2026
+
+The API reported Telegram enabled/configured, canonical frontend `https://www.ai-pulse.tech`, and durable delivery available. Telegram's `getMe` matched `pulsemi_bot`; `getWebhookInfo` showed the Railway `/v1/telegram/webhook` URL, zero pending updates, and no last delivery error. These checks did not send a chat message, alter webhook registration, or purchase a report. Repeat them after deploying changes; they do not prove a new paid report's end-to-end delivery.
 
 ## 4. Optional bot commands
 
@@ -71,8 +79,10 @@ If command shortcuts are desired later, open **Commands** in BotFather's graphic
 start - Open PULSE services
 global - Buy a Global Market report
 prediction - Buy a Prediction Market report
-reports - Open report delivery history
-wallet - Link, inspect, or unlink a wallet
+reports - Open saved reports in Portfolio
+spot - Open wallet-approved Spot trading
+autopilot - Open autonomous strategy management
+wallet - Explain wallet connection and security
 help - Security and usage guide
 ```
 

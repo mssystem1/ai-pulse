@@ -19,7 +19,7 @@ const LEGACY_SERVICE: Record<string, PulseTab> = {
   overview: "overview",
   global: "analyze",
   prediction: "prediction",
-  reports: "telegram",
+  reports: "overview",
   telegram: "telegram",
   docs: "docs",
   safety: "safety",

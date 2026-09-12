@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatUnits } from "viem";
 import { apiGet } from "./api";
-import { aggregateAutopilotMetrics, averageKnownPnl } from "./dashboardMetrics";
+import { aggregateAutopilotMetrics } from "./dashboardMetrics";
+import { spotTradePerformance, type PerformanceFill } from "./tradePerformance";
 import { listJobRecoveries, type JobRecoveryHandle } from "./jobRecovery";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import type { Lang } from "./i18n";
 import type { PulseTab } from "./navigation";
 
-type OverviewActivity = {
+type OverviewActivity = PerformanceFill & {
   id: string;
   source: string;
   kind: string;
@@ -21,6 +22,7 @@ type OverviewOrder = {
   id: string;
   instId: string;
   status: string;
+  currentPrice?: number;
   phase?: "entry" | "protected" | "complete";
   version?: "oco-v1" | "limit-v2" | "bracket-v1";
   estimatedPnlPct?: number | null;
@@ -42,6 +44,7 @@ type OverviewStrategy = {
   baselineValueAtomic?: string;
   pnlBasisAtomic?: string;
   pnlAtomic?: string | null;
+  pnlCashFlow?: { state: string; progressPct: number; detail: string };
   settlementDecimals?: number;
   settlementSymbol?: string;
   aiPass?: {
@@ -121,10 +124,10 @@ type Copy = {
 
 const COPY: Record<Lang, Copy> = {
   en: {
-    eyebrow: "APPLICATION OVERVIEW",
-    title: "Everything PULSE is doing, in one place.",
-    lead: "Review your selected network, wallet, reports, Spot activity and Autopilot runtime before choosing the next action.",
-    refresh: "Refresh overview",
+    eyebrow: "PORTFOLIO · ACTIVITY · RESEARCH",
+    title: "Your PULSE portfolio",
+    lead: "Spot orders, autonomous strategies and saved research—separate views of your activity on the selected network.",
+    refresh: "Refresh portfolio",
     refreshing: "Refreshing…",
     openOrders: "Open Spot orders",
     pendingAndProtected: "pending entries and protected positions",
@@ -140,7 +143,7 @@ const COPY: Record<Lang, Copy> = {
     markToMarket: "settlement balance plus marked invested assets",
     spotOpenPnl: "Open Spot P&L",
     spotRealizedPnl: "Realized Spot P&L",
-    averageKnown: "average across positions with a verified entry basis",
+    averageKnown: "matched execution cost basis · excluding gas",
     awaitingBasis: "awaiting a verified entry and capital basis",
     strategiesLabel: "strategies",
     attention: "Needs attention",
@@ -187,8 +190,8 @@ const COPY: Record<Lang, Copy> = {
     recoverableResearch: "RECOVERABLE RESEARCH",
   },
   zh: {
-    eyebrow: "应用概览",
-    title: "在一个页面查看 PULSE 的全部状态。",
+    eyebrow: "资产 · 活动 · 研究",
+    title: "你的 PULSE 资产总览",
     lead: "先查看当前网络、钱包、报告、现货活动和 Autopilot 运行状态，再选择下一步。",
     refresh: "刷新概览",
     refreshing: "正在刷新…",
@@ -414,11 +417,19 @@ export function OverviewWorkspace({
   const autopilotPnlAmount = aggregateAutopilot.pnlAtomic !== undefined
     ? Number(formatUnits(BigInt(aggregateAutopilot.pnlAtomic), network.payment.decimals))
     : null;
-  const openSpotPnl = averageKnownPnl(openOrders.map((item) => item.estimatedPnlPct));
-  const realizedSpotPnl = averageKnownPnl(orders.filter((item) => item.status === "filled").map((item) => item.realizedPnlPct));
+  const marks = Object.fromEntries(orders.filter(item => typeof item.currentPrice === "number" && item.currentPrice > 0).map(item => [item.instId, item.currentPrice!]));
+  const spotPerformance = spotTradePerformance(activity, marks);
+  const openSpotPnl = spotPerformance.openPnlPct;
+  const realizedSpotPnl = spotPerformance.realizedPct;
   const executionAvailable = networkKey !== "arc-testnet";
   const globalReportCount = reports.filter((report) => report.scope === "spot").length;
   const predictionReportCount = reports.filter((report) => report.scope === "prediction").length;
+
+  useEffect(() => {
+    if (window.location.hash !== "#reports" && new URLSearchParams(window.location.search).get("service") !== "reports") return;
+    const frame = requestAnimationFrame(() => document.getElementById("reports")?.scrollIntoView({ block: "start" }));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <section className="overview-workspace">
@@ -449,7 +460,7 @@ export function OverviewWorkspace({
           <div className="overview-metrics">
             <button type="button" onClick={() => onNavigate("autopilot")}><span>{copy.autopilots}</span><strong>{wallet ? strategies.length : "—"}</strong><small>{wallet ? `${runningStrategies.length} ${copy.running} · ${strategies.length} ${copy.strategiesLabel}` : copy.notConnected}</small></button>
             <button type="button" onClick={() => onNavigate("autopilot")}><span>{copy.autopilotValue}</span><strong>{wallet ? (portfolioLabel || "—") : "—"}</strong><small>{copy.markToMarket}</small></button>
-            <button type="button" onClick={() => onNavigate("autopilot")}><span>{copy.autopilotPnl}</span><strong className={aggregateAutopilot.pnlPct === null ? undefined : aggregateAutopilot.pnlPct < 0 ? "negative" : "positive"}>{wallet ? percentageLabel(aggregateAutopilot.pnlPct) : "—"}</strong><small>{autopilotPnlAmount === null ? copy.awaitingBasis : `${autopilotPnlAmount >= 0 ? "+" : ""}${autopilotPnlAmount.toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 4 })} ${network.payment.symbol} · ${copy.cashFlowAdjusted}`}</small></button>
+            <button type="button" onClick={() => onNavigate("autopilot")}><span>{copy.autopilotPnl}</span><strong className={aggregateAutopilot.pnlPct === null ? undefined : aggregateAutopilot.pnlPct < 0 ? "negative" : "positive"}>{wallet ? percentageLabel(aggregateAutopilot.pnlPct) : "—"}</strong><small>{strategies.some(item => item.pnlCashFlow && item.pnlCashFlow.state !== "synced") ? (lang === "zh" ? "正在核验资金流；查看自动驾驶中的进度" : "Cash-flow verification pending · see Autopilot for details") : autopilotPnlAmount === null ? copy.awaitingBasis : `${autopilotPnlAmount >= 0 ? "+" : ""}${autopilotPnlAmount.toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 4 })} ${network.payment.symbol} · ${copy.cashFlowAdjusted}`}</small></button>
           </div>
         </section>
       </div>}
@@ -494,7 +505,7 @@ export function OverviewWorkspace({
         </section>
       </div>}
 
-      <section className="card overview-panel overview-reports">
+      <section id="reports" className="card overview-panel overview-reports">
         <header className="overview-panel-head">
           <div><span className="eyebrow">{copy.recoverableResearch}</span><h3>{copy.savedReports}</h3><p>{copy.savedReportsLead}</p></div>
         </header>

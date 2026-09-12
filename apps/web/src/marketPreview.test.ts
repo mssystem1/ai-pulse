@@ -1,6 +1,16 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createMarketPreviewLoader, sparklinePoints } from "./marketPreview";
+import { createMarketPreviewLoader, loadHistoricalCandles, sparklinePoints } from "./marketPreview";
+
+test("historical chart pages exclude overlaps, deduplicate, and distinguish failure from end of history", async () => {
+  let path = "";
+  const read = async (url: string) => { path = url; return { ok: true, status: 200, data: { candles: [...candles, candles[1], { ...candles[0], ts: 3 }] } }; };
+  assert.deepEqual((await loadHistoricalCandles(read, "BTC-USDT", "1H", 3)).map(c => c.ts), [1, 2]);
+  assert.match(path, /before=3/);
+  assert.deepEqual(await loadHistoricalCandles(async () => ({ok:true,status:200,data:{candles:[]}}), "BTC-USDT", "1H", 3), []);
+  await assert.rejects(loadHistoricalCandles(async () => ({ok:false,status:502,data:{}}), "BTC-USDT", "1H", 3), /temporarily unavailable/);
+  await assert.rejects(loadHistoricalCandles(async () => ({ok:true,status:200,data:{candles:[{...candles[0],ts:NaN}]}}), "BTC-USDT", "1H", 3), /valid older candles/);
+});
 
 const ticker = { instId: "BTC-USDT", last: 100, change24hPct: 1, high24h: 110, low24h: 90, volCcy24h: 500, ts: "1000" };
 const candles = [2, 1].map(ts => ({ ts, open: 100, high: 105, low: 95, close: 102, volume: 10 }));

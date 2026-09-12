@@ -5,7 +5,7 @@ export type ExecutionNetwork = "xlayer" | "base" | "arbitrum";
 
 const NETWORKS = {
   xlayer: { id: 196, primary: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech", fallback: () => process.env.X_LAYER_RPC_FALLBACK || "https://xlayerrpc.okx.com", prefix: "XLAYER" },
-  base: { id: 8453, primary: () => process.env.BASE_RPC_URL || "https://mainnet.base.org", fallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base", prefix: "BASE" },
+  base: { id: 8453, primary: () => process.env.BASE_RPC_URL || "https://mainnet.base.org", fallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com", prefix: "BASE" },
   arbitrum: { id: 42161, primary: () => process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc", fallback: () => process.env.ARBITRUM_RPC_FALLBACK_URL || "https://arbitrum-one-rpc.publicnode.com", prefix: "ARBITRUM" },
 } as const;
 
@@ -23,9 +23,17 @@ const erc20Abi = [
   { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
 ] as const;
 
+export function normalizeExecutionRpcUrls(network: string, values: readonly string[]) {
+  // This public endpoint permanently returns HTTP 410. Also migrate explicit
+  // legacy environment values; changing only the default leaves them broken.
+  return [...new Set(values.map(value => value.trim()).filter(Boolean).map(value =>
+    network === "base" && /^https?:\/\/1rpc\.io\/base\/?$/i.test(value)
+      ? "https://base-rpc.publicnode.com" : value))];
+}
+
 export function executionRpcUrls(network: ExecutionNetwork) {
   const cfg = NETWORKS[network];
-  return [...new Set([cfg.primary(), cfg.fallback()].map((value) => value.trim()).filter(Boolean))];
+  return normalizeExecutionRpcUrls(network, [cfg.primary(), cfg.fallback()]);
 }
 
 export function executionPublicClient(network: ExecutionNetwork): PublicClient {

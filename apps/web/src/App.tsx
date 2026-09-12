@@ -16,7 +16,7 @@ import {
 import { t, type Lang } from "./i18n";
 import { useDocumentLocale } from "./uiLocale";
 import { formatMarketPrice } from "./format";
-import { loadMarketPreview } from "./SpotMarketPreview";
+import { loadMarketPreview, MarketChartPreview } from "./SpotMarketPreview";
 import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport, type ReportTradeIntent } from "./Report";
 import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
 import { SwapPanel } from "./SwapPanel";
@@ -48,62 +48,6 @@ import { connectCircleWallet, isCircleWalletConnected, restoreCircleWallet } fro
 type Tab = PulseTab;
 type Candle = { ts: number; open: number; high: number; low: number; close: number; volume: number };
 
-function drawChart(canvas: HTMLCanvasElement | null, candles: Candle[]) {
-  if (!canvas || candles.length < 2) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  canvas.width = Math.max(1, Math.floor(w * dpr));
-  canvas.height = Math.max(1, Math.floor(h * dpr));
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  ctx.clearRect(0, 0, w, h);
-
-  const min = Math.min(...candles.map((c) => c.low));
-  const max = Math.max(...candles.map((c) => c.high));
-  const pad = 12;
-  const span = max - min || 1;
-
-  ctx.strokeStyle = "rgba(255,255,255,0.04)";
-  for (let i = 0; i < 4; i++) {
-    const y = pad + ((h - pad * 2) * i) / 3;
-    ctx.beginPath();
-    ctx.moveTo(pad, y);
-    ctx.lineTo(w - pad, y);
-    ctx.stroke();
-  }
-
-  const points = candles.map((c, i) => {
-    const x = pad + (i / (candles.length - 1)) * (w - pad * 2);
-    const y = pad + (1 - (c.close - min) / span) * (h - pad * 2);
-    return { x, y };
-  });
-  const accent = getComputedStyle(document.documentElement).getPropertyValue("--mint").trim() || "#00e5a0";
-  const accentFill = /^#[0-9a-f]{6}$/i.test(accent) ? `${accent}47` : "rgba(0,229,160,.28)";
-  const grad = ctx.createLinearGradient(0, pad, 0, h - pad);
-  grad.addColorStop(0, accentFill);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.beginPath();
-  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-  ctx.lineTo(points[points.length - 1].x, h - pad);
-  ctx.lineTo(points[0].x, h - pad);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  ctx.beginPath();
-  points.forEach((p, i) => (i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y)));
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  const last = points[points.length - 1];
-  ctx.fillStyle = accent;
-  ctx.beginPath();
-  ctx.arc(last.x, last.y, 3.5, 0, Math.PI * 2);
-  ctx.fill();
-}
 
 function storedLanguage(): Lang {
   try { return localStorage.getItem("pulse:language") === "zh" ? "zh" : "en"; }
@@ -276,10 +220,6 @@ export function App() {
     return () => window.clearInterval(id);
   }, [refreshHealth]);
 
-  useEffect(() => {
-    const c = document.getElementById("pulse-chart") as HTMLCanvasElement | null;
-    drawChart(c, candles);
-  }, [candles]);
 
   // Restore session if already authorized
   useEffect(() => {
@@ -718,7 +658,7 @@ export function App() {
               ? { title: "Product documentation", lead: "Understand every workflow, safety boundary, network and production test." }
               : { title: lang === "zh" ? "风险卫士" : "Risk Guard", lead: lang === "zh" ? `在 ${network.label} 上查看免费原始证据，或生成由多来源证据支持的 Grok 代币风险报告，再决定是否签名。` : `View free raw evidence or generate a multi-source Grok Token Risk report on ${network.label} before deciding whether to sign.` };
   const navigationTabs: Array<{ id: Tab; label: string; hint: string }> = [
-    { id: "overview", label: lang === "zh" ? "概览" : "Overview", hint: lang === "zh" ? "钱包和活动摘要" : "Wallet and activity summary" },
+    { id: "overview", label: lang === "zh" ? "资产总览" : "Portfolio", hint: lang === "zh" ? "钱包和活动摘要" : "Positions, activity and saved research" },
     { id: "analyze", label: lang === "zh" ? "全球市场" : "Global Market", hint: lang === "zh" ? "研究和报告" : "Research and reports" },
     { id: "prediction", label: lang === "zh" ? "预测市场" : "Prediction Market", hint: lang === "zh" ? "证据和概率" : "Evidence and probabilities" },
     { id: "safety", label: lang === "zh" ? "风险卫士" : "Risk Guard", hint: lang === "zh" ? "签名前检查" : "Inspect before signing" },
@@ -851,7 +791,7 @@ export function App() {
 
       {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
 
-      {tab !== "overview" && <section className="hero">
+      {!["overview", "telegram", "docs"].includes(tab) && <section className="hero">
         <div className="card hero-copy">
           {tab === "spot" && <span className="eyebrow">REPORT-DRIVEN · CONNECTED WALLET</span>}
           {tab === "autopilot" && <span className="eyebrow">SIX-STEP SETUP · OWNER CONTROLLED</span>}
@@ -866,7 +806,7 @@ export function App() {
             <span>{ticker ? String(ticker.instId) : "—"}</span>
             <span className="muted">{timeframe} · OKX</span>
           </div>
-          <canvas id="pulse-chart" className="chart" />
+          {candles.length > 0 && <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang} />}
           {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
           </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : tab === "spot" ? (lang === "zh" ? "选交易对、查看行情、审核订单。" : "Choose a pair. See the market. Review the order.") : tab === "telegram" ? (lang === "zh" ? "报告与提醒，送达聊天。" : "Reports and reminders, delivered in chat.") : tab === "docs" ? (lang === "zh" ? "了解功能、费用与操作权限。" : "Workflows, prices and control boundaries.") : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : tab === "spot" ? (lang === "zh" ? "行情预览免费。只有审核订单并在钱包签名后才会执行交易。" : "Market previews are free. Execution starts only after you review and sign the order in your wallet.") : tab === "telegram" ? (lang === "zh" ? "在手机打开 PULSE，连接报告通知；机器人不保管资金。" : "Open PULSE on your phone and connect report notifications. The bot does not hold your funds.") : tab === "docs" ? (lang === "zh" ? "从研究、现货与 Autopilot 指南中找到适合你的工作流程。" : "Find the relevant guide for research, Spot execution or independent Autopilot setup.") : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
         </div>

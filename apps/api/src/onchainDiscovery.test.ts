@@ -1,7 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { PublicClient } from "viem";
-import { readSnapshot } from "./onchainDiscovery.js";
+import { normalizeExecutionRpcUrls, readSnapshot } from "./onchainDiscovery.js";
+
+test("retired Base RPC is replaced even in explicit environment configuration", () => {
+  assert.deepEqual(normalizeExecutionRpcUrls("base", [" https://1rpc.io/base/ ", "https://base-rpc.publicnode.com", ""]), ["https://base-rpc.publicnode.com"]);
+  assert.deepEqual(normalizeExecutionRpcUrls("base", ["https://private.example/rpc", "https://mainnet.base.org"]), ["https://private.example/rpc", "https://mainnet.base.org"]);
+  assert.deepEqual(normalizeExecutionRpcUrls("arbitrum", ["https://1rpc.io/arb"]), ["https://1rpc.io/arb"]);
+});
 
 const owner = `0x${"1".repeat(40)}`;
 const token = `0x${"2".repeat(40)}`;

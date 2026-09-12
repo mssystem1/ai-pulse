@@ -1,5 +1,73 @@
 # PULSE deployed Autopilot review
 
+## Latest results — September 11, 2026
+
+Agent #8355's approved descriptions were saved and resubmitted successfully. The submission response reports approval status `2` (under review). Update transaction: `0xdd697538b37ed2fa061d866af2700958c35cc0a5f35b46e4d5baae547d91099e`. No additional paid service request accompanied the update. Earlier listing-status statements below describe their dated verification stage, not the current submission.
+
+The Base aggregate **−15%** was a journal-accounting error, not a verified trading loss. Two September 9 cash flows for vault #2 were absent from the activity projection:
+
+| Confirmed flow | UTC block time | Receipt |
+| --- | --- | --- |
+| Owner withdrawal, 1.00 USDC | September 9, 09:26:43 | `0x1dc43101346d7796b7de702688d7c0652a8aa3109f8383660afad0650bcdb531` |
+| Owner deposit, 0.70 USDC | September 9, 10:40:11 | `0xc5eb5d9e70bb63b10dc1d927aea7ea4ee32c93681be9aeca3f03b933029a21b2` |
+
+Base RPC receipts verified success, exact owner/vault/USDC transfer direction and amounts. Both records were restored atomically with duplicate checks and audit key `pulse:ops:cashflow-repair:base:0x2dd49a1035fcf7a951dda16609f5d33158d91bee:2026-09-09`. **No funds moved.** The subsequent live API showed 0.00% for #1, #2 and #5; #2 had 0.70 USDC current value, 2.20 USDC gross basis and 1.50 USDC withdrawals. This is a timestamped observation, not a guarantee of future PnL.
+
+Blockscout's token-transfer listing omitted these transactions despite ending pagination. A complete cash-flow repair must verify chain receipts; an empty explorer next-page pointer is not proof of completeness. The local September 12 continuation adds automatic receipt-verified cash-flow discovery, independent of explorer pagination; it has not yet been deployed.
+
+Local changes replace the retired Base `1rpc.io/base` fallback, including explicit legacy environment values, with the shared supported fallback configuration. Spot aggregate return now matches confirmed Market/Limit quantities rather than averaging order percentages. Confirmed chart markers, Portfolio/Telegram copy and workflow diagrams are local changes pending deployment; verification is recorded below.
+
+### Local verification of the follow-up changes
+
+- API and web TypeScript checks and production builds pass. Existing frontend dependency/chunk-size warnings remain.
+- API unit/integration suite: 177 passed, including Telegram canonical routing, fragment-based report links, secret validation, private-chat scope, callback acknowledgements and duplicate-update handling.
+- Web unit suite: 64 passed, including weighted Spot cost basis, partial sells, missing history, mixed quote currencies and chart marker filtering.
+- `scripts/product-ui-check.mjs`: 16 fixture cases passed at 390px and 1440px—Telegram ready/unavailable, Docs diagrams, Portfolio return, chart zoom/markers, Global/Prediction share readers and revoked links.
+- `scripts/autopilot-ui-check.mjs`: 6 fixture cases passed at 390px and 1440px—account identity, incomplete setup, same-vault recovery, owner controls and shortlist expansion on Autopilot/Global/Spot.
+- The real localhost `/shared-report` entry rendered a fixture report without importing wallet connector modules. No wallet signing, report payment or vault mutation was performed by these tests.
+
+Review setup now starts account/storage checks and jumps directly to the same vault's review summary. It shows reused capital and draft limits before wallet approval, not a new-account invitation. Telegram now has direct page buttons and a readable, read-only shared-report page instead of raw JSON; old delivered links are not rewritten.
+
+September 12 local continuation: a separate durable cash-flow projection scans bounded chain-log ranges and verifies receipts, resumes saved checkpoints, and rebuilds on a checkpoint hash change. It distinguishes capital transfers from vault executions and withholds PnL on incomplete coverage, stale verification or unpriced non-settlement transfers. Accounting balances use the same checkpoint block as transfers; current marks value invested assets. Legacy starting values retain their original timestamp limitation. Recovery does not modify strategy permissions, passes or wallet funds. It begins after manual deployment with the automation worker enabled; no production scan or import was performed in this continuation.
+
+Expanded charts now page backward through OKX history, return to newer/latest data, and open a confirmed fill's time window. There is no fixed page-count cutoff in PULSE; provider retention still applies. RPC/candle adapter tests and local browser fixtures do not constitute a live paid Telegram delivery or on-chain execution test.
+
+Local verification for this continuation: API 185 tests, web 65 tests, market 11 tests; all passed. Twenty-two browser fixture cases passed at 390px and 1440px, including Older/Newer/Latest navigation, confirmed-fill jumps, provider error versus empty history, and a funded paused vault whose Resume remains available while accounting is recovering. No horizontal overflow or render exceptions were observed in those cases. Market/API/web production builds passed with existing dependency/bundle-size warnings. No new payment, signature, live database mutation, commit, push or deployment was performed.
+
+Subsequent chart-readability update (local, September 12): replaced the SVG candle renderer and Global's custom area renderer with locally bundled TradingView Lightweight Charts 5.2.1. The shared preview/expanded chart uses fixed green/red candles, screen-aware spacing, OHLC/volume readouts, UTC timestamps, mouse/keyboard navigation and touch pinch zoom. Verified fill markers attach above/below bars without changing market-price scaling. The renderer is free; no TradingView API key or billing flag is required. Attribution and license copies ship at `/chart-licenses.txt`.
+
+Chart verification: web suite now passes 68 tests. Eighteen product-browser fixture cases plus six Autopilot/shortlist cases passed at 390px/1440px; chart cases check native wheel/pinch zoom, crosshair readouts, fill jumps, historical navigation and error/empty states. Two additional read-only browser cases used a fresh 100-candle ETH-USDT snapshot from the public OKX feed, with no synthetic trade markers. Screenshots were inspected in light/dark themes. Production web build passed with the existing wallet-dependency and bundle-size warnings; the new renderer is a separate lazy-loaded chunk. No wallet, payment, database or deployment mutation was needed.
+
+## Authorized confirmation correction — September 11, 2026
+
+After the owner's explicit approval, Base Autopilot #5's existing September 10 pass was corrected from `signalsUsed=3` to `signalsUsed=2`, with `signalLimit=3` unchanged. Verification confirmed expiry remains September 11 at **15:51:55 UTC**, `pausedAt` remains absent, and the consumed-signal identities were preserved. No vault transaction or strategy change was made.
+
+The repair checked owner, network, vault, purchase time, expiry and expected counters, then used an atomic compare-and-swap against the complete current Redis value. It preserved the existing key TTL and wrote a one-time audit record under `pulse:ops:pass-repair:base:0xce9d3473e4889214107dd32d43b535970ff8fcb9:2026-09-10:cached-confirmation`. An existing audit marker or concurrent change would reject the repair; no blind retry was performed. The restored confirmation may subsequently be consumed by the running strategy under its existing signed rules.
+
+Agent #8355's proposed eight description corrections passed OKX listing validation with no findings. They remain unpublished pending review of [the exact description proposal](OKX_8355_DESCRIPTION_PROPOSAL.md). No new paid test or resubmission accompanied this correction.
+
+## Post-deployment verification — September 11, 2026 UTC
+
+Commit `a6ef751` is visible in the deployed UI: existing-account recovery, journal navigation and Last Grok signal text are present. The API reports Redis online, Blob configured and mock payments disabled. At approximately 06:15 UTC:
+
+| Base account | Observed state | Remaining action |
+| --- | --- | --- |
+| #1 | Paused, no signed registration, 0 USDC settlement | Finish setup on this existing account and verify capital before activation |
+| #2 | Registered DOGE-USDT breakout; unpaused; 0.70 USDC; 1/3 confirmations used | Scheduler is evaluating; buys still require the signed conditions |
+| #3 | Paused, no signed registration, 0.20 USDC | Finish setup on this existing account; reuse its funds |
+| #4 | Paused, no signed registration, 0.20 USDC | Finish setup on this existing account; reuse its funds |
+| #5 | Registered ETH-USDT mean reversion; unpaused; 0.20 USDC; 3/3 confirmations used | New AI entries blocked by the confirmation allowance, not expiry |
+
+All five accounts returned balance and pause telemetry. These are settlement balances, not a valuation of all possible holdings. The pass for #2 expires September 11 at 15:59:53.489 UTC; #5 expires at 15:51:55 UTC. These times and counters are a snapshot, not a promise of current state when this document is read later.
+
+Grok is running: #2 recorded a live signal at 04:31:19.687 UTC; #5 recorded a live signal at 00:07:19.233 UTC. #5's 04:07:18.258 evaluation explicitly reported `signals_exhausted`. Its earlier September 10 records show a live result at 15:52:13.131 and a cached result at 16:08:11.903. Both consumed allowance before the deduplication fix. With the new live result, the stored total is 3 although only two distinct generated results were used. The deployed fix prevents future duplicate consumption; it does not retroactively restore the one historical confirmation. No entitlement adjustment was performed. Any repair must be narrowly scoped, preserve pause/expiry and consumed-result identities, and account for concurrent worker writes.
+
+The non-spending production acceptance runner completed **268 checks passed, 0 failed, 12 valid-input probes skipped** across X Layer, Base and Arbitrum REST/MCP routes. Skips are the X Layer/Arbitrum Autopilot valid-input challenges, for which no verified registered vault was supplied. Missing-input rejection was checked for all eight services. This proves input validation and challenge shape, not paid delivery of every service.
+
+The disconnected production browser showed no horizontal overflow at 390px or 1440px. Mobile shortlist expansion retained the same section and expanded from two to eight cards; no console errors were observed. Wallet signing and account recovery were not repeated in this production browser session.
+
+Agent #8355 still has the agreed eight service URLs/prices and approved profile description. Its review feedback remains unresolved. See [the current integration notes](OKX_AI_MODERATION.md#current-integration-review--september-11-2026) before proposing a listing update. No new payment, listing update, resubmission or vault transaction was performed during this verification.
+
 ## Evidence and recovery status
 
 Read-only observations from the Railway API and restored Railway Redis, with server timestamps on September 10, 2026 (UTC):

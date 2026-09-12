@@ -83,7 +83,7 @@ const CHAINS = {
   base: {
     id: 8453,
     label: "Base",
-    rpc: [process.env.BASE_RPC_URL || "https://mainnet.base.org", process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base"],
+    rpc: [process.env.BASE_RPC_URL || "https://mainnet.base.org", process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com"],
     settlement: "USDC",
     amount: "1",
     reportRoute: "base",

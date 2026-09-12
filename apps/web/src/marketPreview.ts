@@ -1,7 +1,41 @@
 export type MarketCandle = { ts: number; open: number; high: number; low: number; close: number; volume: number; volumeCcy?: number; confirmed?: boolean };
 export type MarketTicker = { instId: string; last: number; change24hPct: number; high24h: number; low24h: number; volCcy24h: number; ts: string };
 export type MarketPreviewData = { ticker: MarketTicker; candles: MarketCandle[]; fetchedAt: number };
+export type TradeMarker = { id: string; side: "buy" | "sell"; price: number; ts: number; txHash: string };
+export type ChartActivity = { id: string; source: string; kind: string; status: string; pair?: string; account?: string; txHash?: string; fillPrice?: number; fillSide?: "buy" | "sell"; fillObservedAt?: string; createdAt: string };
+
+/** Only confirmed fills for this market and account; never funding or pending orders. */
+export function confirmedTradeMarkers(activity: readonly ChartActivity[], pair: string, account?: string): TradeMarker[] {
+  const seen = new Set<string>();
+  return activity.flatMap(item => {
+    if (item.status !== "confirmed" || item.pair !== pair || !item.txHash || !Number.isFinite(item.fillPrice) || item.fillPrice! <= 0) return [];
+    if (account ? item.source !== "autopilot" || item.account?.toLowerCase() !== account.toLowerCase() : item.source === "autopilot") return [];
+    const side = item.fillSide || (/^(market_buy|buy_filled|automatic_entry_protected)$/.test(item.kind) ? "buy"
+      : /^(market_sell|sell_filled|sell_partial_filled|automatic_take_profit|automatic_stop_loss)$/.test(item.kind) ? "sell" : undefined);
+    const ts = Date.parse(item.fillObservedAt || item.createdAt), id = `${item.txHash.toLowerCase()}:${side}`;
+    if (!side || !Number.isFinite(ts) || seen.has(id)) return [];
+    seen.add(id);
+    return [{ id, side, price: item.fillPrice!, ts, txHash: item.txHash }];
+  }).sort((a, b) => a.ts - b.ts);
+}
+
+export function visibleTradeMarkers(markers: readonly TradeMarker[], candles: readonly MarketCandle[]) {
+  if (candles.length < 2) return [];
+  const interval = candles.at(-1)!.ts - candles.at(-2)!.ts;
+  return markers.filter(marker => marker.ts >= candles[0].ts && marker.ts < candles.at(-1)!.ts + interval);
+}
 type ReadResult = { ok: boolean; status: number; data: unknown };
+
+export async function loadHistoricalCandles(read: (path: string) => Promise<ReadResult>, pair: string, timeframe: string, before: number): Promise<MarketCandle[]> {
+  if (!Number.isSafeInteger(before) || before <= 0) throw new Error("Choose a valid history timestamp");
+  const response = await read(`/v1/market/candles?instId=${encodeURIComponent(pair)}&bar=${encodeURIComponent(timeframe)}&limit=100&before=${before}`);
+  if (!response.ok) throw new Error("Older market data is temporarily unavailable. Retry this range.");
+  const raw = (response.data as { candles?: MarketCandle[] })?.candles;
+  if (!Array.isArray(raw)) throw new Error("Historical market data was incomplete");
+  const rows = raw.filter(c => [c.ts, c.open, c.high, c.low, c.close].every(Number.isFinite) && c.ts < before && c.low > 0 && c.high >= Math.max(c.open, c.close) && c.low <= Math.min(c.open, c.close));
+  if (raw.length && !rows.length) throw new Error("Historical market data did not contain valid older candles");
+  return [...new Map(rows.map(c => [c.ts, c])).values()].sort((a, b) => a.ts - b.ts);
+}
 
 /** Shared by Global and Spot. Coalesces concurrent requests and bounds the cache. */
 export function createMarketPreviewLoader(read: (path: string) => Promise<ReadResult>, now = Date.now) {

@@ -210,6 +210,21 @@ export async function getCandles(
   const data = await okxGet<string[][]>(
     `/api/v5/market/candles?instId=${encodeURIComponent(instId)}&bar=${encodeURIComponent(bar)}&limit=${limit}`,
   );
+  return decodeCandles(data);
+}
+
+/** OKX calls its older-than timestamp cursor `after`. */
+export async function getHistoricalCandles(instId: string, bar: string, limit: number, before: number): Promise<Candle[]> {
+  if (!Number.isSafeInteger(before) || before <= 0 || !Number.isInteger(limit) || limit < 1 || limit > 300) throw new Error("Invalid historical candle range");
+  const data = await okxGet<string[][]>(`/api/v5/market/history-candles?instId=${encodeURIComponent(instId)}&bar=${encodeURIComponent(bar)}&limit=${limit}&after=${before}`);
+  const decoded = decodeCandles(data);
+  if (decoded.some(c => ![c.ts, c.open, c.high, c.low, c.close].every(Number.isFinite) || c.ts <= 0 || c.low <= 0 || c.high < Math.max(c.open, c.close) || c.low > Math.min(c.open, c.close))) throw new Error("Invalid historical candle data");
+  const older = decoded.filter(candle => candle.ts < before).sort((a, b) => a.ts - b.ts);
+  if (decoded.length && !older.length) throw new Error("Historical candle provider did not advance its cursor");
+  return older;
+}
+
+function decodeCandles(data: string[][]): Candle[] {
   return data
     .map((row) => ({
       ts: Number(row[0]),

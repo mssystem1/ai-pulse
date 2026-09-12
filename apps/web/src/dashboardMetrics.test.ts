@@ -84,14 +84,14 @@ test("aggregate PnL uses gross contributed capital, not the post-withdrawal rema
   });
 });
 
-test("malformed strategy telemetry does not stale the multi-agent dashboard", () => {
+test("missing accounting leaves balances visible but never invents an aggregate return", () => {
   assert.deepEqual(aggregateAutopilotMetrics([
     { status: "active", portfolioValueAtomic: "not-a-number", baselineValueAtomic: "500000", pnlAtomic: null },
     { status: "active", portfolioValueAtomic: "500000", baselineValueAtomic: "500000", pnlAtomic: "0" },
   ]), {
     portfolioValueAtomic: "500000",
-    pnlAtomic: "0",
-    pnlPct: 0,
+    pnlAtomic: undefined,
+    pnlPct: null,
   });
 });
 

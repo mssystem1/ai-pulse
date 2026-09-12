@@ -17,7 +17,7 @@ import { asyncRoute } from "./httpResilience.js";
 import { getTicker } from "@pulse/market";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
 import { recordV6Activity } from "./v6Store.js";
-import { executionPublicClient, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
+import { executionPublicClient, executionRpcUrls, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 
 type Network = "xlayer" | "base" | "arbitrum";
@@ -74,7 +74,7 @@ const networks = {
   base: {
     id: 8453,
     rpc: () => process.env.BASE_RPC_URL || "https://mainnet.base.org",
-    rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base",
+    rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com",
     oracle: () => executionContractAddress("base", "oracleRouter"),
     adapter: () => executionContractAddress("base", "executionAdapter"),
     router: () => executionContractAddress("base", "okxRouter"),
@@ -269,7 +269,7 @@ async function save(items: RegisteredOrder[]) {
 }
 function clients(network: Network, key?: `0x${string}`) {
   const cfg = networks[network];
-  const urls = [...new Set([cfg.rpc(), cfg.rpcFallback()].filter(Boolean))];
+  const urls = executionRpcUrls(network);
   const chain = {
     id: cfg.id,
     name: network,

@@ -19,13 +19,15 @@ import {
 import type { ReportTradeIntent } from "./Report";
 import type { Lang } from "./i18n";
 import { ShortlistMarketChart, SpotMarketPreview } from "./SpotMarketPreview";
+import { confirmedTradeMarkers } from "./marketPreview";
 import { AutopilotDecisionJournal, type DecisionEntry } from "./AutopilotDecisionJournal";
 import { decisionAuditColumns, serializeAuditCsv } from "./autopilotExport";
 import { renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
 import { autopilotControlState } from "./autopilotControls";
 import { DocsWorkflowVisuals } from "./DocsWorkflowVisuals";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
-import { aggregateAutopilotMetrics, assessBalanceAmount, averageKnownPnl, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
+import { aggregateAutopilotMetrics, assessBalanceAmount, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
+import { spotTradePerformance } from "./tradePerformance";
 import {
   DEFAULT_AUTOPILOT_CAPITAL,
   DEFAULT_TRADE_AMOUNT,
@@ -71,6 +73,11 @@ type Activity = {
   fillInputSymbol?: string;
   fillOutputSymbol?: string;
   fillObservedAt?: string;
+  fillSide?: "buy" | "sell";
+  fillQuantity?: number;
+  fillQuoteValue?: number;
+  fillBaseAsset?: string;
+  fillQuoteAsset?: string;
   createdAt: string;
 };
 
@@ -184,6 +191,8 @@ type AutopilotStrategyView = {
   pnlBasisAtomic?: string;
   pnlAtomic?: string | null;
   pnlPct?: number | null;
+  pnlCashFlow?: { state: string; progressPct: number; detail: string };
+  pnlAsOf?: string;
   markPrice?: number;
   telemetryError?: string;
   activeTakeProfit?: number;
@@ -2818,7 +2827,7 @@ export function SpotWorkspace({
 
       <div className="spot-trade-shell">
         <section id="spot-trade-ticket" tabIndex={-1} className="card report-trade-ticket">
-          <SpotMarketPreview key={`${pair}:${marketTimeframe}`} pair={pair} timeframe={marketTimeframe} lang={lang} />
+          <SpotMarketPreview key={`${pair}:${marketTimeframe}`} pair={pair} timeframe={marketTimeframe} lang={lang} markers={confirmedTradeMarkers(activity, pair)} />
           <div className="ticket-header">
             <div>
               <span className="eyebrow">TRADE TICKET</span>
@@ -4185,7 +4194,9 @@ export function AutopilotWorkspace({
   const activeStrategy = selectedAutopilotStrategy(strategies, selectedVault);
   const recoveringVault = Boolean(selectedVault && !activeStrategy);
   const selectedVaultNumber = vaults.findIndex(vault => vault.toLowerCase() === selectedVault.toLowerCase()) + 1;
-  function reviewVaultSetup(vault: string) {
+  const [recoveryCheck, setRecoveryCheck] = useState<{ vault: string; state: "checking" | "ready" | "failed" } | null>(null);
+  async function reviewVaultSetup(vault: string) {
+    if (busy) return;
     createNewVaultRef.current = false;
     setSelectedVault(vault);
     setCloseConfirming(false);
@@ -4193,8 +4204,20 @@ export function AutopilotWorkspace({
     // Activity is only a market hint, never a substitute for signed trading rules.
     const hint = [...activity].filter(item => item.account?.toLowerCase() === vault.toLowerCase() && item.status === "confirmed" && item.pair).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
     if (hint?.pair) setPair(hint.pair);
-    setMessage("Finish setup for this existing account. Review the market and risk limits, then sign registration and activation. Existing vault funds are reused; no replacement account is created.");
-    requestAnimationFrame(() => document.getElementById("autopilot-setup-target")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    setRecoveryCheck({ vault, state: "checking" });
+    setBusy(true);
+    setMessage("Checking the existing account and registration service. No transaction or payment is being requested.");
+    requestAnimationFrame(() => document.getElementById("autopilot-review-target")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    try {
+      const readiness = await apiPost("/v1/autopilot/readiness", {});
+      if (!readiness.ok) throw new Error("Registration storage is unavailable. Your existing vault remains unchanged; retry after the service recovers.");
+      await refresh();
+      setRecoveryCheck({ vault, state: "ready" });
+      setMessage("Review this account's market and risk summary below, then approve its wallet prompts. Existing funds are reused. Unsaved settings are drafts—not recovered trading instructions. No new vault will be created.");
+    } catch (error) {
+      setRecoveryCheck({ vault, state: "failed" });
+      setMessage(error instanceof Error ? error.message : String(error));
+    } finally { setBusy(false); }
   }
   function openVaultJournal(vault: string) {
     const journal = document.getElementById(`autopilot-journal-${vault.toLowerCase()}`);
@@ -5600,7 +5623,7 @@ export function AutopilotWorkspace({
           : activeStrategy
             ? "Save changes & restart selected"
             : selectedVault
-              ? "Configure & start selected Autopilot"
+              ? `Approve setup & start Autopilot #${selectedVaultNumber}`
               : "Create & start new Autopilot";
 
   return (
@@ -5688,7 +5711,7 @@ export function AutopilotWorkspace({
             </div>
             <p>{autopilotRouteStatus}</p>
           </div>
-          <SpotMarketPreview key={`autopilot:${pair}:${timeframe}`} pair={pair} timeframe={timeframe} lang={lang} context="autopilot" />
+          <SpotMarketPreview key={`autopilot:${pair}:${timeframe}`} pair={pair} timeframe={timeframe} lang={lang} context="autopilot" markers={selectedVault ? confirmedTradeMarkers(activity, pair, selectedVault) : []} />
           {!autopilotRouteAvailable && (
             <div className="route-suggestion">
               <strong>This pair is not executable here</strong>
@@ -5997,13 +6020,19 @@ export function AutopilotWorkspace({
             {passFundingUnavailable && <div className="capital-inline-warning">PULSE cannot verify the connected-wallet payment balance. Refresh before any vault transaction is prepared.</div>}
           </div>
 
-          <div className="autopilot-step-head">
+          <div id="autopilot-review-target" className="autopilot-step-head">
             <span>5</span>
             <div><small>REVIEW</small><h3>Verify the complete Autopilot</h3></div>
           </div>
 
           <div className="autopilot-review">
             <div>
+              {recoveringVault && <div className="autopilot-recovery-summary" role="status">
+                <strong>Continue existing Autopilot #{selectedVaultNumber}</strong>
+                <p>{recoveryCheck?.vault === selectedVault && recoveryCheck.state === "checking" ? "Checking account and registration service…" : recoveryCheck?.vault === selectedVault && recoveryCheck.state === "failed" ? "Readiness check failed. Read the error below before retrying." : "This account needs signed strategy registration. Review these draft settings before continuing; funding alone does not authorize trading."}</p>
+                <dl><div><dt>Already in this vault</dt><dd>{knownSettlementBalance == null || !/^\d+$/.test(knownSettlementBalance) ? "Balance unavailable" : `${formatUnits(BigInt(knownSettlementBalance), activeSettlementDecimals)} ${activeSettlementSymbol}`}</dd></div><div><dt>Maximum trade</dt><dd>{maxTrade}% of configured capital</dd></div><div><dt>Daily loss limit</dt><dd>{dailyLoss}%</dd></div><div><dt>AI confidence required</dt><dd>{minConfidence}%</dd></div></dl>
+                <button type="button" className="btn btn-soft" disabled={busy} onClick={() => document.getElementById("autopilot-setup-target")?.scrollIntoView({ behavior: "smooth", block: "start" })}>Change market or risk limits</button>
+              </div>}
               <span className="eyebrow">READY TO REVIEW</span>
               <h3>
                 {selectedStrategy.label} · {pair} · {timeframe}
@@ -6438,10 +6467,16 @@ export function AutopilotWorkspace({
                 ? `${aggregateRuntime.pnlPct >= 0 ? "+" : ""}${aggregateRuntime.pnlPct.toFixed(2)}%`
                 : "—"}
             </strong>
-            <small>mark-to-market, cash-flow adjusted</small>
+            <small>{strategies.some(item => item.pnlCashFlow && item.pnlCashFlow.state !== "synced") ? "Cash-flow history is being verified; incomplete returns stay unavailable." : "mark-to-market, cash-flow adjusted"}</small>
           </div>
         </div>
-        {activeStrategy && <details className="autopilot-runtime-market"><summary>{lang === "zh" ? "所选自动驾驶的市场行情" : "Market context for selected Autopilot"} · {activeStrategy.pair} · {activeStrategy.timeframe}</summary><SpotMarketPreview key={`runtime:${activeStrategy.pair}:${activeStrategy.timeframe}`} pair={activeStrategy.pair} timeframe={activeStrategy.timeframe} lang={lang} context="autopilot" /></details>}
+        {activeStrategy?.pnlCashFlow && <section className="cash-flow-coverage" aria-label={lang === "zh" ? "盈亏数据覆盖" : "PnL data coverage"}>
+          <div><strong>{lang === "zh" ? "所选自动驾驶 · 盈亏数据" : "Selected Autopilot · PnL data"}</strong><span>{activeStrategy.pnlCashFlow.state === "synced" ? (lang === "zh" ? "已核验" : "Verified through checkpoint") : activeStrategy.pnlCashFlow.state === "recovering" ? `${lang === "zh" ? "正在同步" : "Synchronizing"} · ${activeStrategy.pnlCashFlow.progressPct}%` : (lang === "zh" ? "盈亏暂不可用" : "PnL unavailable")}</span></div>
+          <p>{activeStrategy.pnlCashFlow.detail}</p>
+          {activeStrategy.pnlAsOf && <small>{lang === "zh" ? "余额与资金流时间点" : "Balances and cash flows as of"} {new Date(activeStrategy.pnlAsOf).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}. {lang === "zh" ? "持仓按最新参考价格估值；上方可用余额更新得更及时。" : "Holdings use the current reference mark; spendable balances above can be newer."}</small>}
+          {activeStrategy.pnlCashFlow.state !== "synced" && <small>{lang === "zh" ? "后台核验不会暂停交易或更改通行证。无需再次付款。" : "Background verification does not pause trading or change your pass. No new payment is needed."}</small>}
+        </section>}
+        {activeStrategy && <details className="autopilot-runtime-market"><summary>{lang === "zh" ? "所选自动驾驶的市场行情" : "Market context for selected Autopilot"} · {activeStrategy.pair} · {activeStrategy.timeframe}</summary><SpotMarketPreview key={`runtime:${activeStrategy.pair}:${activeStrategy.timeframe}`} pair={activeStrategy.pair} timeframe={activeStrategy.timeframe} lang={lang} context="autopilot" markers={confirmedTradeMarkers(activity, activeStrategy.pair, activeStrategy.vault)} /></details>}
         {strategies.length || vaults.length ? (
           <div className="order-monitor">
             {[...vaults, ...strategies.filter(item => !vaults.some(vault => vault.toLowerCase() === item.vault.toLowerCase())).map(item => item.vault)].map(vault => {
@@ -6790,13 +6825,7 @@ function ActivityDashboard({
       item.kind !== "sell_above",
   ).length;
   const activeAutopilotPositions = strategies.filter(hasProtectedAutopilotPosition);
-  const pnlRows = activePositions.filter(
-    (order) => typeof order.estimatedPnlPct === "number",
-  );
-  const estimatedPnlPct = averageKnownPnl([
-    ...pnlRows.map((order) => order.estimatedPnlPct),
-    ...strategies.map((item) => item.pnlPct),
-  ]);
+  const estimatedPnlPct = spotTradePerformance(activity).realizedPct;
   const orderMatches = (order: AutomationOrder) =>
     filter === "all" ||
     (filter === "pending" && pendingOrders.includes(order)) ||
@@ -6874,18 +6903,14 @@ function ActivityDashboard({
           <small>all wallet and contract transactions</small>
         </div>
         <div>
-          <span>PNL</span>
+          <span>Realized Spot P&amp;L</span>
           <strong>
             {estimatedPnlPct === null
               ? "—"
               : `${estimatedPnlPct >= 0 ? "+" : ""}${estimatedPnlPct.toFixed(2)}%`}
           </strong>
           <small>
-            {strategies.length
-              ? "autopilot vault mark-to-market P&L"
-              : orders.length
-                ? "estimated open OCO P&L"
-                : "shown when position basis is known"}
+            {estimatedPnlPct === null ? "awaiting matched Buy/Sell cost basis" : "Market + Limit fills · excluding gas"}
           </small>
         </div>
       </div>
@@ -7228,6 +7253,7 @@ function DisabledArc({ feature }: { feature: string }) {
 }
 
 export function TelegramWorkspace() {
+  const [statusError, setStatusError] = useState(false);
   const [status, setStatus] = useState<{
     configured?: boolean;
     botUrl?: string | null;
@@ -7236,25 +7262,26 @@ export function TelegramWorkspace() {
   } | null>(null);
   useEffect(() => {
     void apiGet("/v1/telegram/status").then(
-      (response) => response.ok && setStatus(response.data as typeof status),
+      (response) => { if (response.ok) setStatus(response.data as typeof status); else setStatusError(true); },
+      () => setStatusError(true),
     );
   }, []);
   return (
     <div className="v6-workspace docs-workspace telegram-user-guide">
       <section className="v6-heading">
         <div>
-          <span className="eyebrow">ANALYSIS IN YOUR CHAT</span>
-          <h2>Use PULSE in Telegram</h2>
+          <span className="eyebrow">YOUR MOBILE COMPANION</span>
+          <h2>Open the app. Get reports in chat.</h2>
           <p>
-            Choose a market in chat, approve the normal x402 payment in the
-            secure Mini App, and receive the completed Global or Prediction
-            report back in the same conversation.
+            Telegram is a shortcut to PULSE and a delivery channel—not a second
+            trading interface. Choose markets, review prices and approve actions
+            in the app. No typed commands required.
           </p>
         </div>
-        {status?.botUrl ? (
+        {status?.configured && status.botUrl ? (
           <a
             className="btn btn-accent telegram-launch"
-            href={status.botUrl}
+            href={`${status.botUrl}?start=pulse`}
             target="_blank"
             rel="noreferrer"
           >
@@ -7263,7 +7290,7 @@ export function TelegramWorkspace() {
         ) : (
           <span className="telegram-availability">
             <i className={status?.configured ? "ready" : ""} />
-            {status?.configured ? "Bot ready" : "Bot link is being configured"}
+            {statusError ? "Cannot check Telegram right now. PULSE remains available here." : !status ? "Checking Telegram…" : "Telegram is unavailable. Use PULSE directly while it is restored."}
           </span>
         )}
       </section>
@@ -7271,12 +7298,12 @@ export function TelegramWorkspace() {
         <div className="dashboard-head">
           <div>
             <span className="eyebrow">FIRST REPORT</span>
-            <h3>Four steps—no bot custody</h3>
+            <h3>From one tap to a delivered report</h3>
           </div>
           <span
             className={`status-chip ${status?.durableDelivery ? "confirmed" : "pending"}`}
           >
-            {status?.durableDelivery ? "durable delivery" : "checking delivery"}
+            {status?.durableDelivery ? "Delivery retries enabled" : !status && !statusError ? "Checking delivery" : "Delivery not verified"}
           </span>
         </div>
         <div className="telegram-steps">
@@ -7295,8 +7322,8 @@ export function TelegramWorkspace() {
             <div>
               <strong>Choose a service</strong>
               <p>
-                Use Global Market for an OKX pair or Prediction Market for one
-                live question. Then choose Base or Premium.
+                Tap Global Market or Prediction Market in the bot. The app opens
+                on that page. Choose your pair or question, timeframe and tier there.
               </p>
             </div>
           </article>
@@ -7305,9 +7332,8 @@ export function TelegramWorkspace() {
             <div>
               <strong>Pay securely</strong>
               <p>
-                Tap Pay & generate. The PULSE Mini App opens with the exact
-                service, network and price. Connect your wallet and review its
-                x402 signature.
+                In the app, choose your network and connect your wallet. Review
+                the report price before approving payment. Opening a page is free.
               </p>
             </div>
           </article>
@@ -7325,28 +7351,22 @@ export function TelegramWorkspace() {
       </section>
       <div className="telegram-guide-grid">
         <section className="card command-card">
-          <span className="eyebrow">WHAT TO TYPE</span>
-          <h3>Commands</h3>
+          <span className="eyebrow">CHOOSE A DESTINATION</span>
+          <h3>Buttons, not commands</h3>
           <div className="command-list">
-            <code>/global</code>
-            <span>Pair → timeframe → tier</span>
-            <code>/prediction</code>
-            <span>Question → tier</span>
-            <code>/reports</code>
-            <span>Your delivered report history</span>
-            <code>/wallet</code>
-            <span>Explain link/unlink security</span>
-            <code>/help</code>
-            <span>Show the guided menu again</span>
+            <strong>Global / Prediction</strong><span>Choose and buy research in the app.</span>
+            <strong>Spot Trading</strong><span>Prepare an order; your wallet approves execution.</span>
+            <strong>Autopilot</strong><span>Manage autonomous strategies and their passes.</span>
+            <strong>My reports</strong><span>Open saved reports. For another device, use Paid report history → Sync with wallet on a research page.</span>
           </div>
         </section>
         <section className="card telegram-example">
           <span className="eyebrow">EXAMPLE</span>
           <h3>BTC 4H Premium</h3>
           <div className="chat-demo">
-            <div className="chat-user">/global</div>
+            <div className="chat-user">Tap Global Market</div>
             <div className="chat-bot">
-              Choose pair <b>BTC-USDT</b> → timeframe <b>4H</b> → <b>Premium</b>
+              In the app: <b>BTC-USDT</b> → <b>4H</b> → <b>Premium</b>
               .
             </div>
             <div className="chat-user">Pay & generate</div>
@@ -7369,7 +7389,7 @@ export function TelegramWorkspace() {
           <ul>
             <li>Receives the report selected for that chat</li>
             <li>Uses an expiring chat-bound delivery capability</li>
-            <li>Retries a failed delivery from KV</li>
+            <li>Retries failed delivery without a second payment</li>
           </ul>
           <ul>
             <li>Never receives private keys or seed phrases</li>
@@ -8630,12 +8650,15 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             <span className="docs-number">09</span>
             <div className="docs-copy">
               <span className="eyebrow">TELEGRAM</span>
-              <h3>Request in chat, authorize in the Mini App</h3>
+              <h3>Tap in chat. Choose and authorize in PULSE.</h3>
               <p>
-                Use `/global` or `/prediction`, make selections, then open the
-                secure payment button. Telegram receives the result, not your
-                wallet credentials. See the Telegram tab for the complete guided
-                example.
+                Press Start in the bot, then tap a destination button. Markets,
+                networks, report tiers and payments are selected in the app—not
+                through a chat questionnaire. My reports opens saved research in
+                Portfolio. To recover another device's reports, open Global or
+                Prediction Market and use Paid report history → Sync with wallet.
+                Chat delivery requires opening a bot-sent link; the profile launch
+                button alone does not link notifications. Telegram never signs a trade.
               </p>
             </div>
           </section>

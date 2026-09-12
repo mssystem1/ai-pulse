@@ -34,7 +34,7 @@ try {
       if (url.origin === origin) return route.continue();
       if (url.pathname.includes("opportunities")) { scans++; return json({ candidates }); }
       if (url.pathname.includes("capabilities")) return json({ network: "base", spot: { enabled: true }, autopilot: { enabled: true }, contracts: { autopilotFactory: addresses[0] } });
-      if (url.pathname.includes("/strategies")) return json({ persistence: { state: "online" }, strategies: [{ id: "base:fixture", vault: addresses[1], owner, network: "base", pair: "DOGE-USDT", timeframe: "4H", policy: { strategy: "Breakout", maxTradePct: 50, dailyLossPct: 3 }, status: "active", runtimeState: "paused", paused: true, settlementAsset: settlement, settlementBalance: "700000", portfolioValueAtomic: "700000", settlementDecimals: 6, settlementSymbol: "USDC", targetAsset: addresses[0], targetBalance: "0", targetDecimals: 18, targetSymbol: "DOGE", evaluations: [], aiPass: { expiresAt: new Date(Date.now() + 86400000).toISOString(), pausedAt: new Date().toISOString(), signalLimit: 3, signalsUsed: 0 } }] });
+      if (url.pathname.includes("/strategies")) return json({ persistence: { state: "online" }, strategies: [{ id: "base:fixture", vault: addresses[1], owner, network: "base", pair: "DOGE-USDT", timeframe: "4H", policy: { strategy: "Breakout", maxTradePct: 50, dailyLossPct: 3 }, status: "active", runtimeState: "paused", paused: true, settlementAsset: settlement, settlementBalance: "700000", portfolioValueAtomic: "700000", pnlAtomic: null, pnlCashFlow: { state: "recovering", progressPct: 42, detail: "Historical cash-flow recovery is in progress; PnL waits for complete coverage." }, settlementDecimals: 6, settlementSymbol: "USDC", targetAsset: addresses[0], targetBalance: "0", targetDecimals: 18, targetSymbol: "DOGE", evaluations: [], aiPass: { expiresAt: new Date(Date.now() + 86400000).toISOString(), pausedAt: new Date().toISOString(), signalLimit: 3, signalsUsed: 0 } }] });
       if (url.pathname.includes("/accounts")) return json({ accounts: { protection: null, limit: null, bracket: null }, vaults: addresses.map((address, i) => ({ address, settlementAsset: settlement, settlementSymbol: "USDC", settlementDecimals: 6, balanceAtomic: i === 0 ? "0" : i === 1 ? "700000" : "200000", paused: true })) });
       if (url.pathname.includes("/activity")) return json({ activity: [], persistence: { state: "online" } });
       if (url.pathname.endsWith("/pairs")) return json({ pairs: candidates.map(item => ({ pair: item.pair, baseSymbol: item.pair.split("-")[0], quoteSymbol: "USDC" })) });
@@ -67,6 +67,8 @@ try {
     assert.equal(await page.locator(`#autopilot-journal-${addresses[1]}`).evaluate(el => el.open), true);
     await page.getByRole("button", { name: "Open Autopilot #2 controls", exact: true }).click();
     await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
+    assert.match(await page.locator('.cash-flow-coverage').innerText(), /Synchronizing · 42%/);
+    assert.match(await page.locator('.cash-flow-coverage').innerText(), /No new payment is needed/);
     }
     const countBefore = scans;
     await page.getByRole("button", { name: /Show \d+ more candidates/ }).click();

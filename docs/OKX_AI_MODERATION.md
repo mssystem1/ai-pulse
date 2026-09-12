@@ -1,8 +1,27 @@
 # PULSE · OKX.AI moderation and x402 replay
 
-This runbook addresses the review feedback for existing PULSE agent **#8355**. Update and resubmit that agent; do not register a duplicate.
+This runbook addresses the review feedback for existing PULSE agent **#8355**. Propose changes to that agent, not a duplicate. Updating or resubmitting requires explicit approval of the exact changes.
 
-## What failed in the moderator run
+## Current integration review — September 11, 2026
+
+The production API is `https://pulse-api-production-7aae.up.railway.app`; the web application is `https://www.ai-pulse.tech`. The registered eight services use the API's `/xlayer` prefix. The profile description and agreed catalog prices are correct and should remain unchanged.
+
+Current non-spending REST/MCP checks: **268 passed, 0 failed, 12 valid-input Autopilot probes skipped** on X Layer/Arbitrum because no verified registered vault was provided. The previous approved Global Quick purchase delivered a final report after authenticated polling. Neither result proves all eight paid paths or resolves the evaluator's specific failed requests.
+
+Two service-description changes need review before publishing:
+
+1. **Global Quick/Pro and Prediction Quick/Pro:** explain asynchronous delivery, not merely a “recoverable report/job.” A successful new paid POST returns HTTP 202 with `job.id`, `recoveryToken` and `pollUrl`. Save the recovery token privately. Resolve `pollUrl` against the same API origin and GET it with `PULSE-RECOVERY-TOKEN: <recoveryToken>` until `job.stage` is `completed`, then GET `/v1/jobs/<job.id>/report` with the same header. MCP callers can use `job_status` and `job_report` with `jobId` and `recoveryToken`. An accepted job is not the final deliverable. Do not pay again while polling, and do not publish the token in logs or the listing. Risk Guard returns its report inline; do not describe it as requiring job polling.
+2. **All three Autopilot passes:** replace the test-wallet owner/vault example with explicit caller-specific prerequisites and identifier discovery. `owner` is the paying wallet's EVM address, not PULSE's example wallet. `vault` is that owner's configured, funded, signed-and-registered X Layer Autopilot. Prepare it in `https://www.ai-pulse.tech/autopilot`, selecting X Layer. Discover existing accounts with `GET /v1/trading/accounts?network=xlayer&owner=<owner>` and verify registration with `GET /v1/autopilot/strategies?network=xlayer&owner=<owner>`. Funding alone does not register a strategy. If no eligible vault exists, finish owner-approved setup before requesting a pass. A pass purchase does not create a vault or grant another caller ownership of an example vault.
+
+The logged-in Codespace wallet had no X Layer Autopilot vault at this review. Therefore an end-to-end pass purchase from that wallet requires separately authorized setup/funding first. Do not substitute the test wallet's vault into that buyer's paid request.
+
+For Prediction inputs, use the free `/v1/polymarket/markets` or `/v1/polymarket/search` discovery routes, and validate the selected ID through `/v1/polymarket/markets/<encoded-market-id>` before quoting. A market ID in an example may stop being active. The currently published example resolved and its context data was available during this review; analysis is read-only and does not authorize trading.
+
+For OKX CLI 4.5.3 REST payments, repeat all business parameters on **both** quote and pay. The observed replay did not inherit quote-time parameters. A missing-body 400 is not evidence of a successful charge; inspect the receipt and wallet transaction before attempting another payment. See [the verified paid-delivery evidence](AUTOPILOT_DEPLOYED_REVIEW.md#live-paid-delivery-result).
+
+These are local review notes, not published listing changes. Preserve the approved profile description, eight service identities, prices and canonical endpoints. Present an exact description diff for approval before updating #8355. Historical material below documents the earlier token-scan review and must not be mistaken for the current eight-service paid acceptance result.
+
+## Historical token-scan moderator run
 
 The web application and the OKX.AI task flow exercise different clients:
 

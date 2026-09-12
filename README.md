@@ -4,7 +4,7 @@
 
 <h1 align="center">PULSE</h1>
 
-<p align="center"><strong>Global & Prediction intelligence. Wallet-signed Spot execution. Independent guarded Autopilot.</strong></p>
+<p align="center"><strong>Market intelligence. Wallet-approved Spot orders. Autonomous Autopilot trading.</strong></p>
 
 PULSE combines live OKX Global Market evidence—including crypto, xStocks, and RWA instruments—with explicitly selected Polymarket data. A valid Global report can prefill an Agentic-Wallet-signed Market or Limit Spot ticket, including optional TP/SL. Guarded Autopilot starts separately through its own pair, strategy, capital/risk, owner-vault and duration workflow; it never requires or reuses a paid report as its live signal. Reports are private, recoverable across devices through wallet proof, and paid per request through network-aware x402 settlement on X Layer, Base, Arbitrum One, and Arc Testnet.
 
@@ -62,6 +62,10 @@ The browser keeps funding in context: connect once, inspect the selected chain�
 
 ## Experience
 
+### Portfolio
+
+The main application opens on **Portfolio** (the existing `/overview` URL remains compatible). Spot orders and matched-fill performance, autonomous Autopilot capital/runtime, and saved Global/Prediction research stay in separate sections. Values are scoped to the selected network. Missing cost basis is shown as unavailable, not zero; Spot and Autopilot percentages are never averaged together.
+
 ### Global Market
 
 Choose a live OKX instrument instead of typing an arbitrary pair. Select a timeframe and PULSE fetches public ticker/OHLCV data, renders the chart locally, and sends bounded structured context—not a screenshot—to Grok. Base and Premium reports have distinct marks. Premium adds an annotated, click-to-enlarge chart with Fibonacci levels, pivots, the current Elliott candidate, its invalidation, and wave-consistent next paths. The recommendation is deliberately **Buy or Wait**; PULSE never turns a bearish report into a new short. Changing pair, timeframe, network, or request tier supersedes the earlier request so a late response cannot replace the current context.
@@ -87,6 +91,8 @@ Spot Trading works with or without a loaded report. The network-specific pair pi
 ### Guarded Autopilot
 
 Autopilot is independent from manual Spot Trading. The six-step setup covers the target vault, market, strategy, capital/risk, AI Entry Pass, review and activation; amounts are shown in readable token units and verified contract addresses remain available under technical proof. **Create new Autopilot** always creates a separate owner-controlled vault, while editing an explicitly selected vault changes only that vault. The creation form labels the connected wallet as the source and shows its spendable USDC or USDT0 balance. The target-token wallet balance is informational and is not required to start; a failed target-token read cannot replace a valid settlement balance with zero. Selecting **Prepare Autopilot** in Opportunity Radar prefills the draft, scrolls to setup and visibly confirms that no transaction has been sent.
+
+For an account whose setup was interrupted, **Review setup** starts a storage/account readiness check and jumps to that vault's review summary. It shows existing capital and draft limits, offers a clear way to edit them, and continues on the same account. Missing signed registration cannot be reconstructed from a deposit alone: the owner must review and authorize the settings. A valid pass and existing vault funds are reused; pass-payment success followed by a rejected Resume is not a reason to buy again.
 
 After creation, one **Autopilot dashboard** combines account selection, status, portfolio balances, pass renewal, Pause/Resume, Add funds, Withdraw/Max, Close & withdraw all, strategy journals and reconciled on-chain activity. **Add funds** means a later owner top-up into that selected vault. It does not silently widen the signed maximum-trade, exposure, turnover, or loss limits; save the selected strategy when the policy should be resized around the larger capital base. **Withdraw** shows the selected vault’s withdrawable settlement balance, not the connected-wallet balance. The executor may act only through allowlisted ERC-20 assets/routes and owner-signed exposure, slippage, turnover, cooldown, daily-loss, confidence, and expiry limits; native assets use their official wrapped representation, such as WOKB on X Layer. The fast risk monitor handles TP/SL and completes bounded exits without waiting for another AI cycle. Closing leaves the empty contract auditable and reusable because deployed smart contracts cannot be deleted.
 
@@ -244,7 +250,7 @@ flowchart TB
   end
 
   subgraph Data[KV and object persistence, no SQL]
-    KV[Upstash KV<br/>jobs · receipts · indexes · sessions · leases · activity · strategies]
+    KV[Railway Redis<br/>jobs · receipts · indexes · sessions · leases · activity · strategies]
     BLOB[Vercel Blob<br/>encrypted report ciphertext · compatible evidence objects]
   end
 
@@ -489,7 +495,7 @@ Each owner-controlled vault uses a manually prepaid AI Entry Pass. One covered d
 
 Dashboard renewal is **pay, then resume**: after successful payment, PULSE checks that exact vault and automatically requests its owner-signed Resume transaction if paused. Already-running vaults need no extra Resume. Rejecting Resume does not repeat payment or discard purchased time: select the paid vault and use **Resume**. Switching wallet/network/vault during checkout stops the follow-up action. A confirmed Resume remains successful even if activity indexing temporarily fails. No pass auto-renews, and pass payments are separate from trading capital.
 
-The in-app **Docs → Workflow maps** offers three visual guides: Research & Spot, independent Autopilot runtime (including a pause/resume timer diagram), and Payment & recovery. These illustrate behavior—not forecast returns or historical performance.
+The in-app **Docs → Workflow maps** offers five visual guides: Research & Spot, independent Autopilot runtime (including a pause/resume timer diagram), Telegram, Performance, and Payment & recovery. These illustrate behavior—not forecast returns or historical performance.
 
 The durable strategy `status` records registration, not a claim that the vault is currently trading. The API and dashboard derive an authoritative effective runtime state from the on-chain pause flag, current invested balance, and AI Entry Pass: **Running**, **Paused**, **Exit protection only**, **Entry pass expired**, **Entry confirmations used**, or **Runtime unavailable**. CSV audit exports begin with a current runtime snapshot and pass counters before the historical decision and on-chain activity rows.
 
@@ -512,6 +518,16 @@ Global pair search, shortlist cards and reports show selected-network Spot mappi
 All eight public MCP services and the REST analysis routes validate required arguments before an x402 challenge. Malformed instruments, unsupported candle intervals, missing token contracts and malformed vault/owner addresses return input errors without payment headers. Autopilot pass challenges additionally require a registered vault owned by the specified wallet on the selected network. See [local verification and resubmission notes](docs/UI_RUNTIME_VERIFICATION.md); local changes do not update agent 8355 or deploy the API.
 
 ### Trading prices, PnL and oracle evidence
+
+**Wallet-level Spot performance** matches all available confirmed Market and Limit Buy/Sell quantities using average cost. Realized profit is sale proceeds minus the cost assigned to the sold quantity; the return percentage divides by that matched cost. Open return needs the remaining cost and a current market mark for every held pair. Receipt refunds are netted; duplicate transaction/side records are counted once. Missing fills, unmatched externally acquired inventory, or mixed quote currencies make aggregate performance unavailable. Gas is excluded. Per-order entry/exit percentages below describe that order only, not a wallet return.
+
+**Autopilot performance** uses `vault value + withdrawals − initial value − later deposits`, divided by initial value plus later deposits for percentage return. Entry Pass purchases and wallet gas are outside the vault capital calculation. The automation worker independently recovers vault cash flows in bounded chain-log pages and verifies each against a successful receipt. Deposits from another sender are capital, not profit; verified vault execution transfers are trades, not capital. Checkpoints live separately from the decision journal in Railway Redis and survive restarts. Paused strategies are included. Missing, stale or unpriced cash-flow coverage withholds PnL rather than displaying a false loss; a partial set of strategies cannot produce a portfolio-wide return.
+
+PnL uses balances and transfers at the same checked block, with a 64-block reorganization buffer and current reference marks for held assets. The dashboard shows the checkpoint timestamp separately from newer spendable balances. The buffer is not a finality guarantee: changed block hashes trigger recovery. New registrations anchor their initial balance to an exact block; legacy strategies retain their original starting value and use the registration timestamp for discovery, with that limitation disclosed. Non-settlement deposits/withdrawals require historical valuation and currently withhold PnL. Recovery runs with `AUTOMATION_WORKER_ENABLED=1`, independently of the trading loop, rotating through two accounts per minute and scanning up to four 2,000-block pages per account per cycle. Initial catch-up can take hours for older accounts; it does not require buying another pass or signing a transaction.
+
+Spot and selected-Autopilot charts label confirmed **B**uy and **S**ell fills for that pair/account within the visible candle window. The expanded chart lists supplied confirmed fills; select one to open its candle window. **Older**, **Newer** and **Latest** browse bounded pages without a fixed application history cutoff, subject to [OKX historical candle availability](https://app.okx.com/docs-v5/en/#order-book-trading-market-data-get-candlesticks-history). Historical pages do not poll live prices. Provider failures offer Retry; an empty page allows returning to newer data. Missing fills are never fabricated, and markers outside a window are not placed at a false timestamp.
+
+Global, Spot and Autopilot market charts use **TradingView Lightweight Charts 5.2.1**, bundled locally and lazy-loaded. This is the free Apache-2.0 renderer—not a paid TradingView terminal or data subscription. No TradingView API key or billing environment variable is required; PULSE keeps its existing OKX data feed. Charts retain TradingView attribution. Green/red candles do not change meaning with the theme; the initial visible range adapts to screen width. Expand a chart for crosshair OHLC/volume readouts, drag/pinch/wheel navigation, keyboard arrows and +/−, and Reset view. Chart timestamps are UTC. B/S arrows sit above/below the corresponding candle (multiple same-side fills are grouped); actual execution prices remain in the fill list and cannot stretch the market-price scale. A marker is not an order trigger or a trade authorization.
 
 PULSE deliberately keeps order conditions, execution evidence, market observations, and accounting separate:
 
@@ -546,6 +562,12 @@ The price path is near-real-time polling, not a continuously streaming Chainlink
 When historical data cannot prove a fill basis, the dashboard displays **unavailable**. It does not use zero, a report recommendation, the trigger, or the current mark as a substitute entry.
 
 ### Telegram paid delivery
+
+No typed commands are required. Press **Start**, then use the bot's **Open PULSE**, **Global Market**, **Prediction Market**, **Spot Trading**, **Autopilot**, or **My reports** button. Pair/question, network and tier selection happen in the app. My reports opens Portfolio's saved-research section; cross-device recovery uses **Paid report history → Sync with wallet** on Global or Prediction Market.
+
+To link delivery, open a **bot-sent** app button. The generic profile/menu launch URL alone carries no chat-delivery capability. The bot handles private chats only, and opening any destination neither charges nor trades. See [Telegram deployment and verification](docs/TELEGRAM_BOT_DEPLOYMENT.md).
+
+New **Open full report** buttons use a readable `/shared-report` frontend page with the capability in the URL fragment. The viewer reuses PULSE's Global/Prediction layouts without wallet initialization or trade controls. Anyone with a share link may read it until revoked; report sharing must be explicitly enabled. Existing raw API links remain API links.
 
 ```mermaid
 sequenceDiagram

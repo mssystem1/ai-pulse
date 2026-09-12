@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { createCircleWalletRouter } from "./circleWallet.js";
 import { createTradeAutomationRouter } from "./tradeAutomation.js";
+import { normalizeExecutionRpcUrls } from "./onchainDiscovery.js";
 import { autopilotPassTargetExists, createAutopilotAutomationRouter, grantAutopilotPass } from "./autopilotAutomation.js";
 import type { AppConfig } from "@pulse/config";
 import { buildAspMetadata, getNetwork, priceLabel, type NetworkKey } from "@pulse/config";
@@ -32,6 +33,7 @@ import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, c
 import {
   buildMarketContext,
   getCandles,
+  getHistoricalCandles,
   getTicker,
   isCryptoTradingPrediction,
   searchSpotInstruments,
@@ -77,7 +79,7 @@ import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
 import { ArcBudgetExceededError, createArcBudgetStore, paymentPayer, type ArcBudgetStore } from "./arcBudget.js";
 import { createV6Router } from "./v6Routes.js";
-import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability } from "./telegram.js";
+import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability, telegramReportUrl } from "./telegram.js";
 import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } from "./resilientKv.js";
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
@@ -335,9 +337,12 @@ export function createApp(cfg: AppConfig, dependencies: {
       const instId = String(req.query.instId || "");
       if (!instId) return res.status(400).json({ error: "instId required" });
       const bar = toOkxBar(String(req.query.bar || req.query.timeframe || "1H"));
-      const limit = Math.min(Number(req.query.limit) || 100, 300);
-      const candles = await observeProvider("okx", "candles", () => getCandles(instId, bar, limit));
-      res.json({ service: "candles", free: true, instId, bar, candles });
+      const limit = req.query.limit === undefined ? 100 : Number(req.query.limit);
+      const before = req.query.before === undefined ? undefined : Number(req.query.before);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 300 || (before !== undefined && (!Number.isSafeInteger(before) || before <= 0)))
+        return res.status(400).json({ error: "limit must be 1–300; before must be a positive timestamp in milliseconds" });
+      const candles = await observeProvider("okx", "candles", () => before === undefined ? getCandles(instId, bar, limit) : getHistoricalCandles(instId, bar, limit, before));
+      res.json({ service: "candles", free: true, instId, bar, candles, nextBefore: candles[0]?.ts ?? null });
     } catch (e) {
       res.status(502).json({ error: String(e) });
     }
@@ -577,7 +582,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       : key === "base" ? [cfg.BASE_RPC_URL, cfg.BASE_RPC_FALLBACK_URL]
       : key === "arbitrum" ? [cfg.ARBITRUM_RPC_URL, cfg.ARBITRUM_RPC_FALLBACK_URL]
       : [cfg.ARC_RPC_URL, cfg.ARC_RPC_FALLBACK_URL];
-    return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
+    return normalizeExecutionRpcUrls(key, values);
   };
 
   app.post("/v1/contract/inspect", async (req, res) => {
@@ -1664,7 +1669,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       const stored = await persistence.reports.save(current.payer, report);
       const telegramDelivery = typeof (current.input as Record<string, unknown>)._telegramDelivery === "string" ? String((current.input as Record<string, unknown>)._telegramDelivery) : "";
       if (telegramDelivery && cfg.REPORT_SHARE_LINK_ENABLED) {
-        try { const share=await persistence.reports.createShare(stored.id);const reportRecord=report as {analysis?:{headline?:unknown;summary?:unknown};service?:unknown};const headline=String(reportRecord.analysis?.headline||reportRecord.service||"PULSE report ready");const summary=String(reportRecord.analysis?.summary||"Your paid report completed successfully.");await deliverTelegramReportDurably(current.id,telegramDelivery,`${headline}\n\n${summary}`,`${cfg.BASE_URL.replace(/\/$/,"")}/v1/shared/reports/${share.token}`); }
+        try { const share=await persistence.reports.createShare(stored.id);const reportRecord=report as {analysis?:{headline?:unknown;summary?:unknown};service?:unknown};const headline=String(reportRecord.analysis?.headline||reportRecord.service||"PULSE report ready");const summary=String(reportRecord.analysis?.summary||"Your paid report completed successfully.");await deliverTelegramReportDurably(current.id,telegramDelivery,`${headline}\n\n${summary}`,telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL || "", share.token)); }
         catch(error){console.error("Telegram report delivery failed",error);}
       }
       const completed = await persistence.jobs.attachReport(current.id, stored.id, partial);

@@ -4,8 +4,41 @@ import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 
-type TelegramUpdate = { update_id?: number; message?: { chat?: { id?: number }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; message?: { chat?: { id?: number } } } };
+type TelegramUpdate = { update_id?: number; message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; message?: { chat?: { id?: number; type?: string } } } };
+
+export function telegramMenu(miniAppUrl: string, capability: string, command = "") {
+  const destinations = [
+    { label: "Open PULSE", path: "/overview", command: "/start" },
+    { label: "Global Market", path: "/global", command: "/global" },
+    { label: "Prediction Market", path: "/prediction", command: "/prediction" },
+    { label: "Spot Trading", path: "/spot", command: "/spot" },
+    { label: "Autopilot", path: "/autopilot", command: "/autopilot" },
+    { label: "My reports", path: "/overview", hash: "reports", command: "/reports" },
+  ];
+  const selected = command.split(/\s/)[0].split("@")[0];
+  const ordered = [...destinations].sort((a, b) => Number(b.command === selected) - Number(a.command === selected));
+  return { inline_keyboard: ordered.map(item => {
+    const url = new URL(miniAppUrl);
+    url.pathname = item.path;
+    url.hash = item.hash || "";
+    // A stale job/service in the configured URL must not override the chosen destination.
+    for (const key of ["service", "job", "recoveryToken"]) url.searchParams.delete(key);
+    url.searchParams.set("source", "telegram");
+    url.searchParams.set("tg", capability);
+    return [{ text: item.label, web_app: { url: url.toString() } }];
+  }) };
+}
 type DeliveryTask = { id:string;delivery:string;text:string;reportUrl:string;attempts:number;nextAt:number;createdAt:string;lastError?:string };
+
+export function telegramReportUrl(miniAppUrl: string, shareToken: string) {
+  const url = new URL(miniAppUrl);
+  if (url.protocol !== "https:") throw new Error("Telegram report viewer requires HTTPS");
+  url.pathname = "/shared-report";
+  url.search = "";
+  // Keep the bearer capability out of frontend access logs and Referer headers.
+  url.hash = new URLSearchParams({ share: shareToken }).toString();
+  return url.toString();
+}
 const memoryDeliveries = new Map<string, DeliveryTask>();
 const memoryUpdates = new Set<number>();
 
@@ -87,15 +120,18 @@ export function createTelegramRouter(cfg: AppConfig) {
     if (req.header("x-telegram-bot-api-secret-token") !== webhookSecret) return res.status(401).json({ error: "Invalid Telegram webhook secret" });
     const update = req.body as TelegramUpdate;
     if (!(await firstTelegramUpdate(update.update_id))) return res.status(200).json({ ok: true, duplicate: true });
-    const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
-    if (!chatId) return res.status(200).json({ ok: true, ignored: true });
+    const chat = update.message?.chat || update.callback_query?.message?.chat;
+    const chatId = chat?.id;
+    // Never publish a report-delivery capability to a group. Web App buttons are private-chat only.
+    if (!chatId || chat?.type !== "private") return res.status(200).json({ ok: true, ignored: true });
     const text = (update.message?.text || update.callback_query?.data || "").trim().toLowerCase();
-    const capability=deliveryToken(chatId,webhookSecret);const separator=miniAppUrl.includes("?")?"&":"?";
-    const keyboard = { inline_keyboard: [[{ text: "Global Market report", web_app: { url: `${miniAppUrl}${separator}source=telegram&service=global&tg=${encodeURIComponent(capability)}` } }], [{ text: "Prediction report", web_app: { url: `${miniAppUrl}${separator}source=telegram&service=prediction&tg=${encodeURIComponent(capability)}` } }], [{ text: "My reports", web_app: { url: `${miniAppUrl}${separator}source=telegram&service=reports&tg=${encodeURIComponent(capability)}` } }]] };
-    const reply = text.startsWith("/help") ? "PULSE uses your own wallet in the secure Mini App. The bot never asks for a seed phrase or private key. Choose a service, review the x402 price, sign payment, and receive the result here."
-      : text.startsWith("/wallet") ? "Open the Mini App to link or unlink a wallet using a one-time signed nonce. Telegram receives no wallet secret."
-      : "Choose a PULSE service. Payment and wallet signatures happen only in the Mini App; the durable report result is delivered back to this chat.";
-    try { await telegram(token, "sendMessage", { chat_id: chatId, text: reply, reply_markup: keyboard, disable_web_page_preview: true }); res.json({ ok: true, updateId: update.update_id }); }
+    const keyboard = telegramMenu(miniAppUrl, deliveryToken(chatId, webhookSecret), text);
+    const reply = text.startsWith("/reports") ? "Open My reports for reports saved on this device. For another device, open Global or Prediction Market and use Paid report history → Sync with wallet. Recovery does not charge you again."
+      : text.startsWith("/wallet") ? "Open PULSE and use Wallet & funding in the header to connect your wallet. Never send a private key or seed phrase here. A report-history signature proves ownership; it does not authorize a payment or trade."
+      : "Welcome to PULSE. Tap a button to open the app—no commands needed.\n\nChoose markets and review prices in the app. Global and Prediction reports purchased through these chat buttons can be delivered here.\n\nSpot orders need your wallet approval. Autopilot trades autonomously within your signed limits. Nothing trades merely by opening the app.";
+    try {
+      if (update.callback_query?.id) await telegram(token, "answerCallbackQuery", { callback_query_id: update.callback_query.id });
+      await telegram(token, "sendMessage", { chat_id: chatId, text: reply, reply_markup: keyboard, disable_web_page_preview: true }); res.json({ ok: true, updateId: update.update_id }); }
     catch (error) { await releaseTelegramUpdate(update.update_id);res.status(502).json({ error: error instanceof Error ? error.message : String(error) }); }
   }));
   return router;

@@ -16,7 +16,7 @@ test("the application root opens the overview", () => {
 
 test("legacy service links remain compatible and canonicalize", () => {
   assert.equal(tabFromHref("https://pulse.test/?service=prediction"), "prediction");
-  assert.equal(tabFromHref("https://pulse.test/?service=reports"), "telegram");
+  assert.equal(tabFromHref("https://pulse.test/?service=reports"), "overview");
   assert.equal(hrefForTab("https://pulse.test/?service=spot&job=one#ticket", "spot"), "/spot?job=one#ticket");
 });
 

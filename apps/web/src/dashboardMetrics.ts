@@ -22,6 +22,7 @@ export function aggregateAutopilotMetrics(strategies: StrategyMetric[]) {
   let pnlAtomic = 0n;
   let hasPortfolio = false;
   let hasPnl = false;
+  let completePnl = true;
 
   for (const strategy of strategies) {
     try {
@@ -32,21 +33,26 @@ export function aggregateAutopilotMetrics(strategies: StrategyMetric[]) {
       const basis = strategy.pnlBasisAtomic || strategy.baselineValueAtomic;
       if (basis && /^\d+$/.test(basis)) {
         baselineValueAtomic += BigInt(basis);
+      } else {
+        completePnl = false;
       }
       if (strategy.pnlAtomic && /^-?\d+$/.test(strategy.pnlAtomic)) {
         pnlAtomic += BigInt(strategy.pnlAtomic);
         hasPnl = true;
+      } else {
+        completePnl = false;
       }
     } catch {
+      completePnl = false;
       // A malformed telemetry field must not make the whole dashboard unusable.
     }
   }
 
   return {
     portfolioValueAtomic: hasPortfolio ? portfolioValueAtomic.toString() : undefined,
-    pnlAtomic: hasPnl ? pnlAtomic.toString() : undefined,
+    pnlAtomic: hasPnl && completePnl ? pnlAtomic.toString() : undefined,
     pnlPct:
-      hasPnl && baselineValueAtomic > 0n
+      hasPnl && completePnl && baselineValueAtomic > 0n
         ? Number((pnlAtomic * 1_000_000n) / baselineValueAtomic) / 10_000
         : null,
   };

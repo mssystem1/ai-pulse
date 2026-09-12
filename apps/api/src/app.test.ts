@@ -37,6 +37,11 @@ async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
 }
 
 describe("PULSE API", () => {
+  it("rejects invalid candle cursors and limits before querying the provider", async () => {
+    for (const query of ["limit=-1", "limit=301", "limit=NaN", "before=garbage", "before=-1", "before=1.5"]) {
+      assert.equal((await jfetch(`/v1/market/candles?instId=BTC-USDT&${query}`)).res.status, 400);
+    }
+  });
   before(async () => {
     // Complete, secret-free test profile; do not depend on the operator's .env.
     Object.assign(process.env, {

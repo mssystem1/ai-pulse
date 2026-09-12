@@ -2,6 +2,7 @@ import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } fro
 import { executionPublicClient, executionRpcUrls, type ExecutionNetwork } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { keccak256, toHex } from "viem";
+import { getNetwork } from "@pulse/config";
 import { applyConfirmedPassPause, mutateAutopilotPass } from "./autopilotPassStore.js";
 
 type Activity = {
@@ -22,6 +23,11 @@ type Activity = {
   fillInputSymbol?: string;
   fillOutputSymbol?: string;
   fillObservedAt?: string;
+  fillSide?: "buy" | "sell";
+  fillQuantity?: number;
+  fillQuoteValue?: number;
+  fillBaseAsset?: string;
+  fillQuoteAsset?: string;
   passTimerReconciledAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -66,7 +72,7 @@ function topicAddress(value?: string) {
 }
 
 async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
-  if (item.fillPrice || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum")) return item;
+  if ((item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue) || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum")) return item;
   const executionKind = /market_(buy|sell)|automatic_(entry|take_profit|stop_loss|fill)|^(buy|sell)(_partial)?_filled$/i.test(item.kind);
   if (!executionKind) return item;
   const client = executionPublicClient(item.network as ExecutionNetwork);
@@ -85,9 +91,18 @@ async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null)
     if (topicAddress(log.topics[1]) === actor) outgoing.set(token, (outgoing.get(token) || 0n) + amount);
     if (topicAddress(log.topics[2]) === actor) incoming.set(token, (incoming.get(token) || 0n) + amount);
   }
-  const outgoingTokens = [...outgoing.keys()].filter((token) => !incoming.has(token) || outgoing.get(token) !== incoming.get(token));
-  const incomingTokens = [...incoming.keys()].filter((token) => !outgoing.has(token) || outgoing.get(token) !== incoming.get(token));
-  if (!outgoingTokens.length || !incomingTokens.length) return item;
+  // Net refunds before computing execution amounts. Gross transfers can count
+  // returned settlement tokens as purchased inventory and produce false PnL.
+  for (const token of new Set([...outgoing.keys(), ...incoming.keys()])) {
+    const net = (outgoing.get(token) || 0n) - (incoming.get(token) || 0n);
+    outgoing.set(token, net > 0n ? net : 0n);
+    incoming.set(token, net < 0n ? -net : 0n);
+  }
+  const outgoingTokens = [...outgoing.keys()].filter(token => outgoing.get(token)! > 0n);
+  const incomingTokens = [...incoming.keys()].filter(token => incoming.get(token)! > 0n);
+  // Ambiguous multi-asset receipts need explicit trade-event decoding, not a
+  // guess based on which token happens to have the largest human-unit amount.
+  if (outgoingTokens.length !== 1 || incomingTokens.length !== 1) return item;
   const tokenAddresses = [...new Set([...outgoingTokens, ...incomingTokens])] as `0x${string}`[];
   const metadata = new Map<string, { symbol: string; decimals: number }>();
   await Promise.all(tokenAddresses.map(async (token) => {
@@ -108,16 +123,16 @@ async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null)
   const input = normalized(outgoingTokens, outgoing);
   const output = normalized(incomingTokens, incoming);
   if (!input || !output) return item;
-  const isBuy = /buy|entry_protected/i.test(item.kind);
+  const settlement = getNetwork(item.network).paymentAsset.address?.toLowerCase();
+  const isBuy = input.token === settlement;
+  if (!isBuy && output.token !== settlement) return item;
   const fillPrice = isBuy ? input.human / output.human : output.human / input.human;
   if (!Number.isFinite(fillPrice) || fillPrice <= 0) return item;
-  let fillObservedAt = item.updatedAt;
-  if (fullReceipt.blockNumber) {
-    try {
-      const block = await client.getBlock({ blockNumber: BigInt(fullReceipt.blockNumber) });
-      fillObservedAt = new Date(Number(block.timestamp) * 1000).toISOString();
-    } catch { /* Receipt remains authoritative even if timestamp lookup degrades. */ }
-  }
+  // Receipt ordering matters for cost basis and chart placement. Never substitute
+  // a later UI refresh time for a trade's block time; retry incomplete enrichment.
+  if (!fullReceipt.blockNumber) return item;
+  const block = await client.getBlock({ blockNumber: BigInt(fullReceipt.blockNumber) });
+  const fillObservedAt = new Date(Number(block.timestamp) * 1000).toISOString();
   return {
     ...item,
     fillPrice,
@@ -126,6 +141,11 @@ async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null)
     fillInputSymbol: input.symbol,
     fillOutputSymbol: output.symbol,
     fillObservedAt,
+    fillSide: isBuy ? "buy" : "sell",
+    fillQuantity: isBuy ? output.human : input.human,
+    fillQuoteValue: isBuy ? input.human : output.human,
+    fillBaseAsset: isBuy ? output.token : input.token,
+    fillQuoteAsset: settlement,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -258,8 +278,8 @@ export async function reconcileV6Activity(owner: string, network: string, rpcUrl
     const status: Activity["status"] = receipt.from?.toLowerCase() === owner.toLowerCase() && receipt.status === "0x1" ? "confirmed" : "failed";
     changed = true; return { ...item, status, updatedAt: new Date().toISOString() };
   });
-  next = await Promise.all(next.map(async (item, index) => {
-    if (item.status !== "confirmed" || item.fillPrice) return item;
+  const enrich = async (item: Activity, index: number) => {
+    if (item.status !== "confirmed" || (item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue)) return item;
     const batchIndex = pendingByIndex.get(index);
     try {
       const receipt = batchIndex === undefined ? null : receipts.get(batchIndex);
@@ -268,6 +288,15 @@ export async function reconcileV6Activity(owner: string, network: string, rpcUrl
       if (enriched !== item) changed = true;
       return enriched;
     } catch { return item; }
+  };
+  // Bound RPC concurrency when legacy histories need receipt enrichment. The
+  // complete journal is retained; it must not become a burst of thousands of calls.
+  let cursor = 0;
+  await Promise.all(Array.from({ length: Math.min(4, next.length) }, async () => {
+    while (cursor < next.length) {
+      const index = cursor++;
+      next[index] = await enrich(next[index], index);
+    }
   }));
   if (changed) await writeActivities(owner, network, next);
   return next;

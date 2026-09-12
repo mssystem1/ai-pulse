@@ -20,8 +20,9 @@ import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
 import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
 import { listV6Activity, recordV6Activity } from "./v6Store.js";
+import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
-import { executionPublicClient } from "./onchainDiscovery.js";
+import { executionPublicClient, executionRpcUrls } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { assertAutopilotStorageReady, getAutopilotPass, mutateAutopilotPass, consumePassSignal, extendAutopilotPass, synchronizeAutopilotPassPause, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
 export { getAutopilotPass, autopilotPassRemainingMs, type AutopilotPass } from "./autopilotPassStore.js";
@@ -83,6 +84,7 @@ type Strategy = {
   evidenceUrl?: string;
   evidenceHash?: string;
   baselineValueAtomic?: string;
+  baselineBlockNumber?: string;
   configurationHash?: string;
   exitPending?: boolean;
   activeTakeProfit?: number;
@@ -131,7 +133,7 @@ const configs = {
   base: {
     id: 8453,
     rpc: () => process.env.BASE_RPC_URL || "https://mainnet.base.org",
-    rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://1rpc.io/base",
+    rpcFallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com",
     oracle: () => executionContractAddress("base", "oracleRouter"),
     adapter: () => executionContractAddress("base", "executionAdapter"),
     router: () => executionContractAddress("base", "okxRouter"),
@@ -417,7 +419,7 @@ async function save(items: Strategy[], mode: "full" | "runtime" = "full") {
 }
 function clients(network: Network, key?: `0x${string}`) {
   const c = configs[network];
-  const urls = [...new Set([c.rpc(), c.rpcFallback()].filter(Boolean))];
+  const urls = executionRpcUrls(network);
   const chain = {
     id: c.id,
     name: network,
@@ -756,13 +758,32 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const portfolioValueAtomic = settlementBalance + targetBalance * price * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
         const baseline = BigInt(strategy.baselineValueAtomic || "0");
-        const strategyCashFlows = (activityByNetwork.get(strategy.network) || [])
-          .filter((item) => item.status === "confirmed" && item.account?.toLowerCase() === strategy.vault.toLowerCase() && item.createdAt >= strategy.createdAt && (item.kind === "vault_fund" || item.kind === "vault_withdraw"))
-        const pnl = cashFlowAdjustedPnl(portfolioValueAtomic, baseline, strategyCashFlows);
+        // PnL uses the independent chain-backed ledger, not browser-announced
+        // activity. Never combine both sources: the same transfer may be in each.
+        const checkpoint = await readCashFlowCheckpoint(strategy).catch(() => null);
+        let pnlCashFlow = cashFlowCoverage(checkpoint, strategy.settlementAsset);
+        let pnl: ReturnType<typeof cashFlowAdjustedPnl> = { contributionsAtomic: 0n, withdrawalsAtomic: 0n, netCashFlowAtomic: 0n, pnlBasisAtomic: baseline, pnlAtomic: null, pnlPct: null };
+        let pnlAsOf: string | undefined;
+        if (checkpoint && pnlCashFlow.state === "synced") {
+          try {
+            const blockNumber = BigInt(checkpoint.throughBlock);
+            const checkpointBlock = await publicClient.getBlock({ blockNumber });
+            if (checkpointBlock.hash !== checkpoint.throughHash) throw new Error("Accounting checkpoint changed");
+            // Match balances and cash flows at the same block. Live balances above
+            // still govern controls; historical accounting never pauses/resumes a pass.
+            const [cash, invested] = await Promise.all([
+              publicClient.readContract({ blockNumber, address: strategy.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [strategy.vault as `0x${string}`] }),
+              publicClient.readContract({ blockNumber, address: strategy.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [strategy.vault as `0x${string}`] }),
+            ]);
+            const accountingValue = cash + invested * price * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
+            pnl = cashFlowAdjustedPnl(accountingValue, baseline, checkpoint.flows);
+            pnlAsOf = new Date(Number(checkpointBlock.timestamp) * 1000).toISOString();
+          } catch { pnlCashFlow = { state: "stale", progressPct: 100, detail: "The accounting checkpoint could not be verified. Live owner controls remain available." }; }
+        }
         const policyBalance = valuedPositionBalance(targetBalance, price, Number(targetDecimals), Number(settlementDecimals));
         const reconciled = { ...reconcileStrategyExecution(strategy, networkActivity, policyBalance), ...historyView, hasResidualDust: targetBalance > 0n && policyBalance === 0n };
         const runtimeState = deriveAutopilotRuntimeState({ configuredStatus: reconciled.status, paused: Boolean(paused), targetBalance: policyBalance, pass: aiPass });
-        return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, contributionsAtomic: String(pnl.contributionsAtomic), withdrawalsAtomic: String(pnl.withdrawalsAtomic), netCashFlowAtomic: String(pnl.netCashFlowAtomic), pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
+        return { ...reconciled, registrationStatus: reconciled.status, runtimeState, aiPass, paused, settlementBalance: String(settlementBalance), targetBalance: String(targetBalance), settlementDecimals: Number(settlementDecimals), targetDecimals: Number(targetDecimals), settlementSymbol, targetSymbol, portfolioValueAtomic: String(portfolioValueAtomic), markPrice: ticker.last, pnlCashFlow, pnlAsOf, contributionsAtomic: pnlCashFlow.state === "synced" ? String(pnl.contributionsAtomic) : undefined, withdrawalsAtomic: pnlCashFlow.state === "synced" ? String(pnl.withdrawalsAtomic) : undefined, netCashFlowAtomic: pnlCashFlow.state === "synced" ? String(pnl.netCashFlowAtomic) : undefined, pnlBasisAtomic: String(pnl.pnlBasisAtomic), pnlAtomic: pnl.pnlAtomic == null ? null : String(pnl.pnlAtomic), pnlPct: pnl.pnlPct };
       } catch (error) {
         return { ...strategy, ...historyView, registrationStatus: strategy.status, runtimeState: "telemetry_unavailable" as const, aiPass, passUnavailable: Boolean(passError), telemetryError: error instanceof Error ? error.message : String(error) };
       }
@@ -799,9 +820,10 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       const { authorization: _authorization, ...authorizedStrategy } = parsed.data;
       const configurationHash = keccak256(toHex(JSON.stringify(authorizedStrategy)));
       const { publicClient } = clients(parsed.data.network);
+      const balanceBlock = await publicClient.getBlockNumber();
       const [settlementBalance, targetBalance, settlementDecimals, targetDecimals] = await Promise.all([
-        publicClient.readContract({ address: parsed.data.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
-        publicClient.readContract({ address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
+        publicClient.readContract({ blockNumber: balanceBlock, address: parsed.data.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
+        publicClient.readContract({ blockNumber: balanceBlock, address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "balanceOf", args: [parsed.data.vault as `0x${string}`] }),
         publicClient.readContract({ address: parsed.data.settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" }),
         publicClient.readContract({ address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" }),
       ]);
@@ -824,6 +846,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         createdAt: previous?.createdAt || now,
         updatedAt: now,
         baselineValueAtomic: previous?.baselineValueAtomic || String(baselineValue),
+        baselineBlockNumber: previous ? previous.baselineBlockNumber : String(balanceBlock),
       };
       await save([...items.filter((s) => s.id !== id), strategy]);
       res.status(201).json({ strategy });
@@ -1512,7 +1535,11 @@ export function startAutopilotAutomation(cfg: AppConfig) {
       if (!isKvUnavailableError(error)) console.error("autopilot cycle failed", error);
     });
   const timer = setInterval(run, 60_000);
+  const recover = () => void list().then(runCashFlowRecoveryCycle).catch(() => undefined);
+  const recoveryTimer = setInterval(recover, 60_000);
+  recoveryTimer.unref();
+  recover();
   timer.unref();
   run();
-  return () => clearInterval(timer);
+  return () => { clearInterval(timer); clearInterval(recoveryTimer); };
 }
