@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "./api";
+import { reportTierLabel } from "./reportLabels";
 import { forgetJobRecovery, listJobRecoveries, type JobRecoveryScope } from "./jobRecovery";
 import type { WebNetworkKey } from "./networks";
 import { switchWalletNetwork } from "./networks";
@@ -9,12 +10,17 @@ type RemoteReport = { id: string; mode: string; tier: string | null; stage: stri
 const TERMINAL_REPORT_STAGES = new Set(["failed_retriable", "failed_terminal", "manual_reconciliation"]);
 
 export function ReportHistory({ networkKey, scope, wallet, onOpen }: { networkKey: WebNetworkKey; scope: JobRecoveryScope; wallet: string | null; onOpen: (report: Record<string, unknown>) => void }) {
+  return <ReportHistoryContent key={`${networkKey}:${wallet?.toLowerCase()}:${scope}`} networkKey={networkKey} scope={scope} wallet={wallet} onOpen={onOpen}/>;
+}
+function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKey: WebNetworkKey; scope: JobRecoveryScope; wallet: string | null; onOpen: (report: Record<string, unknown>) => void }) {
+  const current = useRef(true);
+  useEffect(() => { current.current = true; return () => { current.current = false; }; }, []);
   const [, rerender] = useState(0);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
   const [remote, setRemote] = useState<RemoteReport[]>([]);
   const [sessionToken, setSessionToken] = useState("");
-  const items = listJobRecoveries(localStorage, networkKey, scope);
+  const items = (() => { try { return listJobRecoveries(localStorage, networkKey, scope); } catch { return []; } })();
 
   async function loadWalletHistory(token: string) {
     const response = await fetch(`${API_BASE}/v1/report-history?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" }, cache: "no-store" });
@@ -30,17 +36,20 @@ export function ReportHistory({ networkKey, scope, wallet, onOpen }: { networkKe
     setBusy("sync"); setMessage("");
     try {
       if (networkKey !== "arc-testnet") await switchWalletNetwork(provider, networkKey);
+      if (!current.current) return;
       const challengeResponse = await fetch(`${API_BASE}/v1/report-history/challenge`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet, networkKey }) });
       if (!challengeResponse.ok) throw new Error(`Could not create wallet history challenge (${challengeResponse.status})`);
       const challenge = await challengeResponse.json() as { nonce: string; message: string };
+      if (!current.current) return;
       const signature = await provider.request({ method: "personal_sign", params: [challenge.message, wallet] });
+      if (!current.current) return;
       if (typeof signature !== "string") throw new Error("Wallet returned no history signature");
       const sessionResponse = await fetch(`${API_BASE}/v1/report-history/session`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet, networkKey, nonce: challenge.nonce, signature }) });
       const sessionBody = await sessionResponse.json() as { sessionToken?: string; error?: string };
       if (!sessionResponse.ok || !sessionBody.sessionToken) throw new Error(sessionBody.error || "Wallet history authorization failed");
       setSessionToken(sessionBody.sessionToken);
       await loadWalletHistory(sessionBody.sessionToken);
-      setMessage("Wallet history synchronized from KV and private Blob storage.");
+      setMessage("Your wallet-owned report history is up to date.");
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }
@@ -52,7 +61,7 @@ export function ReportHistory({ networkKey, scope, wallet, onOpen }: { networkKe
       const response = await fetch(`${API_BASE}/v1/report-history/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${sessionToken}`, "Cache-Control": "no-cache" }, cache: "no-store" });
       const body = await response.json() as { report?: Record<string, unknown>; error?: string };
       if (!response.ok || !body.report) throw new Error(body.error || `Report recovery failed (${response.status})`);
-      onOpen(body.report); setMessage("Private Blob report restored for the connected wallet.");
+      if (current.current) { onOpen(body.report); setMessage("Your saved report is open. No new payment was needed."); }
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }
@@ -87,23 +96,23 @@ export function ReportHistory({ networkKey, scope, wallet, onOpen }: { networkKe
       if (!response.ok) throw new Error(`Report recovery failed (${response.status})`);
       const body = await response.json() as { report?: Record<string, unknown> };
       if (!body.report) throw new Error("Stored report payload is unavailable");
-      onOpen(body.report); setMessage("Report restored without a new payment.");
+      if (current.current) { onOpen(body.report); setMessage("Report restored without a new payment."); }
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }
 
   return <section className="report-history" aria-label="Report history">
     <div className="report-history-head"><div><span className="eyebrow">WALLET-OWNED · CROSS-DEVICE</span><h3>Paid report history</h3></div><button type="button" className="btn btn-soft" disabled={Boolean(busy) || !wallet} onClick={() => void syncWalletHistory()}>{busy === "sync" ? "Check wallet…" : remote.length ? "Refresh wallet history" : "Sync with wallet"}</button></div>
-    <p>Reports are stored privately in Blob and indexed by paying wallet in KV. Sign a report-access message to open them or retry an already-settled failure on desktop, iOS, Android or Mac. The signature cannot create a payment or trade.</p>
+    <p>Open reports purchased by this wallet, including purchases from another device. Sign a report-access message to view your history or retry an already-paid report that failed. This signature does not create a payment or trade.</p>
     {remote.length ? <div className="report-history-list remote-history">{remote.map((item) => {
       const retryable = TERMINAL_REPORT_STAGES.has(item.stage);
       return <article key={item.id}>
-        <div><strong>{item.label}</strong><span>{item.tier || "paid"} · {new Date(item.createdAt).toLocaleString()} · {item.stage.replaceAll("_", " ")}</span></div>
+        <div><strong>{item.label}</strong><span>{reportTierLabel(item.tier)} · {new Date(item.createdAt).toLocaleString()} · {item.stage.replaceAll("_", " ")}</span></div>
         <button type="button" disabled={Boolean(busy) || (!item.ready && !retryable)} onClick={() => void (retryable ? retryRemote(item.id) : openRemote(item.id))}>{busy === item.id ? (retryable ? "Restarting…" : "Opening…") : item.ready ? "Open" : retryable ? "Retry" : "Processing"}</button>
       </article>;
     })}</div> : <div className="report-history-empty">{wallet ? "Sign once to load reports purchased by this wallet on the selected network." : "Connect the wallet that paid for the reports."}</div>}
-    {items.length ? <details className="device-recovery"><summary>This-device recovery fallback · {items.length}</summary><p>These opaque capabilities can recover recent jobs without another wallet signature on this browser.</p><div className="report-history-list">{items.map((item) => <article key={item.jobId}>
-      <div><strong>{item.label || `${scope === "spot" ? "Global" : "Prediction"} report`}</strong><span>{item.tier || "paid"} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : item.jobId.slice(0, 8)}</span></div>
+    {items.length ? <details className="device-recovery"><summary>This-device recovery fallback · {items.length}</summary><p>Saved access on this browser can open recent reports without another wallet signature. Do not share or clear it while a report is being recovered.</p><div className="report-history-list">{items.map((item) => <article key={item.jobId}>
+      <div><strong>{item.label || `${scope === "spot" ? "Global" : "Prediction"} report`}</strong><span>{reportTierLabel(item.tier)} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : item.jobId.slice(0, 8)}</span></div>
       <button type="button" disabled={Boolean(busy)} onClick={() => void open(item.jobId, item.recoveryToken)}>{busy === item.jobId ? "Opening…" : "Open"}</button>
       <button type="button" className="forget" disabled={Boolean(busy)} aria-label="Forget this report on this device" onClick={() => { forgetJobRecovery(localStorage, networkKey, scope, item.jobId); rerender((value) => value + 1); }}>Forget</button>
     </article>)}</div></details> : null}

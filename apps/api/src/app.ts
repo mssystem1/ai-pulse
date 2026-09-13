@@ -85,6 +85,7 @@ import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
 import { collectTokenRiskEvidence } from "./tokenRiskEvidence.js";
 import { optionalNumber } from "./geckoEvidence.js";
+import { createPublicActivityStore, jobResearchDelivery, researchDelivery } from "./publicActivity.js";
 
 const AnalysisBodySchema = z.object({
   instId: z.string().min(3).max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/, "Use an OKX instrument such as BTC-USDT"),
@@ -150,6 +151,11 @@ export function createApp(cfg: AppConfig, dependencies: {
     observer: recordProvider,
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
+  const publicActivity = createPublicActivityStore(cfg);
+  const observeDelivery = (delivery: ReturnType<typeof researchDelivery>) => {
+    // Marketing telemetry must never fail or repeat a successfully paid delivery.
+    void publicActivity.record(delivery).catch(() => console.warn("[public-activity] delivery projection unavailable; historical job backfill remains separate"));
+  };
   const passTargetExists = dependencies.passTargetExists || autopilotPassTargetExists;
   const spotInstrumentExists = dependencies.spotInstrumentExists || (async (instId: string) =>
     (await searchSpotInstruments(instId, 100)).some(instrument => instrument.instId === instId));
@@ -171,12 +177,32 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(cors({ exposedHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE"] }));
   app.use(express.json({ limit: "12mb" }));
   app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
-  app.use(createV6Router(cfg));
+  app.use(createV6Router(cfg, publicActivity));
   app.use(createTradeAutomationRouter());
   app.use(createAutopilotAutomationRouter(cfg));
   app.use(createTelegramRouter(cfg));
   app.use(telemetryMiddleware);
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));
+  let activityCache: { value: Awaited<ReturnType<typeof publicActivity.snapshot>>; at: number } | undefined;
+  let activityRead: Promise<Awaited<ReturnType<typeof publicActivity.snapshot>>> | undefined;
+  app.get("/v1/public/activity", async (_req, res) => {
+    // One small aggregate read per minute, shared by concurrent visitors. No wallet/RPC input.
+    try {
+      if (!activityCache || Date.now() - activityCache.at > 60_000) {
+        activityRead ||= publicActivity.snapshot().finally(() => { activityRead = undefined; });
+        activityCache = { value: await activityRead, at: Date.now() };
+      }
+      res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=120");
+      return res.json({ ...activityCache.value, stale: false });
+    } catch {
+      if (activityCache && Date.now() - activityCache.at < 3_600_000) {
+        res.setHeader("Cache-Control", "public, max-age=15");
+        return res.json({ ...activityCache.value, stale: true });
+      }
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(503).json({ error: "Public activity is temporarily unavailable", scope: "platform" });
+    }
+  });
   // Authentication and challenge creation must not pass through a payment-network route.
   // CIRCLE_API_KEY remains server-only; responses are explicitly non-cacheable.
   app.use("/v1/circle/wallet", createCircleWalletRouter());
@@ -1673,6 +1699,8 @@ export function createApp(cfg: AppConfig, dependencies: {
         catch(error){console.error("Telegram report delivery failed",error);}
       }
       const completed = await persistence.jobs.attachReport(current.id, stored.id, partial);
+      const profile = report as { fixture?: boolean; analysisProfile?: { mode?: string } };
+      if (cfg.NODE_ENV !== "test" && !profile.fixture && profile.analysisProfile?.mode === "live") observeDelivery(jobResearchDelivery(completed));
       recordJob(completed.stage, completed.network);
       recordReport(partial ? "partial" : "completed");
     } catch (error) {
@@ -1780,6 +1808,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       const body = TokenScanRequestSchema.parse(req.body);
       const report = await buildPaidTokenRisk(req, body.address, body.lang);
       saveReport(report);
+      if (cfg.NODE_ENV !== "test" && report.analysisProfile.mode === "live") observeDelivery(researchDelivery(receiptFor(req, res, "risk", null), "risk", report.generatedAt));
       res.json({ ...report.token, report });
     } catch (e) {
       res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });
@@ -1820,6 +1849,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       if (!inspectedAddress) return res.status(400).json({ error: "Risk Guard requires an exact token contract address" });
       const report = await buildPaidTokenRisk(req, inspectedAddress, body.lang);
       saveReport(report);
+      if (cfg.NODE_ENV !== "test" && report.analysisProfile.mode === "live") observeDelivery(researchDelivery(receiptFor(req, res, "risk", null), "risk", report.generatedAt));
       res.json(report);
     } catch (e) {
       res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });

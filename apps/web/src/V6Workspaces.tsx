@@ -8,6 +8,7 @@ import {
   toHex,
 } from "viem";
 import { API_BASE, apiGet, apiPost } from "./api";
+import { parseExecutionCapability, type ExecutionCapability as Capability } from "./executionCapability";
 import { useExecutionAvailability } from "./executionAvailability";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
@@ -17,6 +18,7 @@ import {
   type WebNetworkKey,
 } from "./networks";
 import type { ReportTradeIntent } from "./Report";
+import { reportTierLabel } from "./reportLabels";
 import type { Lang } from "./i18n";
 import { ShortlistMarketChart, SpotMarketPreview } from "./SpotMarketPreview";
 import { confirmedTradeMarkers } from "./marketPreview";
@@ -34,28 +36,6 @@ import {
   positiveTokenAmount,
 } from "./tradeAmounts";
 
-type Capability = {
-  network: string;
-  spot: {
-    visible: boolean;
-    enabled: boolean;
-    market?: boolean;
-    limit?: boolean;
-    bracket?: boolean;
-    protectedOrders?: boolean;
-  };
-  autopilot: { visible: boolean; enabled: boolean };
-  contracts?: {
-    registry?: string | null;
-    oracleRouter?: string | null;
-    spotFactory?: string | null;
-    spotLimitFactory?: string | null;
-    spotBracketFactory?: string | null;
-    autopilotFactory?: string | null;
-  };
-  persistence?: string;
-  reasons?: Record<string, string>;
-};
 
 type Activity = {
   id: string;
@@ -1532,8 +1512,9 @@ export function SpotWorkspace({
     const isCurrentScope = () => accountLookupRef.current === refreshScope;
     const cap = await apiGet(`/v1/trading/capabilities?network=${networkKey}`);
     if (!isCurrentScope()) return;
-    setCapabilityUnavailable(!cap.ok);
-    if (cap.ok) setCapability(cap.data as Capability);
+    const nextCapability = cap.ok ? parseExecutionCapability(cap.data, networkKey) : null;
+    setCapabilityUnavailable(!nextCapability);
+    if (nextCapability) setCapability(nextCapability);
     else {
       setCapability(null);
       if (wallet && networkKey !== "arc-testnet") {
@@ -1579,8 +1560,8 @@ export function SpotWorkspace({
         syncNotice ||=
           "Order monitoring is reconnecting. Existing rows remain visible and execution continues on-chain.";
       setActivitySyncNotice(syncNotice);
-      if (cap.ok) {
-        const contracts = (cap.data as Capability).contracts;
+      if (nextCapability) {
+        const contracts = nextCapability.contracts;
         const lookupId = `${refreshScope}:${contracts?.spotFactory || ""}:${contracts?.spotLimitFactory || ""}:${contracts?.spotBracketFactory || ""}`;
         accountLookupRef.current = lookupId;
         setAccountLookupError("");
@@ -2709,6 +2690,7 @@ export function SpotWorkspace({
   }
   return (
     <div className="v6-workspace spot-workspace">
+        <details className="workspace-discovery"><summary>Explore other pairs <span>Free market previews · optional research</span></summary>
         <OpportunityRadar
           networkKey={networkKey}
           context="spot"
@@ -2718,6 +2700,7 @@ export function SpotWorkspace({
           }
           onPrepare={(candidate) => { setMarketTimeframe(candidate.timeframe); selectSpotPair(candidate.pair, true); }}
         />
+        </details>
 
       <section className="v6-heading">
         <div><h2>Trade setup</h2></div>
@@ -2728,7 +2711,7 @@ export function SpotWorkspace({
         <section className="report-intent-strip">
           <div>
             <span className="eyebrow">
-              LOADED FROM {initialTrade.sourceTier.toUpperCase()} REPORT
+              LOADED FROM {reportTierLabel(initialTrade.sourceTier).toUpperCase()} REPORT
             </span>
             <strong>
               {initialTrade.side === "buy" ? "Buy setup" : "Sell / exit setup"}{" "}
@@ -4102,6 +4085,8 @@ export function AutopilotWorkspace({
   initialTrade?: ReportTradeIntent | null;
   onAnalyzeCandidate?: (pair: string, timeframe: string) => void;
 }) {
+  const [setupOpen, setSetupOpen] = useState(false);
+  useEffect(() => { setSetupOpen(false); }, [networkKey, wallet]);
   const [capability, setCapability] = useState<Capability | null>(null);
   const [settlement, setSettlement] = useState<string>(
     WEB_NETWORKS[networkKey].payment.address,
@@ -4148,6 +4133,7 @@ export function AutopilotWorkspace({
   passCheckoutScopeRef.current = passCheckoutScope;
   const passCheckoutInFlight = useRef(false);
   const createNewVaultRef = useRef(false);
+  const accountBeforeSetupRef = useRef("");
   const [vaultStatus, setVaultStatus] = useState<
     "idle" | "checking" | "found" | "absent" | "error"
   >("idle");
@@ -4197,6 +4183,7 @@ export function AutopilotWorkspace({
   const [recoveryCheck, setRecoveryCheck] = useState<{ vault: string; state: "checking" | "ready" | "failed" } | null>(null);
   async function reviewVaultSetup(vault: string) {
     if (busy) return;
+    setSetupOpen(true);
     createNewVaultRef.current = false;
     setSelectedVault(vault);
     setCloseConfirming(false);
@@ -4377,8 +4364,9 @@ export function AutopilotWorkspace({
     }
     const cap = await apiGet(`/v1/trading/capabilities?network=${networkKey}`);
     if (!isCurrentScope()) return;
-    setCapabilityUnavailable(!cap.ok);
-    if (cap.ok) setCapability(cap.data as Capability);
+    const nextCapability = cap.ok ? parseExecutionCapability(cap.data, networkKey) : null;
+    setCapabilityUnavailable(!nextCapability);
+    if (nextCapability) setCapability(nextCapability);
     else {
       setCapability(null);
       if (wallet && networkKey !== "arc-testnet") {
@@ -4436,7 +4424,7 @@ export function AutopilotWorkspace({
           "Autopilot monitoring is reconnecting. On-chain vault guardrails remain active.";
       }
       setActivitySyncNotice(syncNotice);
-      if (cap.ok) {
+      if (nextCapability) {
         const factory = (cap.data as Capability).contracts?.autopilotFactory;
         if (factory) {
           const lookupId = `${refreshScope}:${factory.toLowerCase()}`;
@@ -5623,6 +5611,13 @@ export function AutopilotWorkspace({
 
   return (
     <div className="v6-workspace autopilot-simple">
+      <div className="autopilot-workspace-actions">
+        <p>{vaultStatus === "checking" ? "Checking your Autopilot accounts…" : "Manage existing accounts below, or configure a separate strategy."}</p>
+        <button type="button" className="btn btn-primary" disabled={busy || vaultStatus === "checking"} onClick={() => { accountBeforeSetupRef.current = selectedVault; createNewVaultRef.current = true; setSelectedVault(""); setRecoveryCheck(null); setPreparedCandidate(""); setSetupOpen(true); requestAnimationFrame(() => document.getElementById("autopilot-configuration")?.scrollIntoView({ block: "start" })); }}>New Autopilot</button>
+        {selectedVault && activeStrategy && <button type="button" className="btn btn-soft" disabled={busy} onClick={() => setSetupOpen(true)}>Edit selected strategy</button>}
+      </div>
+      <section id="autopilot-configuration" className="autopilot-configuration" hidden={!setupOpen && Boolean(wallet) && vaultStatus !== "absent"}>
+      {setupOpen && <button type="button" className="btn btn-soft" disabled={busy} onClick={() => { createNewVaultRef.current = false; if (!selectedVault) setSelectedVault(vaults.find(vault => vault.toLowerCase() === accountBeforeSetupRef.current.toLowerCase()) || vaults[0] || ""); setSetupOpen(false); requestAnimationFrame(() => document.getElementById("autopilot-dashboard-controls")?.scrollIntoView({ block: "start" })); }}>Back to accounts</button>}
       <OpportunityRadar
         networkKey={networkKey}
         initialTimeframe={timeframe}
@@ -6353,6 +6348,7 @@ export function AutopilotWorkspace({
           </div>
         </aside>
       </div>
+      </section>
 
       <section className="card activity-dashboard autopilot-unified-dashboard">
         <div className="dashboard-head">
@@ -7257,7 +7253,7 @@ export function TelegramWorkspace() {
       <section className="v6-heading">
         <div>
           <span className="eyebrow">YOUR MOBILE COMPANION</span>
-          <h2>Open the app. Get reports in chat.</h2>
+          <h1>Open the app. Get reports in chat.</h1>
           <p>
             Telegram is a shortcut to PULSE and a delivery channel—not a second
             trading interface. Choose markets, review prices and approve actions
@@ -7348,11 +7344,11 @@ export function TelegramWorkspace() {
         </section>
         <section className="card telegram-example">
           <span className="eyebrow">EXAMPLE</span>
-          <h3>BTC 4H Premium</h3>
+          <h3>BTC 4H Pro</h3>
           <div className="chat-demo">
             <div className="chat-user">Tap Global Market</div>
             <div className="chat-bot">
-              In the app: <b>BTC-USDT</b> → <b>4H</b> → <b>Premium</b>
+              In the app: <b>BTC-USDT</b> → <b>4H</b> → <b>Pro</b>
               .
             </div>
             <div className="chat-user">Pay & generate</div>
@@ -7389,6 +7385,13 @@ export function TelegramWorkspace() {
 }
 
 export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
+  const [topic, setTopic] = useState(() => window.location.hash.slice(1) || "docs-workflows");
+  const [search, setSearch] = useState("");
+  useEffect(() => {
+    const update = () => { const next = window.location.hash.slice(1); if (next.startsWith("docs-")) setTopic(next); };
+    window.addEventListener("hashchange", update);
+    return () => window.removeEventListener("hashchange", update);
+  }, []);
   const sections = [
     ["docs-workflows", "Workflow maps"],
     ["docs-start", "Quick start"],
@@ -7408,36 +7411,35 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-recover", "Report history"],
     ["docs-telegram", "Telegram"],
   ];
+  const article = sections.some(([id]) => id === topic) ? topic : "docs-workflows";
   return (
     <div className="docs-product">
       <header className="docs-product-head">
         <div>
           <span className="eyebrow">PULSE USER HANDBOOK</span>
-          <h2>Learn the product, then act with context</h2>
+          <h1>PULSE guides</h1>
           <p>
             Interactive guidance for analysis, execution, payments and recovery.
             No operator deployment files, no architecture prerequisites.
           </p>
         </div>
-        <div className="docs-version">
-          <span>PRODUCT GUIDE</span>
-          <strong>PULSE</strong>
-          <small>Global · Prediction · Spot · Autopilot</small>
-        </div>
       </header>
       <div className="docs-product-layout">
+        <div className="docs-mobile-topics"><label>Find a guide<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search topics"/></label><label>Current guide<select value={article} onChange={event => { setTopic(event.target.value); setSearch(""); window.location.hash=event.target.value; requestAnimationFrame(() => document.getElementById(event.target.value)?.scrollIntoView({block:"start"})); }}>{sections.filter(([id,label]) => id === article || label.toLowerCase().includes(search.trim().toLowerCase())).map(([id,label]) => <option key={id} value={id}>{label}</option>)}</select></label></div>
         <aside className="docs-nav" aria-label="Documentation navigation">
-          <strong>On this page</strong>
-          {sections.map(([id, label], index) => (
-            <a href={`#${id}`} key={id}>
+          <label className="docs-search">Find a topic<input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Trading, reports, recovery…" /></label>
+          <strong>Choose a guide</strong>
+          {sections.filter(([, label]) => label.toLowerCase().includes(search.trim().toLowerCase())).map(([id, label], index) => (
+            <a href={`#${id}`} key={id} aria-current={topic === id ? "page" : undefined} onClick={() => { setTopic(id); requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ block: "start" })); }}>
               <span>{String(index + 1).padStart(2, "0")}</span>
               {label}
             </a>
           ))}
+          {!sections.some(([, label]) => label.toLowerCase().includes(search.trim().toLowerCase())) && <p role="status">No matching topic. Try “Spot”, “Autopilot” or “reports”.</p>}
         </aside>
         <div className="docs-content">
-          <DocsWorkflowVisuals />
-          <section id="docs-start" className="docs-section hero-doc">
+          <div hidden={article !== "docs-workflows"}><DocsWorkflowVisuals /></div>
+          <section id="docs-start" className="docs-section hero-doc" hidden={article !== "docs-start"}>
             <div>
               <span className="eyebrow">QUICK START</span>
               <h3>From question to controlled action</h3>
@@ -7479,13 +7481,13 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 </text>
               </svg>
               <small>
-                Premium reports map wave-consistent continuation, correction
+                Pro reports map wave-consistent continuation, correction
                 and invalidation paths—not generic up/side/down guesses.
               </small>
             </div>
           </section>
 
-          <section id="docs-global" className="docs-section">
+          <section id="docs-global" className="docs-section" hidden={article !== "docs-global"}>
             <span className="docs-number">01</span>
             <div className="docs-copy">
               <span className="eyebrow">GLOBAL MARKET</span>
@@ -7503,7 +7505,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   freshness.
                 </li>
                 <li>
-                  Choose Base for concise context or Premium for chart structure
+                  Choose Quick for concise context or Pro for chart structure
                   and scenario depth.
                 </li>
                 <li>
@@ -7544,7 +7546,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
             <div className="docs-example">
               <span>EXAMPLE</span>
-              <strong>ETH-USDT · 4H · Premium</strong>
+              <strong>ETH-USDT · 4H · Pro</strong>
               <dl>
                 <div>
                   <dt>Observed</dt>
@@ -7569,7 +7571,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-global-flow" className="docs-deep-dive">
+          <section id="docs-global-flow" className="docs-deep-dive" hidden={article !== "docs-global-flow"}>
             <div className="docs-deep-head">
               <span className="eyebrow">
                 GLOBAL MARKET · TIMEFRAME &amp; HANDOFF
@@ -7620,7 +7622,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <i>→</i>
               <div>
                 <small>VERIFY</small>
-                <b>Base / Premium report</b>
+                <b>Quick / Pro report</b>
               </div>
               <i>→</i>
               <div>
@@ -7644,14 +7646,14 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-prediction" className="docs-section">
+          <section id="docs-prediction" className="docs-section" hidden={article !== "docs-prediction"}>
             <span className="docs-number">02</span>
             <div className="docs-copy">
               <span className="eyebrow">PREDICTION MARKET</span>
               <h3>Analyze one explicitly selected live question</h3>
               <p>
                 PULSE keeps market probability evidence separate from the
-                referenced asset’s price chart. Premium adds an independent 4H
+                referenced asset’s price chart. Pro adds an independent 4H
                 underlying chart with Fibonacci, pivots and Elliott candidate
                 structure.
               </p>
@@ -7679,7 +7681,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-safety" className="docs-section">
+          <section id="docs-safety" className="docs-section" hidden={article !== "docs-safety"}>
             <span className="docs-number">03</span>
             <div className="docs-copy">
               <span className="eyebrow">RISK GUARD</span>
@@ -7736,7 +7738,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-spot" className="docs-section">
+          <section id="docs-spot" className="docs-section" hidden={article !== "docs-spot"}>
             <span className="docs-number">04</span>
             <div className="docs-copy">
               <span className="eyebrow">SPOT TRADING</span>
@@ -7861,7 +7863,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-spot-examples" className="docs-deep-dive">
+          <section id="docs-spot-examples" className="docs-deep-dive" hidden={article !== "docs-spot-examples"}>
             <div className="docs-deep-head">
               <span className="eyebrow">SPOT · WORKED EXAMPLES</span>
               <h3>Know exactly which asset you spend</h3>
@@ -8003,7 +8005,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-spot-troubleshoot" className="docs-deep-dive">
+          <section id="docs-spot-troubleshoot" className="docs-deep-dive" hidden={article !== "docs-spot-troubleshoot"}>
             <div className="docs-deep-head">
               <span className="eyebrow">SPOT · BUTTONS &amp; RECOVERY</span>
               <h3>Why an action may be unavailable</h3>
@@ -8072,7 +8074,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-auto" className="docs-section">
+          <section id="docs-auto" className="docs-section" hidden={article !== "docs-auto"}>
             <span className="docs-number">05</span>
             <div className="docs-copy">
               <span className="eyebrow">AUTOPILOT</span>
@@ -8151,7 +8153,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-auto-capital" className="docs-deep-dive">
+          <section id="docs-auto-capital" className="docs-deep-dive" hidden={article !== "docs-auto-capital"}>
             <div className="docs-deep-head">
               <span className="eyebrow">AUTOPILOT · CAPITAL</span>
               <h3>Know which balance moves before you sign</h3>
@@ -8227,7 +8229,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-auto-rules" className="docs-deep-dive">
+          <section id="docs-auto-rules" className="docs-deep-dive" hidden={article !== "docs-auto-rules"}>
             <div className="docs-deep-head">
               <span className="eyebrow">AUTOPILOT · EXACT TRADING RULES</span>
               <h3>What each strategy actually does</h3>
@@ -8383,7 +8385,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-auto-example" className="docs-deep-dive">
+          <section id="docs-auto-example" className="docs-deep-dive" hidden={article !== "docs-auto-example"}>
             <div className="docs-deep-head">
               <span className="eyebrow">AUTOPILOT · COMPLETE EXAMPLE</span>
               <h3>Run a Balanced WETH strategy on Base</h3>
@@ -8450,7 +8452,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-pay" className="docs-section">
+          <section id="docs-pay" className="docs-section" hidden={article !== "docs-pay"}>
             <span className="docs-number">06</span>
             <div className="docs-copy">
               <span className="eyebrow">PAYMENTS</span>
@@ -8480,10 +8482,10 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 and wallet account before signing.
               </p>
               <div className="docs-glossary payment-price-grid">
-                <div><b>Global Base</b><span>$0.20 per report</span></div>
-                <div><b>Global Premium</b><span>$0.30 per report</span></div>
-                <div><b>Prediction Base</b><span>$0.20 per report</span></div>
-                <div><b>Prediction Premium</b><span>$0.30 per report</span></div>
+                <div><b>Global Quick</b><span>$0.20 per report</span></div>
+                <div><b>Global Pro</b><span>$0.30 per report</span></div>
+                <div><b>Prediction Quick</b><span>$0.20 per report</span></div>
+                <div><b>Prediction Pro</b><span>$0.30 per report</span></div>
                 <div><b>Token Risk Guard</b><span>$0.20 per report</span></div>
                 <div><b>Autopilot · 24h</b><span>$1.50 per vault</span></div>
                 <div><b>Autopilot · 7d</b><span>$10.50 per vault</span></div>
@@ -8506,7 +8508,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-agents" className="docs-deep-dive">
+          <section id="docs-agents" className="docs-deep-dive" hidden={article !== "docs-agents"}>
             <div className="docs-deep-head">
               <span className="eyebrow">AGENTS &amp; API</span>
               <h3>Discover eight services on every supported execution mainnet</h3>
@@ -8584,7 +8586,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-recover" className="docs-section">
+          <section id="docs-recover" className="docs-section" hidden={article !== "docs-recover"}>
             <span className="docs-number">08</span>
             <div className="docs-copy">
               <span className="eyebrow">REPORT HISTORY &amp; RECOVERY</span>
@@ -8595,8 +8597,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   wallet.
                 </li>
                 <li>
-                  Open Global Market or Prediction Market and find{" "}
-                  <b>Paid report history</b>.
+                  In Portfolio, expand <b>Recover wallet-owned reports</b> and choose Global or Prediction. The same <b>Paid report history</b> is also available inside each research workspace.
                 </li>
                 <li>
                   Press <b>Sync with wallet</b> and sign the report-access
@@ -8620,6 +8621,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   does not remove the server-side wallet history.
                 </span>
               </div>
+              <p>The application home is <b>app.ai-pulse.tech/portfolio</b>. If you move from the public-site origin, reconnect the paying wallet; do not repurchase. Device-only recovery handles remain on the original browser/origin. <a href="https://www.ai-pulse.tech/portfolio?legacyRecovery=1#reports" rel="noreferrer">Open original-site report recovery</a>.</p>
             </div>
             <div className="recovery-diagram">
               <span>wallet signs report-access challenge</span>
@@ -8632,7 +8634,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
-          <section id="docs-telegram" className="docs-section">
+          <section id="docs-telegram" className="docs-section" hidden={article !== "docs-telegram"}>
             <span className="docs-number">09</span>
             <div className="docs-copy">
               <span className="eyebrow">TELEGRAM</span>

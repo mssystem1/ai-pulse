@@ -27,6 +27,14 @@ PULSE is an independent intelligence product. Polymarket is a public read-only e
 
 ## The product
 
+### Public website and application
+
+The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support four independent appearances: Pulse, Clarity, Midnight and Horizon.
+
+Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
+
+Public activity combines chains independently of the selected RPC. Research counts include Arc Testnet with explicit labeling; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
+
 Markets move continuously, but most analysis products still require an account, subscription, or separate checkout. Agents need something stricter: structured intelligence they can discover, pay for, recover after a refresh, and consume without a human checkout.
 
 **PULSE turns market intelligence into a multichain onchain service while preserving the original X Layer product.**
@@ -34,7 +42,7 @@ Markets move continuously, but most analysis products still require an account, 
 - Preview live OKX spot instruments, xStocks/RWA instruments, tickers, and candles without payment.
 - Use the Opportunity Radar to shortlist markets worth analyzing without treating a score as a trade signal.
 - Discover active crypto-focused Polymarket questions in an in-page picker and explicitly select the single market used by a report.
-- Buy a visibly marked Base or Premium Global report, or a separate Base or Premium Prediction report. Agent discovery names the same tiers Quick and Pro so the next action is explicit.
+- Buy a Quick ($0.20) or Pro ($0.30) Global report, or a separate Quick/Pro Prediction report. Legacy API/storage names `base`/`standard` and `premium` stay compatible; they refer to the same two report depths.
 - Read deterministic Fibonacci, pivot, and Elliott-wave structure; Pro reports add an annotated chart and executable Buy-or-Wait plan.
 - Move a valid Global plan into connected-wallet Market or Limit Spot execution with route, balance, slippage, entry, TP, and SL carried forward.
 - Run a policy-bounded Autopilot that can Buy, Hold, partially Sell, fully Sell, and later Buy again only inside owner-signed limits.
@@ -72,7 +80,7 @@ Choose a live OKX instrument instead of typing an arbitrary pair. Select a timef
 
 ### Prediction Market
 
-Prediction discovery is free and lives inside the main application rather than on a separate page. The user opens the market picker, chooses one active crypto price/direction question, reviews its probabilities, order books, liquidity, volume, open interest, restriction status, and resolution rules, then purchases Base or Premium prediction analysis. PULSE validates condition/outcome identity, order-book availability, freshness, liquidity, spread, depth, history, and horizon. Restricted markets remain usable as public read-only evidence when active and orderbook-enabled, but the restriction is always disclosed and PULSE never places an order.
+Prediction discovery is free and lives inside the main application rather than on a separate page. The user opens the market picker, chooses one active crypto price/direction question, reviews its probabilities, order books, liquidity, volume, open interest, restriction status, and resolution rules, then purchases Quick or Pro prediction analysis. PULSE validates condition/outcome identity, order-book availability, freshness, liquidity, spread, depth, history, and horizon. Restricted markets remain usable as public read-only evidence when active and orderbook-enabled, but the restriction is always disclosed and PULSE never places an order.
 
 Prediction reports use the same readable presentation standard as Global Market reports: confidence and tier, headline and summary, outcome probability cards, bid/ask and evidence-quality labels, market metrics, invalidation conditions, risks, evidence provenance, and disclaimer. Large provider payloads are kept behind a collapsed technical-details control. The optional focus note lets the user request emphasis such as the bull/up case, counter-case, catalysts, liquidity quality, resolution risk, or invalidation; it does not create a market or place an order.
 
@@ -124,8 +132,8 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 ## Product surfaces
 
-- **Global Market:** live OKX crypto, xStocks/RWA instruments, candles, Opportunity Radar, and Base/Premium reports with Elliott-aware execution plans.
-- **Prediction Markets:** active crypto price/direction markets only, explicit single-market selection, order books, probability history, liquidity and evidence quality, followed by base or premium prediction analysis.
+- **Global Market:** live OKX crypto, xStocks/RWA instruments, candles, Opportunity Radar, and Quick/Pro reports with Elliott-aware execution plans.
+- **Prediction Markets:** active crypto price/direction markets only, explicit single-market selection, order books, probability history, liquidity and evidence quality, followed by Quick or Pro prediction analysis.
 - **Risk Guard:** free raw evidence and optional simulation are separate from the $0.20 Grok Token Risk report; the paid report uses OKX for X Layer on-chain evidence, Blockscout for Base/Arbitrum, and GeckoTerminal for market/profile evidence. Provider outages lower evidence confidence; they are not confirmed token defects.
 - **Spot Trading:** connected-wallet Market, Limit, integrated TP/SL, route/balance checks, account discovery, and reconciled lifecycle dashboard.
 - **Autopilot:** separate owner-controlled vault capital, strategy presets, enforceable policy limits, autonomous Buy/Hold/Sell lifecycle, and shared dashboard semantics.
@@ -215,7 +223,7 @@ The selected network is stored locally and restored on reload or the next start.
 - **X Layer:** OKB and USD₮0 balances; in-app OKB → USD₮0 swap.
 - **Base:** ETH and native USDC balances; in-app ETH → USDC swap.
 - **Arbitrum:** ETH and native USDC balances; in-app ETH → USDC swap with explicit USDC.e warning.
-- **Arc Testnet:** separate Wallet USDC and Gateway USDC tabs, faucet entry, and Gateway deposit. `ARC_AI_MODE=live` is required for real Base/Premium reports; `fixture` is only a deterministic payment/job plumbing check and makes no market inference.
+- **Arc Testnet:** separate Wallet USDC and Gateway USDC tabs, faucet entry, and Gateway deposit. `ARC_AI_MODE=live` is required for real Quick/Pro reports; `fixture` is only a deterministic payment/job plumbing check and makes no market inference.
 
 Supported connection paths include OKX Wallet, EIP-6963 injected wallets such as MetaMask and Rabby, WalletConnect mobile sessions, Base-compatible connectors exposed through AppKit, and Circle User-Controlled EOA wallets via email OTP. The connected address in the funding drawer is copyable. Circle wallet keys remain controlled by the user through Circle's MPC signing UI; `CIRCLE_API_KEY` is server-only.
 
@@ -344,7 +352,7 @@ flowchart LR
   NORMALIZE --> MODEL[xAI structured analysis]
   TECH --> MODEL
   MODEL --> VALIDATE[Strict versioned schema validation]
-  VALIDATE --> PLAN[Base or Premium Buy-or-Wait report]
+  VALIDATE --> PLAN[Quick or Pro Buy-or-Wait report]
   PLAN --> MAP[Selected-chain identity mapping]
   MAP --> TOKEN[Exact token contract and settlement asset]
   TOKEN --> ROUTE[Fresh OKX Onchain OS route]
@@ -359,7 +367,7 @@ flowchart LR
   DATA --> PCONTEXT
   PCONTEXT --> PMODEL[xAI Prediction analysis]
   PMODEL --> PVALIDATE[Strict report validation]
-  PVALIDATE --> PREPORT[Base or Premium Prediction report]
+  PVALIDATE --> PREPORT[Quick or Pro Prediction report]
   OKX4H[Independent mapped 4H OKX context] --> PREPORT
 ```
 

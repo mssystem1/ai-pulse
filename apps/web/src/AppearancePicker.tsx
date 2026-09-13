@@ -3,10 +3,10 @@ import type { WebNetworkKey } from "./networks";
 import "./appearance.css";
 
 export const APPEARANCES = [
-  { id: "xlayer", name: "Neon Pulse", zh: "霓虹脉冲", detail: "Midnight · mint", detailZh: "午夜黑 · 薄荷绿", color: "#00d7ab" },
-  { id: "base", name: "Daybreak", zh: "破晓", detail: "Light · cobalt", detailZh: "明亮白 · 钴蓝", color: "#0052ff" },
-  { id: "arbitrum", name: "Deep Current", zh: "深海洋流", detail: "Navy · ice blue", detailZh: "深海蓝 · 冰蓝", color: "#28a0f0" },
-  { id: "arc-testnet", name: "Silver Orbit", zh: "银色轨道", detail: "Slate · silver", detailZh: "石板灰 · 银色", color: "#adcfd8" },
+  { id: "xlayer", name: "Pulse", zh: "脉冲", detail: "Graphite · teal", detailZh: "石墨黑 · 青绿", color: "#00d7ab" },
+  { id: "base", name: "Clarity", zh: "清晰", detail: "Light · electric blue", detailZh: "明亮白 · 电光蓝", color: "#0052ff" },
+  { id: "arbitrum", name: "Midnight", zh: "午夜", detail: "Navy · ice blue", detailZh: "深海蓝 · 冰蓝", color: "#28a0f0" },
+  { id: "arc-testnet", name: "Horizon", zh: "地平线", detail: "Ocean · warm sand", detailZh: "海洋蓝 · 暖沙色", color: "#d4c598" },
 ] as const;
 
 export function AppearancePicker({ value, onChange, lang }: { value: WebNetworkKey; onChange: (value: WebNetworkKey) => void; lang: string }) {

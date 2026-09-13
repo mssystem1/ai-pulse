@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet, apiPost } from "./api";
 import { formatTokenBalance } from "./format";
+import { applySiteMetadata } from "./siteMetadata";
 import {
   ENABLED_WEB_NETWORKS,
   WEB_NETWORKS,
@@ -21,7 +22,8 @@ import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTo
 import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
 import { SwapPanel } from "./SwapPanel";
 import { PredictionWorkspace } from "./PredictionWorkspace";
-import { AppearancePicker, APPEARANCES } from "./AppearancePicker";
+import { AppearancePicker } from "./AppearancePicker";
+import { applyAppearance, readAppearance } from "./appearancePreference";
 import { AutopilotWorkspace, DocsWorkspace, OpportunityRadar, SpotWorkspace, TelegramWorkspace } from "./V6Workspaces";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { Tip } from "./Tip";
@@ -82,11 +84,10 @@ export function App() {
   const [walletOpen, setWalletOpen] = useState(false);
   const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
   const [appearance, setAppearance] = useState<WebNetworkKey>(() => {
-    const saved = localStorage.getItem("pulse:appearance");
-    return APPEARANCES.some((item) => item.id === saved) ? saved as WebNetworkKey : networkKey;
+    try { return readAppearance(localStorage); } catch { return readAppearance(); }
   });
   const networkPopoverRef = useRef<HTMLDivElement>(null);
-  useEffect(() => { document.documentElement.dataset.pulseTheme = appearance; }, [appearance]);
+  useEffect(() => { applyAppearance(appearance); }, [appearance]);
   useEffect(() => {
     if (!networkMenuOpen) return;
     const dismiss = (event: PointerEvent) => { if (!networkPopoverRef.current?.contains(event.target as Node)) setNetworkMenuOpen(false); };
@@ -116,13 +117,23 @@ export function App() {
   useEffect(() => {
     if (!mobileNavOpen) return undefined;
     const previousOverflow = document.body.style.overflow;
+    const previousFocus = document.activeElement as HTMLElement | null;
+    const sheet = document.querySelector<HTMLElement>(".mobile-service-sheet");
+    sheet?.querySelector<HTMLElement>("button")?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") setMobileNavOpen(false);
+      if (event.key === "Tab" && sheet) {
+        const targets = [...sheet.querySelectorAll<HTMLElement>('button:not([disabled]),a[href],[tabindex="0"]')];
+        const first = targets[0], last = targets.at(-1);
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+      }
     };
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", closeOnEscape);
     return () => {
       document.body.style.overflow = previousOverflow;
+      if (previousFocus?.isConnected) previousFocus.focus();
       window.removeEventListener("keydown", closeOnEscape);
     };
   }, [mobileNavOpen]);
@@ -670,6 +681,7 @@ export function App() {
     { id: "docs", label: lang === "zh" ? "文档" : "Docs", hint: lang === "zh" ? "指南和示例" : "Guides and examples" },
   ];
   const activeNavigationTab = navigationTabs.find((item) => item.id === tab) || navigationTabs[0];
+  useEffect(() => { applySiteMetadata("app"); }, [tab]);
 
   function navigateTo(nextTab: Tab) {
     const safeTab = networkKey === "arc-testnet" && (nextTab === "spot" || nextTab === "autopilot") ? "analyze" : nextTab;
@@ -682,6 +694,7 @@ export function App() {
 
   return (
     <div className={`app theme-${appearance}`}>
+      <a className="app-skip-link" href="#app-main">Skip to workspace</a>
       <nav className="nav">
         <div className="brand">
           <div className="mark">
@@ -697,7 +710,7 @@ export function App() {
             </svg>
           </div>
           <div>
-            <h1><span className="brand-ai">AI</span><span>PULSE</span></h1>
+            <div className="brand-wordmark"><span className="brand-ai">AI</span><span>PULSE</span></div>
             <span>{d.brandSub}</span>
           </div>
         </div>
@@ -713,13 +726,13 @@ export function App() {
               <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "主网执行可用" : "Mainnet execution available")}</span></div>
             </div>}
           </div>
-          <AppearancePicker value={appearance} lang={lang} onChange={(value) => { setAppearance(value); localStorage.setItem("pulse:appearance", value); }} />
+          <AppearancePicker value={appearance} lang={lang} onChange={setAppearance} />
           <div className="lang-switch" aria-label="Language">
             <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
             <button type="button" className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中文</button>
           </div>
-          <span className={`network-status ${health === "ONLINE" ? "live" : ""}`} title={`${health === "ONLINE" ? d.online : d.offline} · ${apiHint}`}>
-            <i /> {health === "ONLINE" ? d.apiLive : d.apiOffline}
+          <span className={`network-status ${health === "ONLINE" ? "live" : health === "…" ? "checking" : ""}`} title={`${health === "…" ? "Checking API" : health === "ONLINE" ? d.online : d.offline} · ${apiHint}`}>
+            <i /> {health === "…" ? (lang === "zh" ? "正在检查 API" : "Checking API…") : health === "ONLINE" ? d.apiLive : d.apiOffline}
           </span>
           {wallet ? (
             <button
@@ -743,7 +756,7 @@ export function App() {
         </div>
       </nav>
 
-      <main>
+      <main id="app-main" tabIndex={-1}>
       <div className="tabs desktop-service-tabs" role="tablist" aria-label="PULSE services">
         {navigationTabs.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`tab ${tab === item.id ? "active" : ""}`} onClick={() => navigateTo(item.id)}>
@@ -773,43 +786,26 @@ export function App() {
       </div>
 
 
-      {networkKey !== "arc-testnet" && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
+      {networkKey !== "arc-testnet" && analysisReady && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
         <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? reportExecution.mapped ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : `${reportExecution.label}. Choose a mapped pair for execution.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
         <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Global intelligence</b><small>{analysisReady ? "Report ready" : "Quick or Pro"}</small></span></button>
         <span className="journey-arrow">→</span>
         <button type="button" className={tab === "spot" ? "active" : ""} onClick={() => navigateTo("spot")}><i>2</i><span><b>Spot Market or Limit</b><small>Review and sign</small></span></button>
       </section>}
 
-      {networkKey !== "arc-testnet" && tab === "autopilot" && <section className="product-journey autopilot-journey" aria-label="Independent Autopilot activation workflow">
-        <div className="journey-copy"><span className="eyebrow">AUTOPILOT PATH</span><strong>Configure once, then let PULSE evaluate</strong><small>No Global report is required or reused. The prepaid pass covers eligible compact entry checks after activation.</small></div>
-        <div className="journey-step"><i>1</i><span><b>Configure</b><small>Pair and strategy</small></span></div>
-        <span className="journey-arrow">→</span>
-        <div className="journey-step"><i>2</i><span><b>Fund &amp; protect</b><small>Capital, risk and pass</small></span></div>
-        <span className="journey-arrow">→</span>
-        <div className="journey-step"><i>3</i><span><b>Activate</b><small>Review and approve</small></span></div>
-      </section>}
+      {(["spot", "autopilot"] as Tab[]).includes(tab) && <header className="workspace-page-heading"><h1>{tab === "spot" ? (lang === "zh" ? "现货交易" : "Spot trading") : "Autopilot"}</h1><p>{tab === "spot" ? (lang === "zh" ? "选择交易对、查看行情，然后在钱包中审核订单。" : "Choose a pair, explore the market, then review your order in your wallet.") : (lang === "zh" ? "在你批准的资金和风险限制内自主交易。" : "Autonomous trading within your approved capital and risk limits.")}</p></header>}
+      {tab === "analyze" && <header className="workspace-page-heading"><h1>{lang === "zh" ? "全球市场" : "Global Market"}</h1><p>{lang === "zh" ? "查看市场行情，选择报告深度，再决定下一步。" : "Explore the selected market, choose your research depth, then decide your next action."}</p></header>}
 
-      {tab === "analyze" && <OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} />}
+      {tab === "analyze" && <details className="workspace-discovery"><summary>Explore other markets <span>Free shortlist · choose a pair for research</span></summary><OpportunityRadar networkKey={networkKey} initialTimeframe={timeframe} context="global" onAnalyze={(candidate) => selectCandidateForAnalysis(candidate.pair, candidate.timeframe)} /></details>}
 
-      {!["overview", "telegram", "docs"].includes(tab) && <section className="hero">
-        <div className="card hero-copy">
-          {tab === "spot" && <span className="eyebrow">REPORT-DRIVEN · CONNECTED WALLET</span>}
-          {tab === "autopilot" && <span className="eyebrow">SIX-STEP SETUP · OWNER CONTROLLED</span>}
-          <h2>{experience.title}</h2>
-          <p className="lead">{experience.lead}</p>
-          <div className="nfa">{d.nfa}</div>
-          <div className="hero-proof"><span><i /> {d.proofLive}</span><span>{d.proofPay}</span><span>{d.proofKeys}</span></div>
-        </div>
-        <div className={`card chart-card ${tab !== "analyze" ? "experience-card" : ""}`}>
-          {tab === "analyze" ? <>
-          <div className="chart-head">
-            <span>{ticker ? String(ticker.instId) : "—"}</span>
-            <span className="muted">{timeframe} · OKX</span>
-          </div>
-          {candles.length > 0 && <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang} />}
-          {!candles.length && <div className="chart-empty">{d.loadFree}</div>}
-          </> : <div className="experience-summary"><span className="eyebrow">{network.label} · {network.provider}</span><h3>{tab === "prediction" ? "One question. Clear evidence. Two report depths." : tab === "autopilot" ? "Configure once. PULSE evaluates while active." : tab === "spot" ? (lang === "zh" ? "选交易对、查看行情、审核订单。" : "Choose a pair. See the market. Review the order.") : tab === "telegram" ? (lang === "zh" ? "报告与提醒，送达聊天。" : "Reports and reminders, delivered in chat.") : tab === "docs" ? (lang === "zh" ? "了解功能、费用与操作权限。" : "Workflows, prices and control boundaries.") : "Evidence first. Unknown stays unknown."}</h3><p>{tab === "prediction" ? "Market selection and live context stay in the main workspace below." : tab === "autopilot" ? "Your pair, strategy, capital, risk policy and AI Entry Pass define this independent workflow." : tab === "spot" ? (lang === "zh" ? "行情预览免费。只有审核订单并在钱包签名后才会执行交易。" : "Market previews are free. Execution starts only after you review and sign the order in your wallet.") : tab === "telegram" ? (lang === "zh" ? "在手机打开 PULSE，连接报告通知；机器人不保管资金。" : "Open PULSE on your phone and connect report notifications. The bot does not hold your funds.") : tab === "docs" ? (lang === "zh" ? "从研究、现货与 Autopilot 指南中找到适合你的工作流程。" : "Find the relevant guide for research, Spot execution or independent Autopilot setup.") : "Contract evidence and simulation stay scoped to the selected chain."}</p></div>}
-        </div>
+      {(tab === "prediction" || tab === "safety") && <header className="workspace-page-heading"><h1>{experience.title}</h1><p>{experience.lead}</p><div className="nfa">{d.nfa}</div></header>}
+
+      {tab === "analyze" && <section className="card global-market-workspace" aria-label="Selected market and chart">
+        <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{d.symbol} <Tip text={d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><button type="button" className="btn btn-soft" disabled={loading} onClick={() => void loadTeaser()}>{busyAction === "free" ? d.loading : d.loadFree}</button></div>
+        <p className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; Spot needs a mapped pair, a live route and wallet approval.</p>
+        <div className="chart-head"><span>{instId}</span><span className="muted">{timeframe} · OKX · Free market preview</span></div>
+        {candles.length > 0 ? <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang}/> : <div className="chart-empty">{d.loadFree}</div>}
+        <p className="hint">{d.nfa}</p>
       </section>}
 
       {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
@@ -821,28 +817,6 @@ export function App() {
         <div className="card">
           {tab === "analyze" ? (
             <>
-              <div className="section">{d.step1}</div>
-              <div className="row">
-                <div className="field">
-                  <div className="field-label">
-                    {d.symbol} <Tip text={d.symbolTip} />
-                  </div>
-                  <MarketPairPicker
-                    id="market-pair"
-                    networkKey={networkKey}
-                    lang={lang}
-                    value={instId}
-                    onSelect={(instrument) => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}
-                  />
-                  <small className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; a mapped pair still needs a live route and wallet approval.</small>
-                </div>
-                <div className="field">
-                  <label htmlFor="market-timeframe">
-                    {d.timeframe} <Tip text={d.tfTip} />
-                  </label>
-                  <TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={(next) => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }} />
-                </div>
-              </div>
               <div className="field">
                 <label htmlFor="focus-note">
                   {d.note} <Tip text={d.noteTip} />
@@ -850,12 +824,6 @@ export function App() {
                 <input id="focus-note" value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
 
-              <div className="section">
-                {d.step2} <Tip text={d.freeTip} />
-              </div>
-              <button type="button" className="btn btn-soft full" disabled={loading} onClick={() => void loadTeaser()}>
-                {busyAction === "free" ? d.loading : d.loadFree}
-              </button>
 
               {ticker && (
                 <div className="ticker">
@@ -882,7 +850,7 @@ export function App() {
               )}
 
               <div className="section">
-                {d.step3} <Tip text={d.connectTip} />
+                {lang === "zh" ? "选择报告深度" : "Choose report depth"} <Tip text={d.connectTip} />
               </div>
               {!wallet && <p className="wallet-guidance">↑ {d.headerWalletHint}</p>}
               <div className="actions stack" style={{ marginTop: 10 }}>
@@ -893,7 +861,7 @@ export function App() {
                   onClick={() => void runAnalysis("base")}
                   title={d.baseTip}
                 >
-                  {busyAction === "base" ? d.loading : `${lang === "zh" ? "基础分析" : "Base analysis"} · $${routePrices[networkKey === "xlayer" ? "/v1/analysis/base" : "/v1/analysis/spot/standard"].toFixed(2)}`}
+                  {busyAction === "base" ? d.loading : `${lang === "zh" ? "快速报告" : "Quick report"} · $${routePrices[networkKey === "xlayer" ? "/v1/analysis/base" : "/v1/analysis/spot/standard"].toFixed(2)}`}
                 </button>
                 <button
                   type="button"
@@ -902,7 +870,7 @@ export function App() {
                   onClick={() => void runAnalysis("premium")}
                   title={d.premiumTip}
                 >
-                  {busyAction === "premium" ? d.loading : `${lang === "zh" ? "高级分析" : "Premium analysis"} · $${routePrices[networkKey === "xlayer" ? "/v1/analysis/premium" : "/v1/analysis/spot/premium"].toFixed(2)}`}
+                  {busyAction === "premium" ? d.loading : `${lang === "zh" ? "专业报告" : "Pro report"} · $${routePrices[networkKey === "xlayer" ? "/v1/analysis/premium" : "/v1/analysis/spot/premium"].toFixed(2)}`}
                 </button>
               </div>
               <p className="hint">{d.walletNote}</p>

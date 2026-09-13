@@ -178,15 +178,15 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
           <div className="section">3 · Choose report depth</div>
           {!wallet && <p className="wallet-guidance">Connect once from the header to purchase a report.</p>}
           <div className="actions stack">
-            <button className="btn btn-primary full" disabled={Boolean(busy)} onClick={() => void analyze("standard")}>Base prediction analysis · ${prices["/v1/analysis/prediction/standard"].toFixed(2)}<small>Drivers, market quality, risks, invalidation and concise conclusion.</small></button>
-            <button className="btn btn-accent full" disabled={Boolean(busy)} onClick={() => void analyze("premium")}>Premium prediction analysis · ${prices["/v1/analysis/prediction/premium"].toFixed(2)}<small>Detailed scenarios, catalysts, counter-case, evidence weighting and checklist.</small></button>
+            <button className="btn btn-primary full" disabled={Boolean(busy)} onClick={() => void analyze("standard")}>Quick prediction report · ${prices["/v1/analysis/prediction/standard"].toFixed(2)}<small>Drivers, market quality, risks, invalidation and concise conclusion.</small></button>
+            <button className="btn btn-accent full" disabled={Boolean(busy)} onClick={() => void analyze("premium")}>Pro prediction report · ${prices["/v1/analysis/prediction/premium"].toFixed(2)}<small>Detailed scenarios, catalysts, counter-case, evidence weighting and checklist.</small></button>
           </div>
         </>}
       </>}
       {error && <div className="err">{error}</div>}
     </div>
     <div className="card report-card"><div className="section">Prediction report</div>
-      {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{jobStage ? jobStage.replaceAll("_", " ") : "Your prediction report lands here"}</h3><p>{jobStage ? "PULSE is polling this paid report automatically. Refreshing does not charge again." : "Select one crypto prediction, review its live evidence, then choose base or premium analysis."}</p>{jobStage && <button type="button" className="btn btn-primary" onClick={() => void retryPredictionRecovery()}>Recover without paying again</button>}</div>}
+      {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{jobStage ? jobStage.replaceAll("_", " ") : "Your prediction report lands here"}</h3><p>{jobStage ? "PULSE is polling this paid report automatically. Refreshing does not charge again." : "Select one crypto prediction, review its live evidence, then choose Quick or Pro analysis."}</p>{jobStage && <button type="button" className="btn btn-primary" onClick={() => void retryPredictionRecovery()}>Recover without paying again</button>}</div>}
       {result && <PredictionAnalysisReport data={result} />}
       <ReportHistory networkKey={networkKey} scope="prediction" wallet={wallet} onOpen={setResult} />
     </div>

@@ -37,6 +37,17 @@ async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
 }
 
 describe("PULSE API", () => {
+  it("serves public cross-chain aggregates without payment or wallet parameters", async () => {
+    const first = await jfetch("/v1/public/activity");
+    const filtered = await jfetch("/v1/public/activity?network=base&wallet=ignored");
+    assert.equal(first.res.status, 200);
+    assert.equal(first.res.headers.has("PAYMENT-REQUIRED"), false);
+    assert.equal(first.json.scope, "platform");
+    assert.equal(first.json.networks.length, 4);
+    assert.equal(first.json.networks.some((item: {environment:string}) => item.environment === "testnet"), true);
+    assert.deepEqual(filtered.json, first.json);
+    assert.equal(JSON.stringify(first.json).includes("payer"), false);
+  });
   it("rejects invalid candle cursors and limits before querying the provider", async () => {
     for (const query of ["limit=-1", "limit=301", "limit=NaN", "before=garbage", "before=-1", "before=1.5"]) {
       assert.equal((await jfetch(`/v1/market/candles?instId=BTC-USDT&${query}`)).res.status, 400);

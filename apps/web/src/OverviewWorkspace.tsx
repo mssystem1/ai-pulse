@@ -1,4 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SavedResearchDialog } from "./SavedResearchDialog";
+import { ReportHistory } from "./ReportHistory";
+import { reportTierLabel } from "./reportLabels";
+import "./portfolio.css";
 import { formatUnits } from "viem";
 import { apiGet } from "./api";
 import { aggregateAutopilotMetrics } from "./dashboardMetrics";
@@ -350,43 +354,61 @@ export function OverviewWorkspace({
 }) {
   const copy = COPY[lang];
   const network = WEB_NETWORKS[networkKey];
-  const [activity, setActivity] = useState<OverviewActivity[]>([]);
-  const [orders, setOrders] = useState<OverviewOrder[]>([]);
-  const [strategies, setStrategies] = useState<OverviewStrategy[]>([]);
+  const [activityData, setActivity] = useState<OverviewActivity[]>([]);
+  const [orderData, setOrders] = useState<OverviewOrder[]>([]);
+  const [strategyData, setStrategies] = useState<OverviewStrategy[]>([]);
+  const contextKey=`${networkKey}:${wallet?.toLowerCase() || ""}`;
+  const [dataContext,setDataContext]=useState("");
+  const activity=dataContext===contextKey?activityData:[];
+  const orders=dataContext===contextKey?orderData:[];
+  const strategies=dataContext===contextKey?strategyData:[];
+  const request=useRef<AbortController|null>(null);
+  const [openedReport,setOpenedReport]=useState<(JobRecoveryHandle & {scope:"spot"|"prediction";contextKey:string})|null>(null);
   const [loading, setLoading] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
   const reports = useMemo(() => safeReports(networkKey), [networkKey, refreshVersion]);
 
   const refresh = useCallback(async (includeWalletBalance = false) => {
+    request.current?.abort();
+    const controller=new AbortController(); request.current=controller;
     setRefreshVersion((value) => value + 1);
     if (!wallet || networkKey === "arc-testnet") {
       setActivity([]);
       setOrders([]);
       setStrategies([]);
       setSyncError(false);
+      setLoading(false);
+      setDataContext(contextKey);
       return;
     }
     setLoading(true);
     const encodedWallet = encodeURIComponent(wallet);
+    const timeout=setTimeout(()=>controller.abort(),20_000);
+    try {
     const [history, orderResult, strategyResult] = await Promise.all([
-      apiGet(`/v1/trading/activity?network=${networkKey}&address=${encodedWallet}`),
-      apiGet(`/v1/automation/orders?owner=${encodedWallet}&network=${networkKey}`),
-      apiGet(`/v1/autopilot/strategies?owner=${encodedWallet}&network=${networkKey}`),
+      apiGet(`/v1/trading/activity?network=${networkKey}&address=${encodedWallet}`,{signal:controller.signal}),
+      apiGet(`/v1/automation/orders?owner=${encodedWallet}&network=${networkKey}`,{signal:controller.signal}),
+      apiGet(`/v1/autopilot/strategies?owner=${encodedWallet}&network=${networkKey}`,{signal:controller.signal}),
     ]);
+    if(controller.signal.aborted || request.current!==controller) return;
     if (includeWalletBalance) await onRefreshBalances();
+    if(controller.signal.aborted || request.current!==controller) return;
     setActivity(history.ok ? ((history.data as { activity?: OverviewActivity[] }).activity || []) : []);
     setOrders(orderResult.ok ? ((orderResult.data as { orders?: OverviewOrder[] }).orders || []) : []);
     setStrategies(strategyResult.ok ? ((strategyResult.data as { strategies?: OverviewStrategy[] }).strategies || []) : []);
     setSyncError(!history.ok || !orderResult.ok || !strategyResult.ok);
-    setLoading(false);
-  }, [networkKey, onRefreshBalances, wallet]);
+    setDataContext(contextKey);
+    } catch { if(request.current===controller)setSyncError(true); }
+    finally {clearTimeout(timeout);if(request.current===controller){setLoading(false);if(controller.signal.aborted)setSyncError(true);}}
+  }, [networkKey, onRefreshBalances, wallet, contextKey]);
 
   useEffect(() => {
     void refresh(false);
     const timer = window.setInterval(() => void refresh(false), 60_000);
-    return () => window.clearInterval(timer);
+    return () => {window.clearInterval(timer);request.current?.abort();};
   }, [refresh]);
+  useEffect(()=>{setOpenedReport(null);},[contextKey]);
 
   const openOrders = orders.filter((item) => item.status === "active" || item.status === "paused");
   const runningStrategies = strategies.filter((item) => {
@@ -402,7 +424,7 @@ export function OverviewWorkspace({
     return remaining > 0 && remaining <= 6 * 3_600_000;
   }).length;
   const alerts = [
-    health !== "ONLINE" ? copy.apiOffline : "",
+    health === "OFFLINE" ? copy.apiOffline : "",
     syncError ? copy.syncProblem : "",
     pendingTransactions ? `${pendingTransactions} ${copy.pendingTransactions}` : "",
     failedStrategies ? `${failedStrategies} ${copy.strategyFailures}` : "",
@@ -410,6 +432,8 @@ export function OverviewWorkspace({
     expiringPasses ? `${expiringPasses} ${copy.passExpiring}` : "",
   ].filter(Boolean);
   const recentActivity = activity.slice().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, 6);
+  const [libraryScope, setLibraryScope] = useState<"spot" | "prediction">("spot");
+  const [restoredReport, setRestoredReport] = useState<{ report: Record<string, unknown>; scope: "spot" | "prediction"; contextKey: string } | null>(null);
   const aggregateAutopilot = aggregateAutopilotMetrics(strategies);
   const portfolioLabel = aggregateAutopilot.portfolioValueAtomic !== undefined
     ? `${Number(formatUnits(BigInt(aggregateAutopilot.portfolioValueAtomic), network.payment.decimals)).toLocaleString(lang === "zh" ? "zh-CN" : "en-US", { maximumFractionDigits: 4 })} ${network.payment.symbol}`
@@ -424,6 +448,13 @@ export function OverviewWorkspace({
   const executionAvailable = networkKey !== "arc-testnet";
   const globalReportCount = reports.filter((report) => report.scope === "spot").length;
   const predictionReportCount = reports.filter((report) => report.scope === "prediction").length;
+  const allocation = strategies.map(strategy => {
+    let value = NaN;
+    try { if (strategy.portfolioValueAtomic != null && strategy.settlementDecimals != null) value = Number(formatUnits(BigInt(strategy.portfolioValueAtomic), strategy.settlementDecimals)); } catch { /* Malformed valuation is unavailable, not a broken Portfolio. */ }
+    return { strategy, value };
+  });
+  const allocationReady=allocation.length>0 && allocation.every(item=>Number.isFinite(item.value) && item.value>=0 && item.strategy.settlementSymbol===network.payment.symbol);
+  const allocationTotal=allocationReady ? allocation.reduce((sum,item)=>sum+item.value,0) : 0;
 
   useEffect(() => {
     if (window.location.hash !== "#reports" && new URLSearchParams(window.location.search).get("service") !== "reports") return;
@@ -436,7 +467,7 @@ export function OverviewWorkspace({
       <header className="overview-heading">
         <div>
           <span className="eyebrow">{copy.eyebrow} · {network.label}</span>
-          <h2>{copy.title}</h2>
+          <h1>{lang === "zh" ? "资产总览" : "Portfolio"}</h1>
           <p>{copy.lead}</p>
         </div>
         <button type="button" className="overview-refresh" disabled={loading} onClick={() => void refresh(true)}>
@@ -472,16 +503,22 @@ export function OverviewWorkspace({
           <ul>{alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul>
         </aside>}
 
+      {wallet && allocationReady && allocationTotal>0 && <section className="card portfolio-allocation" aria-label={lang==="zh"?"自动驾驶资金分配":"Autopilot capital allocation"}>
+        <header><div><span className="eyebrow">{network.label} · {lang==="zh"?"已注册自动驾驶":"REGISTERED AUTOPILOTS"}</span><h3>{lang==="zh"?"资金分配":"Where your Autopilot capital sits"}</h3></div><span>{allocationTotal.toLocaleString(lang==="zh"?"zh-CN":"en-US",{maximumFractionDigits:4})} {network.payment.symbol}</span></header>
+        <div className="allocation-bar" aria-hidden>{allocation.filter(item=>item.value>0).map(({strategy,value},index)=><span key={strategy.vault} style={{flexGrow:value/allocationTotal,background:`var(--allocation-${index%4})`}}/>)}</div>
+        <ul>{allocation.filter(item=>item.value>0).map(({strategy,value},index)=><li key={strategy.vault}><i aria-hidden style={{background:`var(--allocation-${index%4})`}}/><span>{strategy.pair}<small>{strategy.vault.slice(0,6)}…{strategy.vault.slice(-4)}</small></span><strong>{value.toLocaleString(lang==="zh"?"zh-CN":"en-US",{maximumFractionDigits:4})} {network.payment.symbol}<small>{(value/allocationTotal*100).toFixed(1)}%</small></strong></li>)}</ul>
+        <p>{lang==="zh"?"所选网络已注册账户的当前参考估值；不是收益或整个钱包的余额。":"Current reference valuation of registered accounts on this network—not profit or your entire wallet balance."}</p>
+      </section>}
+
       {executionAvailable && <div className="overview-detail-grid">
         <section className="card overview-panel">
           <header className="overview-panel-head">
             <div><span className="eyebrow">{copy.walletContracts}</span><h3>{copy.recentActivity}</h3><p>{copy.recentActivityLead}</p></div>
-            {executionAvailable && <button type="button" onClick={() => onNavigate("spot")}>{copy.viewSpot} →</button>}
           </header>
           {wallet && recentActivity.length ? <div className="overview-activity-list">
             {recentActivity.map((item) => <article key={item.id}>
               <span className={`overview-status ${item.status}`}>{readableStatus(item.status, lang)}</span>
-              <div><strong>{readableKind(item.kind, lang)}</strong><small>{item.pair || item.executionPair || item.source}</small></div>
+              <div><button type="button" onClick={() => onNavigate(item.source === "autopilot" ? "autopilot" : "spot")}><strong>{readableKind(item.kind, lang)}</strong></button><small>{item.pair || item.executionPair || item.source}</small></div>
               <time>{relativeTime(item.createdAt, lang)}</time>
             </article>)}
           </div> : <div className="overview-empty"><i aria-hidden>⇄</i><strong>{copy.noActivity}</strong><span>{wallet ? copy.noActivityBody : copy.connectBody}</span></div>}
@@ -514,10 +551,13 @@ export function OverviewWorkspace({
           <button type="button" onClick={() => onNavigate("analyze")}><span>{copy.globalReports}</span><strong>{globalReportCount}</strong><small>{copy.globalReport} →</small></button>
           <button type="button" onClick={() => onNavigate("prediction")}><span>{copy.predictionReports}</span><strong>{predictionReportCount}</strong><small>{copy.predictionReport} →</small></button>
         </div>
-        {reports.length ? <div className="overview-report-list">{reports.slice(0, 6).map((report) => <button type="button" key={`${report.scope}:${report.jobId}`} onClick={() => onNavigate(report.scope === "spot" ? "analyze" : "prediction")}>
-          <span>{report.scope === "spot" ? copy.globalReport : copy.predictionReport}</span><strong>{reportLabel(report, copy)}</strong><small>{relativeTime(report.createdAt, lang)} · {report.tier || "report"}</small><b>→</b>
+        {reports.length ? <div className="overview-report-list">{reports.slice(0, 6).map((report) => <button type="button" key={`${report.scope}:${report.jobId}`} onClick={() => setOpenedReport({...report,contextKey})}>
+          <span>{report.scope === "spot" ? copy.globalReport : copy.predictionReport}</span><strong>{reportLabel(report, copy)}</strong><small>{relativeTime(report.createdAt, lang)} · {reportTierLabel(report.tier)}</small><b>→</b>
         </button>)}</div> : <div className="overview-empty compact"><i aria-hidden>▤</i><strong>{copy.noReports}</strong><span>{copy.noReportsBody}</span></div>}
       </section>
+      {openedReport?.contextKey===contextKey && <SavedResearchDialog key={`${contextKey}:${openedReport.jobId}`} handle={openedReport} scope={openedReport.scope} onClose={()=>setOpenedReport(null)} />}
+      <details className="portfolio-report-library"><summary>Recover wallet-owned reports <span>Another device or the new app address? No repurchase needed.</span></summary><p>Connect the wallet that originally paid, choose its payment network in the header, then sign a report-access message. Reconnecting does not create a payment.</p><div role="group" aria-label="Report library type"><button type="button" aria-pressed={libraryScope === "spot"} onClick={() => setLibraryScope("spot")}>Global Market</button><button type="button" aria-pressed={libraryScope === "prediction"} onClick={() => setLibraryScope("prediction")}>Prediction Market</button></div><ReportHistory networkKey={networkKey} scope={libraryScope} wallet={wallet} onOpen={report => setRestoredReport({report,scope:libraryScope,contextKey})}/><p>Device-only recovery handles stay in the browser where you bought the report. <a href="https://www.ai-pulse.tech/portfolio?legacyRecovery=1#reports" rel="noreferrer">Open the original-site recovery page</a>. No recovery tokens are transferred between sites.</p></details>
+      {restoredReport?.contextKey === contextKey && <SavedResearchDialog restoredReport={restoredReport.report} scope={restoredReport.scope} onClose={() => setRestoredReport(null)}/>}
     </section>
   );
 }

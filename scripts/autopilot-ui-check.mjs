@@ -13,7 +13,7 @@ const candidates = ["BTC", "ETH", "DOGE", "XRP", "ADA", "LTC", "SOL", "SHIB"].ma
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 await mkdir(".codex-ui-review", { recursive: true });
 try {
-  for (const [context, width] of ["autopilot", "global", "spot"].flatMap(context => [1440, 390].map(width => [context, width]))) {
+  for (const [context, width] of ["autopilot", "global", "spot", "spot-handoff"].flatMap(context => [1440, 390].map(width => [context, width]))) {
     const page = await browser.newPage({ viewport: { width, height: 900 } });
     const errors = [];
     page.on("pageerror", error => { errors.push(error.message); console.error("Browser error:", error.message); });
@@ -24,16 +24,16 @@ try {
       const json = body => route.fulfill({ contentType: "application/json", headers: { "Access-Control-Allow-Origin": "*" }, body: JSON.stringify(body) });
       if (url.origin === origin && url.pathname === "/__autopilot_ui_check") return route.fulfill({ contentType: "text/html", body: `<!doctype html><html data-pulse-theme="base"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body><main id="root" style="max-width:1320px;margin:24px auto;padding:12px"></main><script type="module">
         import RefreshRuntime from '/@react-refresh'; RefreshRuntime.injectIntoGlobalHook(window); window.$RefreshReg$=()=>{}; window.$RefreshSig$=()=>type=>type; window.__vite_plugin_react_preamble_installed__=true;
-        await import('/src/styles.css'); await import('/src/appearance.css'); await import('/src/autopilotJournal.css');
+        await import('/src/styles.css'); await import('/src/appearance.css'); await import('/src/autopilotJournal.css'); await import('/src/portfolio.css');
         const ReactModule = await import('/node_modules/.vite/deps/react.js'); const React=ReactModule.default||ReactModule;
         const DomModule = await import('/node_modules/.vite/deps/react-dom_client.js'); const {createRoot}=DomModule.default||DomModule;
-        const {AutopilotWorkspace,OpportunityRadar} = await import('/src/V6Workspaces.tsx');
-        const Component='${context}'==='autopilot'?AutopilotWorkspace:OpportunityRadar;
-        createRoot(document.getElementById('root')).render(React.createElement(Component,{networkKey:'base',wallet:'${owner}',lang:'en',context:'${context}',onAnalyze:()=>{},onPrepare:()=>{}}));
+        const {AutopilotWorkspace,OpportunityRadar,SpotWorkspace} = await import('/src/V6Workspaces.tsx');
+        const Component='${context}'==='autopilot'?AutopilotWorkspace:'${context}'==='spot-handoff'?SpotWorkspace:OpportunityRadar;
+        createRoot(document.getElementById('root')).render(React.createElement(Component,{networkKey:'base',wallet:'${context}'==='spot-handoff'?null:'${owner}',lang:'en',context:'${context}',onAnalyze:()=>{},onPrepare:()=>{},initialPair:'ETH-USDT',initialTrade:{pair:'ETH-USDT',timeframe:'4H',side:'buy',orderType:'limit',entryPrice:2100,takeProfit:2300,stopLoss:2000,rationale:'Selected Global report fixture',sourceTier:'premium'},onPairSelected:pair=>{window.selectedSpotPair=pair;}}));
       </script></body></html>` });
       if (url.origin === origin) return route.continue();
       if (url.pathname.includes("opportunities")) { scans++; return json({ candidates }); }
-      if (url.pathname.includes("capabilities")) return json({ network: "base", spot: { enabled: true }, autopilot: { enabled: true }, contracts: { autopilotFactory: addresses[0] } });
+      if (url.pathname.includes("capabilities")) return json({ network: "base", spot: { visible: true, enabled: true }, autopilot: { visible: true, enabled: true }, contracts: { autopilotFactory: addresses[0] } });
       if (url.pathname.includes("/strategies")) return json({ persistence: { state: "online" }, strategies: [{ id: "base:fixture", vault: addresses[1], owner, network: "base", pair: "DOGE-USDT", timeframe: "4H", policy: { strategy: "Breakout", maxTradePct: 50, dailyLossPct: 3 }, status: "active", runtimeState: "paused", paused: true, settlementAsset: settlement, settlementBalance: "700000", portfolioValueAtomic: "700000", pnlAtomic: null, pnlCashFlow: { state: "recovering", progressPct: 42, detail: "Historical cash-flow recovery is in progress; PnL waits for complete coverage." }, settlementDecimals: 6, settlementSymbol: "USDC", targetAsset: addresses[0], targetBalance: "0", targetDecimals: 18, targetSymbol: "DOGE", evaluations: [], aiPass: { expiresAt: new Date(Date.now() + 86400000).toISOString(), pausedAt: new Date().toISOString(), signalLimit: 3, signalsUsed: 0 } }] });
       if (url.pathname.includes("/accounts")) return json({ accounts: { protection: null, limit: null, bracket: null }, vaults: addresses.map((address, i) => ({ address, settlementAsset: settlement, settlementSymbol: "USDC", settlementDecimals: 6, balanceAtomic: i === 0 ? "0" : i === 1 ? "700000" : "200000", paused: true })) });
       if (url.pathname.includes("/activity")) return json({ activity: [], persistence: { state: "online" } });
@@ -47,10 +47,20 @@ try {
       return json({});
     });
     await page.goto(`${origin}/__autopilot_ui_check`, { waitUntil: "networkidle" });
-    await page.locator(".potential-gainer-grid>article").first().waitFor({ timeout: 45000 }).catch(async error => {
+    if(context==='spot-handoff'){
+      await page.locator('.report-intent-strip').filter({hasText:'ETH-USDT'}).waitFor();
+      assert.match(await page.locator('.report-intent-strip').innerText(),/2,?100|2100/);
+      await page.locator('.workspace-discovery>summary').click();
+      await page.getByRole('button',{name:'Load BTC-USDT in Spot ticket',exact:true}).click();
+      assert.equal(await page.evaluate(()=>window.selectedSpotPair),'BTC-USDT');
+      await page.getByText('DIRECT SPOT MODE',{exact:true}).waitFor();
+      assert.equal(await page.getByText('Selected Global report fixture',{exact:true}).count(),0,'new pair clears stale report levels/context');
+    }
+    await page.locator(context === "autopilot" ? ".identified-vault" : ".potential-gainer-grid>article").first().waitFor({ timeout: 45000 }).catch(async error => {
       console.error("Visible state:", (await page.locator("body").innerText()).slice(0, 1500)); throw error;
     });
     if (context === "autopilot") {
+    assert.equal(await page.locator('#autopilot-configuration').isVisible(), false, 'returning users see accounts before setup');
     await page.locator(".identified-vault").first().waitFor();
     assert.equal(await page.locator(".identified-vault").count(), 4);
     assert.deepEqual(await page.locator(".identified-vault .vault-identity strong").allTextContents(), ["#1", "#2", "#3", "#4"]);
@@ -68,6 +78,13 @@ try {
     await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
     assert.match(await page.locator('.cash-flow-coverage').innerText(), /Synchronizing · 42%/);
     assert.match(await page.locator('.cash-flow-coverage').innerText(), /No new payment is needed/);
+    await page.getByRole('button',{name:'New Autopilot',exact:true}).click();
+    assert.equal(await page.locator('#autopilot-configuration').isVisible(),true);
+    await page.getByRole('button',{name:'Back to accounts',exact:true}).click();
+    assert.equal(await page.locator('#autopilot-configuration').isVisible(),false);
+    await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
+    // Restore the setup drawer only to exercise its optional shortlist below.
+    await page.getByRole('button',{name:'Edit selected strategy',exact:true}).click();
     }
     const countBefore = scans;
     await page.getByRole("button", { name: /Show \d+ more candidates/ }).click();

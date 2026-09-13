@@ -281,7 +281,7 @@ export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: stri
   const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, entryPrice: Number(buyPlan.trigger) || undefined, takeProfit: Number(buyPlan.takeProfit) || undefined, stopLoss: Number(buyPlan.stopLoss) || undefined, rationale: String(buyPlan.scenario || recommendation.reason || "Report buy setup"), sourceTier: tier });
   return (
     <div className={`sr tiered-report ${premium ? "premium-report" : "base-report"}`}>
-      <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PREMIUM" : "BASE"}</span><strong>{premium ? "Trading intelligence · annotated structure" : "Market intelligence · concise evidence"}</strong></div>
+      <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PRO" : "QUICK"}</span><strong>{premium ? "Trading intelligence · annotated structure" : "Market intelligence · concise evidence"}</strong></div>
       <div className="sr-title-row">
         <span className={`sr-pill ${badgeClass}`}>
           {bias} · {String(a.confidence ?? "—")}%
@@ -519,7 +519,7 @@ export function PredictionAnalysisReport({ data }: { data: AnyRec }) {
 
   return (
     <div className={`sr prediction-analysis-report tiered-report ${premium ? "premium-report" : "base-report"}`}>
-      <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PREMIUM" : "BASE"}</span><strong>{premium ? "Prediction evidence + independent 4H asset structure" : "Concise prediction evidence"}</strong></div>
+      <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PRO" : "QUICK"}</span><strong>{premium ? "Prediction evidence + independent 4H asset structure" : "Concise prediction evidence"}</strong></div>
       <div className="sr-title-row">
         <span className={`sr-pill ${confidenceClass}`}>{Number.isFinite(confidence) ? `${confidence}% confidence` : "Confidence unavailable"}</span>
         <span className="sr-pill muted-pill">{String(data.tier || "prediction")}</span>

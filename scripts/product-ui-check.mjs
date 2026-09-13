@@ -74,12 +74,12 @@ try {
         await page.getByRole('button', { name: 'Telegram', exact: true }).first().click();
         assert.match(await page.locator('.docs-flow-visual').innerText(), /generic Open App button/);
       } else if (context === 'portfolio') {
-        await page.getByRole('heading', { name: 'Your PULSE portfolio' }).waitFor();
+        await page.getByRole('heading', { name: 'Portfolio', exact: true }).waitFor();
         await page.getByText('+10.00%', { exact: true }).waitFor();
         assert.equal(await page.locator('#reports').count(), 1);
       } else if(context==='global-chart') {
         await page.getByRole('button',{name:'Load free market data',exact:true}).click();
-        await page.locator('.chart-card .candle-canvas canvas').first().waitFor();
+        await page.locator('.global-market-workspace .candle-canvas canvas').first().waitFor();
         assert.equal(await page.locator('#pulse-chart').count(),0);
         await page.getByRole('button',{name:/Open market chart BTC-USDT/}).click();
         await page.locator('dialog .candle-canvas canvas').first().waitFor();

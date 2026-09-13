@@ -4,6 +4,8 @@ import { hrefForTab, tabFromHref } from "./navigation.js";
 
 test("direct service URLs survive refresh and trailing slashes", () => {
   assert.equal(tabFromHref("https://pulse.test/overview"), "overview");
+  assert.equal(tabFromHref("https://pulse.test/portfolio"), "overview");
+  assert.equal(hrefForTab("https://pulse.test/overview#reports", "overview"), "/portfolio#reports");
   assert.equal(tabFromHref("https://pulse.test/autopilot"), "autopilot");
   assert.equal(tabFromHref("https://pulse.test/spot/"), "spot");
   assert.equal(tabFromHref("https://pulse.test/safety"), "safety");
@@ -11,7 +13,7 @@ test("direct service URLs survive refresh and trailing slashes", () => {
 
 test("the application root opens the overview", () => {
   assert.equal(tabFromHref("https://pulse.test/"), "overview");
-  assert.equal(hrefForTab("https://pulse.test/", "overview"), "/overview");
+  assert.equal(hrefForTab("https://pulse.test/", "overview"), "/portfolio");
 });
 
 test("legacy service links remain compatible and canonicalize", () => {

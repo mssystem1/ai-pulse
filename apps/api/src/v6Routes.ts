@@ -7,6 +7,8 @@ import { reconcileV6Activity, recordV6Activity, v6ActivityPersistenceStatus } fr
 import { asyncRoute } from "./httpResilience.js";
 import { kvCircuitStatus, kvConfigured } from "./resilientKv.js";
 import { getOnchainAccountSnapshot } from "./onchainDiscovery.js";
+import { createExecutionProjector } from "./publicExecution.js";
+import type { PublicActivityStore } from "./publicActivity.js";
 import {
   executionContractAddress,
   executionContracts,
@@ -31,7 +33,8 @@ export const TradeSchema = z.object({
   maxAutoSlippagePercent: z.coerce.number().min(0.1).max(5).optional().default(1),
 });
 
-export function createV6Router(cfg: AppConfig) {
+export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivityStore) {
+  const projectExecutions = publicActivity && cfg.NODE_ENV !== "test" && !cfg.X402_MOCK ? createExecutionProjector(publicActivity) : null;
   const router = Router();
 
   router.get("/v1/trading/capabilities", (req, res) => {
@@ -266,6 +269,7 @@ export function createV6Router(cfg: AppConfig) {
     const owner = String(req.query.address || ""); const network = String(req.query.network || "");
     if (!ADDRESS.test(owner) || !NETWORKS[network as keyof typeof NETWORKS]) return res.status(400).json({ error: "Valid address and mainnet network are required" });
     const activity = await reconcileV6Activity(owner, network, NETWORKS[network as keyof typeof NETWORKS].rpc());
+    if (projectExecutions) void projectExecutions(owner, network as "base" | "arbitrum" | "xlayer", activity).catch(() => console.warn("[public-activity] execution projection pending; confirmed account history is unchanged"));
     res.json({ activity, persistence: v6ActivityPersistenceStatus() });
   }));
 
