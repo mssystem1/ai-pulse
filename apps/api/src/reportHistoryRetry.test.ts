@@ -9,6 +9,14 @@ import { MemoryJobStore, MemoryReportStore, type PaymentReceipt } from "./jobs.j
 const account = privateKeyToAccount("0x0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef");
 
 test("wallet history retries a terminal settled report without another payment", async () => {
+  // Memory persistence must also isolate the session/challenge store from a
+  // developer's Railway/Upstash credentials loaded by dotenv.
+  const envKeys = ["QUEUE_PROVIDER", "STORAGE_PROVIDER", "KV_REST_API_URL", "KV_REST_API_TOKEN"] as const;
+  const previousEnv = new Map(envKeys.map(key => [key, process.env[key]]));
+  process.env.QUEUE_PROVIDER = "memory";
+  process.env.STORAGE_PROVIDER = "memory";
+  process.env.KV_REST_API_URL = "";
+  process.env.KV_REST_API_TOKEN = "";
   const jobs = new MemoryJobStore();
   const reports = new MemoryReportStore();
   const acquired = await jobs.acquire({
@@ -72,6 +80,9 @@ test("wallet history retries a terminal settled report without another payment",
     assert.equal(retried.job?.receipt?.id, receipt.id);
     assert.equal((await jobs.get(acquired.job.id))?.receiptId, receipt.id);
   } finally {
+    for (const [key, value] of previousEnv) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
 });

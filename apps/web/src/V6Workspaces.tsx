@@ -30,6 +30,7 @@ import { DocsWorkflowVisuals } from "./DocsWorkflowVisuals";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
 import { aggregateAutopilotMetrics, assessBalanceAmount, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
 import { spotTradePerformance } from "./tradePerformance";
+import { formatRuleEvidence } from "./evidenceDisplay";
 import {
   DEFAULT_AUTOPILOT_CAPITAL,
   DEFAULT_TRADE_AMOUNT,
@@ -493,7 +494,7 @@ export function OpportunityRadar({
                     {candidate.change24hPct.toFixed(2)}%
                   </span>
                 </div>
-                {(context === "spot" || context === "autopilot") && <ShortlistMarketChart pair={candidate.pair} timeframe={candidate.timeframe} mark={candidate.mark} history={candidate.priceHistory} fetchedAt={candidate.fetchedAt} lang={lang} />}
+                <ShortlistMarketChart pair={candidate.pair} timeframe={candidate.timeframe} mark={candidate.mark} history={candidate.priceHistory} fetchedAt={candidate.fetchedAt} lang={lang} />
                 <div className="candidate-score">
                   <b>{candidate.score}</b>
                   <span>setup score / 100</span>
@@ -1179,6 +1180,7 @@ export function SpotWorkspace({
     base: number | null;
     quote: number | null;
   }>({ base: null, quote: null });
+  const [spotBalanceRefresh, setSpotBalanceRefresh] = useState(0);
   const [fromToken, setFromToken] = useState("");
   const [toToken, setToToken] = useState("");
   const [amount, setAmount] = useState("0");
@@ -1404,12 +1406,14 @@ export function SpotWorkspace({
         baseToken.address,
         baseToken.decimals,
         networkKey,
+        spotBalanceRefresh > 0,
       ),
       fetchTokenBalance(
         wallet,
         quoteToken.address,
         quoteToken.decimals,
         networkKey,
+        spotBalanceRefresh > 0,
       ),
     ])
       .then(([base, quote]) => {
@@ -1421,7 +1425,7 @@ export function SpotWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [wallet, baseToken, quoteToken, mappingScope, expectedMappingScope, networkKey]);
+  }, [wallet, baseToken, quoteToken, mappingScope, expectedMappingScope, networkKey, spotBalanceRefresh]);
 
   useEffect(() => {
     if (mappingScope !== expectedMappingScope) return;
@@ -1503,6 +1507,9 @@ export function SpotWorkspace({
 
   const refresh = useCallback(async (freshOrders = false) => {
     lastRefreshAtRef.current = Date.now();
+    // Receipt settlement and manual refresh must refresh the ticket balances,
+    // not only the order history. Otherwise a sold balance stays spendable in UI.
+    setSpotBalanceRefresh(value => value + 1);
     // Establish the active chain/wallet scope before the first await. Without
     // this guard, a slower request from the previous tab/network can overwrite
     // the newly selected network's account state.
@@ -6693,7 +6700,7 @@ export function AutopilotWorkspace({
                                 <b>{rule.passed ? "PASS" : "WAIT"}</b>
                                 <span>{rule.label}</span>
                                 <small>
-                                  {rule.observed} - requires {rule.required}
+                                  {formatRuleEvidence(rule.observed)} - requires {formatRuleEvidence(rule.required)}
                                 </small>
                               </div>
                             ))}

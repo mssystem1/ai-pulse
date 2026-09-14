@@ -77,7 +77,7 @@ assertPkLocalOnly();
 console.log("=== PULSE live simulate ===");
 console.log("API", BASE);
 console.log("Wallet", WALLET);
-console.log("PK loaded:", PK.slice(0, 6) + "…" + PK.slice(-4));
+console.log("Test wallet credentials loaded; private key is never printed.");
 
 const health = await call("/healthz");
 console.log("\n[health]", health.status, health.json);

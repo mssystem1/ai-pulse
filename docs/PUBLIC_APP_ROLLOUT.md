@@ -67,6 +67,16 @@ npx tsx apps/api/src/publicActivityBackfill.ts --write
 
 This writes aggregate facts, never overwrites jobs, never moves funds and is idempotent with the live delivery path. Confirm the resolved Redis destination and PULSE namespace in the environment before `--write`; do not paste credentials into chat or command output. The scan is bounded to 500 pages / 50,000 examined records and never claims complete lifetime coverage. It cannot reconstruct already deleted history or old inline Risk Guard deliveries. Do not run it as a request-time landing-page operation.
 
+For migrated PULSE history spread across namespaces, explicitly name each source and the live destination. Preview first, then repeat with `--write` after checking the counts:
+
+```powershell
+npx.cmd tsx apps/api/src/publicActivityBackfill.ts --source-namespace pulse:local --source-namespace pulse:production --target-namespace pulse:production
+```
+
+Use the actual deployment namespace, not a new name. Source jobs and report bodies stay in their original namespaces. Only receipt-verified public aggregates are published in the target. Original payment identities deduplicate across namespaces, including genuine live developer tests; fixtures and unsettled receipts remain excluded. Cross-namespace writes require an explicit `--target-namespace`.
+
+Spot history includes legacy direct-wallet fills, protected market buys and confirmed protected limit entries. The activity source label alone is not trade evidence: server reconciliation must verify the successful receipt, approved router or owner-matched PULSE account, net token transfers and block time. Funding, approvals, withdrawals and failed/cancelled orders never become trading volume.
+
 ### Arc mainnet readiness
 
 The statistics model records chain identity and environment separately. Do not rename the existing Arc Testnet bucket into mainnet on a calendar date. Verify official network configuration, payment contracts and PULSE service deployment before adding Arc Mainnet. New mainnet activity joins the aggregates as a separate bucket; old testnet analyses remain visible and labeled. Mainnet availability alone does not enable Spot/Autopilot routes.

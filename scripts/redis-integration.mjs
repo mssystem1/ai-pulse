@@ -37,7 +37,8 @@ try {
   validateRedisUrl(url);
   assert.equal(await command("PING"), "PONG"); connected = true;
   const jobs = new RedisJobStore(url, "", 60, namespace);
-  const input = { idempotencyKey: "fixture-authorization", requestHash: "fixture", resourceUrl: "/fixture", network: "eip155:8453", networkKey: "base", mode: "spot", tier: "standard", payer: owner, maxRegenerationAttempts: 2 };
+  const request = { primaryMarketId: "pm:fixture", additionalMarketIds: [], nested: { items: [] }, lang: "en" };
+  const input = { idempotencyKey: "fixture-authorization", requestHash: "fixture", resourceUrl: "/fixture", network: "eip155:8453", networkKey: "base", mode: "prediction", tier: "standard", payer: owner, input: request, maxRegenerationAttempts: 2 };
   const acquired = await Promise.all(Array.from({ length: 4 }, () => jobs.acquire(input)));
   assert.equal(acquired.filter(item => item.created).length, 1);
   assert.equal(new Set(acquired.map(item => item.job.id)).size, 1);
@@ -45,14 +46,17 @@ try {
   const now = new Date().toISOString();
   const receipt = { id: "fixture-receipt", provider: "mock", network: "eip155:8453", chainId: 8453, asset: owner, amountAtomic: "0", payer: owner, payee: owner, authorizationId: "fixture", resourceUrl: "/fixture", requestHash: "fixture", verificationResult: "accepted_by_middleware", settlementResult: "settled", settlementMode: "mock", finality: { status: "simulated", scope: "mock" }, createdAt: now, verifiedAt: now, settledAt: now };
   await jobs.bindReceiptAndEnqueue(job.id, receipt);
+  assert.deepEqual((await jobs.get(job.id)).input, request, "receipt binding preserves request arrays through real Redis Lua");
   const claims = await Promise.all([jobs.claim("worker-a", 30), jobs.claim("worker-b", 30)]);
   assert.equal(claims.filter(Boolean).length, 1);
+  assert.deepEqual(claims.find(Boolean).input, request, "worker receives original request, not cjson-corrupted objects");
   const worker = claims[0] ? "worker-a" : "worker-b";
   assert.equal(await jobs.extendLease(job.id, "wrong-owner", 30), false);
   assert.equal(await jobs.extendLease(job.id, worker, 30), true);
   await jobs.requeue(job.id, worker);
   assert.equal((await jobs.claim(worker, 30))?.id, job.id);
   await jobs.attachReport(job.id, "fixture-report");
+  assert.deepEqual((await jobs.get(job.id)).input, request, "report attachment preserves the original request");
   await jobs.ack(job.id, worker);
   assert.deepEqual(await jobs.queueStats(), { ready: 0, leased: 0 });
   assert.equal((await jobs.listByPayer(owner, "base"))[0]?.receipt?.reportId, "fixture-report");

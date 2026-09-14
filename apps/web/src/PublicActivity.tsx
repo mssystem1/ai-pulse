@@ -48,6 +48,12 @@ export function usePublicActivity() {
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
+    const refresh = () => { if (document.visibilityState === "visible") setAttempt(value => value + 1); };
+    const timer = window.setInterval(refresh, 60_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, []);
+  useEffect(() => {
     const controller = new AbortController();
     let active = true;
     const timeout = window.setTimeout(() => controller.abort(), 12_000);

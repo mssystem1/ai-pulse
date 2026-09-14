@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { randomBytes } from "node:crypto";
-import { MemoryJobStore, MemoryReportStore, VercelBlobReportStore, createPersistence, decryptReport, encryptReport, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type PaymentReceipt, type ReportStoreDependencies } from "./jobs.js";
+import { MemoryJobStore, MemoryReportStore, VercelBlobReportStore, createPersistence, decodedJob, serializedJob, decryptReport, encryptReport, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type PaymentReceipt, type ReportStoreDependencies } from "./jobs.js";
 
 const receipt = (id = "receipt-1"): PaymentReceipt => ({
   id, provider: "mock", network: "eip155:196", chainId: 196, asset: "0x3333333333333333333333333333333333333333",
@@ -14,6 +14,23 @@ const receipt = (id = "receipt-1"): PaymentReceipt => ({
 });
 
 describe("paid jobs and private reports", () => {
+  it("preserves empty arrays through Redis cjson rewrites and hides the storage snapshot", async () => {
+    const input = { primaryMarketId: "pm:fixture", additionalMarketIds: [], nested: { outcomes: [], scalar: 0.1234567890123456 }, lang: "en" };
+    const { job } = await new MemoryJobStore().acquire({ idempotencyKey: "arrays", requestHash: requestHash(input), resourceUrl: "/prediction", network: "eip155:42161", mode: "prediction", tier: "standard", payer: "owner", input, maxRegenerationAttempts: 2 });
+    const wire = serializedJob(job);
+    const mutated = { ...wire, input: { ...input, additionalMarketIds: {}, nested: { outcomes: {}, scalar: 0.123456789 } } };
+    assert.deepEqual(decodedJob(JSON.stringify(mutated)).input, input);
+    assert.equal("_inputJson" in decodedJob(JSON.stringify(mutated)), false);
+  });
+
+  it("repairs legacy empty prediction arrays only when the original paid request hash matches", async () => {
+    const input = { primaryMarketId: "pm:fixture", additionalMarketIds: [], lang: "en" };
+    const { job } = await new MemoryJobStore().acquire({ idempotencyKey: "legacy", requestHash: requestHash(input), resourceUrl: "/prediction", network: "eip155:42161", mode: "prediction", tier: "standard", payer: "owner", input: { ...input, additionalMarketIds: {} }, maxRegenerationAttempts: 2 });
+    assert.deepEqual(decodedJob(job).input, input);
+    assert.deepEqual(decodedJob({ ...job, requestHash: "different" }).input, job.input);
+    assert.deepEqual(decodedJob({ ...job, input: { ...input, additionalMarketIds: { invalid: true } } }).input, { ...input, additionalMarketIds: { invalid: true } });
+    assert.deepEqual(decodedJob({ ...job, input: { ...job.input as object, _telegramDelivery: "private-capability" } }).input, { ...input, _telegramDelivery: "private-capability" });
+  });
   it("separates Base and Arbitrum idempotency namespaces", () => {
     const common = {
       provider: "cdp", authorizationId: "nonce", payer: "0x1111111111111111111111111111111111111111",

@@ -33,6 +33,8 @@ The public landing introduces Global Market, Prediction Market, Risk Guard, wall
 
 Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
 
+See the [13–14 September deployment audit](docs/PULSE_POST_DEPLOY_AUDIT_2026-09-14.md) for verified live workflows, payment recovery, historical statistics, test coverage and remaining validation limits.
+
 Public activity combines chains independently of the selected RPC. Research counts include Arc Testnet with explicit labeling; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
 
 Markets move continuously, but most analysis products still require an account, subscription, or separate checkout. Agents need something stricter: structured intelligence they can discover, pay for, recover after a refresh, and consume without a human checkout.

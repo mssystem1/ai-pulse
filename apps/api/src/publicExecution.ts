@@ -7,7 +7,8 @@ import type { PublicActivityStore, VerifiedExecution } from "./publicActivity.js
 export function publicExecution(item: Activity, accounts: OnchainAccountSnapshot | null): VerifiedExecution | null {
   if (!["base", "arbitrum", "xlayer"].includes(item.network) || item.status !== "confirmed"
     || !item.txHash || !item.fillObservedAt || !item.fillSide || !item.fillQuoteAsset || !item.fillQuoteValue || !item.fillQuantity
-    || !/^(market_(buy|sell)|automatic_(entry|take_profit|stop_loss|fill)|(buy|sell)(_partial)?_filled)$/i.test(item.kind)) return null;
+    || !Number.isFinite(item.fillQuoteValue) || item.fillQuoteValue <= 0 || !Number.isFinite(item.fillQuantity) || item.fillQuantity <= 0
+    || !/^(market_(buy|sell)|market_buy_with_protection|automatic_(entry|entry_protected|take_profit|stop_loss|fill)|(buy|sell)(_partial)?_filled)$/i.test(item.kind)) return null;
   const network = getNetwork(item.network as ExecutionNetwork);
   if (item.fillQuoteAsset.toLowerCase() !== network.paymentAsset.address?.toLowerCase()) return null;
   let service: "spot" | "autopilot" = "spot";
@@ -16,7 +17,9 @@ export function publicExecution(item: Activity, accounts: OnchainAccountSnapshot
     const account = item.account.toLowerCase();
     if (accounts.vaults.some(vault => vault.address.toLowerCase() === account)) service = "autopilot";
     else if (!Object.values(accounts.accounts).some(value => value?.toLowerCase() === account)) return null;
-  } else if (item.source !== "spot") return null;
+  // Direct Spot orders have historically been journalled under "wallet".
+  // Receipt enrichment already verifies the owner, approved router and net swap.
+  } else if (!["spot", "wallet"].includes(item.source)) return null;
   const settlementAtomic = item.fillSide === "buy" ? item.fillInputAmount : item.fillOutputAmount;
   if (!settlementAtomic || !/^[1-9]\d*$/.test(settlementAtomic)) return null;
   return { chain: network.caip2, txHash: item.txHash, service, at: item.fillObservedAt, settlementAsset: item.fillQuoteAsset, settlementAtomic };

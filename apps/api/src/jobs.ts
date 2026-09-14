@@ -159,8 +159,27 @@ function newJob(input: JobCreateInput): { job: AnalysisJob; recoveryToken: strin
   return { job, recoveryToken };
 }
 
-function decodedJob(value: string | AnalysisJob): AnalysisJob {
-  return Object.freeze(typeof value === "string" ? JSON.parse(value) as AnalysisJob : value);
+/** Redis Lua cjson cannot preserve empty JSON arrays. Keep immutable request JSON opaque. */
+export function serializedJob(job: AnalysisJob) {
+  return { ...job, _inputJson: JSON.stringify(job.input) };
+}
+
+export function decodedJob(value: string | AnalysisJob): AnalysisJob {
+  const stored = (typeof value === "string" ? JSON.parse(value) : value) as AnalysisJob & { _inputJson?: string };
+  const { _inputJson, ...job } = stored;
+  if (typeof _inputJson === "string") return Object.freeze({ ...job, input: JSON.parse(_inputJson) });
+  // Repair the known legacy [] -> {} corruption only when the reconstructed
+  // original request matches its payment-bound hash. Never guess new inputs.
+  if (job.mode === "prediction" && job.input && typeof job.input === "object" && !Array.isArray(job.input)) {
+    const input = job.input as Record<string, unknown>;
+    const ids = input.additionalMarketIds;
+    if (ids && typeof ids === "object" && !Array.isArray(ids) && Object.keys(ids).length === 0) {
+      const repaired = { ...input, additionalMarketIds: [] };
+      const { _telegramDelivery, ...originalRequest } = repaired as Record<string, unknown>;
+      if (requestHash(originalRequest) === job.requestHash) return Object.freeze({ ...job, input: repaired });
+    }
+  }
+  return Object.freeze(job);
 }
 
 export function canonicalJson(value: unknown): string {
@@ -329,7 +348,7 @@ export class RedisJobStore implements JobStore {
     const result = await this.redis.eval<[string, string, string], string>(
       "local e=redis.call('GET',KEYS[1]); if e then return e end; redis.call('SET',KEYS[2],ARGV[1],'EX',ARGV[2]); redis.call('SET',KEYS[1],ARGV[3],'EX',ARGV[2]); return ARGV[3]",
       [this.idemKey(input.idempotencyKey), this.jobKey(job.id)],
-      [JSON.stringify(job), String(this.retentionSeconds), job.id],
+      [JSON.stringify(serializedJob(job)), String(this.retentionSeconds), job.id],
     );
     if (result !== job.id) {
       const existing = await this.get(result);
@@ -342,7 +361,8 @@ export class RedisJobStore implements JobStore {
   }
 
   async get(jobId: string) {
-    return await this.redis.get<AnalysisJob>(this.jobKey(jobId));
+    const job = await this.redis.get<AnalysisJob>(this.jobKey(jobId));
+    return job ? decodedJob(job) : null;
   }
 
   private async indexPayerJob(job: AnalysisJob) {
@@ -362,7 +382,7 @@ export class RedisJobStore implements JobStore {
         const scanResult: [string, string[]] = await this.redis.scan(cursor, { match: `${this.namespace}:job:*`, count: 200 });
         const nextCursor: string = scanResult[0];
         const keys: string[] = scanResult[1];
-        const rows = (await Promise.all(keys.map((key) => this.redis.get<AnalysisJob>(key)))).filter((item): item is AnalysisJob => Boolean(item));
+        const rows = (await Promise.all(keys.map((key) => this.redis.get<AnalysisJob>(key)))).filter((item): item is AnalysisJob => Boolean(item)).map(decodedJob);
         for (const item of rows) if (item.payer.toLowerCase() === payer.toLowerCase()) { discovered.push(item); await this.indexPayerJob(item); }
         cursor = nextCursor;
         if (String(cursor) === "0") break;
@@ -374,7 +394,7 @@ export class RedisJobStore implements JobStore {
   }
 
   private async save(job: AnalysisJob) {
-    await this.redis.set(this.jobKey(job.id), job, { ex: this.retentionSeconds });
+    await this.redis.set(this.jobKey(job.id), serializedJob(job), { ex: this.retentionSeconds });
     return job;
   }
 

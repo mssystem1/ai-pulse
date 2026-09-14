@@ -17,6 +17,10 @@ async function serve(app: express.Express) {
 }
 
 test("automation tick fails closed and runs each enabled worker only with the cron secret", async () => {
+  const previousQueue = process.env.QUEUE_PROVIDER;
+  const previousStorage = process.env.STORAGE_PROVIDER;
+  process.env.QUEUE_PROVIDER = "memory";
+  process.env.STORAGE_PROVIDER = "memory";
   const previous = process.env.AUTOMATION_WORKER_ENABLED;
   const previousKvUrl = process.env.KV_REST_API_URL;
   const previousKvToken = process.env.KV_REST_API_TOKEN;
@@ -46,6 +50,8 @@ test("automation tick fails closed and runs each enabled worker only with the cr
     assert.equal(body.ok, true);
     assert.equal(body.results?.length, 3);
   } finally {
+    if (previousQueue === undefined) delete process.env.QUEUE_PROVIDER; else process.env.QUEUE_PROVIDER = previousQueue;
+    if (previousStorage === undefined) delete process.env.STORAGE_PROVIDER; else process.env.STORAGE_PROVIDER = previousStorage;
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (previous === undefined) delete process.env.AUTOMATION_WORKER_ENABLED;
     else process.env.AUTOMATION_WORKER_ENABLED = previous;
@@ -55,6 +61,10 @@ test("automation tick fails closed and runs each enabled worker only with the cr
 });
 
 test("automation tick reports a disabled worker without invoking it", async () => {
+  const previousQueue = process.env.QUEUE_PROVIDER;
+  const previousStorage = process.env.STORAGE_PROVIDER;
+  process.env.QUEUE_PROVIDER = "memory";
+  process.env.STORAGE_PROVIDER = "memory";
   const previous = process.env.AUTOMATION_WORKER_ENABLED;
   const previousKvUrl = process.env.KV_REST_API_URL;
   const previousKvToken = process.env.KV_REST_API_TOKEN;
@@ -76,6 +86,8 @@ test("automation tick reports a disabled worker without invoking it", async () =
     assert.equal(response.status, 503);
     assert.equal(called, false);
   } finally {
+    if (previousQueue === undefined) delete process.env.QUEUE_PROVIDER; else process.env.QUEUE_PROVIDER = previousQueue;
+    if (previousStorage === undefined) delete process.env.STORAGE_PROVIDER; else process.env.STORAGE_PROVIDER = previousStorage;
     await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
     if (previous === undefined) delete process.env.AUTOMATION_WORKER_ENABLED;
     else process.env.AUTOMATION_WORKER_ENABLED = previous;

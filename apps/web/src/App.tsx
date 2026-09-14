@@ -146,6 +146,9 @@ export function App() {
 
   const [ticker, setTicker] = useState<Record<string, unknown> | null>(null);
   const [candles, setCandles] = useState<Candle[]>([]);
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState<string | null>(null);
+  const marketRequestRef = useRef(0);
   const teaserScope = `${instId}:${timeframe}`;
   const teaserScopeRef = useRef(teaserScope);
   teaserScopeRef.current = teaserScope;
@@ -379,20 +382,31 @@ export function App() {
   }
 
   async function loadTeaser() {
-    setLoading(true);
-    setBusyAction("free");
-    setError(null);
+    const request = ++marketRequestRef.current;
+    setMarketLoading(true);
+    setMarketError(null);
     try {
       const preview = await loadMarketPreview(instId, timeframe);
-      if (teaserScopeRef.current !== teaserScope) return;
+      if (teaserScopeRef.current !== teaserScope || marketRequestRef.current !== request) return;
       setTicker(preview.ticker);
       setCandles(preview.candles);
     } catch (e) {
-      if (teaserScopeRef.current === teaserScope) setError(e instanceof Error ? e.message : String(e));
+      if (teaserScopeRef.current === teaserScope && marketRequestRef.current === request) setMarketError(e instanceof Error ? e.message : String(e));
     } finally {
-      if (teaserScopeRef.current === teaserScope) { setLoading(false); setBusyAction(null); }
+      if (teaserScopeRef.current === teaserScope && marketRequestRef.current === request) setMarketLoading(false);
     }
   }
+
+  // Free market context is independent of report checkout/recovery state.
+  // Changing pair, timeframe or page invalidates delayed responses.
+  useEffect(() => {
+    if (tab !== "analyze") return;
+    const refresh = () => { if (document.visibilityState === "visible" && !document.querySelector("dialog[open]")) void loadTeaser(); };
+    refresh();
+    const timer = window.setInterval(refresh, 30_000);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { marketRequestRef.current++; window.clearInterval(timer); document.removeEventListener("visibilitychange", refresh); };
+  }, [tab, teaserScope]);
 
   /** Paid call: check the selected network's payment balance, then let the wallet sign x402. */
   async function recoverSpotJob(jobId: string, recoveryToken: string, recoveryNetwork: WebNetworkKey, requestId = reportRequestRef.current) {
@@ -656,9 +670,9 @@ export function App() {
   const analysisReady = Boolean(result) && ["analysis_base", "analysis_premium", "spot_analysis_standard", "spot_analysis_premium"].includes(service);
   const riskOnchainSource = networkKey === "xlayer" ? "OKX API" : networkKey === "base" || networkKey === "arbitrum" ? "Blockscout API" : "available indexed chain evidence";
   const experience = tab === "analyze"
-    ? { title: "Global market intelligence", lead: "Explore every live OKX spot instrument—including crypto, xStocks and RWA—then choose Base or Premium analysis." }
+    ? { title: "Global market intelligence", lead: "Explore every live OKX spot instrument—including crypto, xStocks and RWA—then choose Quick or Pro analysis." }
     : tab === "prediction"
-      ? { title: "Prediction market intelligence", lead: "Choose one live Polymarket question, inspect its executable evidence, then request Base or Premium analysis." }
+      ? { title: "Prediction market intelligence", lead: "Choose one live Polymarket question, inspect its executable evidence, then request Quick or Pro analysis." }
       : tab === "spot"
         ? { title: "Trade with your wallet", lead: "Choose a pair or load a Global Market report. Review your Market or Limit ticket, amount and protection, then sign when ready." }
         : tab === "autopilot"
@@ -801,10 +815,11 @@ export function App() {
       {(tab === "prediction" || tab === "safety") && <header className="workspace-page-heading"><h1>{experience.title}</h1><p>{experience.lead}</p><div className="nfa">{d.nfa}</div></header>}
 
       {tab === "analyze" && <section className="card global-market-workspace" aria-label="Selected market and chart">
-        <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{d.symbol} <Tip text={d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><button type="button" className="btn btn-soft" disabled={loading} onClick={() => void loadTeaser()}>{busyAction === "free" ? d.loading : d.loadFree}</button></div>
+        <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{d.symbol} <Tip text={d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><button type="button" className="btn btn-soft" disabled={marketLoading} onClick={() => void loadTeaser()}>{marketLoading ? d.loading : d.loadFree}</button></div>
         <p className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; Spot needs a mapped pair, a live route and wallet approval.</p>
         <div className="chart-head"><span>{instId}</span><span className="muted">{timeframe} · OKX · Free market preview</span></div>
-        {candles.length > 0 ? <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang}/> : <div className="chart-empty">{d.loadFree}</div>}
+        {candles.length > 0 ? <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang}/> : <div className="chart-empty" role="status">{marketError ? (lang === "zh" ? "市场数据暂不可用，请重试。" : "Market data temporarily unavailable. Retry the free preview.") : d.loading}</div>}
+        {marketError && candles.length > 0 && <p role="status">{lang === "zh" ? "更新失败，显示上次行情。" : "Refresh failed; showing the last market snapshot."}</p>}
         <p className="hint">{d.nfa}</p>
       </section>}
 

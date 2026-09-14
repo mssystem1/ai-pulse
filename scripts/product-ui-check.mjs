@@ -78,7 +78,7 @@ try {
         await page.getByText('+10.00%', { exact: true }).waitFor();
         assert.equal(await page.locator('#reports').count(), 1);
       } else if(context==='global-chart') {
-        await page.getByRole('button',{name:'Load free market data',exact:true}).click();
+        // Opening Global must load the selected market without another click.
         await page.locator('.global-market-workspace .candle-canvas canvas').first().waitFor();
         assert.equal(await page.locator('#pulse-chart').count(),0);
         await page.getByRole('button',{name:/Open market chart BTC-USDT/}).click();

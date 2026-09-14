@@ -89,6 +89,7 @@ try {
     const countBefore = scans;
     await page.getByRole("button", { name: /Show \d+ more candidates/ }).click();
     assert.equal(await page.locator(".potential-gainer-grid>article").count(), 8);
+    assert.equal(await page.locator('.potential-gainer-grid .shortlist-sparkline').count(), 8, 'Global, Spot and Autopilot all provide market charts');
     const allShown = page.getByRole("button", { name: /All 8 candidates shown/ });
     assert.equal(await allShown.isDisabled(), true);
     await allShown.evaluate(button => { button.click(); button.click(); button.click(); });
