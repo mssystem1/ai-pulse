@@ -10,3 +10,109 @@ test("OTOCO bracket turns a filled limit buy into protected custody then closes 
 test("Autopilot V2 enforces owner policy then executes an allowlisted oracle-valued trade once",async()=>{const h=await harness();const registry=await h.deploy("PulseRegistryV1",[h.account.address]);const oracle=await h.deploy("OracleRouterV1",[h.account.address]);const adapter=await h.deploy("OkxSwapAdapterV1",[h.account.address]);const factory=await h.deploy("AutopilotVaultFactoryV2",[registry.address,oracle.address]);const settlement=await h.deploy("MockERC20Pulse",["USD","USD",6]);const target=await h.deploy("MockERC20Pulse",["Target","TGT",18]);const router=await h.deploy("MockRouterPulse");await h.write(registry,"setAdapter",[adapter.address,true]);await h.write(registry,"setAutopilotExecutor",[h.account.address,true]);await h.write(adapter,"setRouter",[router.address,true]);const policyHash=keccak256(toHex("policy"));await h.write(factory,"createVault",[settlement.address,policyHash]);const vaultAddress=(await h.publicClient.readContract({address:factory.address,abi:factory.abi,functionName:"vaultsOf",args:[h.account.address]}))[0];const vault={address:vaultAddress,abi:(await artifact("AutopilotVaultV2")).abi};await h.write(vault,"configureAsset",[target.address,true,200_000_000n]);await h.write(vault,"configureLimits",[100_000_000n,500_000_000n,500,1000,30n,BigInt(Math.floor(Date.now()/1000)+3600)]);await h.write(settlement,"mint",[vault.address,100_000_000n]);await h.write(target,"mint",[router.address,100n*10n**18n]);await h.write(oracle,"setPrice",[target.address,settlement.address,10n**18n,300n]);await h.write(vault,"setPaused",[false]);const routerData=encodeFunctionData({abi:router.abi,functionName:"swap",args:[settlement.address,target.address,50_000_000n,50n*10n**18n]});const adapterData=encodeFunctionData({abi:adapter.abi,functionName:"execute",args:[router.address,settlement.address,target.address,50_000_000n,49n*10n**18n,routerData]});const decision=keccak256(toHex("decision")),evidence=keccak256(toHex("evidence"));await h.write(vault,"execute",[decision,3n,0n,adapter.address,settlement.address,target.address,50_000_000n,49n*10n**18n,adapterData,evidence]);assert.equal(await h.publicClient.readContract({address:target.address,abi:target.abi,functionName:"balanceOf",args:[vault.address]}),50n*10n**18n);await assert.rejects(()=>h.publicClient.simulateContract({address:vault.address,abi:vault.abi,functionName:"execute",args:[decision,3n,0n,adapter.address,settlement.address,target.address,1n,1n,adapterData,evidence],account:h.account}),/NONCE/);});
 
 test("OKX adapter V2 keeps router and approval spender policies separate",async()=>{const h=await harness();const adapter=await h.deploy("OkxSwapAdapterV2",[h.account.address]);const sell=await h.deploy("MockERC20Pulse",["USD","USD",6]);const buy=await h.deploy("MockERC20Pulse",["Asset","AST",6]);const spender=await h.deploy("MockApprovalSpenderPulse");const router=await h.deploy("MockRouterWithSpenderPulse");await h.write(adapter,"setRouter",[router.address,true]);await h.write(adapter,"setSpender",[spender.address,true]);await h.write(sell,"mint",[adapter.address,100_000_000n]);await h.write(buy,"mint",[router.address,200_000_000n]);const routerData=encodeFunctionData({abi:router.abi,functionName:"swap",args:[spender.address,sell.address,buy.address,100_000_000n,200_000_000n]});await h.write(adapter,"execute",[router.address,spender.address,sell.address,buy.address,100_000_000n,190_000_000n,routerData]);assert.equal(await h.publicClient.readContract({address:buy.address,abi:buy.abi,functionName:"balanceOf",args:[h.account.address]}),200_000_000n);assert.equal(await h.publicClient.readContract({address:sell.address,abi:sell.abi,functionName:"allowance",args:[adapter.address,spender.address]}),0n);await assert.rejects(()=>h.publicClient.simulateContract({address:adapter.address,abi:adapter.abi,functionName:"execute",args:[router.address,router.address,sell.address,buy.address,1n,1n,routerData],account:h.account}),/INPUT/);});
+
+// Exact deployed account/adapter versions, with isolated 6/18-decimal mock
+// assets and a split router/spender. No production RPC, wallet or funds.
+async function robinhoodCombination() {
+  const h = await harness();
+  const registry = await h.deploy("PulseRegistryV1", [h.account.address]);
+  const oracle = await h.deploy("OracleRouterV1", [h.account.address]);
+  const adapter = await h.deploy("OkxSwapAdapterV2", [h.account.address]);
+  const spender = await h.deploy("MockApprovalSpenderPulse");
+  const router = await h.deploy("MockRouterWithSpenderPulse");
+  const usd = await h.deploy("MockERC20Pulse", ["Fixture USDG", "USDG", 6]);
+  const asset = await h.deploy("MockERC20Pulse", ["Fixture token", "TGT", 18]);
+  await h.write(registry, "setAdapter", [adapter.address, true]);
+  await h.write(registry, "setSpotKeeper", [h.account.address, true]);
+  await h.write(registry, "setAutopilotExecutor", [h.account.address, true]);
+  await h.write(adapter, "setRouter", [router.address, true]);
+  await h.write(adapter, "setSpender", [spender.address, true]);
+  const read = (contract, functionName, args = []) => h.publicClient.readContract({ ...contract, functionName, args });
+  const price = value => h.write(oracle, "setPrice", [asset.address, usd.address, value, 300n]);
+  const route = async (sell, buy, amount, output, minimum = output) => {
+    await h.write(buy, "mint", [router.address, output]);
+    const data = encodeFunctionData({ abi: router.abi, functionName: "swap", args: [spender.address, sell.address, buy.address, amount, output] });
+    return encodeFunctionData({ abi: adapter.abi, functionName: "execute", args: [router.address, spender.address, sell.address, buy.address, amount, minimum, data] });
+  };
+  const clean = async () => {
+    for (const token of [usd, asset]) {
+      assert.equal(await read(token, "allowance", [adapter.address, spender.address]), 0n);
+      assert.equal(await read(token, "balanceOf", [adapter.address]), 0n);
+    }
+  };
+  return { ...h, registry, oracle, adapter, spender, router, usd, asset, read, price, route, clean };
+}
+
+test("Robinhood combination: V1 market protection exits through V2 split-spender adapter", async () => {
+  const h = await robinhoodCombination(), unit = 10n ** 18n;
+  const factory = await h.deploy("SpotOrderAccountFactoryV1", [h.registry.address, h.oracle.address]);
+  await h.write(factory, "createAccount");
+  const account = { address: await h.read(factory, "accountOf", [h.account.address]), abi: (await artifact("SpotOrderAccountV1")).abi };
+  await h.write(h.asset, "mint", [h.account.address, unit]);
+  await h.write(h.asset, "approve", [account.address, unit]);
+  await h.write(account, "createPosition", [h.asset.address, h.usd.address, unit, 22n * unit / 10n, 18n * unit / 10n, 0n]);
+  const data = await h.route(h.asset, h.usd, unit, 2_400_000n);
+  const args = [1n, h.adapter.address, data, 2_400_000n];
+  await h.price(2n * unit);
+  await assert.rejects(() => h.publicClient.simulateContract({ ...account, functionName: "executeExit", args, account: h.account }), /NOT_TRIGGERED/);
+  await h.price(24n * unit / 10n);
+  await h.write(account, "executeExit", args);
+  assert.equal(await h.read(h.usd, "balanceOf", [h.account.address]), 2_400_000n);
+  assert.equal(await h.read(h.asset, "balanceOf", [account.address]), 0n);
+  await assert.rejects(() => h.publicClient.simulateContract({ ...account, functionName: "executeExit", args, account: h.account }), /STATE/);
+  await h.clean();
+});
+
+test("Robinhood combination: protected bracket entry and exit use V2 and preserve custody", async () => {
+  const h = await robinhoodCombination(), unit = 10n ** 18n;
+  const factory = await h.deploy("SpotBracketAccountFactoryV1", [h.registry.address, h.oracle.address]);
+  await h.write(factory, "createAccount");
+  const account = { address: await h.read(factory, "accountOf", [h.account.address]), abi: (await artifact("SpotBracketAccountV1")).abi };
+  await h.write(h.usd, "mint", [h.account.address, 100_000_000n]);
+  await h.write(h.usd, "approve", [account.address, 100_000_000n]);
+  await h.write(account, "createOrder", [h.usd.address, h.asset.address, h.asset.address, h.usd.address, 100_000_000n, 2n * unit, false, 50n * unit, 22n * unit / 10n, 18n * unit / 10n, true, BigInt(Math.floor(Date.now() / 1000) + 3600)]);
+  await h.price(2n * unit);
+  await h.write(account, "executeEntry", [1n, h.adapter.address, await h.route(h.usd, h.asset, 100_000_000n, 50n * unit)]);
+  assert.equal(Number((await h.read(account, "orders", [1n]))[14]), 3);
+  assert.equal(await h.read(h.asset, "balanceOf", [account.address]), 50n * unit);
+  assert.equal(await h.read(h.asset, "balanceOf", [h.account.address]), 0n);
+  await h.clean();
+  await h.price(24n * unit / 10n);
+  await h.write(account, "executeExit", [1n, h.adapter.address, await h.route(h.asset, h.usd, 50n * unit, 120_000_000n), 120_000_000n]);
+  assert.equal(Number((await h.read(account, "orders", [1n]))[14]), 5);
+  assert.equal(await h.read(h.usd, "balanceOf", [h.account.address]), 120_000_000n);
+  assert.equal(await h.read(h.asset, "balanceOf", [account.address]), 0n);
+  await h.clean();
+});
+
+test("Robinhood combination: V2 Autopilot buy/sell conserves balances and rejects replay", async () => {
+  const h = await robinhoodCombination(), unit = 10n ** 18n;
+  const factory = await h.deploy("AutopilotVaultFactoryV2", [h.registry.address, h.oracle.address]);
+  await h.write(factory, "createVault", [h.usd.address, keccak256(toHex("fixture policy"))]);
+  const vault = { address: (await h.read(factory, "vaultsOf", [h.account.address]))[0], abi: (await artifact("AutopilotVaultV2")).abi };
+  await h.write(vault, "configureAsset", [h.asset.address, true, 200_000_000n]);
+  await h.write(vault, "configureLimits", [200_000_000n, 500_000_000n, 500, 1000, 30n, BigInt(Math.floor(Date.now() / 1000) + 3600)]);
+  await h.write(h.usd, "mint", [vault.address, 100_000_000n]);
+  await h.price(2n * unit);
+  await h.write(vault, "setPaused", [false]);
+  const proof = keccak256(toHex("fixture evidence"));
+  const buyArgs = [keccak256(toHex("fixture buy")), 3n, 0n, h.adapter.address, h.usd.address, h.asset.address, 100_000_000n, 50n * unit, await h.route(h.usd, h.asset, 100_000_000n, 50n * unit), proof];
+  await h.write(vault, "execute", buyArgs);
+  assert.equal(await h.read(h.asset, "balanceOf", [vault.address]), 50n * unit);
+  assert.equal(await h.read(h.usd, "balanceOf", [vault.address]), 0n);
+  await assert.rejects(() => h.publicClient.simulateContract({ ...vault, functionName: "execute", args: buyArgs, account: h.account }), /NONCE/);
+  await h.clean();
+  await h.publicClient.request({ method: "evm_increaseTime", params: [31] });
+  await h.publicClient.request({ method: "evm_mine", params: [] });
+  await h.price(24n * unit / 10n);
+  const sellArgs = [keccak256(toHex("fixture sell")), 3n, 1n, h.adapter.address, h.asset.address, h.usd.address, 50n * unit, 120_000_000n, await h.route(h.asset, h.usd, 50n * unit, 120_000_000n), proof];
+  await h.write(vault, "execute", sellArgs);
+  assert.equal(await h.read(h.asset, "balanceOf", [vault.address]), 0n);
+  assert.equal(await h.read(h.usd, "balanceOf", [vault.address]), 120_000_000n);
+  assert.equal(await h.read(vault, "actionNonce"), 2n);
+  await assert.rejects(() => h.publicClient.simulateContract({ ...vault, functionName: "execute", args: sellArgs, account: h.account }), /NONCE/);
+  await h.write(vault, "setPaused", [true]);
+  await h.write(vault, "withdraw", [h.usd.address, 120_000_000n]);
+  assert.equal(await h.read(h.usd, "balanceOf", [h.account.address]), 120_000_000n);
+  await h.clean();
+});
