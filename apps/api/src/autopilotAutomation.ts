@@ -12,7 +12,8 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { put } from "@vercel/blob";
-import { buildMarketContext, getTicker } from "@pulse/market";
+import { buildMarketContext } from "@pulse/market";
+import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, assertRobinhoodAutomationHistory } from "./robinhoodMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
@@ -32,6 +33,8 @@ import { AutopilotAiBudgetExceededError, actualAutopilotSignalCostUsd, estimated
 import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
 import { boundedBuyAmount, valuedPositionBalance } from "./autopilotPolicy.js";
+import { validateRobinhoodSwap } from "./robinhoodFunding.js";
+import { robinhoodAutomationReadiness } from "./robinhoodExecutionReadiness.js";
 
 type StrategyEvaluation = {
   id: string;
@@ -50,7 +53,7 @@ type StrategyEvaluation = {
   error?: string;
 };
 
-type Network = "xlayer" | "base" | "arbitrum";
+type Network = import("./executionContracts.js").ExecutionNetwork;
 type Strategy = {
   id: string;
   owner: string;
@@ -120,6 +123,16 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const NATIVE_TOKEN = /^0x[eE]{40}$/;
 const Erc20AddressSchema = z.string().regex(ADDRESS).refine((value) => !NATIVE_TOKEN.test(value), "Autopilot assets must be ERC-20 contracts; use the wrapped native asset");
 const configs = {
+  robinhood: {
+    id: 4663,
+    rpc: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
+    rpcFallback: () => process.env.ROBINHOOD_RPC_FALLBACK_URL || "https://rpc.mainnet.chain.robinhood.com",
+    oracle: () => executionContractAddress("robinhood", "oracleRouter"),
+    adapter: () => executionContractAddress("robinhood", "executionAdapter"),
+    router: () => executionContractAddress("robinhood", "okxRouter"),
+    spender: () => executionContractAddress("robinhood", "okxApproval"),
+    factory: () => executionContractAddress("robinhood", "autopilotFactory"),
+  },
   xlayer: {
     id: 196,
     rpc: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech",
@@ -153,7 +166,7 @@ const configs = {
 } as const;
 const StrategySchema = z.object({
   owner: z.string().regex(ADDRESS),
-  network: z.enum(["xlayer", "base", "arbitrum"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
   vault: z.string().regex(ADDRESS),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
@@ -182,10 +195,11 @@ const StrategySchema = z.object({
   }),
 });
 const StrategyPreflightSchema = z.object({
-  network: z.enum(["xlayer", "base", "arbitrum"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
   pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
+  timeframe: z.enum(["15m", "1H", "4H", "1D"]).optional(),
   amountAtomic: z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n),
 });
 async function kv(command: unknown[]) {
@@ -270,7 +284,7 @@ async function saveAutopilotPass(value: AutopilotPass) {
   await mutateAutopilotPass(value.network, value.vault, current => current && current.purchasedAt === value.purchasedAt
     ? { ...current, expiryWarningSentAt: value.expiryWarningSentAt, expiredNoticeSentAt: value.expiredNoticeSentAt } : current);
 }
-export async function grantAutopilotPass(input: { owner: string; network: Network; vault: string; days: 1 | 7 | 30; telegramDelivery?: string }) {
+export async function grantAutopilotPass(input: { owner: string; network: Network; vault: string; days: 1 | 7 | 30; telegramDelivery?: string; paymentId?: string }) {
   const strategy = (await list(false)).find((item) => item.network === input.network && item.vault.toLowerCase() === input.vault.toLowerCase() && item.owner.toLowerCase() === input.owner.toLowerCase());
   if (!strategy) throw new Error("The selected vault is not a registered Autopilot owned by this wallet on the selected network");
   const { publicClient } = clients(input.network);
@@ -350,7 +364,9 @@ async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D") {
       rows.push(...results.filter((row): row is NonNullable<typeof row> => row !== null));
       await new Promise((resolve) => setTimeout(resolve, 120));
     }
-    const value = rows.sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 8);
+    // Keep the full scan so network filtering cannot hide supported pairs that
+    // ranked below research-only assets in a global top-eight list.
+    const value = rows.sort((a, b) => Number(b.technicalReady) - Number(a.technicalReady) || Number(b.score) - Number(a.score));
     potentialGainerCache.set(timeframe, { value, expiresAt: Date.now() + 5 * 60_000 });
     if (kvConfigured()) await kv(["SET", `pulse:v6:autopilot:potential-gainers:${timeframe}`, JSON.stringify(value), "EX", 300]).catch(() => undefined);
     return value;
@@ -623,7 +639,8 @@ function authorizationMessage(input: z.infer<typeof StrategySchema>) {
   };
   return `PULSE Autopilot strategy\n${keccak256(toHex(JSON.stringify(payload)))}\nExpires:${input.authorization.expiresAt}`;
 }
-async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
+async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppConfig) {
+  assertExecutionMarketIdentity(input.network, input.pair);
   const { publicClient } = clients(input.network);
   const address = input.vault as `0x${string}`;
   const factory = configs[input.network].factory();
@@ -659,7 +676,9 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>) {
     throw new Error("Vault was not created by the configured Autopilot factory");
   const [base, quote, extra] = input.pair.toUpperCase().split("-");
   const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[input.network].id), name));
-  if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
+  if (input.network === "robinhood" && isRobinhoodMarket(input.pair)) {
+    await verifyRobinhoodMarketBinding(cfg, input.pair, input.targetAsset, input.settlementAsset);
+  } else if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
     throw new Error(`On-chain tokens ${targetSymbol}/${settlementSymbol} do not match ${input.pair}`);
   if (keccak256(toHex(JSON.stringify(input.policy))) !== policyHash)
     throw new Error(
@@ -689,6 +708,11 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     try {
       const { network, settlementAsset, targetAsset, pair, amountAtomic } = parsed.data;
+      assertExecutionMarketIdentity(network, pair);
+      if (network === "robinhood") {
+        const readiness = await robinhoodAutomationReadiness(cfg);
+        if (!readiness.ready) throw new Error(readiness.reason);
+      }
       const { publicClient } = clients(network);
       const [settlementCode, targetCode, metadata] = await Promise.all([
         publicClient.getCode({ address: settlementAsset as `0x${string}` }),
@@ -705,7 +729,15 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       const [targetSymbol, settlementSymbol, targetName, settlementName] = metadata.map(String);
       const [base, quote, extra] = pair.toUpperCase().split("-");
       const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[network].id), name));
-      if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
+      if (network === "robinhood" && isRobinhoodMarket(pair)) {
+        await verifyRobinhoodMarketBinding(cfg, pair, targetAsset, settlementAsset);
+        if (!parsed.data.timeframe) throw new Error("Choose the Robinhood Autopilot timeframe before setup");
+        const [market] = await Promise.all([
+          executionMarketContext(cfg, { instId: pair, timeframe: parsed.data.timeframe, candleLimit: 120, completedOnly: true }),
+          executionSettlementTicker(cfg, pair),
+        ]);
+        assertRobinhoodAutomationHistory(market.candles, parsed.data.timeframe);
+      } else if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
         throw new Error(`Contract route ${targetSymbol}/${settlementSymbol} does not represent ${pair}`);
       await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic, slippagePercent: "1.5" });
       res.json({ ready: true, pair, executionPair: `${targetSymbol}/${settlementSymbol}`, targetAsset, settlementAsset });
@@ -751,7 +783,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
               { address: strategy.vault as `0x${string}`, abi: vaultReadAbi, functionName: "paused" },
             ],
           }),
-          getTicker(strategy.pair),
+          executionSettlementTicker(cfg, strategy.pair),
         ]);
         const [settlementBalance, targetBalance, settlementDecimals, targetDecimals, settlementSymbol, targetSymbol, paused] = chainState;
         if (aiPass) aiPass = await synchronizeAutopilotPassPause(aiPass, Boolean(paused), Date.now());
@@ -812,7 +844,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       return res.status(400).json({ error: parsed.error.flatten() });
     try {
       await assertAutopilotStorageReady();
-      await verifyStrategy(parsed.data);
+      await verifyStrategy(parsed.data, cfg);
       const items = await list();
       const id = `${parsed.data.network}:${parsed.data.vault.toLowerCase()}`;
       const previous = items.find((s) => s.id === id);
@@ -828,7 +860,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
         publicClient.readContract({ address: parsed.data.targetAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" }),
       ]);
       // An empty target position needs no market dependency to value its deposit.
-      const ticker = targetBalance > 0n ? await getTicker(parsed.data.pair) : { last: 0 };
+      const ticker = targetBalance > 0n ? await executionSettlementTicker(cfg, parsed.data.pair) : { last: 0 };
       const baselinePrice = parseUnits(ticker.last.toFixed(18), 18);
       const baselineValue = settlementBalance + targetBalance * baselinePrice * (10n ** BigInt(settlementDecimals)) / (10n ** BigInt(targetDecimals)) / 10n ** 18n;
       const strategy: Strategy = {
@@ -912,7 +944,7 @@ async function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluati
     + (evaluation.status === "failed" ? 1 : 0);
   await persistJournalRow(strategy, evaluation, kvConfigured() ? kv : undefined);
 }
-export async function runAutopilotCycle(cfg: AppConfig) {
+export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Network; vault: string }) {
   {
     const key = (cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY) as `0x${string}`;
     if (
@@ -929,7 +961,9 @@ export async function runAutopilotCycle(cfg: AppConfig) {
       30_000,
       Number(process.env.AUTOPILOT_RISK_INTERVAL_MS || 60000) || 60000,
     );
-    const activeItems = items.filter((x) => x.status === "active");
+    const activeItems = items.filter((x) => x.status === "active" && Object.hasOwn(configs, x.network)
+      && (x.network !== "robinhood" || process.env.FEATURE_ROBINHOOD_TRADING === "1")
+      && (!scope || (x.network === scope.network && x.vault.toLowerCase() === scope.vault.toLowerCase())));
     const scheduled = [
       ...activeItems.map((strategy) => ({ strategy, mode: "risk" as const })),
       ...activeItems.map((strategy) => ({ strategy, mode: "analysis" as const })),
@@ -942,6 +976,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
       let aiAttemptedThisCycle = false;
       let evaluatedDecision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
       try {
+        assertExecutionMarketIdentity(s.network, s.pair);
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
         const lastRiskCheck = Date.parse(s.lastRiskCheckAt || "");
@@ -1018,7 +1053,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         }
         const strategyType = s.strategyType || identifyAutopilotStrategy(s.policy.strategy);
         s.strategyType = strategyType;
-        const positionTicker = targetBalance > 0n ? await getTicker(s.pair) : undefined;
+        const positionTicker = targetBalance > 0n ? await executionSettlementTicker(cfg, s.pair) : undefined;
         const policyBalance = valuedPositionBalance(targetBalance, positionTicker ? parseUnits(positionTicker.last.toFixed(18), 18) : 0n, Number(targetDecimals), Number(settlementDecimals));
         if (policyBalance === 0n && s.lastTxHash && s.lastDecision !== "sell_filled") {
           Object.assign(s, reconcileStrategyExecution(s, await listV6Activity(s.owner, s.network), policyBalance));
@@ -1035,6 +1070,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         let cooldownReady = cooldownRemaining === 0;
         let decision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
         let executionPrice = 0;
+        let analysisToSettlement = 1;
         let evidenceContext: unknown;
         let executionPlan: ReturnType<typeof buildSpotExecutionPlan> | undefined;
 
@@ -1084,29 +1120,39 @@ export async function runAutopilotCycle(cfg: AppConfig) {
 
         if (!decision) {
           analysisAttempted = true;
-          const market = await buildMarketContext({
+          const market = await executionMarketContext(cfg, {
             instId: s.pair,
             timeframe: s.timeframe,
             candleLimit: 120,
             completedOnly: true,
           });
           const candleTs = market.candles.at(-1)?.ts || 0;
+          if (isRobinhoodMarket(s.pair)) assertRobinhoodAutomationHistory(market.candles, s.timeframe);
           if (s.lastEvaluatedCandleTs === candleTs) {
             if (!s.lastError) s.lastDecision = "hold_same_candle";
             s.sameCandleSkipCount = (s.sameCandleSkipCount || 0) + 1;
             s.lastRunAt = new Date().toISOString();
             continue;
           }
-          s.lastEvaluatedCandleTs = candleTs;
           const technical = buildTechnicalStructure(market.candles);
           executionPrice = market.ticker.last;
+          if (isRobinhoodMarket(s.pair)) {
+            const settlementTicker = await executionSettlementTicker(cfg, s.pair);
+            if (settlementTicker.ts !== market.ticker.ts) throw new Error("Robinhood analysis and execution marks changed; retry with synchronized prices");
+            executionPrice = settlementTicker.last;
+            if (!("usdPerSettlement" in settlementTicker)) throw new Error("Robinhood USDG conversion is unavailable");
+            analysisToSettlement = 1 / settlementTicker.usdPerSettlement;
+          }
+          s.lastEvaluatedCandleTs = candleTs;
           const neutralAnalysis = { bias: "neutral", confidence: 0, regime: "transition", keyLevels: { support: [] as number[], resistance: [] as number[] } };
 
           // An open position never needs a new AI call to remain protected or
           // to react to deterministic structure failure.
           if (policyBalance > 0n) {
             const report = { analysis: neutralAnalysis };
-            decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report, aiEvaluated: false, minConfidence: s.minConfidence, hasPosition: true, exitPending: s.exitPending, activeTakeProfit: s.activeTakeProfit, activeStopLoss: s.activeStopLoss });
+            decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report, aiEvaluated: false, minConfidence: s.minConfidence, hasPosition: true, exitPending: s.exitPending,
+              activeTakeProfit: s.activeTakeProfit === undefined ? undefined : s.activeTakeProfit / analysisToSettlement,
+              activeStopLoss: s.activeStopLoss === undefined ? undefined : s.activeStopLoss / analysisToSettlement });
             s.aiSignalSource = "deterministic";
             s.aiBudgetStatus = "not_required_for_open_position";
             evidenceContext = { mode: "deterministic_position_monitor", technical };
@@ -1362,6 +1408,7 @@ export async function runAutopilotCycle(cfg: AppConfig) {
           throw new Error(
             "Autopilot prepared route failed router/value policy",
           );
+        if (s.network === "robinhood") validateRobinhoodSwap(prepared, { from: sellToken, to: buyToken, amount: String(amount), receiver: adapter!, slippageBps: Number(slippage) });
         const quoted = BigInt(String(prepared.quote?.toTokenAmount || "0"));
         const quoteMinimum = (quoted * (10000n - BigInt(slippage))) / 10000n;
         const oracleMinimum = minimumOracleOutput({
@@ -1458,8 +1505,8 @@ export async function runAutopilotCycle(cfg: AppConfig) {
         s.lastError = undefined;
         if (decision.action === "buy") {
           s.exitPending = false;
-          s.activeTakeProfit = Number(executionPlan!.buy.takeProfit) || undefined;
-          s.activeStopLoss = Number(executionPlan!.buy.stopLoss) || undefined;
+          s.activeTakeProfit = Number(executionPlan!.buy.takeProfit) * analysisToSettlement || undefined;
+          s.activeStopLoss = Number(executionPlan!.buy.stopLoss) * analysisToSettlement || undefined;
         } else {
           s.exitPending = partialExit;
           if (!partialExit) {

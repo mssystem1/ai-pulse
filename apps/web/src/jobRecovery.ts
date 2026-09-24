@@ -2,7 +2,7 @@ import type { WebNetworkKey } from "./networks";
 
 export type JobRecoveryHandle = Readonly<{ jobId: string; recoveryToken: string; createdAt?: string; label?: string; tier?: string }>;
 
-export type JobRecoveryScope = "prediction" | "spot";
+export type JobRecoveryScope = "prediction" | "spot" | "risk";
 function key(network: WebNetworkKey, scope: JobRecoveryScope) { return `pulse:last-job:${scope}:${network}`; }
 function historyKey(network: WebNetworkKey, scope: JobRecoveryScope) { return `pulse:report-history:${scope}:${network}`; }
 

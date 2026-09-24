@@ -6,7 +6,7 @@ const browser=await chromium.launch({channel:'msedge',headless:true});
 const origin='http://127.0.0.1:5178';
 const paths=process.env.UI_PATHS?.split(',')||['portfolio','global','prediction','safety','spot','autopilot','telegram','docs'];
 try{
-  for(const width of process.env.UI_WIDTHS?.split(',').map(Number)||[360,390,768,1440])for(const theme of process.env.UI_THEMES?.split(',')||['xlayer','base','arbitrum','arc-testnet']){
+  for(const width of process.env.UI_WIDTHS?.split(',').map(Number)||[360,390,768,1440])for(const theme of process.env.UI_THEMES?.split(',')||['xlayer','base','arbitrum','arc-testnet','robinhood']){
     const page=await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'}),errors=[];
     page.on('pageerror',error=>errors.push(error.message));
     await page.route('**/*',route=>{
@@ -44,10 +44,14 @@ try{
         }
       }
       if(path==='docs'){
-        assert.equal(await page.locator('.docs-content>[hidden]').count(),16);
+        assert.equal(await page.locator('.docs-content>[hidden]').count(),17);
         if(width<=800)await page.locator('.docs-mobile-topics select').selectOption('docs-auto');
         else await page.locator('.docs-nav a[href="#docs-auto"]').click();
         await page.locator('#docs-auto:visible').waitFor();
+        assert.equal(await page.locator('.docs-content>section:visible').count(),1);
+        if(width<=800)await page.locator('.docs-mobile-topics select').selectOption('docs-robinhood');
+        else await page.locator('.docs-nav a[href="#docs-robinhood"]').click();
+        await page.locator('#docs-robinhood:visible').waitFor();
         assert.equal(await page.locator('.docs-content>section:visible').count(),1);
       }
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,`${path} ${theme} ${width}: overflow`);

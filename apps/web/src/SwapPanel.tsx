@@ -3,6 +3,7 @@ import { fmtBal, USDT0_ADDRESS } from "./balances";
 import { apiGet, apiPost } from "./api";
 import { WEB_NETWORKS, depositArcGateway, type WebNetworkKey } from "./networks";
 import { getInjectedProvider, shortAddr } from "./wallet";
+import { RobinhoodFunding } from "./RobinhoodFundingPanel";
 
 type Props = {
   lang: "en" | "zh"; open: boolean; address: string | null; walletName: string;
@@ -94,9 +95,10 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
 
   useEffect(() => {
     setQuote(null);
+    setCdpQuote(null);
     setSwapError(null);
     setTxHash(null);
-  }, [address]);
+  }, [address, networkKey]);
 
   async function loadQuote(): Promise<DexQuote> {
     if (!address) throw new Error(copy.disconnected);
@@ -242,7 +244,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
     ? (lang === "zh" ? "充值 USDT0" : "Top up USDT0")
     : networkKey === "arc-testnet"
       ? (lang === "zh" ? "将 USDC 存入 Gateway" : "Deposit USDC into Gateway")
-      : (lang === "zh" ? "充值 USDC" : "Top up USDC");
+      : `${lang === "zh" ? "充值" : "Top up"} ${network.payment.symbol}`;
   const dexUrl = `https://web3.okx.com/dex-swap#srcChain=196&dstChain=196&toTokenAddress=${USDT0_ADDRESS}`;
   return (
     <div className="wallet-layer" role="dialog" aria-modal="true" aria-label={copy.title}>
@@ -301,7 +303,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
         </section> : <section className="swap-section funding-section">
           <div className="swap-title-row"><div><span className="eyebrow">{network.provider}</span><h3>Fund {network.payment.symbol} on {network.label}</h3></div><a href={network.fundingUrl} target="_blank" rel="noreferrer">{network.fundingLabel} ↗</a></div>
           <p>{network.fundingNote}</p>
-          {networkKey === "arc-testnet" ? (
+          {networkKey === "robinhood" ? <RobinhoodFunding key={address || "disconnected"} address={address} balance={balances?.native ?? null} onRefresh={onRefresh} /> : networkKey === "arc-testnet" ? (
             <div className="native-swap">
               <div className="swap-asset-card"><div><span>Gateway deposit</span><small>Wallet balance: {balances ? fmtBal(balances.payment, 6) : "—"} USDC</small></div><div className="swap-input-row"><input inputMode="decimal" value={gatewayAmount} onChange={(event) => setGatewayAmount(event.target.value)} aria-label="Gateway deposit amount" /><strong>USDC</strong></div></div>
               <button type="button" className="btn btn-primary full" disabled={!address || fundingBusy} onClick={() => void fundGateway()}>{fundingBusy ? "Approving and depositing…" : "Deposit into Circle Gateway"}</button>

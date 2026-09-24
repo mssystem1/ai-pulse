@@ -1,6 +1,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { createMarketPreviewLoader, loadHistoricalCandles, sparklinePoints } from "./marketPreview";
+import { createMarketPreviewLoader, loadHistoricalCandles, sparklinePoints, marketPairLabel, marketPriceCurrency } from "./marketPreview";
+
+test("Robinhood chart labels distinguish USD market prices from USDG settlement", () => {
+  const pair = "AAPL.AF3D76F1834A1D42-USDG";
+  assert.equal(marketPairLabel(pair), "AAPL/USDG");
+  assert.equal(marketPriceCurrency(pair), "USD");
+  assert.equal(marketPairLabel("BTC-USDT"), "BTC-USDT");
+  assert.equal(marketPriceCurrency("BTC-USDT"), "USDT");
+});
 
 test("historical chart pages exclude overlaps, deduplicate, and distinguish failure from end of history", async () => {
   let path = "";

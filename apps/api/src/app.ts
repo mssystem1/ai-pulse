@@ -69,12 +69,13 @@ import {
 import { z } from "zod";
 import { createPaidFetch, buyerAddress } from "@pulse/buyer";
 import { createMcpHandler } from "./mcp.js";
-import { getReport, listReports, saveReport } from "./store.js";
+import { getReport, listReports } from "./store.js";
 import { executionAssetAliases, getOkbUsdt0Quote, getOkbUsdt0Swap, getOkxTradeTokens, searchOkxDefiOpportunities } from "./okxDex.js";
 import { collectLiveContractEvidence, inspectEvmAddress, simulateEvmTransaction } from "./contractInspect.js";
 import { getCdpNativeUsdcSwap } from "./cdpSwap.js";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
 import { createPersistence, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type AnalysisJob, type PaymentReceipt } from "./jobs.js";
+import { executionTicker, isRobinhoodMarket, robinhoodCandles } from "./robinhoodMarkets.js";
 import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
 import { ArcBudgetExceededError, createArcBudgetStore, paymentPayer, type ArcBudgetStore } from "./arcBudget.js";
@@ -84,8 +85,12 @@ import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } f
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
 import { collectTokenRiskEvidence } from "./tokenRiskEvidence.js";
+import { reportDelivery, fullReportDelivery } from "./reportDelivery.js";
 import { optionalNumber } from "./geckoEvidence.js";
 import { createPublicActivityStore, jobResearchDelivery, researchDelivery } from "./publicActivity.js";
+import { createRobinhoodPaymentRuntime } from "./robinhoodPaymentRuntime.js";
+import { paidReplayRecoveryToken, verifyPaidReplayRecoveryToken } from "./paidJobRecovery.js";
+import { prepareRobinhoodFunding } from "./robinhoodFunding.js";
 
 const AnalysisBodySchema = z.object({
   instId: z.string().min(3).max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/, "Use an OKX instrument such as BTC-USDT"),
@@ -142,6 +147,8 @@ export function createApp(cfg: AppConfig, dependencies: {
   passTargetExists?: typeof autopilotPassTargetExists;
   automationTick?: Partial<AutomationTickDependencies>;
   startDurableWorker?: boolean;
+  /** Explicit in-process test adapter. Never populated from HTTP or environment. */
+  robinhoodPayment?: express.RequestHandler;
 } = {}) {
   const app = express();
   const polymarket = dependencies.polymarket || new PolymarketClient({
@@ -178,7 +185,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(express.json({ limit: "12mb" }));
   app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
   app.use(createV6Router(cfg, publicActivity));
-  app.use(createTradeAutomationRouter());
+  app.use(createTradeAutomationRouter(cfg));
   app.use(createAutopilotAutomationRouter(cfg));
   app.use(createTelegramRouter(cfg));
   app.use(telemetryMiddleware);
@@ -216,13 +223,13 @@ export function createApp(cfg: AppConfig, dependencies: {
     }
   });
 
-  const networkAliases = { xlayer: "xlayer", base: "base", arbitrum: "arbitrum", arc: "arc-testnet" } as const;
+  const networkAliases = { xlayer: "xlayer", base: "base", arbitrum: "arbitrum", arc: "arc-testnet", robinhood: "robinhood" } as const;
   app.use((req, res, next) => {
-    const match = req.url.match(/^\/(xlayer|base|arbitrum|arc)(?=\/)/);
+    const match = req.url.match(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/);
     const alias = match?.[1] as keyof typeof networkAliases | undefined;
     const networkKey = alias ? networkAliases[alias] : "xlayer";
     if (!cfg.enabledNetworks.includes(networkKey)) return res.status(404).json({ error: `Network disabled: ${networkKey}` });
-    const enabled = networkKey === "xlayer"
+    const enabled = networkKey === "xlayer" || networkKey === "robinhood"
       || (networkKey === "base" && cfg.FEATURE_BASE_PAYMENTS)
       || (networkKey === "arbitrum" && cfg.FEATURE_ARBITRUM_PAYMENTS)
       || (networkKey === "arc-testnet" && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_ENABLED);
@@ -230,6 +237,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     const network = cfg.enabledNetworks.includes(networkKey) ? networkKey : "xlayer";
     Object.assign(req, { pulseNetworkKey: network });
     if (match) req.url = req.url.slice(match[0].length) || "/";
+    // Express accepts trailing slashes; prechecks, pricing and receipt identity
+    // must see the same canonical path before any payment can be requested.
+    req.url = req.url.replace(/\/(?=\?|$)/, "") || "/";
     next();
   });
 
@@ -305,6 +315,12 @@ export function createApp(cfg: AppConfig, dependencies: {
     const metadata = buildAspMetadata(cfg);
     const withInputContract = <T extends { path: string; free: boolean }>(service: T) => ({
       ...service,
+      requestSpec: service.free ? undefined : { method: "POST", fields: buildX402InputRequired(service.path).fields },
+      serviceGuide: service.free ? undefined : service.path.includes("/analysis/spot/")
+        ? "Ask for pair, timeframe and report language together. POST JSON; preserve the method through input collection. After the authorized payment, poll the returned job without paying again and display the complete reportMarkdown. A wait recommendation still allows the user to configure a manual Spot ticket; no trade is executed by this service."
+        : service.path.includes("/autopilot/pass/")
+          ? "Collect owner and an already configured, funded and registered vault on the selected network. Verify ownership and setup before payment. This service activates or extends AI runtime; the owner's separately signed start/resume call controls trading."
+          : "Collect the selected market or exact token contract together with report language. POST JSON. Deliver every report section and preserve the recovery information; report retrieval and retry never require a second payment.",
       outputSchema: service.free ? undefined : getX402OutputSchema(service.path),
     });
     res.json({
@@ -313,6 +329,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         ...metadata.asp,
         services: metadata.asp.services.map(withInputContract),
         featuredServices: metadata.asp.featuredServices.map(withInputContract),
+        networkServices: metadata.asp.networkServices.map(withInputContract),
       },
     });
   });
@@ -351,7 +368,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     try {
       const instId = String(req.query.instId || "");
       if (!instId) return res.status(400).json({ error: "instId required" });
-      const ticker = await observeProvider("okx", "ticker", () => getTicker(instId));
+      const ticker = await observeProvider("okx", "ticker", () => executionTicker(cfg, instId));
       res.json({ service: "ticker", free: true, ticker });
     } catch (e) {
       res.status(502).json({ error: String(e) });
@@ -367,8 +384,9 @@ export function createApp(cfg: AppConfig, dependencies: {
       const before = req.query.before === undefined ? undefined : Number(req.query.before);
       if (!Number.isInteger(limit) || limit < 1 || limit > 300 || (before !== undefined && (!Number.isSafeInteger(before) || before <= 0)))
         return res.status(400).json({ error: "limit must be 1–300; before must be a positive timestamp in milliseconds" });
-      const candles = await observeProvider("okx", "candles", () => before === undefined ? getCandles(instId, bar, limit) : getHistoricalCandles(instId, bar, limit, before));
-      res.json({ service: "candles", free: true, instId, bar, candles, nextBefore: candles[0]?.ts ?? null });
+      const candles = await observeProvider("okx", "candles", () => isRobinhoodMarket(instId) ? robinhoodCandles(cfg, instId, bar, limit, before) : before === undefined ? getCandles(instId, bar, limit) : getHistoricalCandles(instId, bar, limit, before));
+      res.json({ service: "candles", free: true, instId, bar, candles,
+        priceCurrency: isRobinhoodMarket(instId) ? "USD" : instId.split("-").at(-1), nextBefore: candles[0]?.ts ?? null });
     } catch (e) {
       res.status(502).json({ error: String(e) });
     }
@@ -607,6 +625,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const values = key === "xlayer" ? [cfg.X_LAYER_RPC, cfg.X_LAYER_RPC_FALLBACK]
       : key === "base" ? [cfg.BASE_RPC_URL, cfg.BASE_RPC_FALLBACK_URL]
       : key === "arbitrum" ? [cfg.ARBITRUM_RPC_URL, cfg.ARBITRUM_RPC_FALLBACK_URL]
+      : key === "robinhood" ? [cfg.ROBINHOOD_RPC_URL]
       : [cfg.ARC_RPC_URL, cfg.ARC_RPC_FALLBACK_URL];
     return normalizeExecutionRpcUrls(key, values);
   };
@@ -775,7 +794,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const job = await persistence.jobs.get(String(req.params.jobId));
     if (!job) return null;
     const token = String(req.header("PULSE-RECOVERY-TOKEN") || req.query.recoveryToken || "");
-    return verifyRecoveryToken(job, token) ? job : false;
+    return verifyRecoveryToken(job, token) || verifyPaidReplayRecoveryToken(job, token, cfg.REPORT_ENCRYPTION_KEY) ? job : false;
   };
   const retrySettledReportJob = async (job: AnalysisJob) => {
     if (job.reportId || job.stage === "completed" || job.stage === "completed_partial") {
@@ -801,7 +820,18 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const HistoryIdentitySchema = z.object({
     wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-    networkKey: z.enum(["xlayer", "base", "arbitrum", "arc-testnet"]),
+    networkKey: z.enum(["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"]),
+  });
+
+  app.post("/v1/dex/robinhood/native-usdg", async (req, res) => {
+    try {
+      const body = DexSwapBodySchema.omit({ slippagePercent: true }).strict().parse(req.body);
+      if (!cfg.enabledNetworks.includes("robinhood")) return res.status(503).json({ error: "Robinhood funding is not enabled on this deployment" });
+      res.json(await prepareRobinhoodFunding(cfg, body.amount, body.userWalletAddress));
+    } catch (error) {
+      res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof z.ZodError
+        ? "Enter a positive ETH amount and valid wallet address" : "A verified ETH to USDG route is unavailable. No transaction was submitted; try a fresh quote." });
+    }
   });
 
   app.get("/v1/tokens", async (req, res) => {
@@ -868,6 +898,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const input = job.input && typeof job.input === "object" ? job.input as Record<string, unknown> : {};
     if (job.mode === "spot") return `${String(input.instId || "Global market")} · ${String(input.timeframe || "report")}`;
     if (job.mode === "prediction") return `Prediction · ${String(input.primaryMarketId || "selected market").slice(0, 42)}`;
+    if (job.mode === "risk") return `Risk Guard · ${String(input.tokenAddress || input.address || input.toToken || input.fromToken || "token")}`;
     return `${job.mode.replaceAll("-", " ")} report`;
   };
 
@@ -941,7 +972,8 @@ export function createApp(cfg: AppConfig, dependencies: {
     const record = await persistence.reports.get(job.reportId);
     if (!record) return res.status(404).json({ error: "Stored report not found" });
     try {
-      return res.json({ report: await persistence.reports.read(record), metadata: privateRecordView(record), job: publicJobView(job) });
+      const report = await persistence.reports.read(record);
+      return res.json({ report, ...fullReportDelivery(report), metadata: privateRecordView(record), job: publicJobView(job) });
     } catch (error) {
       res.setHeader("Retry-After", "5");
       return res.status(503).json({ error: "Report storage is temporarily unavailable", recoverable: true, retryAfterSeconds: 5, detail: error instanceof Error ? error.message : String(error) });
@@ -1012,8 +1044,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     "/v1/autopilot/pass/7d",
     "/v1/autopilot/pass/30d",
   ]) {
-    app.get(path, (_req, res) => {
-      res.status(400).json(buildX402InputRequired(path));
+    app.get(path, (req, res) => {
+      const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
+      res.status(400).json(buildX402InputRequired(`/${key === "arc-testnet" ? "arc" : key}${path}`));
     });
   }
 
@@ -1158,6 +1191,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (!parsed.success) return res.status(400).json(buildX402InputRequired(req.path, parsed.error.issues));
     const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
     if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+    if (network === "robinhood" && process.env.FEATURE_ROBINHOOD_TRADING !== "1") return res.status(422).json({ error: "Robinhood Autopilot is awaiting execution readiness checks; no payment requested" });
     try {
       if (!(await passTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
         return res.status(409).json({ error: "Strategy registration is incomplete or unavailable for this wallet and network. Finish setup before buying a pass; no payment requested.", code: "autopilot_registration_required" });
@@ -1170,7 +1204,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   // Payment gate for paid routes, measured only until challenge rejection or
   // verified/settled continuation (never including downstream provider work).
-  const paymentGate = createPaymentGate(cfg);
+  const paymentGate = createPaymentGate(cfg, { robinhood: dependencies.robinhoodPayment || createRobinhoodPaymentRuntime(cfg) });
   app.use((req, res, next) => {
     const route = cfg.routes[`${req.method.toUpperCase()} ${req.path}`];
     if (!route || route.free || route.priceUsd <= 0) return paymentGate(req, res, next);
@@ -1182,7 +1216,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       if (recorded) return; recorded = true;
       recordPayment({ provider, network: network.caip2, phase: signed ? "verify_settle" : "challenge", durationMs: performance.now() - started, success, ...(signed && success ? { amountAtomic: String(Math.round(route.priceUsd * 1_000_000)) } : {}) });
     };
-    res.once("finish", () => { if (!recorded) record(!signed ? res.statusCode === 402 : res.statusCode < 500 && res.statusCode !== 402); });
+    res.once("finish", () => { if (!recorded) record(!signed ? res.statusCode === 402 : res.statusCode < 400); });
     return paymentGate(req, res, (error?: unknown) => { record(!error); return error ? next(error) : next(); });
   });
 
@@ -1193,9 +1227,13 @@ export function createApp(cfg: AppConfig, dependencies: {
         if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
         const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
         if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+        if (network === "robinhood" && process.env.FEATURE_ROBINHOOD_TRADING !== "1") return res.status(422).json({ error: "Robinhood Autopilot is awaiting execution readiness checks" });
         const payer = paymentPayer(req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT"));
         if (!cfg.X402_MOCK && (!payer || payer !== parsed.data.owner.toLowerCase())) return res.status(403).json({ error: "The paying wallet must own the selected Autopilot" });
-        const aiPass = await grantAutopilotPass({ owner: parsed.data.owner, network, vault: parsed.data.vault, days, ...(parsed.data.telegramDelivery && isTelegramDeliveryCapability(parsed.data.telegramDelivery) ? { telegramDelivery: parsed.data.telegramDelivery } : {}) });
+        const settledTransaction = (req as SettlementRequest).pulseSettlement?.result?.transaction;
+        const authorization = req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT") || "";
+        const paymentId = typeof settledTransaction === "string" && /^0x[\da-f]{64}$/i.test(settledTransaction) ? `${network}:${settledTransaction.toLowerCase()}` : authorization ? `${network}:${requestHash(authorization)}` : undefined;
+        const aiPass = await grantAutopilotPass({ owner: parsed.data.owner, network, vault: parsed.data.vault, days, paymentId, ...(parsed.data.telegramDelivery && isTelegramDeliveryCapability(parsed.data.telegramDelivery) ? { telegramDelivery: parsed.data.telegramDelivery } : {}) });
         return res.status(201).json({ aiPass, behavior: { newEntries: "AI-assisted while the pass is active and signals remain", expired: "Hold new entries; deterministic risk monitoring and exits continue" } });
       } catch (error) { return next(error); }
     });
@@ -1326,7 +1364,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const acquireV5Job = async (
     req: express.Request,
-    mode: "spot" | "prediction" | "fused" | "divergence" | "event-risk",
+    mode: "spot" | "prediction" | "fused" | "divergence" | "event-risk" | "risk",
     tier: "standard" | "premium" | null,
   ) => {
     const authorization = String(req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT") || "settled-by-middleware");
@@ -1341,7 +1379,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       (req.body && typeof req.body === "object" ? req.body : {}) as Record<string, unknown>;
     const telegramDelivery = String(req.header("PULSE-TELEGRAM-DELIVERY") || "").slice(0, 100);
     const durableInput = { ...durableBody, ...(telegramDelivery && isTelegramDeliveryCapability(telegramDelivery) ? { _telegramDelivery: telegramDelivery } : {}) };
-    return persistence.jobs.acquire({
+    const acquired = await persistence.jobs.acquire({
       idempotencyKey: paymentIdempotencyKey({
         network: network.caip2, provider: cfg.X402_MOCK ? "mock" : network.paymentProvider,
         authorizationId, payer, payee,
@@ -1354,6 +1392,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       requesterIp: req.ip || req.socket.remoteAddress || "unknown",
       maxRegenerationAttempts: cfg.PAID_REGENERATION_MAX_ATTEMPTS,
     });
+    return { ...acquired, recoveryToken: acquired.recoveryToken || paidReplayRecoveryToken(acquired.job, cfg.REPORT_ENCRYPTION_KEY) };
   };
   const settlementTransaction = (header: string): string | undefined => {
     try {
@@ -1382,12 +1421,14 @@ export function createApp(cfg: AppConfig, dependencies: {
       ? { status: "simulated" as const, scope: "mock" as const }
       : network.key === "arc-testnet"
         ? { status: "gateway_batch_accepted" as const, scope: "gateway" as const }
+        : network.key === "robinhood"
+          ? { status: "receipt_verified" as const, scope: "l2" as const, parentChainStatus: "unknown" as const }
         : network.key === "arbitrum"
           ? { status: "facilitator_confirmed" as const, scope: "l2" as const, parentChainStatus: "unknown" as const }
           : { status: "facilitator_confirmed" as const, scope: "l1" as const };
     recordJob("payment_settled", network.caip2);
     return Object.freeze({
-      id: requestHash(settlement), provider: cfg.X402_MOCK ? "mock" : network.paymentProvider,
+      id: requestHash(settlement), provider: cfg.X402_MOCK ? "mock" : inline?.provider || network.paymentProvider,
       network: network.caip2, chainId: network.chainId, asset: network.paymentAsset.address || cfg.X402_ASSET, amountAtomic,
       payer, payee: network.key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
       authorizationId, resourceUrl: req.originalUrl.split("?")[0], requestHash: requestHash(req.body),
@@ -1419,8 +1460,13 @@ export function createApp(cfg: AppConfig, dependencies: {
     const connectivityFailure = isKvUnavailableError(error) || isTransientConnectivityError(error);
     if (jobId) {
       try {
-        await persistence.jobs.transition(jobId, "failed_retriable", detail);
-        recordReport("failed");
+        const current = await persistence.jobs.get(jobId);
+        // Retrieval failure is not a failed generation. Keep completed reports
+        // out of regeneration queues when Blob/network reads temporarily fail.
+        if (!current?.reportId) {
+          await persistence.jobs.transition(jobId, "failed_retriable", detail);
+          recordReport("failed");
+        }
       } catch (persistenceError) {
         // The durable record remains recoverable by its idempotency key. Do not
         // let a second KV failure escape an Express 4 async request and kill Node.
@@ -1449,12 +1495,12 @@ export function createApp(cfg: AppConfig, dependencies: {
       const body = AnalysisBodySchema.parse(req.body);
       const acquired = await acquireV5Job(req, "spot", tier);
       jobId = acquired.job.id;
-      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), replay: true }); }
+      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true }); }
       await persistence.jobs.transition(jobId, "payment_verified");
       await persistence.jobs.transition(jobId, "payment_settled");
       await persistence.jobs.bindReceiptAndEnqueue(jobId, receiptFor(req, res, "spot", tier));
       const accepted = await persistence.jobs.get(jobId);
-      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, pollUrl: `/v1/jobs/${jobId}` });
+      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId) });
       wakeWorker();
       return;
     } catch (error) {
@@ -1471,12 +1517,12 @@ export function createApp(cfg: AppConfig, dependencies: {
       const body = PredictionAnalysisRequestSchema.parse(req.body);
       const acquired = await acquireV5Job(req, "prediction", tier);
       jobId = acquired.job.id;
-      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), replay: true }); }
+      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true }); }
       await persistence.jobs.transition(jobId, "payment_verified");
       await persistence.jobs.transition(jobId, "payment_settled");
       await persistence.jobs.bindReceiptAndEnqueue(jobId, receiptFor(req, res, "prediction", tier));
       const accepted = await persistence.jobs.get(jobId);
-      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, pollUrl: `/v1/jobs/${jobId}` });
+      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId) });
       wakeWorker();
       return;
     } catch (error) {
@@ -1514,12 +1560,12 @@ export function createApp(cfg: AppConfig, dependencies: {
       const body = FusedAnalysisRequestSchema.parse(req.body);
       const acquired = await acquireV5Job(req, "fused", tier);
       jobId = acquired.job.id;
-      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), replay: true }); }
+      if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true }); }
       await persistence.jobs.transition(jobId, "payment_verified");
       await persistence.jobs.transition(jobId, "payment_settled");
       await persistence.jobs.bindReceiptAndEnqueue(jobId, receiptFor(req, res, "fused", tier));
       const accepted = await persistence.jobs.get(jobId);
-      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, pollUrl: `/v1/jobs/${jobId}` });
+      res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId) });
       wakeWorker();
       return;
     } catch (error) {
@@ -1539,12 +1585,12 @@ export function createApp(cfg: AppConfig, dependencies: {
         const body = DivergenceAnalysisRequestSchema.parse(req.body);
         const acquired = await acquireV5Job(req, "divergence", null);
         jobId = acquired.job.id;
-        if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), replay: true }); }
+        if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true }); }
         await persistence.jobs.transition(jobId, "payment_verified");
         await persistence.jobs.transition(jobId, "payment_settled");
         await persistence.jobs.bindReceiptAndEnqueue(jobId, receiptFor(req, res, "divergence", null));
         const accepted = await persistence.jobs.get(jobId);
-        res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, pollUrl: `/v1/jobs/${jobId}` });
+        res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId) });
         wakeWorker();
         return;
       } catch (error) {
@@ -1560,12 +1606,12 @@ export function createApp(cfg: AppConfig, dependencies: {
         const body = EventRiskPreflightRequestSchema.parse(req.body);
         const acquired = await acquireV5Job(req, "event-risk", null);
         jobId = acquired.job.id;
-        if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), replay: true }); }
+        if (!acquired.created) { recordReport("recovered"); return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true }); }
         await persistence.jobs.transition(jobId, "payment_verified");
         await persistence.jobs.transition(jobId, "payment_settled");
         await persistence.jobs.bindReceiptAndEnqueue(jobId, receiptFor(req, res, "event-risk", null));
         const accepted = await persistence.jobs.get(jobId);
-        res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, pollUrl: `/v1/jobs/${jobId}` });
+        res.status(202).json({ job: publicJobView(accepted!), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId) });
         wakeWorker();
         return;
       } catch (error) {
@@ -1582,6 +1628,16 @@ export function createApp(cfg: AppConfig, dependencies: {
     header: () => undefined,
   } as unknown as express.Request);
 
+  const notifyReportDelivery = async (job: AnalysisJob, reportId: string, report: unknown) => {
+    const delivery = String((job.input as Record<string, unknown>)?._telegramDelivery || "");
+    if (!delivery || !cfg.FEATURE_TELEGRAM || !cfg.REPORT_SHARE_LINK_ENABLED) return;
+    try {
+      const share = await persistence.reports.createShare(reportId);
+      const data = report as { analysis?: { headline?: string; summary?: string }; headline?: string; summary?: string; service?: string };
+      await deliverTelegramReportDurably(job.id, delivery, `${data.analysis?.headline || data.headline || data.service || "PULSE report ready"}\n\n${data.analysis?.summary || data.summary || "Your full report is ready."}`, telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL || "", share.token));
+    } catch (error) { console.error("Telegram report delivery failed", error); }
+  };
+
   const executePersistedJob = async (claimed: AnalysisJob) => {
     const current = await persistence.jobs.get(claimed.id);
     if (!current || current.reportId || current.stage === "completed" || current.stage === "completed_partial") return;
@@ -1596,7 +1652,13 @@ export function createApp(cfg: AppConfig, dependencies: {
       let report: unknown;
       let partial = false;
 
-      if (current.mode === "spot") {
+      if (current.mode === "risk") {
+        const body = current.input as { tokenAddress?: string; address?: string; toToken?: string; fromToken?: string; lang?: "en" | "zh" };
+        const address = body.tokenAddress || body.address || body.toToken || body.fromToken;
+        if (!address) throw new Error("Risk Guard requires the exact token address");
+        await persistence.jobs.transition(current.id, "generating_analysis");
+        report = await withReceiptBoundRegeneration(current.id, () => buildPaidTokenRisk(req, address, body.lang || "en"));
+      } else if (current.mode === "spot") {
         const body = AnalysisBodySchema.parse(current.input);
         report = await withReceiptBoundRegeneration(current.id, () => buildSpotReport(
           req, body, tier === "premium" ? "premium" : "base", true,
@@ -1692,12 +1754,9 @@ export function createApp(cfg: AppConfig, dependencies: {
       }
 
       await persistence.jobs.transition(current.id, "validating_report");
+      report = { ...(report as Record<string, unknown>), lang: (current.input as { lang?: string }).lang || "en" };
       const stored = await persistence.reports.save(current.payer, report);
-      const telegramDelivery = typeof (current.input as Record<string, unknown>)._telegramDelivery === "string" ? String((current.input as Record<string, unknown>)._telegramDelivery) : "";
-      if (telegramDelivery && cfg.REPORT_SHARE_LINK_ENABLED) {
-        try { const share=await persistence.reports.createShare(stored.id);const reportRecord=report as {analysis?:{headline?:unknown;summary?:unknown};service?:unknown};const headline=String(reportRecord.analysis?.headline||reportRecord.service||"PULSE report ready");const summary=String(reportRecord.analysis?.summary||"Your paid report completed successfully.");await deliverTelegramReportDurably(current.id,telegramDelivery,`${headline}\n\n${summary}`,telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL || "", share.token)); }
-        catch(error){console.error("Telegram report delivery failed",error);}
-      }
+      await notifyReportDelivery(current, stored.id, report);
       const completed = await persistence.jobs.attachReport(current.id, stored.id, partial);
       const profile = report as { fixture?: boolean; analysisProfile?: { mode?: string } };
       if (cfg.NODE_ENV !== "test" && !profile.fixture && profile.analysisProfile?.mode === "live") observeDelivery(jobResearchDelivery(completed));
@@ -1749,14 +1808,14 @@ export function createApp(cfg: AppConfig, dependencies: {
     const analysis = ai?.analysis || {
       headline: `TEST FIXTURE · ${fixtureScan?.symbol || "Token"} token risk`, summary: "Deterministic test-only report; production requires Grok and live source collection.",
       riskScore: fixtureScan?.riskScore || 0, confidence: 0,
-      components: (fixtureScan?.components || []).slice(0, 5).map((component, index) => ({ ...component, key: ["contract", "market", "holders", "project", "promotion"][index] || component.key, evidence: ["Test fixture"] })),
+      components: (fixtureScan?.components || []).slice(0, 5).map((component, index) => ({ ...component, status: "assessed", key: ["contract", "market", "holders", "project", "promotion"][index] || component.key, evidence: ["Test fixture"] })),
       criticalRisks: fixtureScan?.flags || [], positiveSignals: [], unknowns: ["Live sources are disabled in the test fixture"],
       mostLikelyLossScenario: "Not evaluated in fixture mode.", recommendedAction: "Do not use fixture output for a real transaction.", maxExposurePct: 0,
       projectAssessment: "Not evaluated.", promotionAssessment: "Not evaluated.", disclaimer: "TEST FIXTURE · NFA / DYOR",
     };
-    const score = Math.round(analysis.riskScore * 10) / 10;
-    const verdict = scoreToVerdict(score);
-    const grade = scoreToGrade(score);
+    const score = analysis.riskScore === null ? null : Math.round(analysis.riskScore * 10) / 10;
+    const verdict = score === null ? "UNKNOWN" : ai && ai.analysis.evidenceCoverage < 100 && scoreToVerdict(score) === "PASS" ? "WARN" : scoreToVerdict(score);
+    const grade = score === null ? "Unknown" : scoreToGrade(score);
     const evidenceSources = evidence.sources as Array<{ source: string; status: string; error?: string; data?: unknown }>;
     const sources = evidenceSources.map((source) => ({ name: source.source, status: source.status, detail: source.error || null }));
     const sourceData = (name: string) => evidenceSources.find((source) => source.source === name)?.data;
@@ -1772,7 +1831,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const holders = optionalNumber(blockToken.holders ?? (geckoProfile.holders as { count?: unknown } | undefined)?.count ?? okxToken.holders);
     const pairCreatedAt = Date.parse(String(pool.createdAt || ""));
     const ageDays = Number.isFinite(pairCreatedAt) && pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 86_400_000)) : null;
-    const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "1" | "56" | "137" | "8453" | "42161", lang }, mv);
+    const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "8453" | "42161" | "5042002" | "4663", lang }, mv);
     const token = {
       service: "token_scan", methodology_version: mv, chainId: String(network.chainId), address: address.toLowerCase(),
       symbol: String(blockToken.symbol || okxToken.symbol || geckoToken.symbol || fixtureScan?.symbol || "Unknown"),
@@ -1793,9 +1852,9 @@ export function createApp(cfg: AppConfig, dependencies: {
     return {
       service: "preflight" as const, serviceName: "PULSE Token Risk Guard", methodology_version: mv,
       intent: "token_due_diligence", chainId: String(network.chainId), networkKey: key, network: network.caip2,
-      address: address.toLowerCase(), overallScore: score, riskScore: score, grade, verdict, headline: analysis.headline,
+      address: address.toLowerCase(), lang, overallScore: score, riskScore: score, grade, verdict, headline: analysis.headline,
       summary: analysis.summary, confidence: analysis.confidence,
-      checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
+      checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score === null ? "unknown" : component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
       token, intelligence: analysis, recommendations: [analysis.recommendedAction], mostLikelyLossScenario: analysis.mostLikelyLossScenario,
       sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + GeckoTerminal token/pool/profile + bounded project website + Grok synthesis; no automatic RPC eth_call",
       analysisProfile: { mode: ai ? "live" : "fixture", model: ai?.model || "fixture", reasoningEffort: ai ? "low" : "none" },
@@ -1803,13 +1862,42 @@ export function createApp(cfg: AppConfig, dependencies: {
     };
   };
 
+  const runRiskReport = async (req: express.Request, res: express.Response, address: string, lang: "en" | "zh", tokenOnly: boolean) => {
+    let jobId = "";
+    try {
+      const acquired = await acquireV5Job(req, "risk", null);
+      jobId = acquired.job.id;
+      if (!acquired.created) {
+        const stored = acquired.job.reportId ? await persistence.reports.get(acquired.job.reportId) : null;
+        if (stored) {
+          const report = await persistence.reports.read(stored) as Record<string, unknown>;
+          if (acquired.job.stage === "failed_retriable" || acquired.job.stage === "failed_terminal") {
+            await persistence.jobs.attachReport(jobId, stored.id);
+          }
+          return res.json({ ...(tokenOnly ? { ...(report.token as object), report } : report), ...fullReportDelivery(report),
+            history: { jobId, recoveryToken: acquired.recoveryToken }, replay: true });
+        }
+        return res.status(202).json({ job: publicJobView(acquired.job), recoveryToken: acquired.recoveryToken, ...reportDelivery(jobId), replay: true });
+      }
+      await persistence.jobs.transition(jobId, "payment_verified");
+      await persistence.jobs.transition(jobId, "payment_settled");
+      await persistence.jobs.bindReceipt(jobId, receiptFor(req, res, "risk", null));
+      await persistence.jobs.transition(jobId, "fetching_context");
+      await persistence.jobs.transition(jobId, "generating_analysis");
+      const report = await buildPaidTokenRisk(req, address, lang);
+      await persistence.jobs.transition(jobId, "validating_report");
+      const stored = await persistence.reports.save(acquired.job.payer, report);
+      const completed = await persistence.jobs.attachReport(jobId, stored.id);
+      await notifyReportDelivery(completed, stored.id, report);
+      if (cfg.NODE_ENV !== "test" && report.analysisProfile.mode === "live") observeDelivery(jobResearchDelivery(completed));
+      return res.json({ ...(tokenOnly ? { ...report.token, report } : report), ...fullReportDelivery(report), history: { jobId, recoveryToken: acquired.recoveryToken } });
+    } catch (error) { return respondToQueuedJobFailure(res, error, jobId); }
+  };
+
   app.post("/v1/token/scan", async (req, res) => {
     try {
       const body = TokenScanRequestSchema.parse(req.body);
-      const report = await buildPaidTokenRisk(req, body.address, body.lang);
-      saveReport(report);
-      if (cfg.NODE_ENV !== "test" && report.analysisProfile.mode === "live") observeDelivery(researchDelivery(receiptFor(req, res, "risk", null), "risk", report.generatedAt));
-      res.json({ ...report.token, report });
+      await runRiskReport(req, res, body.address, body.lang, true);
     } catch (e) {
       res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });
     }
@@ -1847,10 +1935,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       const body = PreflightRequestSchema.parse(req.body);
       const inspectedAddress = body.tokenAddress || body.toToken || body.fromToken;
       if (!inspectedAddress) return res.status(400).json({ error: "Risk Guard requires an exact token contract address" });
-      const report = await buildPaidTokenRisk(req, inspectedAddress, body.lang);
-      saveReport(report);
-      if (cfg.NODE_ENV !== "test" && report.analysisProfile.mode === "live") observeDelivery(researchDelivery(receiptFor(req, res, "risk", null), "risk", report.generatedAt));
-      res.json(report);
+      await runRiskReport(req, res, inspectedAddress, body.lang, false);
     } catch (e) {
       res.status(e instanceof z.ZodError ? 400 : 502).json({ error: e instanceof Error ? e.message : String(e) });
     }

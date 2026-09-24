@@ -154,10 +154,13 @@ export function buildSpotExecutionPlan(input: {
   const sellTrigger = nearest(levels.support, last, "below") || finite(technical.possibleMoves.bearish.trigger) || last;
   const bullTarget = finite(continuationPath?.target) || finite(scenario("bull")?.target) || finite(technical.possibleMoves.bullish.target) || last;
   const bearTarget = finite(correctionPath?.target) || finite(scenario("bear")?.target) || finite(technical.possibleMoves.bearish.target) || last;
-  const stop = finite(wave.invalidation) || reportInvalidation || finite(continuationPath?.invalidation) || finite(scenario("bull")?.invalidation) || finite(technical.possibleMoves.bullish.invalidation) || last;
-  const risk = Math.abs(buyEntry - stop);
+  // A bearish thesis invalidation above entry is never a long stop.
+  const stop = [finite(continuationPath?.invalidation), finite(scenario("bull")?.invalidation), finite(wave.invalidation), reportInvalidation, finite(technical.possibleMoves.bullish.invalidation)]
+    .find((value): value is number => value !== null && value > 0 && value < buyEntry) ?? null;
+  const validBuyLevels = buyEntry > 0 && stop !== null && bullTarget > Math.max(buyEntry, last);
+  const risk = stop === null ? 0 : buyEntry - stop;
   const reward = Math.max(0, bullTarget - buyEntry);
-  const recommendedAction = confidence >= 55 && bias === "bullish" ? "buy" : "wait";
+  const recommendedAction = confidence > 60 && bias === "bullish" && validBuyLevels ? "buy" : "wait";
   return Object.freeze({
     version: "pulse-spot-plan-v1",
     pair: input.instId,
@@ -168,7 +171,7 @@ export function buildSpotExecutionPlan(input: {
       action: recommendedAction,
       confidence,
       label: recommendedAction === "buy" ? "Conditional spot buy setup" : "No new buy · wait for confirmation",
-      reason: recommendedAction === "wait" ? `The ${bias} bias/confidence does not justify opening a new spot buy. Existing holdings remain under the owner's control.` : "The bullish report bias supports a conditional buy; execution still depends on the trigger and stop below.",
+      reason: recommendedAction === "wait" ? `A recommended spot buy requires bullish confidence above 60% and valid entry, target and stop levels. Current bias: ${bias}; confidence: ${confidence}%. You may configure a manual trade at your own risk.` : "The bullish report bias supports a conditional buy; execution still depends on the trigger and stop below.",
     },
     buy: {
       side: "buy",
@@ -176,7 +179,8 @@ export function buildSpotExecutionPlan(input: {
       trigger: round(buyEntry),
       entryZone: [round(Math.min(buyEntry, last)), round(Math.max(buyEntry, last))],
       takeProfit: round(bullTarget),
-      stopLoss: round(stop),
+      stopLoss: stop === null ? null : round(stop),
+      valid: validBuyLevels,
       riskReward: risk > 0 ? round(reward / risk) : null,
       scenario: String(continuationPath?.thesis || continuationPath?.label || scenario("bull")?.thesis || "The primary Elliott continuation path is valid only after the stated trigger holds."),
     },
@@ -190,7 +194,7 @@ export function buildSpotExecutionPlan(input: {
       thesis: String(correctionPath?.label || scenario("base")?.thesis || "Wait while the Elliott continuation and correction counts remain unresolved."),
     },
     noTrade: [
-      `Do not enter when the live price has already crossed the stop at ${round(stop)}.`,
+      stop === null ? "No valid long stop was established; configure and review protection manually." : `Do not enter when the live price has already crossed the stop at ${round(stop)}.`,
       "Refresh the quote and report when market data, route liquidity or the selected network changes.",
       "Targets are conditional scenarios, not guaranteed outcomes.",
     ],

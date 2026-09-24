@@ -11,7 +11,7 @@ const fixture = {version:1,scope:'platform',persistence:'durable',asOf:'2026-09-
 for (const service of ['global','prediction','risk']) fixture.research[service].partial=4;
 fixture.execution={spot:{count:2,byChain:[{count:2,firstAt:bucket.firstAt,lastAt:bucket.lastAt,amount:'12.340000',symbol:'USDC',chain:'eip155:8453',label:'Base'}]},autopilot:null};
 try {
-  for (const width of [360,390,768,1440]) for (const theme of ['xlayer','base','arbitrum','arc-testnet']) {
+  for (const width of process.env.UI_WIDTHS?.split(',').map(Number)||[360,390,768,1440]) for (const theme of process.env.UI_THEMES?.split(',')||['xlayer','base','arbitrum','arc-testnet','robinhood']) {
     const page = await browser.newPage({viewport:{width,height:900},reducedMotion:'reduce'});
     const errors=[],requests=[];
     page.on('pageerror',error=>errors.push(error.message));

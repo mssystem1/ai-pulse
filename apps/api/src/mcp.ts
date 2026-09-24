@@ -186,12 +186,14 @@ function availableTools(cfg: AppConfig) {
   }).map((original) => {
     const tool = original.name.startsWith("spot_analysis_") ? {
       ...original,
-      inputSchema: { ...original.inputSchema, properties: {
+      inputSchema: { ...original.inputSchema, required: ["instId", "timeframe", "lang"], properties: {
         ...original.inputSchema.properties,
         instId: { type: "string", pattern: "^[A-Z0-9]+-[A-Z0-9]+$", maxLength: 32 },
-        timeframe: { type: "string", default: "1H", enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] },
+        timeframe: { type: "string", enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] },
         userNote: { type: "string", maxLength: 500 },
       } },
+    } : original.name === "preflight" || original.name.startsWith("prediction_analysis_") ? {
+      ...original, inputSchema: { ...original.inputSchema, required: original.name === "preflight" ? ["tokenAddress", "lang"] : ["primaryMarketId", "lang"], properties: { ...original.inputSchema.properties, lang: { type: "string", enum: ["en", "zh"], description: "Collect report language together with the other required inputs." } } },
     } : original;
     if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Quick → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise OKX-grounded Buy-or-Wait plan followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
     if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Pro → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots and Elliott paths followed by a separately reviewed, Agentic-Wallet-signed Spot order` };

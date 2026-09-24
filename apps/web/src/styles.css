@@ -879,6 +879,9 @@ body.picker-open { overflow: hidden; }
 .swap-asset-card.receive { background: linear-gradient(135deg, rgba(0,229,160,.055), rgba(0,196,255,.03)); }
 .swap-output { display: flex; align-items: center; justify-content: space-between; gap: .7rem; min-height: 38px; margin-top: .7rem; color: var(--mint); font: 700 1.45rem var(--display); overflow-wrap: anywhere; }
 .swap-arrow { position: absolute; z-index: 1; top: 92px; left: 50%; display: grid; place-items: center; width: 28px; height: 28px; transform: translateX(-50%); border: 4px solid #05080d; border-radius: 50%; color: var(--mint); background: #111923; font-size: .8rem; }
+.robinhood-funding .swap-arrow { position: static; transform: none; margin: 0 auto; }
+.robinhood-funding > h4, .robinhood-funding > p { margin: .2rem 0; }
+.robinhood-funding .quote-meta span:last-child { grid-column: 1 / -1; text-align: left; }
 .quote-meta { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; padding: .25rem .15rem; }
 .quote-meta span { display: grid; gap: .2rem; color: var(--muted); font-size: .58rem; }
 .quote-meta span:last-child { text-align: right; }
@@ -1275,6 +1278,12 @@ html[data-pulse-theme="base"] .trade-mode-tabs button.active,html[data-pulse-the
 .autopilot-recovery-summary dl { display: grid; gap: 10px; }
 .autopilot-recovery-summary dl > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 .autopilot-recovery-summary dd { margin: 0; }
+.telegram-user-guide { width:100%; min-width:0; box-sizing:border-box; }
+.global-market-reference summary { cursor:pointer; padding:10px 0; color:var(--muted); }
+.global-market-reference .shortlist-market-snapshot { max-width:560px; }
+#global-report-controls { scroll-margin-top:120px; }
+.analysis-layout { grid-template-columns:minmax(260px,.65fr) minmax(0,1.6fr); align-items:start; }
+@media(max-width:900px) { .analysis-layout { grid-template-columns:minmax(0,1fr); } }
 .telegram-user-guide .telegram-steps strong { font-size: .85rem; }
 .telegram-user-guide .telegram-steps p { font-size: .78rem; line-height: 1.65; }
 .telegram-user-guide .command-list { font-size: .82rem; line-height: 1.6; }

@@ -18,7 +18,7 @@ export type PaymentReceipt = Readonly<{
   requestHash: string; verificationResult: "accepted_by_middleware"; settlementResult: "settled";
   settlementMode: "synchronous_onchain" | "gateway_batch" | "mock";
   finality: Readonly<{
-    status: "facilitator_confirmed" | "gateway_batch_accepted" | "simulated";
+    status: "facilitator_confirmed" | "receipt_verified" | "gateway_batch_accepted" | "simulated";
     scope: "l1" | "l2" | "gateway" | "mock";
     parentChainStatus?: "unknown";
   }>;
@@ -33,12 +33,12 @@ export type AnalysisJob = Readonly<{
   requestHash: string;
   resourceUrl: string;
   network: string;
-  mode: "spot" | "prediction" | "fused" | "divergence" | "event-risk";
+  mode: "spot" | "prediction" | "fused" | "divergence" | "event-risk" | "risk";
   tier: "standard" | "premium" | null;
   payer: string;
   /** Validated request data required to resume work after a process restart. */
   input: unknown;
-  networkKey: "xlayer" | "base" | "arbitrum" | "arc-testnet";
+  networkKey: "xlayer" | "base" | "arbitrum" | "arc-testnet" | "robinhood";
   requesterIp: string;
   stage: JobStage;
   events: readonly JobEvent[];
@@ -183,13 +183,25 @@ export function decodedJob(value: string | AnalysisJob): AnalysisJob {
 }
 
 export function canonicalJson(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") {
-    return `{${Object.entries(value as Record<string, unknown>)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, item]) => `${JSON.stringify(key)}:${canonicalJson(item)}`).join(",")}}`;
+  // Apply JSON semantics first: omit undefined object fields, use null in
+  // arrays, and honor toJSON. Interpolating undefined produced invalid reports
+  // that uploaded successfully but could never be read back from Blob.
+  const json = JSON.stringify(value);
+  const render = (item: unknown): string => Array.isArray(item) ? `[${item.map(render).join(",")}]`
+    : item && typeof item === "object" ? `{${Object.entries(item).sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, nested]) => `${JSON.stringify(key)}:${render(nested)}`).join(",")}}` : JSON.stringify(item);
+  return json === undefined ? "null" : render(JSON.parse(json));
+}
+
+/** Read-only compatibility for checksum-verified historical payloads written by
+ * the former serializer. Replace bare undefined only, never text inside strings.
+ * Unknown values become null; do not rewrite the source Blob/checksum. */
+export function parseStoredReport(payload: string): unknown {
+  try { return JSON.parse(payload); } catch {
+    const repaired = payload.replace(/"(?:[^"\\]|\\.)*"|\bundefined\b/g, token => token === "undefined" ? "null" : token);
+    if (repaired === payload) throw new Error("Stored report JSON is invalid");
+    return JSON.parse(repaired);
   }
-  return JSON.stringify(value);
 }
 
 export function requestHash(body: unknown): string {
@@ -614,7 +626,7 @@ export class VercelBlobReportStore implements ReportStore {
     if (!payload) return null;
     const checksum = createHash("sha256").update(payload).digest("hex");
     if (checksum !== record.checksum) throw new Error("Stored report checksum mismatch");
-    return JSON.parse(payload) as unknown;
+    return parseStoredReport(payload);
   }
   private async readPublicBlob(url: string) {
     let lastError: unknown;

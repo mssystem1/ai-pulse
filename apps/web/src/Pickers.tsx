@@ -597,7 +597,8 @@ export function ExecutionPairPicker({
     return () => { current = false; window.clearTimeout(timeout); };
   }, [open, networkKey, query, reload, custody]);
 
-  const [base, quote] = value.split("-");
+  const [rawBase, quote] = value.split("-");
+  const base = networkKey === "robinhood" ? rawBase.replace(/\.[A-F0-9]{16}$/, "") : rawBase;
   return <>
     <button id={id} type="button" className="selector-trigger execution-pair-trigger" aria-haspopup="dialog" aria-expanded={open} disabled={networkKey === "arc-testnet"} onClick={() => setOpen(true)}>
       <span className="pair-symbols"><b>{base}</b><i>/</i><span>{quote}</span></span>
@@ -605,7 +606,9 @@ export function ExecutionPairPicker({
     </button>
     <PickerDialog open={open} title={`Choose a live pair on ${network.label}`} lead={`PULSE verifies the identity-safe token and a live OKX Onchain OS route before accepting your choice. A token contract by itself is not enough.`} closeLabel="Close" onClose={() => setOpen(false)}>
       <div className="picker-search-wrap"><span aria-hidden="true">⌕</span><input autoFocus className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, DOGE or token name…" aria-label="Search executable pairs"/></div>
-      <div className="picker-disclosure">The left name is the market symbol. The right name is its verified on-chain representation. Select it to run the final live route check; unavailable choices remain unselected.</div>
+      <div className="picker-disclosure">{networkKey === "robinhood"
+        ? "Choose an asset by name or contract address. Trades settle in USDG. A live route is checked on selection; Autopilot also requires usable price history."
+        : "The left name is the market symbol. The right name is its verified on-chain representation. Select it to run the final live route check; unavailable choices remain unselected."}</div>
       <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{items.length} results</span></div>
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}
@@ -624,7 +627,7 @@ export function ExecutionPairPicker({
           }).catch((reason) => setUnavailable((current) => ({ ...current, [item.pair]: reason instanceof Error ? reason.message : String(reason) }))).finally(() => setVerifyingPair(""));
         }}>
           <span className="pair-avatar">{item.token.logoUrl ? <img src={item.token.logoUrl} alt=""/> : item.analysisBase.slice(0, 2)}</span>
-          <span className="picker-item-main"><strong>{item.pair.replace("-", "/")}</strong><small>{unavailableReason || `Candidate ${item.executionPair}`}</small></span>
+          <span className="picker-item-main"><strong>{networkKey === "robinhood" ? item.executionPair : item.pair.replace("-", "/")}</strong><small>{unavailableReason || (networkKey === "robinhood" ? item.token.name : `Candidate ${item.executionPair}`)}</small>{networkKey === "robinhood" && <small title={item.token.address}>{item.token.address.slice(0, 8)}…{item.token.address.slice(-6)}</small>}</span>
           <span className="pair-item-status"><small className="asset-class-badge crypto">{unavailableReason ? "UNAVAILABLE" : "ON-CHAIN"}</small><span className="live-chip">{checking ? "VERIFYING…" : unavailableReason ? "TRY ANOTHER" : item.pair === value ? "RECHECK" : "VERIFY ROUTE"}</span></span>
         </button>; })}
       </div>

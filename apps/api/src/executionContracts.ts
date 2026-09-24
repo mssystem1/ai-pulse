@@ -1,4 +1,4 @@
-export type ExecutionNetwork = "xlayer" | "base" | "arbitrum";
+export type ExecutionNetwork = "xlayer" | "base" | "arbitrum" | "robinhood";
 
 export type ExecutionContractKey =
   | "registry"
@@ -19,6 +19,18 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
  * variable must not silently remove an already-published product capability.
  */
 export const PUBLISHED_EXECUTION_CONTRACTS = {
+  robinhood: {
+    registry: "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+    oracleRouter: "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+    executionAdapter: "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+    // Dedicated V1 protection deployment, separate from the V2 limit factory.
+    spotFactory: "0x1e1f08e79f866df4819cf691c43b6efd9dec513c",
+    spotLimitFactory: "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+    spotBracketFactory: "0xa4546529b1174765d4d8e256c951365359c853fa",
+    autopilotFactory: "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+    okxRouter: "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919",
+    okxApproval: "0x42170295F1173c9e5874ea9d00c6d137E1a4f53d",
+  },
   xlayer: {
     registry: "0x814469ebed3a8466266a9fa9cdf78c381c16a146",
     oracleRouter: "0x3df7a41d0b07ffcd25ecba43e9b4620c627ba8b0",
@@ -55,6 +67,17 @@ export const PUBLISHED_EXECUTION_CONTRACTS = {
 } as const satisfies Record<ExecutionNetwork, Record<ExecutionContractKey, string>>;
 
 const ENV_NAMES: Record<ExecutionNetwork, Record<ExecutionContractKey, string>> = {
+  robinhood: {
+    registry: "ROBINHOOD_PULSE_REGISTRY_ADDRESS",
+    oracleRouter: "ROBINHOOD_ORACLE_ROUTER_ADDRESS",
+    executionAdapter: "ROBINHOOD_EXECUTION_ADAPTER_ADDRESS",
+    spotFactory: "ROBINHOOD_SPOT_ORDER_FACTORY_ADDRESS",
+    spotLimitFactory: "ROBINHOOD_SPOT_LIMIT_FACTORY_ADDRESS",
+    spotBracketFactory: "ROBINHOOD_SPOT_BRACKET_FACTORY_ADDRESS",
+    autopilotFactory: "ROBINHOOD_AUTOPILOT_VAULT_FACTORY_ADDRESS",
+    okxRouter: "ROBINHOOD_OKX_ROUTER_ADDRESS",
+    okxApproval: "ROBINHOOD_OKX_APPROVAL_ADDRESS",
+  },
   xlayer: {
     registry: "XLAYER_PULSE_REGISTRY_ADDRESS",
     oracleRouter: "XLAYER_ORACLE_ROUTER_ADDRESS",
@@ -106,7 +129,7 @@ export function executionContracts(network: ExecutionNetwork) {
     registry: executionContractAddress(network, "registry"),
     oracleRouter: executionContractAddress(network, "oracleRouter"),
     executionAdapter: executionContractAddress(network, "executionAdapter"),
-    spotFactory: executionContractAddress(network, "spotFactory"),
+    spotFactory: executionContractAddress(network, "spotFactory") || null,
     spotLimitFactory: executionContractAddress(network, "spotLimitFactory"),
     spotBracketFactory: executionContractAddress(network, "spotBracketFactory"),
     autopilotFactory: executionContractAddress(network, "autopilotFactory"),

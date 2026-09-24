@@ -1,3 +1,24 @@
+/* Appearance is independent of chain readiness and never selects a network. */
+html[data-pulse-theme="robinhood"] {
+  color-scheme: dark;
+  --bg: #0b0d08; --card: #151910; --field: #10140c;
+  --text: #f5f7ed; --muted: #acb5a0;
+  --mint: #ccff00; --cyan: #b9ec20; --accent: #ccff00;
+  --line: rgba(204,255,0,.19); --line2: rgba(204,255,0,.4);
+  --border: var(--line); --border-strong: var(--line2);
+  --panel: #151910; --panel-strong: #1e2417;
+  --button-ink: #111600; --warn: #ffd166; --fail: #ff768b;
+  --chain-primary: #ccff00; --chain-secondary: #b9ec20;
+  --chain-glow: rgba(204,255,0,.1);
+}
+html[data-pulse-theme="robinhood"] body { background: var(--bg); }
+html[data-pulse-theme="robinhood"] body::before {
+  background: radial-gradient(ellipse at 80% 0,rgba(204,255,0,.09),transparent 55%);
+  opacity: 1;
+}
+html[data-pulse-theme="robinhood"] .landing-page { --landing-surface: #151910; }
+html[data-pulse-theme="robinhood"] :focus-visible { outline-color: var(--mint); }
+html[data-pulse-theme="robinhood"] ::selection { color: #111600; background: #ccff00; }
 .appearance-picker { position:relative; }
 .appearance-trigger { display:flex; align-items:center; gap:8px; min-height:42px; padding:8px 12px; border:1px solid var(--line2); border-radius:12px; color:var(--text); background:var(--card); }
 .appearance-trigger i,.appearance-menu i { width:16px; height:16px; border-radius:50%; flex-shrink:0; box-shadow:inset 0 0 0 1px #ffffff50; }

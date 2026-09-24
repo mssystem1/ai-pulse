@@ -1,7 +1,7 @@
-export const NETWORK_KEYS = ["xlayer", "base", "arbitrum", "arc-testnet"] as const;
+export const NETWORK_KEYS = ["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"] as const;
 
 export type NetworkKey = (typeof NETWORK_KEYS)[number];
-export type PaymentProvider = "okx" | "cdp" | "circle-gateway";
+export type PaymentProvider = "okx" | "cdp" | "circle-gateway" | "robinhood-x402";
 
 export type AssetConfig = Readonly<{
   symbol: string;
@@ -35,6 +35,14 @@ const network = (value: PulseNetwork): PulseNetwork =>
   });
 
 export const NETWORK_REGISTRY: Readonly<Record<NetworkKey, PulseNetwork>> = Object.freeze({
+  robinhood: network({
+    key: "robinhood", label: "Robinhood Chain", chainId: 4663, caip2: "eip155:4663", environment: "mainnet",
+    rpcUrls: ["https://rpc.mainnet.chain.robinhood.com"], explorerUrl: "https://robinhoodchain.blockscout.com",
+    nativeAsset: asset({ symbol: "ETH", name: "Ether", decimals: 18, address: null }),
+    paymentAsset: asset({ symbol: "USDG", name: "Global Dollar", decimals: 6, address: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168" }),
+    paymentProvider: "robinhood-x402", tokenDiscoveryProvider: "generic-evm", contractEvidenceProvider: "generic-evm",
+    fundingOptions: ["fund-usdg", "swap-eth-usdg"],
+  }),
   xlayer: network({
     key: "xlayer",
     label: "X Layer",

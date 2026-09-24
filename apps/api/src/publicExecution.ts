@@ -5,7 +5,7 @@ import type { PublicActivityStore, VerifiedExecution } from "./publicActivity.js
 
 /** Client input cannot supply fill fields. These come from receipt/net-transfer reconciliation. */
 export function publicExecution(item: Activity, accounts: OnchainAccountSnapshot | null): VerifiedExecution | null {
-  if (!["base", "arbitrum", "xlayer"].includes(item.network) || item.status !== "confirmed"
+  if (!["base", "arbitrum", "xlayer", "robinhood"].includes(item.network) || item.status !== "confirmed"
     || !item.txHash || !item.fillObservedAt || !item.fillSide || !item.fillQuoteAsset || !item.fillQuoteValue || !item.fillQuantity
     || !Number.isFinite(item.fillQuoteValue) || item.fillQuoteValue <= 0 || !Number.isFinite(item.fillQuantity) || item.fillQuantity <= 0
     || !/^(market_(buy|sell)|market_buy_with_protection|automatic_(entry|entry_protected|take_profit|stop_loss|fill)|(buy|sell)(_partial)?_filled)$/i.test(item.kind)) return null;

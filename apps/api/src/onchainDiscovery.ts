@@ -1,9 +1,11 @@
 import { createPublicClient, fallback, http, type PublicClient } from "viem";
 import { executionContractAddress } from "./executionContracts.js";
 
-export type ExecutionNetwork = "xlayer" | "base" | "arbitrum";
+export type { ExecutionNetwork } from "./executionContracts.js";
+import type { ExecutionNetwork } from "./executionContracts.js";
 
 const NETWORKS = {
+  robinhood: { id: 4663, primary: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com", fallback: () => process.env.ROBINHOOD_RPC_FALLBACK_URL || "https://rpc.mainnet.chain.robinhood.com", prefix: "ROBINHOOD" },
   xlayer: { id: 196, primary: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech", fallback: () => process.env.X_LAYER_RPC_FALLBACK || "https://xlayerrpc.okx.com", prefix: "XLAYER" },
   base: { id: 8453, primary: () => process.env.BASE_RPC_URL || "https://mainnet.base.org", fallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com", prefix: "BASE" },
   arbitrum: { id: 42161, primary: () => process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc", fallback: () => process.env.ARBITRUM_RPC_FALLBACK_URL || "https://arbitrum-one-rpc.publicnode.com", prefix: "ARBITRUM" },

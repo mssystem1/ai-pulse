@@ -10,6 +10,7 @@ import {
 import { API_BASE, apiGet, apiPost } from "./api";
 import { parseExecutionCapability, type ExecutionCapability as Capability } from "./executionCapability";
 import { useExecutionAvailability } from "./executionAvailability";
+import { ASSESSMENT_EVENT, currentOpportunityAssessment, isConfirmedSpotSetup, readOpportunityAssessments } from "./opportunityAssessment";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
   switchWalletNetwork,
@@ -62,13 +63,13 @@ type Activity = {
   createdAt: string;
 };
 
-const EXECUTION_NETWORKS: WebNetworkKey[] = ["xlayer", "base", "arbitrum"];
+const EXECUTION_NETWORKS: WebNetworkKey[] = ["xlayer", "base", "arbitrum", "robinhood"];
 
 async function probePairRoute(
   pair: string,
   network: WebNetworkKey,
   erc20Custody = false,
-): Promise<{ base: TradeToken; quote: TradeToken } | null> {
+): Promise<{ base: TradeToken; quote: TradeToken; executionMarketPair?: string } | null> {
   const response = await apiGet(
     `/v1/trading/resolve-pair?network=${network}&pair=${encodeURIComponent(pair)}${erc20Custody ? "&custody=erc20" : ""}`,
   );
@@ -77,9 +78,10 @@ async function probePairRoute(
     available?: boolean;
     base?: TradeToken;
     quote?: TradeToken;
+    executionMarketPair?: string;
   };
   return result.available && result.base && result.quote
-    ? { base: result.base, quote: result.quote }
+    ? { base: result.base, quote: result.quote, executionMarketPair: result.executionMarketPair }
     : null;
 }
 
@@ -134,7 +136,7 @@ type AutomationOrder = {
 };
 type AutopilotStrategyView = {
   id: string;
-  network?: "xlayer" | "base" | "arbitrum";
+  network?: "xlayer" | "base" | "arbitrum" | "robinhood";
   vault: string;
   settlementAsset?: string;
   targetAsset?: string;
@@ -381,7 +383,14 @@ export function OpportunityRadar({
       : "1H",
   );
   const [items, setItems] = useState<PotentialGainer[]>([]);
-  const executionAvailability = useExecutionAvailability(networkKey);
+  const [showTechnical, setShowTechnical] = useState(true);
+  const [assessments, setAssessments] = useState(() => readOpportunityAssessments(localStorage, networkKey));
+  useEffect(() => {
+    const refresh = () => setAssessments(readOpportunityAssessments(localStorage, networkKey));
+    refresh(); window.addEventListener(ASSESSMENT_EVENT, refresh); window.addEventListener("storage", refresh);
+    return () => { window.removeEventListener(ASSESSMENT_EVENT, refresh); window.removeEventListener("storage", refresh); };
+  }, [networkKey]);
+  const executionAvailability = useExecutionAvailability(networkKey, context === "autopilot" ? "erc20" : "spot");
   const [status, setStatus] = useState("Scanning live market structure…");
   const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef(expanded);
@@ -429,7 +438,7 @@ export function OpportunityRadar({
       setItems(
         (
           (response.data as { candidates?: PotentialGainer[] }).candidates || []
-        ).slice(0, 8),
+        ),
       );
       setStatus(context === "autopilot"
         ? "Live OKX candle shortlist. Selecting a card only prepares a draft; Autopilot evaluates fresh entry conditions after activation."
@@ -451,7 +460,9 @@ export function OpportunityRadar({
       ? "MARKET SHORTLIST · CHOOSE YOUR NEXT ACTION"
       : "OPPORTUNITY RADAR · RESEARCH FIRST";
   const collapsedCount = compactMobile ? 2 : 4;
-  const visibleItems = items.slice(0, expanded ? 8 : collapsedCount);
+  const eligibleItems = items.filter(candidate => (context === "global" || executionAvailability(candidate.pair).mapped)
+    && (showTechnical || isConfirmedSpotSetup(currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe))));
+  const visibleItems = eligibleItems.slice(0, expanded ? 8 : collapsedCount);
   return (
     <section
       className={`card potential-gainers opportunity-radar ${context}`}
@@ -476,7 +487,11 @@ export function OpportunityRadar({
           />
         </div>
       </div>
-      {items.length ? (
+      {context !== "autopilot" && <div className="report-execution-choice" role="group" aria-label="Shortlist evidence">
+        <button type="button" className={showTechnical ? "active" : ""} onClick={() => setShowTechnical(true)}><b>Explore technical candidates</b><span>Free scan · confidence needs a report</span></button>
+        <button type="button" className={!showTechnical ? "active" : ""} onClick={() => setShowTechnical(false)}><b>Recent bullish reports &gt;60%</b><span>Your existing reports · last 15 minutes</span></button>
+      </div>}
+      {eligibleItems.length ? (
         <>
           <div className="potential-gainer-grid">
             {visibleItems.map((candidate) => (
@@ -496,9 +511,10 @@ export function OpportunityRadar({
                 </div>
                 <ShortlistMarketChart pair={candidate.pair} timeframe={candidate.timeframe} mark={candidate.mark} history={candidate.priceHistory} fetchedAt={candidate.fetchedAt} lang={lang} />
                 <div className="candidate-score">
-                  <b>{candidate.score}</b>
-                  <span>setup score / 100</span>
+                  <b>{currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe) ? `${currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe)!.confidence}%` : "—"}</b>
+                  <span>{currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe)?.bias || "Report confidence not assessed"}</span>
                 </div>
+                <small>Technical match {candidate.score}/100 · {candidate.technicalReady ? "candle conditions met" : "waiting for candle conditions"}</small>
                 <p>{candidate.reason}</p>
                 <small className="execution-availability" data-status={executionAvailability(candidate.pair).status}>{executionAvailability(candidate.pair).label}</small>
                 <small>
@@ -530,7 +546,7 @@ export function OpportunityRadar({
               </article>
             ))}
           </div>
-          {items.length > collapsedCount && (<div className="radar-browse-controls">
+          {eligibleItems.length > collapsedCount && (<div className="radar-browse-controls">
             <button
               type="button"
               className="radar-more"
@@ -539,23 +555,23 @@ export function OpportunityRadar({
               disabled={expanded}
             >
               {expanded
-                ? `All ${items.length} candidates shown · refresh pauses while you browse`
-                : `Show ${items.length - collapsedCount} more candidates`}
+                 ? `${visibleItems.length} candidates shown · refresh pauses while you browse`
+                 : `Show ${Math.min(8, eligibleItems.length) - collapsedCount} more candidates`}
             </button>
             {expanded && <button type="button" className="radar-more" onClick={() => setExpanded(false)}>Show fewer candidates</button>}
           </div>)}
         </>
       ) : (
         <div className="empty-dashboard compact">
-          <strong>No shortlist loaded</strong>
-          <span>{status}</span>
+          <strong>{!showTechnical ? "No current confirmed setup above 60%" : items.length ? "No shortlisted markets available for this network" : "No shortlist loaded"}</strong>
+          <span>{!showTechnical ? "Open a recent bullish report or explore the free technical candidates. Neutral, bearish, stale and unassessed markets are not confirmed buy setups. You can still choose any supported pair for a manual trade." : items.length ? "Choose a supported pair directly below, or explore Global Market for research. Availability is checked again before a trade." : status}</span>
         </div>
       )}
       <div className="candidate-disclaimer">
         {context === "autopilot" ? <>
           <b>Two separate actions:</b> Use for Autopilot prefills pair, timeframe and strategy without buying a report. Open Global analysis starts the full Quick/Pro intelligence workflow. Neither action starts or authorizes a vault; fresh runtime gates, a verified route, owner-approved capital and an active AI Entry Pass are still required on {WEB_NETWORKS[networkKey].label}.
         </> : context === "spot" ? <>
-          <b>Choose your next action:</b> Trade this pair loads the Spot ticket below, where you choose Market or Limit, amount and protection. Research in Global opens the analysis page for this pair. Neither button charges your wallet or places a trade. The setup score measures technical conditions, not token safety or guaranteed returns.
+          <b>Choose your next action:</b> Trade this pair loads the Spot ticket below, where you choose Market or Limit, amount and protection. Research in Global opens the analysis page for this pair. Neither button charges your wallet or places a trade. Technical match ranks candle conditions; it is not report confidence or a probability of profit.
         </> : <>
           <b>How to use this:</b> choose a candidate for Global intelligence or a Spot ticket. A shortlist score never authorizes a trade; execution still requires a verified representation, live route, sufficient wallet balance and your signature on {WEB_NETWORKS[networkKey].label}.
         </>}
@@ -1291,12 +1307,18 @@ export function SpotWorkspace({
           available?: boolean;
           base?: TradeToken;
           quote?: TradeToken;
+          executionMarketPair?: string;
           explanation?: string;
           reason?: string;
         };
         // A verified token representation and a safely executable route are
         // different facts. Keep the real contracts visible even when OKX
         // rejects the route, but never enable an order without both.
+        if (response.ok && result.available && networkKey === "robinhood" && result.executionMarketPair && result.executionMarketPair !== pair) {
+          selectSpotPair(result.executionMarketPair);
+          setMessage("Robinhood token market loaded. Review fresh USDG order levels; Global report prices were not copied because token and underlying-share prices can differ. No transaction was sent.");
+          return;
+        }
         const resolvedBase = response.ok ? result.base || null : null;
         const resolvedQuote = response.ok ? result.quote || null : null;
         setBaseToken(resolvedBase);
@@ -4517,6 +4539,10 @@ export function AutopilotWorkspace({
       .then((route) => {
         if (cancelled) return;
         if (route) {
+          if (networkKey === "robinhood" && route.executionMarketPair && route.executionMarketPair !== pair) {
+            setPair(route.executionMarketPair);
+            return;
+          }
           setTargetToken(route.base);
           setTargetAsset(route.base.address);
           setSettlement(route.quote.address);
@@ -4812,6 +4838,7 @@ export function AutopilotWorkspace({
         settlementAsset: settlement,
         targetAsset,
         pair,
+        timeframe,
         amountAtomic: buyAmountAtomic,
       });
       if (!preflight.ok)
@@ -7256,7 +7283,7 @@ export function TelegramWorkspace() {
     );
   }, []);
   return (
-    <div className="v6-workspace docs-workspace telegram-user-guide">
+    <div className="v6-workspace telegram-user-guide">
       <section className="v6-heading">
         <div>
           <span className="eyebrow">YOUR MOBILE COMPANION</span>
@@ -7311,8 +7338,8 @@ export function TelegramWorkspace() {
             <div>
               <strong>Choose a service</strong>
               <p>
-                Tap Global Market or Prediction Market in the bot. The app opens
-                on that page. Choose your pair or question, timeframe and tier there.
+                Tap Global Market, Prediction Market or Risk Guard in the bot.
+                Choose the pair, question or token and the service options in the app.
               </p>
             </div>
           </article>
@@ -7343,7 +7370,7 @@ export function TelegramWorkspace() {
           <span className="eyebrow">CHOOSE A DESTINATION</span>
           <h3>Buttons, not commands</h3>
           <div className="command-list">
-            <strong>Global / Prediction</strong><span>Choose and buy research in the app.</span>
+            <strong>Global / Prediction / Risk Guard</strong><span>Choose and buy research in the app.</span>
             <strong>Spot Trading</strong><span>Prepare an order; your wallet approves execution.</span>
             <strong>Autopilot</strong><span>Manage autonomous strategies and their passes.</span>
             <strong>My reports</strong><span>Open saved reports. For another device, use Paid report history → Sync with wallet on a research page.</span>
@@ -7414,6 +7441,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-auto-rules", "Autopilot rules"],
     ["docs-auto-example", "Autopilot example"],
     ["docs-pay", "Payments"],
+    ["docs-robinhood", "Robinhood & USDG"],
     ["docs-agents", "Agents & API"],
     ["docs-recover", "Report history"],
     ["docs-telegram", "Telegram"],
@@ -7446,6 +7474,21 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
         </aside>
         <div className="docs-content">
           <div hidden={article !== "docs-workflows"}><DocsWorkflowVisuals /></div>
+          <section id="docs-robinhood" className="docs-section" hidden={article !== "docs-robinhood"}>
+            <div className="docs-copy">
+              <span className="eyebrow">ROBINHOOD MAINNET</span>
+              <h3>Exact assets. USDG settlement.</h3>
+              <p>When Robinhood is enabled, use USDG for payments and trading capital, and keep ETH for network fees. Wallet funding lets you review an ETH-to-USDG swap before signing. Changing appearance never changes your network.</p>
+              <ul>
+                <li>Choose the token by its name and contract. A catalog listing is not a promise of liquidity; PULSE checks the route when selected and again before execution.</li>
+                <li>Charts use the actual token’s DEX prices in USD. Trading levels and settlement use USDG with a fresh conversion. A stock token’s price must not be replaced with the underlying share price.</li>
+                <li>A Global research report does not authorize a trade. When moving to a Robinhood token, review fresh execution levels instead of reusing levels for a different asset.</li>
+                <li>Autopilot requires sufficient closed-candle history, a verified route, your signed risk policy and an active Entry Pass. A failed entry condition means Hold, not an automatic paid AI call.</li>
+                <li>Risk Guard distinguishes issuer stock tokens, USDG and wrapped ETH. Missing provider evidence stays unknown; market capitalization and an issuer listing do not establish safety.</li>
+              </ul>
+              <p>Availability is checked independently for each feature. If automated execution is paused or unavailable, do not repeatedly fund or pay to bypass it. Owner withdrawals remain subject to the account’s on-chain controls.</p>
+            </div>
+          </section>
           <section id="docs-start" className="docs-section hero-doc" hidden={article !== "docs-start"}>
             <div>
               <span className="eyebrow">QUICK START</span>
@@ -8483,11 +8526,19 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   <b>Arc Testnet</b>
                   <span>test USDC · analysis only</span>
                 </div>
+                <div>
+                  <b>Robinhood Chain</b>
+                  <span>USDG · PULSE self-hosted x402 · opt-in rollout</span>
+                </div>
               </div>
               <p>
                 Always confirm the selected network, payment asset, exact price
                 and wallet account before signing.
               </p>
+              <div className="docs-callout">
+                <b>Robinhood: research payments and funding</b>
+                <span>When enabled, Global Quick/Pro, Prediction Quick/Pro and Risk Guard use USDG on Robinhood mainnet. Wallet &amp; funding offers an ETH → USDG quote, shows the minimum received, then simulates before your wallet signs. Keep ETH for gas. An appearance change does not switch networks. Robinhood Spot and Autopilot remain unavailable until their separate execution checks are complete.</span>
+              </div>
               <div className="docs-glossary payment-price-grid">
                 <div><b>Global Quick</b><span>$0.20 per report</span></div>
                 <div><b>Global Pro</b><span>$0.30 per report</span></div>

@@ -1,7 +1,7 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import type { Server } from "node:http";
-import { loadConfig } from "@pulse/config";
+import { loadConfig, NETWORK_KEYS } from "@pulse/config";
 import { createApp, estimateAiCostUsd } from "./app.js";
 import type { PolymarketClient } from "@pulse/market";
 
@@ -37,26 +37,116 @@ async function jfetch(path: string, init?: RequestInit & { pay?: boolean }) {
 }
 
 describe("PULSE API", () => {
+  it("all eight marketplace services preserve POST and complete input discovery through the X Layer alias", async () => {
+    for (const path of ["analysis/spot/standard", "analysis/spot/premium", "analysis/prediction/standard", "analysis/prediction/premium", "preflight", "autopilot/pass/24h", "autopilot/pass/7d", "autopilot/pass/30d"]) {
+      const { res, json } = await jfetch(`/xlayer/v1/${path}`);
+      assert.equal(res.status, 400, path);
+      assert.equal(json.method, "POST", path);
+      assert.equal(json.requestSpec.method, "POST", path);
+      assert.deepEqual(json.requestSpec.fields, json.fields, path);
+      assert.equal(res.headers.get("payment-required"), null);
+      if (path.startsWith("analysis/spot")) for (const name of ["instId", "timeframe", "lang"]) assert.equal(json.fields.find((field: { name: string }) => field.name === name).required, true);
+    }
+  });
+  it("Risk Guard reports have private authenticated history and replay without regeneration", async () => {
+    const body = JSON.stringify({ tokenAddress: "0x0cc24c51bf89c00c5affbfcf5e856c25ecbdb48e", lang: "en" });
+    const first = await jfetch("/v1/preflight", { method: "POST", pay: true, body });
+    assert.equal(first.res.status, 200);
+    assert.ok(first.json.history.recoveryToken);
+    const reportPath = `/v1/jobs/${first.json.history.jobId}/report`;
+    assert.equal((await jfetch(reportPath)).res.status, 403);
+    const recovered = await jfetch(reportPath, { headers: { "PULSE-RECOVERY-TOKEN": first.json.history.recoveryToken } });
+    assert.equal(recovered.res.status, 200);
+    assert.equal(recovered.json.job.mode, "risk");
+    assert.equal(recovered.json.report.address, "0x0cc24c51bf89c00c5affbfcf5e856c25ecbdb48e");
+    assert.ok(recovered.json.reportMarkdown.includes("intelligence"));
+    const replay = await jfetch("/v1/preflight", { method: "POST", pay: true, body });
+    assert.equal(replay.res.status, 200);
+    assert.equal(replay.json.replay, true);
+    assert.equal(replay.json.generatedAt, first.json.generatedAt);
+    assert.equal(replay.json.history.jobId, first.json.history.jobId);
+    assert.ok(replay.json.history.recoveryToken);
+    const replayRecovered = await jfetch(reportPath, { headers: { "PULSE-RECOVERY-TOKEN": replay.json.history.recoveryToken } });
+    assert.equal(replayRecovered.res.status, 200);
+    assert.equal((await jfetch(reportPath, { headers: { "PULSE-RECOVERY-TOKEN": first.json.history.recoveryToken } })).res.status, 200);
+  });
+  it("Risk Guard accepts normalized chain IDs after payment on every network and trailing-slash input remains validated", async () => {
+    for (const [alias, chainId] of [["xlayer", "196"], ["base", "8453"], ["arbitrum", "42161"], ["arc", "5042002"], ["robinhood", "4663"]]) {
+      const path = `/${alias}/v1/preflight/`;
+      const invalid = await jfetch(path, { method: "POST", body: "{}" });
+      assert.equal(invalid.res.status, 400);
+      assert.equal(invalid.res.headers.has("PAYMENT-REQUIRED"), false);
+      const { res, json } = await jfetch(path, { method: "POST", pay: true,
+        body: JSON.stringify({ tokenAddress: "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168", chainId, lang: "en" }) });
+      assert.equal(res.status, 200, `${alias}: ${JSON.stringify(json)}`);
+      assert.equal(json.chainId, chainId);
+      assert.ok(json.history.recoveryToken);
+    }
+  });
   it("serves public cross-chain aggregates without payment or wallet parameters", async () => {
     const first = await jfetch("/v1/public/activity");
     const filtered = await jfetch("/v1/public/activity?network=base&wallet=ignored");
     assert.equal(first.res.status, 200);
     assert.equal(first.res.headers.has("PAYMENT-REQUIRED"), false);
     assert.equal(first.json.scope, "platform");
-    assert.equal(first.json.networks.length, 4);
+    assert.equal(first.json.networks.length, NETWORK_KEYS.length);
     assert.equal(first.json.networks.some((item: {environment:string}) => item.environment === "testnet"), true);
     assert.deepEqual(filtered.json, first.json);
     assert.equal(JSON.stringify(first.json).includes("payer"), false);
+  });
+  it("reissues private recovery on paid asynchronous research replays without replacing the original capability", async () => {
+    // No provider calls or background job consumption: test payment/job wiring.
+    const app = createApp(testConfig, { startDurableWorker: false, spotInstrumentExists: async () => true,
+      polymarket: { getMarket: async () => ({ id: "pm:replay", active: true, closed: false, archived: false,
+        enableOrderBook: true, outcomes: [{ tokenId: "1" }, { tokenId: "2" }] }),
+        getOrderBook: async () => ({ bids: [], asks: [] }) } as unknown as PolymarketClient });
+    const local = app.listen(0, "127.0.0.1");
+    await new Promise<void>(resolve => local.once("listening", resolve));
+    const origin = `http://127.0.0.1:${(local.address() as { port: number }).port}`;
+    try {
+      for (const mode of ["spot", "prediction"]) for (const tier of ["standard", "premium"]) {
+        const route = `${origin}/robinhood/v1/analysis/${mode}/${tier}`;
+        const input = mode === "spot" ? { instId: "ETH-USDT", timeframe: "1H", lang: "en" }
+          : { primaryMarketId: "pm:replay", lang: "en" };
+        const post = () => fetch(route, { method: "POST", headers: { "Content-Type": "application/json",
+          "PAYMENT-SIGNATURE": "test-payment-signature-ok" }, body: JSON.stringify(input) });
+        const firstResponse = await post(); const first = await firstResponse.json();
+        assert.equal(firstResponse.status, 202);
+        assert.ok(first.recoveryToken);
+        const replayResponse = await post(); const replay = await replayResponse.json();
+        assert.equal(replayResponse.status, 202);
+        assert.equal(replay.job.id, first.job.id);
+        assert.equal(replay.replay, true);
+        assert.match(replay.recoveryToken, /^ppr1_/);
+        const jobUrl = `${origin}/robinhood/v1/jobs/${first.job.id}`;
+        assert.equal((await fetch(jobUrl)).status, 403);
+        for (const token of [first.recoveryToken, replay.recoveryToken]) {
+          assert.equal((await fetch(jobUrl, { headers: { "PULSE-RECOVERY-TOKEN": token } })).status, 200);
+        }
+        assert.equal((await fetch(jobUrl,
+          { headers: { "PULSE-RECOVERY-TOKEN": `${replay.recoveryToken}corrupt` } })).status, 403);
+      }
+    } finally { local.closeAllConnections(); await new Promise<void>(resolve => local.close(() => resolve())); }
   });
   it("rejects invalid candle cursors and limits before querying the provider", async () => {
     for (const query of ["limit=-1", "limit=301", "limit=NaN", "before=garbage", "before=-1", "before=1.5"]) {
       assert.equal((await jfetch(`/v1/market/candles?instId=BTC-USDT&${query}`)).res.status, 400);
     }
   });
+  it("validates free Robinhood funding without an x402 challenge or payment", async () => {
+    for (const body of [{}, { amount: "0", userWalletAddress: ADDRESS }, { amount: "1", userWalletAddress: "bad" },
+      { amount: "1", userWalletAddress: ADDRESS, toToken: ADDRESS }]) {
+      const { res } = await jfetch("/v1/dex/robinhood/native-usdg", { method: "POST", body: JSON.stringify(body) });
+      assert.equal(res.status, 400);
+      assert.equal(res.headers.has("PAYMENT-REQUIRED"), false);
+      assert.equal(res.headers.has("PAYMENT-RESPONSE"), false);
+    }
+  });
   before(async () => {
     // Complete, secret-free test profile; do not depend on the operator's .env.
     Object.assign(process.env, {
-      ENABLED_NETWORKS: "xlayer,base,arbitrum,arc-testnet",
+      ENABLED_NETWORKS: "xlayer,base,arbitrum,arc-testnet,robinhood",
+      REPORT_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64url"),
       FEATURE_BASE_PAYMENTS: "1", FEATURE_ARBITRUM_PAYMENTS: "1", FEATURE_ARC_PAYMENTS: "1",
       FEATURE_POLYMARKET: "1", FEATURE_PREDICTION_ANALYSIS: "1", FEATURE_JOBS: "1",
       FEATURE_FUSED_ANALYSIS: "0", FEATURE_DIVERGENCE_ANALYSIS: "0", FEATURE_EVENT_RISK_ANALYSIS: "0",
@@ -242,6 +332,16 @@ describe("PULSE API", () => {
     const { res, json } = await jfetch("/v1/metadata");
     assert.equal(res.status, 200);
     const services = json.asp.networkServices as Array<{ path: string; network: string; paymentProvider: string }>;
+    for (const service of json.asp.networkServices) {
+      assert.equal(service.requestSpec.method, "POST");
+      assert.ok(service.requestSpec.fields.length > 0);
+      assert.equal(service.outputSchema.method, "POST");
+      assert.ok(service.serviceGuide);
+      if (service.path.endsWith("/preflight")) {
+        const chain = service.requestSpec.fields.find((field: { name: string }) => field.name === "chainId");
+        assert.equal(chain.default, service.network.split(":")[1]);
+      }
+    }
     assert.ok(services.some((item) => item.path === "/xlayer/v1/analysis/prediction/premium" && item.paymentProvider === "okx"));
     assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
     assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));

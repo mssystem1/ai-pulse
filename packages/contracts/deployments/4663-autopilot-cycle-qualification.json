@@ -1,0 +1,72 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "registry-resume",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 38,
+      "hash": "0x9deefb1c071a60671080cd3a3ed6429b8c0d381fd4b69eee437d469aed942e94",
+      "status": "success",
+      "maxGasETH": "0.000001987079328",
+      "gasETH": "0.00000130562802"
+    },
+    {
+      "step": "vault-resume",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 39,
+      "hash": "0x694c0021aa86d042de6fe5a8b75706fdd0124a937a0a9de393ea2f9e322c5a09",
+      "status": "success",
+      "maxGasETH": "0.0000021176889264",
+      "gasETH": "0.000001405406816"
+    },
+    {
+      "step": "vault-pause",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 40,
+      "hash": "0xd22d5b05a3532a1492687c0cc586a42c620c3ee11025685be358eee57f9d226e",
+      "status": "success",
+      "maxGasETH": "0.000001970067888",
+      "gasETH": "0.000001294864572"
+    },
+    {
+      "step": "withdraw-check",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 41,
+      "hash": "0xc1dd3f74bc1cf10ddafac8eb3132cac933d85edd2793a88eefd701c5a201de11",
+      "status": "success",
+      "maxGasETH": "0.000004320705852",
+      "gasETH": "0.000002623389432"
+    },
+    {
+      "step": "return-withdrawal",
+      "to": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "nonce": 42,
+      "hash": "0x16a63651798c0cfeb54b3bdd0afc5376089a7b7c83f60e327ae3dc3593d92880",
+      "status": "success",
+      "maxGasETH": "0.00000342999552",
+      "gasETH": "0.000002261761488"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 43,
+      "hash": "0xc2beae6f10a4af4243004d109b986b9083f43cf84e609f77854f85f6224d557d",
+      "status": "success",
+      "maxGasETH": "0.000001988099592",
+      "gasETH": "0.000001306969044"
+    }
+  ],
+  "data": {
+    "lastDecision": "hold_trend_following",
+    "evaluationCount": "13",
+    "aiCalls": "0",
+    "targetBalanceAfterCycle": "0",
+    "cycleCompleted": true,
+    "pausedTimerVerified": true,
+    "withdrawalVerified": true,
+    "totalGasETH": "0.000008891050328",
+    "workflowComplete": true,
+    "completed": true
+  }
+}

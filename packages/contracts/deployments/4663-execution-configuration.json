@@ -1,0 +1,45 @@
+{
+  "chainId": 4663,
+  "transactions": [
+    {
+      "functionName": "setRouter",
+      "address": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "role": "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919",
+      "hash": "0xc1b6365123dc9f4fcd5a329fe1a96f8320bbb09850d227e4591f89ec3da40d12",
+      "nonce": 15,
+      "status": "success",
+      "maxGasETH": "0.000003957404304",
+      "gasETH": "0.000002590591564"
+    },
+    {
+      "functionName": "setSpender",
+      "address": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "role": "0x42170295F1173c9e5874ea9d00c6d137E1a4f53d",
+      "hash": "0x2244ca704ee142791d19613e49342b5f4272a653dc56a2a823bea6850e143ea8",
+      "nonce": 16,
+      "status": "success",
+      "maxGasETH": "0.0000039148427832",
+      "gasETH": "0.000002584917456"
+    },
+    {
+      "functionName": "setSpotKeeper",
+      "address": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "role": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+      "hash": "0x3803ef09ae819abde616fb5c877a256a63ecf62eaecdc9ed943fb3b6d7b4483c",
+      "nonce": 17,
+      "status": "success",
+      "maxGasETH": "0.0000039103932816",
+      "gasETH": "0.000002583363036"
+    },
+    {
+      "functionName": "setAutopilotExecutor",
+      "address": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "role": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+      "hash": "0x9705c43e71e10ea8476515077cb1c93b467a81c8d53c94fcdbfb33b30f3d56ba",
+      "nonce": 18,
+      "status": "success",
+      "maxGasETH": "0.000003916317024",
+      "gasETH": "0.00000258228196"
+    }
+  ]
+}

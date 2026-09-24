@@ -3,26 +3,27 @@ import { apiGet } from "./api";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 
 type Catalog = { network: WebNetworkKey; status: "ready" | "unavailable"; pairs: Set<string> };
-const cache = new Map<WebNetworkKey, { until: number; promise: Promise<Catalog> }>();
-export function useExecutionAvailability(network: WebNetworkKey) {
+const cache = new Map<string, { until: number; promise: Promise<Catalog> }>();
+export function useExecutionAvailability(network: WebNetworkKey, custody: "spot" | "erc20" = "spot") {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   useEffect(() => {
     let current = true;
     if (network === "arc-testnet") { setCatalog({ network, status: "ready", pairs: new Set() }); return; }
-    let entry = cache.get(network);
+    const cacheKey = `${network}:${custody}`;
+    let entry = cache.get(cacheKey);
     if (!entry || entry.until < Date.now()) {
-      const promise = apiGet(`/v1/trading/pairs?network=${network}&limit=1000`).then(response => {
+      const promise = apiGet(`/v1/trading/pairs?network=${network}&limit=1000${custody === "erc20" ? "&custody=erc20" : ""}`).then(response => {
         if (!response.ok) return { network, status: "unavailable" as const, pairs: new Set<string>() };
-        const data = response.data as { pairs?: Array<{ pair: string }> };
+        const data = response.data as { pairs?: Array<{ pair: string; researchPairs?: string[] }> };
         if (!Array.isArray(data?.pairs)) return { network, status: "unavailable" as const, pairs: new Set<string>() };
-        return { network, status: "ready" as const, pairs: new Set((data.pairs || []).map(item => item.pair.toUpperCase())) };
+        return { network, status: "ready" as const, pairs: new Set(data.pairs.flatMap(item => [item.pair, ...(network === "robinhood" ? item.researchPairs || [] : [])]).map(pair => pair.toUpperCase())) };
       }).catch(() => ({ network, status: "unavailable" as const, pairs: new Set<string>() }));
       entry = { until: Date.now() + 60_000, promise };
-      cache.set(network, entry);
+      cache.set(cacheKey, entry);
     }
     void entry.promise.then(value => { if (current) setCatalog(value); });
     return () => { current = false; };
-  }, [network]);
+  }, [network, custody]);
   return (pair: string) => {
     if (network === "arc-testnet") return { mapped: false, label: "Research only · Arc Testnet", status: "research" };
     if (!catalog || catalog.network !== network) return { mapped: false, label: "Checking Spot availability…", status: "loading" };

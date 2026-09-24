@@ -1,9 +1,10 @@
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
 
 export type AutopilotPass = {
-  owner: string; network: "base" | "arbitrum" | "xlayer"; vault: string;
+  owner: string; network: import("./executionContracts.js").ExecutionNetwork; vault: string;
   purchasedAt: string; expiresAt: string; signalLimit: number; signalsUsed: number;
   consumedSignalIds?: string[];
+  creditedPaymentIds?: string[];
   pausedAt?: string; stateObservedAt?: number; telegramDelivery?: string;
   expiryWarningSentAt?: string; expiredNoticeSentAt?: string;
   timerBaseExpiresAt?: string; timerInitiallyPaused?: boolean;
@@ -87,7 +88,8 @@ export function applyConfirmedPassPause(value: AutopilotPass, event: { txHash: s
   return next;
 }
 export function extendAutopilotPass(existing: AutopilotPass | null,
-  input: { owner: string; network: AutopilotPass["network"]; vault: string; days: 1 | 7 | 30; paused: boolean; telegramDelivery?: string }, now: number): AutopilotPass {
+  input: { owner: string; network: AutopilotPass["network"]; vault: string; days: 1 | 7 | 30; paused: boolean; telegramDelivery?: string; paymentId?: string }, now: number): AutopilotPass {
+  if (existing && input.paymentId && existing.creditedPaymentIds?.includes(input.paymentId)) return existing;
   const current = existing ? transitionPassPause(existing, input.paused, now) : null;
   const remaining = current ? Math.max(0, autopilotPassRemainingMs(current, now)) : 0;
   // Rebase to now even when an expired pass was paused in the past.
@@ -96,5 +98,6 @@ export function extendAutopilotPass(existing: AutopilotPass | null,
     ...(input.paused ? { pausedAt: new Date(now).toISOString() } : {}), stateObservedAt: now,
     timerBaseExpiresAt: new Date(now + remaining + input.days * 86_400_000).toISOString(), timerInitiallyPaused: input.paused,
     signalLimit: (remaining > 0 && current ? Math.max(0, current.signalLimit - current.signalsUsed) : 0) + input.days * 3,
-    signalsUsed: 0, telegramDelivery: input.telegramDelivery || current?.telegramDelivery };
+    signalsUsed: 0, telegramDelivery: input.telegramDelivery || current?.telegramDelivery,
+    creditedPaymentIds: [...(existing?.creditedPaymentIds || []), ...(input.paymentId ? [input.paymentId] : [])] };
 }

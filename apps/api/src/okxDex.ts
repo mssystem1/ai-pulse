@@ -35,7 +35,7 @@ export function createOkxDexHeaders(
   };
 }
 
-async function okxDexGetMany(
+export async function okxDexGetMany(
   cfg: AppConfig,
   path: string,
   params: Record<string, string>,
@@ -200,6 +200,22 @@ function genericQuoteSummary(raw: Record<string, unknown>, chainId: string) {
   };
 }
 
+/** Fail closed before advertising a Robinhood route, not only at execution. */
+export function assertRobinhoodQuoteIdentity(raw: Record<string, unknown>, input: GenericDexRequest) {
+  if (input.chainId !== "4663") return;
+  const from = raw.fromToken as Record<string, unknown> | undefined;
+  const to = raw.toToken as Record<string, unknown> | undefined;
+  if ((raw.chainIndex != null && String(raw.chainIndex) !== input.chainId)
+    || String(from?.tokenContractAddress || "").toLowerCase() !== input.fromTokenAddress.toLowerCase()
+    || String(to?.tokenContractAddress || "").toLowerCase() !== input.toTokenAddress.toLowerCase())
+    throw new Error("Robinhood quote assets or chain do not match the request");
+  const amount = String(raw.fromTokenAmount ?? "");
+  const received = String(raw.toTokenAmount ?? "");
+  if (!/^\d+$/.test(amount) || !/^\d+$/.test(received) || !/^\d+$/.test(input.amount)
+    || BigInt(amount) !== BigInt(input.amount) || BigInt(amount) <= 0n || BigInt(received) <= 0n)
+    throw new Error("Robinhood quote must match the exact input and have positive output");
+}
+
 /** Live Onchain OS quote for any exact token pair supported by its chain router. */
 export async function getGenericOkxQuote(cfg: AppConfig, input: GenericDexRequest) {
   const raw = await okxDexGet(cfg, "/api/v6/dex/aggregator/quote", {
@@ -209,6 +225,7 @@ export async function getGenericOkxQuote(cfg: AppConfig, input: GenericDexReques
     amount: input.amount,
     swapMode: "exactIn",
   });
+  assertRobinhoodQuoteIdentity(raw, input);
   return genericQuoteSummary(raw, input.chainId);
 }
 
@@ -227,6 +244,7 @@ export async function getGenericOkxSwap(cfg: AppConfig, input: GenericDexRequest
   });
   const tx = raw.tx as Record<string, unknown> | undefined;
   const router = raw.routerResult as Record<string, unknown> | undefined;
+  if (input.chainId === "4663") assertRobinhoodQuoteIdentity(router || {}, input);
   if (!tx || typeof tx.to !== "string" || typeof tx.data !== "string") {
     throw new Error("OKX Onchain OS returned no executable transaction");
   }
@@ -439,6 +457,8 @@ const EXECUTION_ASSET_ALIASES: Record<string, Record<string, string[]>> = {
 
 export function executionAssetAliases(symbol: string, chainId: string, assetClass?: "crypto" | "tokenized_stock" | "tokenized_etf" | "rwa") {
   const normalized = symbol.trim().toUpperCase();
+  if (chainId === "4663" && normalized === "ETH") return ["WETH", "ETH"];
+  if (chainId === "4663" && normalized.startsWith("X") && (assetClass === "tokenized_stock" || assetClass === "tokenized_etf")) return [normalized.slice(1)];
   const xStock = (chainId === "196" || chainId === "42161")
     && (assetClass === "tokenized_stock" || assetClass === "tokenized_etf")
     && normalized.startsWith("X") && normalized.length > 1
@@ -452,6 +472,8 @@ export function executionAssetAliases(symbol: string, chainId: string, assetClas
 
 export function analysisSymbolForExecutionToken(symbol: string, chainId?: string, tokenName?: string) {
   const normalized = symbol.trim().toUpperCase().replaceAll("₮", "T").replace(/\.E$/, "");
+  if (chainId === "4663" && normalized === "WETH") return "ETH";
+  if (chainId === "4663" && /Robinhood Token/i.test(tokenName || "")) return `X${normalized}`;
   for (const [analysis, aliases] of Object.entries(EXECUTION_ASSET_ALIASES[chainId || ""] || {}))
     if (aliases.includes(normalized)) return analysis;
   const official = (OFFICIAL_WRAPPED_ASSETS[chainId || ""] || [])
@@ -506,7 +528,25 @@ export async function getOkxTradeTokens(
   if (query === "btc" || query === "wbtc") { aliases.add("btc"); aliases.add("wbtc"); }
   if (query === "eth" || query === "weth") { aliases.add("eth"); aliases.add("weth"); }
   if (query === "usdt" || query === "usdt0" || query === "usdc") { aliases.add("usdt"); aliases.add("usdt0"); aliases.add("usdc"); }
-  const candidates = [...(OFFICIAL_WRAPPED_ASSETS[chainId] || []), ...cached.tokens]
+  let chainTokens = cached.tokens;
+  if (chainId === "4663") {
+    const { robinhoodStockCatalog } = await import("./robinhoodAssetRegistry.js");
+    const stocks = await robinhoodStockCatalog().catch(() => []);
+    const canonical = new Map<string, Record<string, unknown>>([
+      ["0x5fc5360d0400a0fd4f2af552add042d716f1d168", { tokenSymbol: "USDG", tokenName: "Global Dollar", decimals: 6 }],
+      ["0x0bd7d308f8e1639fab988df18a8011f41eacad73", { tokenSymbol: "WETH", tokenName: "Wrapped Ether", decimals: 18 }],
+      ["0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee", { tokenSymbol: "ETH", tokenName: "Ether", decimals: 18 }],
+      ...stocks.map(stock => [stock.address, { tokenSymbol: stock.symbol, tokenName: stock.name, decimals: 18, priceMultiplier: stock.multiplier }] as [string, Record<string, unknown>]),
+    ]);
+    // Preserve the full DEX catalog. Only exact registry identities receive
+    // canonical metadata; ordinary assets use address-scoped market IDs.
+    chainTokens = cached.tokens.map(item => {
+      const address = String(item.tokenContractAddress || "").toLowerCase();
+      const identity = canonical.get(address);
+      return identity ? { ...item, ...identity, tokenSource: "Robinhood canonical deployment · OKX route" } : item;
+    });
+  }
+  const candidates = [...(OFFICIAL_WRAPPED_ASSETS[chainId] || []), ...chainTokens]
     .filter((item, index, all) => all.findIndex((candidate) => String(candidate.tokenContractAddress).toLowerCase() === String(item.tokenContractAddress).toLowerCase()) === index);
   return candidates.filter((item) => !query || [item.tokenSymbol, item.tokenName, item.tokenContractAddress]
     .some((value) => [...aliases].some((alias) => String(value || "").toLowerCase().includes(alias))))
@@ -518,6 +558,7 @@ export async function getOkxTradeTokens(
       decimals: Number(item.decimals ?? item.decimal ?? 18),
       logoUrl: typeof item.tokenLogoUrl === "string" ? item.tokenLogoUrl : null,
       chainId,
+      ...(typeof item.priceMultiplier === "string" ? { priceMultiplier: item.priceMultiplier } : {}),
       provider: item.tokenSource === "Coinbase" ? "Coinbase wrapped asset · OKX Onchain OS route" : String(item.tokenSource || "OKX Onchain OS"),
     }))
     .filter((item) => /^0x[a-fA-F0-9]{40}$/.test(item.address));

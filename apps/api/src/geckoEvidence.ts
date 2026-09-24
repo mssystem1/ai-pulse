@@ -1,6 +1,6 @@
 import type { NetworkKey } from "@pulse/config";
 
-const NETWORKS: Partial<Record<NetworkKey, string>> = { xlayer: "x-layer", base: "base", arbitrum: "arbitrum" };
+const NETWORKS: Partial<Record<NetworkKey, string>> = { xlayer: "x-layer", base: "base", arbitrum: "arbitrum", robinhood: "robinhood" };
 const cache = new Map<string, { until: number; promise: Promise<unknown> }>();
 
 // Share in-flight requests and cache failures as well as successes. Empty DEX

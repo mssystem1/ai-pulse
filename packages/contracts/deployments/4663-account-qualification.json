@@ -1,0 +1,35 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "policy": {
+    "pair": "WETH.0BD7D308F8E1639F-USDG",
+    "timeframe": "1H",
+    "maxTradePct": 50,
+    "dailyLossPct": 5,
+    "strategy": "trend_following"
+  },
+  "entries": [
+    {
+      "kind": "autopilot",
+      "factory": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "hash": "0xd58bd8623f25e4a91d7b75745ebfa741eb288077bddadadb018067a3168b931e",
+      "nonce": 24,
+      "status": "success",
+      "maxGasETH": "0.0001347010382592",
+      "gasETH": "0.00008788362415",
+      "account": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "observedPaused": true
+    },
+    {
+      "kind": "spot-limit",
+      "factory": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "hash": "0x1e7e99dcbac3e3e82a432e04459bea60d23edc89aaefc956b36867715d40d337",
+      "nonce": 25,
+      "status": "success",
+      "maxGasETH": "0.000098326124544",
+      "gasETH": "0.000065089252204",
+      "account": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE"
+    }
+  ],
+  "completed": true
+}

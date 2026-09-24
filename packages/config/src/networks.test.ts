@@ -5,16 +5,27 @@ import { NETWORK_REGISTRY, getNetworkByCaip2, parseEnabledNetworks } from "./net
 
 describe("network registry", () => {
   it("contains only the approved networks", () => {
-    assert.deepEqual(Object.keys(NETWORK_REGISTRY), ["xlayer", "base", "arbitrum", "arc-testnet"]);
+    assert.deepEqual(Object.keys(NETWORK_REGISTRY).sort(), ["arbitrum", "arc-testnet", "base", "robinhood", "xlayer"]);
     assert.equal(getNetworkByCaip2("eip155:196")?.key, "xlayer");
     assert.equal(getNetworkByCaip2("eip155:8453")?.key, "base");
     assert.equal(getNetworkByCaip2("eip155:42161")?.key, "arbitrum");
     assert.equal(getNetworkByCaip2("eip155:5042002")?.key, "arc-testnet");
+    assert.equal(getNetworkByCaip2("eip155:4663")?.key, "robinhood");
+    assert.equal(getNetworkByCaip2("eip155:46630"), undefined);
   });
 
   it("uses native USDC for Base and Arbitrum", () => {
     assert.equal(NETWORK_REGISTRY.base.paymentAsset.address, "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913");
     assert.equal(NETWORK_REGISTRY.arbitrum.paymentAsset.address, "0xaf88d065e77c8cC2239327C5EDb3A432268e5831");
+  });
+
+  it("uses USDG with ETH gas for Robinhood, without enabling it by default", () => {
+    const chain = NETWORK_REGISTRY.robinhood;
+    assert.equal(chain.paymentAsset.symbol, "USDG");
+    assert.equal(chain.paymentAsset.decimals, 6);
+    assert.equal(chain.nativeAsset.symbol, "ETH");
+    assert.equal(chain.paymentProvider, "robinhood-x402");
+    assert.equal(chain.environment, "mainnet");
   });
 
   it("parses a unique ordered allowlist and rejects unsupported networks", () => {

@@ -11,6 +11,7 @@ export function telegramMenu(miniAppUrl: string, capability: string, command = "
     { label: "Open PULSE", path: "/overview", command: "/start" },
     { label: "Global Market", path: "/global", command: "/global" },
     { label: "Prediction Market", path: "/prediction", command: "/prediction" },
+    { label: "Risk Guard", path: "/safety", command: "/risk" },
     { label: "Spot Trading", path: "/spot", command: "/spot" },
     { label: "Autopilot", path: "/autopilot", command: "/autopilot" },
     { label: "My reports", path: "/overview", hash: "reports", command: "/reports" },
@@ -41,6 +42,8 @@ export function telegramReportUrl(miniAppUrl: string, shareToken: string) {
 }
 const memoryDeliveries = new Map<string, DeliveryTask>();
 const memoryUpdates = new Set<number>();
+const memoryDeliveryLocks = new Set<string>();
+const memoryDelivered = new Set<string>();
 
 type TelegramEnvironment = Partial<Record<"TELEGRAM_BOT_TOKEN" | "TELEGRAM_BOT_USERNAME" | "TELEGRAM_WEBHOOK_SECRET" | "TELEGRAM_MINI_APP_URL", string | undefined>>;
 
@@ -92,16 +95,37 @@ async function saveDelivery(task:DeliveryTask){
 }
 async function removeDelivery(id:string){if(kvConfigured()){await kv(["DEL",`pulse:v6:telegram:delivery:${id}`]);await kv(["ZREM","pulse:v6:telegram:due",id]);}else memoryDeliveries.delete(id);}
 export async function deliverTelegramReportDurably(id:string,delivery:string,text:string,reportUrl:string){
-  try{await deliverTelegramReport(delivery,text,reportUrl);await removeDelivery(id);return {delivered:true};}
-  catch(error){const task:DeliveryTask={id,delivery,text,reportUrl,attempts:0,nextAt:Date.now()+30_000,createdAt:new Date().toISOString(),lastError:(error instanceof Error?error.message:String(error)).slice(0,300)};await saveDelivery(task);return {delivered:false,queued:true};}
+  if (await wasDelivered(id)) return { delivered:true };
+  const task:DeliveryTask={id,delivery,text,reportUrl,attempts:0,nextAt:Date.now(),createdAt:new Date().toISOString()};
+  // Persist before attempting network delivery so a process restart can resume it.
+  await saveDelivery(task);
+  const delivered = await attemptDelivery(task);
+  return { delivered, queued: !delivered };
 }
 async function dueDeliveries(){
   if(kvConfigured()){const ids=await kv(["ZRANGEBYSCORE","pulse:v6:telegram:due",0,Date.now(),"LIMIT",0,20]);const tasks=await Promise.all((Array.isArray(ids)?ids:[]).map(async id=>{const raw=await kv(["GET",`pulse:v6:telegram:delivery:${id}`]);return typeof raw==="string"?JSON.parse(raw) as DeliveryTask:null;}));return tasks.filter((task):task is DeliveryTask=>Boolean(task));}
   return [...memoryDeliveries.values()].filter(task=>task.nextAt<=Date.now()).slice(0,20);
 }
-async function lockDelivery(id:string){if(kvConfigured())return (await kv(["SET",`pulse:v6:telegram:lock:${id}`,"1","NX","EX",60]))==="OK";return true;}
-export async function runTelegramDeliveryCycle(){for(const task of await dueDeliveries()){if(!(await lockDelivery(task.id)))continue;try{await deliverTelegramReport(task.delivery,task.text,task.reportUrl);await removeDelivery(task.id);}catch(error){task.attempts+=1;task.lastError=(error instanceof Error?error.message:String(error)).slice(0,300);task.nextAt=Date.now()+Math.min(3_600_000,30_000*2**Math.min(task.attempts,7));await saveDelivery(task);}}}
-export function startTelegramDeliveryWorker(){if(process.env.FEATURE_TELEGRAM!=="1")return()=>{};const run=()=>void runTelegramDeliveryCycle().catch(error=>{if(!isKvUnavailableError(error))console.error("Telegram delivery retry failed",error);});const timer=setInterval(run,30_000);timer.unref();run();return()=>clearInterval(timer);}
+async function wasDelivered(id:string){return kvConfigured() ? Boolean(await kv(["GET",`pulse:v6:telegram:sent:${id}`])) : memoryDelivered.has(id);}
+async function lockDelivery(id:string){if(kvConfigured())return (await kv(["SET",`pulse:v6:telegram:lock:${id}`,"1","NX","EX",60]))==="OK";if(memoryDeliveryLocks.has(id))return false;memoryDeliveryLocks.add(id);return true;}
+async function attemptDelivery(task:DeliveryTask){
+  if(!(await lockDelivery(task.id)))return false;
+  try {
+    if (!(await wasDelivered(task.id))) {
+      await deliverTelegramReport(task.delivery,task.text,task.reportUrl);
+      if(kvConfigured())await kv(["SET",`pulse:v6:telegram:sent:${task.id}`,"1","EX",604800]);
+      else { memoryDelivered.add(task.id); if(memoryDelivered.size>1000)memoryDelivered.delete(memoryDelivered.values().next().value!); }
+    }
+    await removeDelivery(task.id);return true;
+  } catch(error) {
+    task.attempts+=1;task.lastError=(error instanceof Error?error.message:String(error)).slice(0,300);
+    task.nextAt=Date.now()+Math.min(3_600_000,30_000*2**Math.min(task.attempts,7));await saveDelivery(task);return false;
+  } finally {
+    if(kvConfigured())await kv(["DEL",`pulse:v6:telegram:lock:${task.id}`]);else memoryDeliveryLocks.delete(task.id);
+  }
+}
+export async function runTelegramDeliveryCycle(){for(const task of await dueDeliveries())await attemptDelivery(task);}
+export function startTelegramDeliveryWorker(){if(!["1","true"].includes(process.env.FEATURE_TELEGRAM||""))return()=>{};const run=()=>void runTelegramDeliveryCycle().catch(error=>{if(!isKvUnavailableError(error))console.error("Telegram delivery retry failed",error);});const timer=setInterval(run,30_000);timer.unref();run();return()=>clearInterval(timer);}
 async function firstTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return true;if(kvConfigured())return (await kv(["SET",`pulse:v6:telegram:update:${updateId}`,"1","NX","EX",604800]))==="OK";if(memoryUpdates.has(updateId))return false;memoryUpdates.add(updateId);return true;}
 async function releaseTelegramUpdate(updateId:number|undefined){if(updateId===undefined)return;if(kvConfigured())await kv(["DEL",`pulse:v6:telegram:update:${updateId}`]);else memoryUpdates.delete(updateId);}
 
@@ -112,7 +136,7 @@ export function createTelegramRouter(cfg: AppConfig) {
 
   const enabled = cfg.FEATURE_TELEGRAM;
   router.get("/v1/telegram/status", (_req, res) => {
-    res.json({ enabled, configured: Boolean(enabled && telegramConfig.complete), missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError, botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && kvConfigured()) });
+    res.json({ enabled, configured: Boolean(enabled && telegramConfig.complete), missing: telegramConfig.missing, miniAppUrlError: telegramConfig.miniAppUrlError, botUsername: botUsername || null, botUrl: botUsername ? `https://t.me/${botUsername}` : null, webhookPath: "/v1/telegram/webhook", miniAppUrl: miniAppUrl || null, custody: false, durableDelivery: Boolean(enabled && telegramConfig.complete && cfg.REPORT_SHARE_LINK_ENABLED && kvConfigured()) });
   });
   router.post("/v1/telegram/webhook", asyncRoute(async (req, res) => {
     if (!enabled) return res.status(404).json({ error: "Telegram bot is disabled" });
@@ -126,9 +150,9 @@ export function createTelegramRouter(cfg: AppConfig) {
     if (!chatId || chat?.type !== "private") return res.status(200).json({ ok: true, ignored: true });
     const text = (update.message?.text || update.callback_query?.data || "").trim().toLowerCase();
     const keyboard = telegramMenu(miniAppUrl, deliveryToken(chatId, webhookSecret), text);
-    const reply = text.startsWith("/reports") ? "Open My reports for reports saved on this device. For another device, open Global or Prediction Market and use Paid report history → Sync with wallet. Recovery does not charge you again."
+    const reply = text.startsWith("/reports") ? "Open My reports for reports saved on this device. For another device, open Global, Prediction Market or Risk Guard and use Paid report history → Sync with wallet. Recovery does not charge you again."
       : text.startsWith("/wallet") ? "Open PULSE and use Wallet & funding in the header to connect your wallet. Never send a private key or seed phrase here. A report-history signature proves ownership; it does not authorize a payment or trade."
-      : "Welcome to PULSE. Tap a button to open the app—no commands needed.\n\nChoose markets and review prices in the app. Global and Prediction reports purchased through these chat buttons can be delivered here.\n\nSpot orders need your wallet approval. Autopilot trades autonomously within your signed limits. Nothing trades merely by opening the app.";
+      : "Welcome to PULSE. Tap a button to open the app—no commands needed.\n\nChoose markets and review prices in the app. Global, Prediction and Risk Guard reports purchased through these chat buttons can be delivered here.\n\nSpot orders need your wallet approval. Autopilot trades autonomously within your signed limits. Nothing trades merely by opening the app.";
     try {
       if (update.callback_query?.id) await telegram(token, "answerCallbackQuery", { callback_query_id: update.callback_query.id });
       await telegram(token, "sendMessage", { chat_id: chatId, text: reply, reply_markup: keyboard, disable_web_page_preview: true }); res.json({ ok: true, updateId: update.update_id }); }

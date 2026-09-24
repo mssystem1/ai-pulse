@@ -55,7 +55,7 @@ export function receiptPauseState(receipt: FillReceipt, owner: string, account: 
 async function reconcilePassTimer(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
   if (item.passTimerReconciledAt || item.source !== "autopilot" || !item.account || !item.txHash
     || !/^vault_(pause|resume|policy_update|asset_configure|configure|limits_configure)$/.test(item.kind)
-    || !["base", "arbitrum", "xlayer"].includes(item.network)) return item;
+    || !["base", "arbitrum", "xlayer", "robinhood"].includes(item.network)) return item;
   const client = executionPublicClient(item.network as ExecutionNetwork);
   const verifiedReceipt = receipt || await client.getTransactionReceipt({ hash: item.txHash as `0x${string}` }) as unknown as FillReceipt;
   const paused = receiptPauseState(verifiedReceipt, item.owner, item.account);
@@ -72,7 +72,7 @@ function topicAddress(value?: string) {
 }
 
 async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
-  if ((item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue) || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum")) return item;
+  if ((item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue) || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum" || item.network === "robinhood")) return item;
   const executionKind = /market_(buy|sell)|automatic_(entry|take_profit|stop_loss|fill)|^(buy|sell)(_partial)?_filled$/i.test(item.kind);
   if (!executionKind) return item;
   const client = executionPublicClient(item.network as ExecutionNetwork);
@@ -247,7 +247,7 @@ async function writeActivities(owner: string, network: string, items: Activity[]
 }
 
 async function receiptBatch(network: string, rpcUrl: string, hashes: string[]) {
-  const urls = network === "xlayer" || network === "base" || network === "arbitrum" ? executionRpcUrls(network as ExecutionNetwork) : [rpcUrl];
+  const urls = network === "xlayer" || network === "base" || network === "arbitrum" || network === "robinhood" ? executionRpcUrls(network as ExecutionNetwork) : [rpcUrl];
   let lastError: unknown;
   for (const url of [...new Set([rpcUrl, ...urls])]) {
     try {

@@ -55,3 +55,14 @@ test("report execution uses Elliott wave paths for the chart and Spot ticket", (
   assert.equal("sell" in plan, false);
   assert.equal(plan.baseCase.target, 1_905);
 });
+
+test("bearish invalidations never become buy stops and 60% is not above the recommendation threshold", () => {
+  const technical = buildTechnicalStructure(candles);
+  for (const confidence of [40, 60, 61]) {
+    const plan = buildSpotExecutionPlan({ instId: "BTC-USDT", timeframe: "1H", tier: "premium", lastPrice: 76938,
+      analysis: { bias: confidence === 40 ? "bearish" : "bullish", confidence, keyLevels: { support: [76500] }, invalidation: { price: 78000 }, elliottWave: { invalidation: 79600, paths: [{ type: "recount", target: 80200, invalidation: 79600 }] } }, technical });
+    assert.ok(plan.buy.stopLoss === null || plan.buy.stopLoss < plan.buy.trigger);
+    if (confidence <= 60) assert.equal(plan.recommendation.action, "wait");
+    if (plan.recommendation.action === "buy") assert.ok(plan.buy.valid);
+  }
+});

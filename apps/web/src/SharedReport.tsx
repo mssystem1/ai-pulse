@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "./api";
-import { AnalysisReport, PredictionAnalysisReport } from "./Report";
+import { AnalysisReport, PredictionAnalysisReport, SafetyPreflightReport } from "./Report";
 
 /** Read-only bearer-share viewer. Never connects a wallet or prepares a trade. */
 export function SharedReport() {
@@ -25,11 +25,12 @@ export function SharedReport() {
     return () => { active = false; clearTimeout(timeout); controller.abort(); };
   }, [attempt]);
   const prediction = report?.mode === "prediction" || Boolean(report?.predictionContext);
+  const risk = Boolean(report?.intelligence && report?.checklist);
   return <main className="shared-report-page">
     <header><div><span className="eyebrow">PULSE · SHARED RESEARCH</span><h1>Your report</h1></div><a className="btn btn-soft" href="/portfolio" rel="noreferrer">Open PULSE</a></header>
     <p className="shared-report-notice">Read-only report. Anyone with this link can read it until the share is revoked. Opening it never charges, connects a wallet or places an order.</p>
     {error ? <section className="card" role="alert"><h2>Report unavailable</h2><p>{error}</p><button type="button" className="btn btn-soft" onClick={() => setAttempt(value => value + 1)}>Retry existing report</button></section>
-      : report ? <section className="card">{prediction ? <PredictionAnalysisReport data={report} /> : <AnalysisReport data={report} nfa="Research, not financial advice. Scenarios are not guarantees." />}</section>
+      : report ? <section className="card">{risk ? <SafetyPreflightReport data={report} /> : prediction ? <PredictionAnalysisReport data={report} /> : <AnalysisReport data={report} nfa="Research, not financial advice. Scenarios are not guarantees." />}</section>
       : <p role="status">Opening your paid report… No new payment is needed.</p>}
   </main>;
 }

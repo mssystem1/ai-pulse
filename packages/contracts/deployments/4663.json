@@ -1,0 +1,365 @@
+{
+  "release": "pulse-v6.2.0",
+  "network": "robinhood",
+  "chainId": 4663,
+  "deployer": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "deployedAt": "2026-09-19T19:40:11.181Z",
+  "status": "deployed_verified_paused",
+  "contracts": {
+    "registry": {
+      "address": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "txHash": "0x04698e348477866ee3b22a396fac2932deba3ee5576b1556b39a857ce39f89e4",
+      "blockNumber": "67339904",
+      "contractName": "PulseRegistryV1",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ],
+      "creationDataHash": "0xe2be73637ba75b2e04b2445d1d580ad9008d6a615ef5f59ed306b5b9cf5cc00e",
+      "runtimeCodeHash": "0x51d794a75bad9d0a60e4a33294f7eb26cb7482ba6ac3fd3a77ebf700fbc6f696"
+    },
+    "oracleRouter": {
+      "address": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "txHash": "0x776a0db5569fd7d614a07810e9138f721c7ab2bfc29f3175abb97f6e13e8d8ad",
+      "blockNumber": "67339963",
+      "contractName": "OracleRouterV1",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ],
+      "creationDataHash": "0x748006d124030d12156b1dc23bdf5fe9cea04fe75b3bbce1f419bccda16ef22a",
+      "runtimeCodeHash": "0x6eddf11a1884984a36b91ee28f491f1683f4da92efc5bea47cff8ef8f9cae23f"
+    },
+    "executionAdapter": {
+      "address": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "txHash": "0x93ceed3e44348d832df96c828a7437e25c07acd25205d0206b0c73f02d814024",
+      "blockNumber": "67340021",
+      "contractName": "OkxSwapAdapterV2",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ],
+      "creationDataHash": "0xd1d25beb7f80f0ef16d48f2598c3fc898407abc8f99a4b8a0aed95938fb9af36",
+      "runtimeCodeHash": "0xca9ed0afc2b687795ef902436b50a2ed5ba168834b0155d9fd847e3fb30c947f"
+    },
+    "spotFactory": {
+      "address": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "txHash": "0x1c4f5111eba0d81fa9adafcec315207fa34573ddaddc2e0ef8a523f835a3edbc",
+      "blockNumber": "67340079",
+      "contractName": "SpotOrderAccountFactoryV2",
+      "constructorArguments": [
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+        "0xA61BeA98E42A943874dc80d958b157173B9f5a6E"
+      ],
+      "creationDataHash": "0x158ce7fe47562e5e132d5296e30f2e07551a79a04a6851570c0ebf9113ad21d2",
+      "runtimeCodeHash": "0x70ba5c0cb9950b96416ef598f406215d7fc9e391c73d4dd111632f70a67d3f49"
+    },
+    "autopilotFactory": {
+      "address": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "txHash": "0x5820c9dcc7d877351eb5399d50011d7b9dc8849020222a72ab3b1b02cc24821e",
+      "blockNumber": "67340139",
+      "contractName": "AutopilotVaultFactoryV2",
+      "constructorArguments": [
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+        "0xA61BeA98E42A943874dc80d958b157173B9f5a6E"
+      ],
+      "creationDataHash": "0x58eb36c5e2ad0c12f009c5d8296a61b3f77722e3dfb06981c72657c4886c72d7",
+      "runtimeCodeHash": "0x1198ebc8e574bae963801e0f260681456e4795b0df773d32fc6d2bdc3da8785a"
+    },
+    "spotBracketFactory": {
+      "address": "0xa4546529b1174765d4d8e256c951365359c853fa",
+      "txHash": "0x1af4e472a9c6f323c32395ddba0d2cf48977e5abe2b1787314e0a7f50dc85378",
+      "blockNumber": "67340197",
+      "contractName": "SpotBracketAccountFactoryV1",
+      "constructorArguments": [
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+        "0xA61BeA98E42A943874dc80d958b157173B9f5a6E"
+      ],
+      "creationDataHash": "0x2c6fb6b401ed06bac68ad60d1fde4305ebbd01d9116735c22c6c3f7b1287b014",
+      "runtimeCodeHash": "0xb48524bf2f3bd7abf4474bab9a600d158873f2741067147af61b5eed1051ed21"
+    },
+    "spotProtectionFactory": {
+      "address": "0x1e1f08e79f866df4819cf691c43b6efd9dec513c",
+      "txHash": "0x375d0db340ef8cf57144fefa7edce7ced57b1113621c499b17e39a5dd4ad840e",
+      "blockNumber": "71118938",
+      "contractName": "SpotOrderAccountFactoryV1",
+      "constructorArguments": [
+        "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+        "0xa61bea98e42a943874dc80d958b157173b9f5a6e"
+      ],
+      "creationDataHash": "0xb9a0c2f56a04d28b7893895d0ec12f9b5026c943f74565643d5522bdfa1e70e9",
+      "runtimeCodeHash": "0x1c5f5b694e4ff446a1b388e693270b05bb27e4376f298f4698eb18db79dd9ac4"
+    }
+  },
+  "transactions": [
+    {
+      "label": "PulseRegistryV1",
+      "hash": "0x04698e348477866ee3b22a396fac2932deba3ee5576b1556b39a857ce39f89e4",
+      "nonce": 1,
+      "dataHash": "0xe2be73637ba75b2e04b2445d1d580ad9008d6a615ef5f59ed306b5b9cf5cc00e",
+      "status": "success",
+      "to": null,
+      "gasLimit": "524157",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67339904",
+      "feeETH": "0.000028050749724"
+    },
+    {
+      "label": "OracleRouterV1",
+      "hash": "0x776a0db5569fd7d614a07810e9138f721c7ab2bfc29f3175abb97f6e13e8d8ad",
+      "nonce": 2,
+      "dataHash": "0x748006d124030d12156b1dc23bdf5fe9cea04fe75b3bbce1f419bccda16ef22a",
+      "status": "success",
+      "to": null,
+      "gasLimit": "506606",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67339963",
+      "feeETH": "0.000027089641776"
+    },
+    {
+      "label": "OkxSwapAdapterV2",
+      "hash": "0x93ceed3e44348d832df96c828a7437e25c07acd25205d0206b0c73f02d814024",
+      "nonce": 3,
+      "dataHash": "0xd1d25beb7f80f0ef16d48f2598c3fc898407abc8f99a4b8a0aed95938fb9af36",
+      "status": "success",
+      "to": null,
+      "gasLimit": "922435",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340021",
+      "feeETH": "0.0000491217888"
+    },
+    {
+      "label": "SpotOrderAccountFactoryV2",
+      "hash": "0x1c4f5111eba0d81fa9adafcec315207fa34573ddaddc2e0ef8a523f835a3edbc",
+      "nonce": 4,
+      "dataHash": "0x158ce7fe47562e5e132d5296e30f2e07551a79a04a6851570c0ebf9113ad21d2",
+      "status": "success",
+      "to": null,
+      "gasLimit": "1884852",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340079",
+      "feeETH": "0.00010016996551"
+    },
+    {
+      "label": "AutopilotVaultFactoryV2",
+      "hash": "0x5820c9dcc7d877351eb5399d50011d7b9dc8849020222a72ab3b1b02cc24821e",
+      "nonce": 5,
+      "dataHash": "0x58eb36c5e2ad0c12f009c5d8296a61b3f77722e3dfb06981c72657c4886c72d7",
+      "status": "success",
+      "to": null,
+      "gasLimit": "2484378",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340139",
+      "feeETH": "0.00013220998616"
+    },
+    {
+      "label": "SpotBracketAccountFactoryV1",
+      "hash": "0x1af4e472a9c6f323c32395ddba0d2cf48977e5abe2b1787314e0a7f50dc85378",
+      "nonce": 6,
+      "dataHash": "0x2c6fb6b401ed06bac68ad60d1fde4305ebbd01d9116735c22c6c3f7b1287b014",
+      "status": "success",
+      "to": null,
+      "gasLimit": "2352081",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340197",
+      "feeETH": "0.000124874430012"
+    },
+    {
+      "label": "pauseAutomation",
+      "hash": "0xf402f3e2d6f9ae9194fb9b52533db1fd578baed26a2b0d29d923543a0c2cf871",
+      "nonce": 7,
+      "dataHash": "0xe68e3740f392ab939b5a5a78f9a4dcf85db5e81f625f76052f9fc5c8ed0b98ae",
+      "status": "success",
+      "to": "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+      "gasLimit": "34985",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340283",
+      "feeETH": "0.000001871473968"
+    },
+    {
+      "label": "setAdapter",
+      "hash": "0x8fdcbe8e842a81b733ef768c917bf97ad19a040af4ce91272401a8af9d1c1d41",
+      "nonce": 8,
+      "dataHash": "0xc60469222fbb3aeb3423c2aea33e9281e52030dff96ffb27a799b2fa6cd5b7b8",
+      "status": "success",
+      "to": "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+      "gasLimit": "57456",
+      "maxFeePerGas": "81744000",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "67340359",
+      "feeETH": "0.000003072543936"
+    },
+    {
+      "label": "SpotOrderAccountFactoryV1",
+      "hash": "0x375d0db340ef8cf57144fefa7edce7ced57b1113621c499b17e39a5dd4ad840e",
+      "nonce": 44,
+      "dataHash": "0xb9a0c2f56a04d28b7893895d0ec12f9b5026c943f74565643d5522bdfa1e70e9",
+      "status": "success",
+      "to": null,
+      "gasLimit": "1626620",
+      "maxFeePerGas": "56361600",
+      "maxPriorityFeePerGas": "0",
+      "blockNumber": "71118938",
+      "feeETH": "0.00006071521644"
+    }
+  ],
+  "configurationTransactions": {
+    "pauseAutomation": "0xf402f3e2d6f9ae9194fb9b52533db1fd578baed26a2b0d29d923543a0c2cf871",
+    "setAdapter": "0x8fdcbe8e842a81b733ef768c917bf97ad19a040af4ce91272401a8af9d1c1d41"
+  },
+  "productionReady": false,
+  "tradingEnabled": false,
+  "budgetETH": "0.00085",
+  "feeCeilingETH": "0.000733612263696",
+  "compilerVersion": "0.8.26+commit.8a97fa7a",
+  "standardInput": {
+    "language": "Solidity",
+    "sources": {
+      "AutopilotVaultFactoryV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./AutopilotVaultV1.sol\";\ncontract AutopilotVaultFactoryV1 {\n    address public immutable registry; mapping(address=>address[]) private vaults;\n    event VaultCreated(address indexed owner,address indexed vault,address indexed settlementAsset,bytes32 policyHash);\n    constructor(address registry_){require(registry_!=address(0),\"ZERO\");registry=registry_;}\n    function createVault(address settlementAsset,bytes32 policyHash) external returns(address vault){require(settlementAsset!=address(0)&&policyHash!=bytes32(0),\"INPUT\");vault=address(new AutopilotVaultV1(msg.sender,settlementAsset,registry,policyHash));vaults[msg.sender].push(vault);emit VaultCreated(msg.sender,vault,settlementAsset,policyHash);}\n    function vaultsOf(address owner) external view returns(address[] memory){return vaults[owner];}\n}\n"
+      },
+      "AutopilotVaultFactoryV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./AutopilotVaultV2.sol\";\ncontract AutopilotVaultFactoryV2 {\n    address public immutable registry;address public immutable oracle;mapping(address=>address[]) private vaults;\n    event VaultCreated(address indexed owner,address indexed vault,address indexed settlementAsset,bytes32 policyHash);\n    constructor(address registry_,address oracle_){require(registry_!=address(0)&&oracle_!=address(0),\"ZERO\");registry=registry_;oracle=oracle_;}\n    function createVault(address settlementAsset,bytes32 policyHash) external returns(address vault){require(settlementAsset!=address(0)&&policyHash!=bytes32(0),\"INPUT\");vault=address(new AutopilotVaultV2(msg.sender,settlementAsset,registry,oracle,policyHash));vaults[msg.sender].push(vault);emit VaultCreated(msg.sender,vault,settlementAsset,policyHash);}\n    function vaultsOf(address owner) external view returns(address[] memory){return vaults[owner];}\n}\n"
+      },
+      "AutopilotVaultV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV1.sol\";\n\ncontract AutopilotVaultV1 {\n    address public immutable owner; address public immutable settlementAsset; IPulseRegistry public immutable registry;\n    bytes32 public policyHash; uint64 public policyVersion = 1; uint64 public actionNonce; bool public paused;\n    uint128 public maxTradeAmount; uint128 public dailyTurnoverCap; uint64 public cooldown; uint64 public expiry; uint64 public lastActionAt; uint64 public turnoverDay; uint256 public dailyTurnover;\n    uint256 private locked = 1;\n    event PolicyUpdated(bytes32 indexed policyHash, uint256 version);\n    event Executed(bytes32 indexed decisionId, address indexed adapter, uint256 nonce, bytes32 evidenceHash);\n    event Paused(bool paused); event OwnerWithdrawal(address indexed token, uint256 amount);\n    modifier onlyOwner(){ require(msg.sender == owner,\"OWNER\"); _; } modifier nonReentrant(){ require(locked==1,\"REENTRANT\"); locked=2;_;locked=1; }\n    constructor(address owner_, address settlement_, address registry_, bytes32 policyHash_){ require(owner_!=address(0)&&settlement_!=address(0)&&registry_!=address(0),\"ZERO\"); owner=owner_;settlementAsset=settlement_;registry=IPulseRegistry(registry_);policyHash=policyHash_; }\n    function updatePolicy(bytes32 next) external onlyOwner { require(next != bytes32(0),\"POLICY\"); policyHash=next; policyVersion++; emit PolicyUpdated(next,policyVersion); }\n    function configureLimits(uint128 maxTrade,uint128 dailyCap,uint64 cooldown_,uint64 expiry_) external onlyOwner {require(maxTrade>0&&dailyCap>=maxTrade&&cooldown_>=30&&expiry_>block.timestamp,\"LIMITS\");maxTradeAmount=maxTrade;dailyTurnoverCap=dailyCap;cooldown=cooldown_;expiry=expiry_;policyVersion++;}\n    function setPaused(bool value) external onlyOwner { paused=value; emit Paused(value); }\n    function execute(bytes32 decisionId,uint64 expectedVersion,uint64 expectedNonce,address adapter,address sellToken,uint256 sellAmount,bytes calldata adapterData,bytes32 evidenceHash) external nonReentrant {\n        require(!paused&&!registry.automationPaused(),\"PAUSED\"); require(registry.autopilotExecutors(msg.sender),\"EXECUTOR\"); require(registry.approvedAdapters(adapter),\"ADAPTER\"); require(expectedVersion==policyVersion&&expectedNonce==actionNonce,\"NONCE\"); require(decisionId!=bytes32(0)&&evidenceHash!=bytes32(0)&&sellAmount>0&&sellAmount<=maxTradeAmount,\"INPUT\"); require(expiry>block.timestamp&&block.timestamp>=lastActionAt+cooldown,\"TIME\"); uint64 day=uint64(block.timestamp/1 days);if(day!=turnoverDay){turnoverDay=day;dailyTurnover=0;}require(dailyTurnover+sellAmount<=dailyTurnoverCap,\"DAILY_CAP\");dailyTurnover+=sellAmount;lastActionAt=uint64(block.timestamp);actionNonce++; require(IERC20Pulse(sellToken).transfer(adapter,sellAmount),\"TRANSFER\"); (bool ok,)=adapter.call(adapterData); require(ok,\"EXECUTE\"); emit Executed(decisionId,adapter,expectedNonce,evidenceHash);\n    }\n    function withdraw(address token,uint256 amount) external onlyOwner nonReentrant { require(IERC20Pulse(token).transfer(owner,amount),\"TRANSFER\"); emit OwnerWithdrawal(token,amount); }\n}\n"
+      },
+      "AutopilotVaultV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV1.sol\";\n\n/// @notice Owner-custodied trading vault. The executor can trade, but cannot withdraw,\n/// change policy, add assets, bypass oracle valuation, or select an unapproved adapter.\ncontract AutopilotVaultV2 {\n    address public immutable owner;\n    address public immutable settlementAsset;\n    IPulseRegistry public immutable registry;\n    IOracleRouterPulse public immutable oracle;\n    bytes32 public policyHash;\n    uint64 public policyVersion = 1;\n    uint64 public actionNonce;\n    bool public paused = true;\n    uint128 public maxTradeValue;\n    uint128 public dailyTurnoverCap;\n    uint16 public maxSlippageBps;\n    uint16 public maxDailyLossBps;\n    uint64 public cooldown;\n    uint64 public expiry;\n    uint64 public lastActionAt;\n    uint64 public turnoverDay;\n    uint256 public dailyTurnover;\n    uint256 public dayStartValue;\n    uint256 private locked = 1;\n    address[] private assets;\n    mapping(address => bool) public allowedAssets;\n    mapping(address => uint256) public exposureCap;\n\n    event PolicyUpdated(bytes32 indexed policyHash, uint256 version);\n    event AssetConfigured(address indexed asset, bool allowed, uint256 exposureCap);\n    event LimitsConfigured(uint256 maxTradeValue,uint256 dailyTurnoverCap,uint256 maxSlippageBps,uint256 maxDailyLossBps,uint256 cooldown,uint256 expiry);\n    event Executed(bytes32 indexed decisionId,address indexed adapter,uint256 nonce,address sellToken,address buyToken,uint256 sellAmount,uint256 amountOut,bytes32 evidenceHash);\n    event Paused(bool paused);\n    event OwnerWithdrawal(address indexed token,uint256 amount);\n    modifier onlyOwner(){require(msg.sender==owner,\"OWNER\");_;}\n    modifier nonReentrant(){require(locked==1,\"REENTRANT\");locked=2;_;locked=1;}\n\n    constructor(address owner_,address settlement_,address registry_,address oracle_,bytes32 policyHash_){\n        require(owner_!=address(0)&&settlement_!=address(0)&&registry_!=address(0)&&oracle_!=address(0)&&policyHash_!=bytes32(0),\"INPUT\");\n        owner=owner_;settlementAsset=settlement_;registry=IPulseRegistry(registry_);oracle=IOracleRouterPulse(oracle_);policyHash=policyHash_;\n        allowedAssets[settlement_]=true;assets.push(settlement_);\n    }\n    function assetsOf() external view returns(address[] memory){return assets;}\n    function updatePolicy(bytes32 next) external onlyOwner {require(next!=bytes32(0),\"POLICY\");policyHash=next;policyVersion++;paused=true;emit PolicyUpdated(next,policyVersion);emit Paused(true);}\n    function configureAsset(address asset,bool allowed,uint256 cap) external onlyOwner {\n        require(asset!=address(0),\"ASSET\");\n        if(allowed&&!allowedAssets[asset]){require(assets.length<16,\"ASSET_LIMIT\");assets.push(asset);}\n        require(asset==settlementAsset||cap>0||!allowed,\"CAP\");allowedAssets[asset]=allowed;exposureCap[asset]=cap;policyVersion++;paused=true;emit AssetConfigured(asset,allowed,cap);emit Paused(true);\n    }\n    function configureLimits(uint128 maxTrade,uint128 dailyCap,uint16 slippageBps,uint16 dailyLossBps,uint64 cooldown_,uint64 expiry_) external onlyOwner {\n        require(maxTrade>0&&dailyCap>=maxTrade&&slippageBps<=1000&&dailyLossBps<=3000&&cooldown_>=30&&expiry_>block.timestamp,\"LIMITS\");\n        maxTradeValue=maxTrade;dailyTurnoverCap=dailyCap;maxSlippageBps=slippageBps;maxDailyLossBps=dailyLossBps;cooldown=cooldown_;expiry=expiry_;policyVersion++;paused=true;\n        emit LimitsConfigured(maxTrade,dailyCap,slippageBps,dailyLossBps,cooldown_,expiry_);emit Paused(true);\n    }\n    function setPaused(bool value) external onlyOwner {if(!value)require(maxTradeValue>0&&dailyTurnoverCap>0,\"CONFIG\");paused=value;emit Paused(value);}\n    function portfolioValue() public view returns(uint256 total){for(uint256 i=0;i<assets.length;i++){address token=assets[i];if(!allowedAssets[token])continue;uint256 balance=IERC20Pulse(token).balanceOf(address(this));if(balance==0)continue;total+=_value(token,balance);}}\n    function execute(bytes32 decisionId,uint64 expectedVersion,uint64 expectedNonce,address adapter,address sellToken,address buyToken,uint256 sellAmount,uint256 minOut,bytes calldata adapterData,bytes32 evidenceHash) external nonReentrant {\n        require(!paused&&!registry.automationPaused(),\"PAUSED\");require(registry.autopilotExecutors(msg.sender),\"EXECUTOR\");require(registry.approvedAdapters(adapter),\"ADAPTER\");\n        require(expectedVersion==policyVersion&&expectedNonce==actionNonce,\"NONCE\");require(decisionId!=bytes32(0)&&evidenceHash!=bytes32(0)&&allowedAssets[sellToken]&&allowedAssets[buyToken]&&sellToken!=buyToken&&sellAmount>0,\"INPUT\");\n        require(expiry>block.timestamp&&block.timestamp>=lastActionAt+cooldown,\"TIME\");uint256 tradeValue=_value(sellToken,sellAmount);require(tradeValue<=maxTradeValue,\"MAX_TRADE\");\n        uint64 day=uint64(block.timestamp/1 days);uint256 beforeValue=portfolioValue();if(day!=turnoverDay){turnoverDay=day;dailyTurnover=0;dayStartValue=beforeValue;}require(dailyTurnover+tradeValue<=dailyTurnoverCap,\"DAILY_TURNOVER\");\n        uint256 oracleMinimum=_minimumOut(sellToken,buyToken,sellAmount);require(minOut>=oracleMinimum,\"SLIPPAGE\");\n        dailyTurnover+=tradeValue;lastActionAt=uint64(block.timestamp);actionNonce++;require(IERC20Pulse(sellToken).transfer(adapter,sellAmount),\"TRANSFER\");\n        (bool ok,bytes memory result)=adapter.call(adapterData);require(ok&&result.length>=32,\"EXECUTE\");uint256 amountOut=abi.decode(result,(uint256));require(amountOut>=minOut,\"MIN_OUT\");\n        uint256 buyExposure=_value(buyToken,IERC20Pulse(buyToken).balanceOf(address(this)));if(buyToken!=settlementAsset)require(buyExposure<=exposureCap[buyToken],\"EXPOSURE\");\n        uint256 afterValue=portfolioValue();require(afterValue*10000>=beforeValue*(10000-maxSlippageBps),\"TRADE_LOSS\");require(dayStartValue==0||afterValue*10000>=dayStartValue*(10000-maxDailyLossBps),\"DAILY_LOSS\");\n        emit Executed(decisionId,adapter,expectedNonce,sellToken,buyToken,sellAmount,amountOut,evidenceHash);\n    }\n    function withdraw(address token,uint256 amount) external onlyOwner nonReentrant {require(IERC20Pulse(token).transfer(owner,amount),\"TRANSFER\");emit OwnerWithdrawal(token,amount);}\n    function _minimumOut(address sell,address buy,uint256 amount) private view returns(uint256){uint256 sellValue=_value(sell,amount);uint256 buyPrice=buy==settlementAsset?1e18:_price(buy);return sellValue*(10**_decimals(buy))*1e18/buyPrice/(10**_decimals(settlementAsset))*(10000-maxSlippageBps)/10000;}\n    function _value(address token,uint256 amount) private view returns(uint256){if(token==settlementAsset)return amount;return amount*_price(token)*(10**_decimals(settlementAsset))/(10**_decimals(token))/1e18;}\n    function _price(address token) private view returns(uint256 price){(price,)=oracle.readPrice(token,settlementAsset);}\n    function _decimals(address token) private view returns(uint256 d){(bool ok,bytes memory data)=token.staticcall(abi.encodeWithSignature(\"decimals()\"));require(ok&&data.length>=32,\"DECIMALS\");d=abi.decode(data,(uint256));require(d<=24,\"DECIMALS_RANGE\");}\n}\n"
+      },
+      "OkxSwapAdapterV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV1.sol\";\n\ncontract OkxSwapAdapterV1 {\n    address public immutable admin; mapping(address=>bool) public approvedRouters; uint256 private locked=1;\n    event RouterSet(address indexed router,bool approved); event SwapExecuted(address indexed caller,address indexed router,address sellToken,address buyToken,uint256 amountIn,uint256 amountOut);\n    modifier onlyAdmin(){require(msg.sender==admin,\"ADMIN\");_;} modifier nonReentrant(){require(locked==1,\"REENTRANT\");locked=2;_;locked=1;}\n    constructor(address admin_){require(admin_!=address(0),\"ZERO\");admin=admin_;}\n    function setRouter(address router,bool approved) external onlyAdmin {require(router!=address(0),\"ZERO\");approvedRouters[router]=approved;emit RouterSet(router,approved);}\n    function execute(address router,address sellToken,address buyToken,uint256 amount,uint256 minOut,bytes calldata routerCalldata) external nonReentrant returns(uint256 amountOut){\n        require(approvedRouters[router]&&sellToken!=address(0)&&buyToken!=address(0)&&sellToken!=buyToken&&amount>0,\"INPUT\");\n        uint256 beforeBuy=IERC20Pulse(buyToken).balanceOf(address(this));\n        _approve(sellToken,router,0);_approve(sellToken,router,amount);\n        (bool ok,)=router.call(routerCalldata);require(ok,\"ROUTER\");_approve(sellToken,router,0);\n        amountOut=IERC20Pulse(buyToken).balanceOf(address(this))-beforeBuy;require(amountOut>=minOut,\"MIN_OUT\");require(IERC20Pulse(buyToken).transfer(msg.sender,amountOut),\"PAYOUT\");\n        emit SwapExecuted(msg.sender,router,sellToken,buyToken,amount,amountOut);\n    }\n    function rescue(address token,uint256 amount,address recipient) external onlyAdmin {require(recipient!=address(0),\"ZERO\");require(IERC20Pulse(token).transfer(recipient,amount),\"TRANSFER\");}\n    function _approve(address token,address spender,uint256 amount) private {(bool ok,bytes memory result)=token.call(abi.encodeWithSignature(\"approve(address,uint256)\",spender,amount));require(ok&&(result.length==0||abi.decode(result,(bool))),\"APPROVE\");}\n}\n"
+      },
+      "OkxSwapAdapterV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\nimport \"./SpotOrderAccountV1.sol\";\n\n/// @notice Executes an exact, pre-built OKX route while independently\n/// allowlisting the call target and ERC-20 approval spender. OKX deliberately\n/// separates these contracts, and may upgrade either address.\ncontract OkxSwapAdapterV2 {\n    address public immutable admin;\n    mapping(address => bool) public approvedRouters;\n    mapping(address => bool) public approvedSpenders;\n    uint256 private locked = 1;\n\n    event RouterSet(address indexed router, bool approved);\n    event SpenderSet(address indexed spender, bool approved);\n    event SwapExecuted(\n        address indexed caller,\n        address indexed router,\n        address indexed spender,\n        address sellToken,\n        address buyToken,\n        uint256 amountIn,\n        uint256 amountOut,\n        uint256 refundedInput\n    );\n\n    modifier onlyAdmin() {\n        require(msg.sender == admin, \"ADMIN\");\n        _;\n    }\n\n    modifier nonReentrant() {\n        require(locked == 1, \"REENTRANT\");\n        locked = 2;\n        _;\n        locked = 1;\n    }\n\n    constructor(address admin_) {\n        require(admin_ != address(0), \"ZERO\");\n        admin = admin_;\n    }\n\n    function setRouter(address router, bool approved) external onlyAdmin {\n        require(router != address(0), \"ZERO\");\n        approvedRouters[router] = approved;\n        emit RouterSet(router, approved);\n    }\n\n    function setSpender(address spender, bool approved) external onlyAdmin {\n        require(spender != address(0), \"ZERO\");\n        approvedSpenders[spender] = approved;\n        emit SpenderSet(spender, approved);\n    }\n\n    function execute(\n        address router,\n        address spender,\n        address sellToken,\n        address buyToken,\n        uint256 amount,\n        uint256 minOut,\n        bytes calldata routerCalldata\n    ) external nonReentrant returns (uint256 amountOut) {\n        require(\n            approvedRouters[router] && approvedSpenders[spender] &&\n            sellToken != address(0) && buyToken != address(0) &&\n            sellToken != buyToken && amount > 0,\n            \"INPUT\"\n        );\n        uint256 sellBalance = IERC20Pulse(sellToken).balanceOf(address(this));\n        require(sellBalance >= amount, \"BALANCE\");\n        uint256 priorSellBalance = sellBalance - amount;\n        uint256 beforeBuy = IERC20Pulse(buyToken).balanceOf(address(this));\n\n        _approve(sellToken, spender, 0);\n        _approve(sellToken, spender, amount);\n        (bool ok,) = router.call(routerCalldata);\n        require(ok, \"ROUTER\");\n        _approve(sellToken, spender, 0);\n\n        amountOut = IERC20Pulse(buyToken).balanceOf(address(this)) - beforeBuy;\n        require(amountOut >= minOut, \"MIN_OUT\");\n        require(IERC20Pulse(buyToken).transfer(msg.sender, amountOut), \"PAYOUT\");\n\n        uint256 remainingSellBalance = IERC20Pulse(sellToken).balanceOf(address(this));\n        uint256 refundedInput = remainingSellBalance > priorSellBalance\n            ? remainingSellBalance - priorSellBalance\n            : 0;\n        if (refundedInput > 0) {\n            require(IERC20Pulse(sellToken).transfer(msg.sender, refundedInput), \"REFUND\");\n        }\n        emit SwapExecuted(msg.sender, router, spender, sellToken, buyToken, amount, amountOut, refundedInput);\n    }\n\n    function rescue(address token, uint256 amount, address recipient) external onlyAdmin {\n        require(recipient != address(0), \"ZERO\");\n        require(IERC20Pulse(token).transfer(recipient, amount), \"TRANSFER\");\n    }\n\n    function _approve(address token, address spender, uint256 amount) private {\n        (bool ok, bytes memory result) = token.call(\n            abi.encodeWithSignature(\"approve(address,uint256)\", spender, amount)\n        );\n        require(ok && (result.length == 0 || abi.decode(result, (bool))), \"APPROVE\");\n    }\n}\n"
+      },
+      "OracleRouterV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\ncontract OracleRouterV1 {\n    struct Observation { uint192 price; uint64 updatedAt; uint64 maxAge; }\n    address public immutable admin; mapping(address => bool) public updaters; mapping(bytes32 => Observation) public observations;\n    event UpdaterSet(address indexed updater,bool approved); event PriceUpdated(address indexed base,address indexed quote,uint256 price,uint256 updatedAt,uint256 maxAge);\n    modifier onlyAdmin(){require(msg.sender==admin,\"ADMIN\");_;} modifier onlyUpdater(){require(updaters[msg.sender],\"UPDATER\");_;}\n    constructor(address updater){require(updater!=address(0),\"ZERO\");admin=msg.sender;updaters[updater]=true;}\n    function setUpdater(address updater,bool approved) external onlyAdmin {updaters[updater]=approved;emit UpdaterSet(updater,approved);}\n    function setPrice(address base,address quote,uint192 price,uint64 maxAge) external onlyUpdater {require(base!=address(0)&&quote!=address(0)&&price>0&&maxAge>=30,\"INPUT\");observations[keccak256(abi.encode(base,quote))]=Observation(price,uint64(block.timestamp),maxAge);emit PriceUpdated(base,quote,price,block.timestamp,maxAge);}\n    function readPrice(address base,address quote) external view returns(uint256 price,uint256 updatedAt){Observation memory o=observations[keccak256(abi.encode(base,quote))];require(o.price>0&&block.timestamp<=o.updatedAt+o.maxAge,\"STALE\");return(o.price,o.updatedAt);}\n}\n"
+      },
+      "PulseRegistryV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\ncontract PulseRegistryV1 {\n    address public immutable admin;\n    address public guardian;\n    bool public automationPaused;\n    mapping(address => bool) public approvedAdapters;\n    mapping(address => bool) public spotKeepers;\n    mapping(address => bool) public autopilotExecutors;\n\n    event AdapterSet(address indexed adapter, bool approved);\n    event RoleSet(bytes32 indexed role, address indexed account, bool approved);\n    event AutomationPaused(bool paused);\n\n    modifier onlyAdmin() { require(msg.sender == admin, \"ADMIN\"); _; }\n    modifier onlyGuardian() { require(msg.sender == guardian || msg.sender == admin, \"GUARDIAN\"); _; }\n\n    constructor(address guardian_) { require(guardian_ != address(0), \"ZERO\"); admin = msg.sender; guardian = guardian_; }\n    function setAdapter(address adapter, bool approved) external onlyAdmin { require(adapter != address(0), \"ZERO\"); approvedAdapters[adapter] = approved; emit AdapterSet(adapter, approved); }\n    function setSpotKeeper(address account, bool approved) external onlyAdmin { spotKeepers[account] = approved; emit RoleSet(keccak256(\"SPOT_KEEPER\"), account, approved); }\n    function setAutopilotExecutor(address account, bool approved) external onlyAdmin { autopilotExecutors[account] = approved; emit RoleSet(keccak256(\"AUTOPILOT_EXECUTOR\"), account, approved); }\n    function setGuardian(address next) external onlyAdmin { require(next != address(0), \"ZERO\"); guardian = next; }\n    function pauseAutomation(bool paused) external onlyGuardian { automationPaused = paused; emit AutomationPaused(paused); }\n}\n"
+      },
+      "SpotBracketAccountFactoryV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\nimport \"./SpotBracketAccountV1.sol\";\n\ncontract SpotBracketAccountFactoryV1 {\n    address public immutable registry;\n    address public immutable oracle;\n    mapping(address=>address) public accountOf;\n    event AccountCreated(address indexed owner,address indexed account);\n    constructor(address registry_,address oracle_){require(registry_!=address(0)&&oracle_!=address(0),\"ZERO\");registry=registry_;oracle=oracle_;}\n    function createAccount() external returns(address account){require(accountOf[msg.sender]==address(0),\"EXISTS\");account=address(new SpotBracketAccountV1(msg.sender,registry,oracle));accountOf[msg.sender]=account;emit AccountCreated(msg.sender,account);}\n}\n"
+      },
+      "SpotBracketAccountV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\nimport \"./SpotOrderAccountV1.sol\";\n\n/// @notice Owner-funded OTOCO spot order. A keeper may execute the exact entry\n/// and, when requested by the owner, retain only its received asset under the\n/// owner's TP/SL levels. It cannot choose assets, levels, size, or recipient.\ncontract SpotBracketAccountV1 {\n    enum State { None, Pending, PausedEntry, Protected, PausedProtection, Executed, Cancelled }\n    struct Order {\n        address sellToken;\n        address buyToken;\n        address oracleBase;\n        address oracleQuote;\n        uint128 entryAmount;\n        uint128 positionAmount;\n        uint128 entryTrigger;\n        uint128 takeProfit;\n        uint128 stopLoss;\n        uint128 entryMinOut;\n        uint64 expiry;\n        uint64 nonce;\n        bool triggerAbove;\n        bool protectAfterFill;\n        State state;\n    }\n\n    address public immutable owner;\n    IPulseRegistry public immutable registry;\n    IOracleRouterPulse public immutable oracle;\n    uint256 public nextOrderId = 1;\n    uint256 private locked = 1;\n    mapping(uint256 => Order) public orders;\n\n    event BracketCreated(uint256 indexed id,address indexed sellToken,address indexed buyToken,uint256 entryAmount,uint256 entryTrigger,uint256 takeProfit,uint256 stopLoss,bool triggerAbove,bool protectAfterFill);\n    event EntryFilled(uint256 indexed id,address indexed adapter,uint256 amountIn,uint256 amountOut,bool protectedAfterFill);\n    event ProtectionUpdated(uint256 indexed id,uint256 takeProfit,uint256 stopLoss,uint256 nonce);\n    event OrderPaused(uint256 indexed id,bool paused,uint8 phase);\n    event PositionClosed(uint256 indexed id,address indexed adapter,uint256 amountIn,uint256 amountOut);\n    event OrderCancelled(uint256 indexed id,address indexed token,uint256 returnedAmount);\n\n    modifier onlyOwner(){require(msg.sender==owner,\"OWNER\");_;}\n    modifier nonReentrant(){require(locked==1,\"REENTRANT\");locked=2;_;locked=1;}\n\n    constructor(address owner_,address registry_,address oracle_){\n        require(owner_!=address(0)&&registry_!=address(0)&&oracle_!=address(0),\"ZERO\");\n        owner=owner_;registry=IPulseRegistry(registry_);oracle=IOracleRouterPulse(oracle_);\n    }\n\n    function createOrder(\n        address sellToken,address buyToken,address oracleBase,address oracleQuote,\n        uint128 entryAmount,uint128 entryTrigger,bool triggerAbove,uint128 entryMinOut,\n        uint128 takeProfit,uint128 stopLoss,bool protectAfterFill,uint64 expiry\n    ) external onlyOwner nonReentrant returns(uint256 id){\n        require(sellToken!=address(0)&&buyToken!=address(0)&&sellToken!=buyToken&&oracleBase!=address(0)&&oracleQuote!=address(0),\"TOKEN\");\n        require(entryAmount>0&&entryTrigger>0&&entryMinOut>0&&expiry>block.timestamp,\"INPUT\");\n        if(protectAfterFill) require(takeProfit>stopLoss&&takeProfit>0&&stopLoss>0,\"LEVELS\");\n        require(IERC20Pulse(sellToken).transferFrom(owner,address(this),entryAmount),\"TRANSFER\");\n        id=nextOrderId++;\n        orders[id]=Order(sellToken,buyToken,oracleBase,oracleQuote,entryAmount,0,entryTrigger,takeProfit,stopLoss,entryMinOut,expiry,1,triggerAbove,protectAfterFill,State.Pending);\n        emit BracketCreated(id,sellToken,buyToken,entryAmount,entryTrigger,takeProfit,stopLoss,triggerAbove,protectAfterFill);\n    }\n\n    function executeEntry(uint256 id,address adapter,bytes calldata adapterData) external nonReentrant returns(uint256 amountOut){\n        Order storage o=orders[id];require(o.state==State.Pending,\"STATE\");_keeperAndAdapter(adapter);require(block.timestamp<=o.expiry,\"EXPIRED\");\n        (uint256 price,)=oracle.readPrice(o.oracleBase,o.oracleQuote);require(o.triggerAbove?price>=o.entryTrigger:price<=o.entryTrigger,\"NOT_TRIGGERED\");\n        o.state=State.Executed;\n        uint256 beforeBalance=IERC20Pulse(o.buyToken).balanceOf(address(this));\n        require(IERC20Pulse(o.sellToken).transfer(adapter,o.entryAmount),\"TRANSFER\");\n        (bool ok,bytes memory result)=adapter.call(adapterData);require(ok&&result.length>=32,\"EXECUTE\");\n        amountOut=IERC20Pulse(o.buyToken).balanceOf(address(this))-beforeBalance;\n        require(amountOut>=o.entryMinOut&&amountOut==abi.decode(result,(uint256)),\"MIN_OUT\");\n        if(o.protectAfterFill){require(amountOut<=type(uint128).max,\"AMOUNT\");o.positionAmount=uint128(amountOut);o.state=State.Protected;}\n        else require(IERC20Pulse(o.buyToken).transfer(owner,amountOut),\"PAYOUT\");\n        emit EntryFilled(id,adapter,o.entryAmount,amountOut,o.protectAfterFill);\n    }\n\n    function executeExit(uint256 id,address adapter,bytes calldata adapterData,uint256 minOut) external nonReentrant returns(uint256 amountOut){\n        Order storage o=orders[id];require(o.state==State.Protected,\"STATE\");_keeperAndAdapter(adapter);require(block.timestamp<=o.expiry,\"EXPIRED\");\n        (uint256 price,)=oracle.readPrice(o.buyToken,o.sellToken);require(price>=o.takeProfit||price<=o.stopLoss,\"NOT_TRIGGERED\");\n        o.state=State.Executed;\n        uint256 beforeBalance=IERC20Pulse(o.sellToken).balanceOf(address(this));\n        require(IERC20Pulse(o.buyToken).transfer(adapter,o.positionAmount),\"TRANSFER\");\n        (bool ok,bytes memory result)=adapter.call(adapterData);require(ok&&result.length>=32,\"EXECUTE\");\n        amountOut=IERC20Pulse(o.sellToken).balanceOf(address(this))-beforeBalance;\n        require(amountOut>=minOut&&amountOut==abi.decode(result,(uint256)),\"MIN_OUT\");\n        require(IERC20Pulse(o.sellToken).transfer(owner,amountOut),\"PAYOUT\");\n        emit PositionClosed(id,adapter,o.positionAmount,amountOut);\n    }\n\n    function updateProtection(uint256 id,uint128 takeProfit,uint128 stopLoss,uint64 expiry) external onlyOwner {\n        Order storage o=orders[id];require(o.state==State.Protected||o.state==State.PausedProtection,\"STATE\");require(takeProfit>stopLoss&&stopLoss>0&&expiry>block.timestamp,\"LEVELS\");\n        o.takeProfit=takeProfit;o.stopLoss=stopLoss;o.expiry=expiry;o.nonce++;emit ProtectionUpdated(id,takeProfit,stopLoss,o.nonce);\n    }\n\n    function setPaused(uint256 id,bool value) external onlyOwner {\n        Order storage o=orders[id];\n        if(o.state==State.Pending||o.state==State.PausedEntry)o.state=value?State.PausedEntry:State.Pending;\n        else if(o.state==State.Protected||o.state==State.PausedProtection)o.state=value?State.PausedProtection:State.Protected;\n        else revert(\"STATE\");\n        emit OrderPaused(id,value,o.state==State.PausedEntry||o.state==State.Pending?1:2);\n    }\n\n    function cancelAndWithdraw(uint256 id) external onlyOwner nonReentrant {\n        Order storage o=orders[id];address token;uint256 amount;\n        if(o.state==State.Pending||o.state==State.PausedEntry){token=o.sellToken;amount=o.entryAmount;}\n        else if(o.state==State.Protected||o.state==State.PausedProtection){token=o.buyToken;amount=o.positionAmount;}\n        else revert(\"STATE\");\n        o.state=State.Cancelled;require(IERC20Pulse(token).transfer(owner,amount),\"TRANSFER\");emit OrderCancelled(id,token,amount);\n    }\n\n    function _keeperAndAdapter(address adapter) private view {\n        require(!registry.automationPaused()&&registry.spotKeepers(msg.sender),\"KEEPER\");require(registry.approvedAdapters(adapter),\"ADAPTER\");\n    }\n}\n"
+      },
+      "SpotOrderAccountFactoryV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV1.sol\";\n\ncontract SpotOrderAccountFactoryV1 {\n    address public immutable registry;\n    address public immutable oracle;\n    mapping(address => address) public accountOf;\n    event AccountCreated(address indexed owner, address indexed account);\n    constructor(address registry_,address oracle_) { require(registry_ != address(0)&&oracle_!=address(0), \"ZERO\"); registry = registry_; oracle=oracle_; }\n    function createAccount() external returns (address account) { require(accountOf[msg.sender] == address(0), \"EXISTS\"); account = address(new SpotOrderAccountV1(msg.sender, registry,oracle)); accountOf[msg.sender] = account; emit AccountCreated(msg.sender, account); }\n}\n"
+      },
+      "SpotOrderAccountFactoryV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV2.sol\";\ncontract SpotOrderAccountFactoryV2 {\n    address public immutable registry;address public immutable oracle;mapping(address=>address) public accountOf;event AccountCreated(address indexed owner,address indexed account);\n    constructor(address registry_,address oracle_){require(registry_!=address(0)&&oracle_!=address(0),\"ZERO\");registry=registry_;oracle=oracle_;}\n    function createAccount() external returns(address account){require(accountOf[msg.sender]==address(0),\"EXISTS\");account=address(new SpotOrderAccountV2(msg.sender,registry,oracle));accountOf[msg.sender]=account;emit AccountCreated(msg.sender,account);}\n}\n"
+      },
+      "SpotOrderAccountV1.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\ninterface IERC20Pulse { function transfer(address,uint256) external returns (bool); function transferFrom(address,address,uint256) external returns (bool); function balanceOf(address) external view returns (uint256); }\ninterface IPulseRegistry { function approvedAdapters(address) external view returns (bool); function spotKeepers(address) external view returns (bool); function autopilotExecutors(address) external view returns (bool); function automationPaused() external view returns (bool); }\ninterface IOracleRouterPulse { function readPrice(address,address) external view returns(uint256,uint256); }\n\ncontract SpotOrderAccountV1 {\n    enum State { None, Protected, Paused, Closed, Cancelled }\n    struct Position { address asset; address settlement; uint128 amount; uint128 takeProfit; uint128 stopLoss; uint64 expiry; uint64 nonce; State state; }\n    address public immutable owner;\n    IPulseRegistry public immutable registry;\n    IOracleRouterPulse public immutable oracle;\n    uint256 public nextPositionId = 1;\n    uint256 private locked = 1;\n    mapping(uint256 => Position) public positions;\n\n    event PositionCreated(uint256 indexed id, address indexed asset, uint256 amount, uint256 takeProfit, uint256 stopLoss);\n    event ProtectionUpdated(uint256 indexed id, uint256 takeProfit, uint256 stopLoss, uint256 nonce);\n    event PositionPaused(uint256 indexed id, bool paused);\n    event PositionClosed(uint256 indexed id, address indexed adapter, uint256 amountIn, uint256 amountOut);\n    event PositionCancelled(uint256 indexed id, uint256 returnedAmount);\n\n    modifier onlyOwner() { require(msg.sender == owner, \"OWNER\"); _; }\n    modifier nonReentrant() { require(locked == 1, \"REENTRANT\"); locked = 2; _; locked = 1; }\n    constructor(address owner_, address registry_, address oracle_) { require(owner_ != address(0) && registry_ != address(0) && oracle_ != address(0), \"ZERO\"); owner = owner_; registry = IPulseRegistry(registry_); oracle = IOracleRouterPulse(oracle_); }\n\n    function createPosition(address asset, address settlement, uint128 amount, uint128 takeProfit, uint128 stopLoss, uint64 expiry) external onlyOwner nonReentrant returns (uint256 id) {\n        require(asset != address(0) && settlement != address(0) && asset != settlement && amount > 0, \"INPUT\");\n        require(takeProfit > stopLoss, \"LEVELS\");\n        require(IERC20Pulse(asset).transferFrom(owner, address(this), amount), \"TRANSFER\");\n        id = nextPositionId++;\n        positions[id] = Position(asset, settlement, amount, takeProfit, stopLoss, expiry, 1, State.Protected);\n        emit PositionCreated(id, asset, amount, takeProfit, stopLoss);\n    }\n    function updateProtection(uint256 id, uint128 takeProfit, uint128 stopLoss, uint64 expiry) external onlyOwner { Position storage p = positions[id]; require(p.state == State.Protected || p.state == State.Paused, \"STATE\"); require(takeProfit > stopLoss, \"LEVELS\"); p.takeProfit = takeProfit; p.stopLoss = stopLoss; p.expiry = expiry; p.nonce++; emit ProtectionUpdated(id, takeProfit, stopLoss, p.nonce); }\n    function setPaused(uint256 id, bool paused) external onlyOwner { Position storage p = positions[id]; require(p.state == State.Protected || p.state == State.Paused, \"STATE\"); p.state = paused ? State.Paused : State.Protected; emit PositionPaused(id, paused); }\n    function executeExit(uint256 id, address adapter, bytes calldata adapterData, uint256 minOut) external nonReentrant returns (uint256 amountOut) {\n        Position storage p = positions[id]; require(p.state == State.Protected, \"STATE\"); require(!registry.automationPaused() && registry.spotKeepers(msg.sender), \"KEEPER\"); require(registry.approvedAdapters(adapter), \"ADAPTER\"); require(p.expiry == 0 || block.timestamp <= p.expiry, \"EXPIRED\");\n        (uint256 triggerPrice,) = oracle.readPrice(p.asset,p.settlement); require(triggerPrice >= p.takeProfit || triggerPrice <= p.stopLoss,\"NOT_TRIGGERED\");\n        p.state = State.Closed; uint256 beforeBalance = IERC20Pulse(p.settlement).balanceOf(address(this)); require(IERC20Pulse(p.asset).transfer(adapter, p.amount), \"TRANSFER\");\n        (bool ok,) = adapter.call(adapterData); require(ok, \"EXECUTE\"); amountOut = IERC20Pulse(p.settlement).balanceOf(address(this)) - beforeBalance; require(amountOut >= minOut, \"MIN_OUT\"); require(IERC20Pulse(p.settlement).transfer(owner, amountOut), \"PAYOUT\"); emit PositionClosed(id, adapter, p.amount, amountOut);\n    }\n    function cancelAndWithdraw(uint256 id) external onlyOwner nonReentrant { Position storage p = positions[id]; require(p.state == State.Protected || p.state == State.Paused, \"STATE\"); p.state = State.Cancelled; uint256 amount = p.amount; require(IERC20Pulse(p.asset).transfer(owner, amount), \"TRANSFER\"); emit PositionCancelled(id, amount); }\n}\n"
+      },
+      "SpotOrderAccountV2.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\nimport \"./SpotOrderAccountV1.sol\";\n\n/// @notice Connected-wallet owned conditional order account supporting both\n/// protective OCO exits and buy/sell limit entries without a delegated wallet.\ncontract SpotOrderAccountV2 {\n    enum State { None, Active, Paused, Filled, Cancelled }\n    struct Order {address sellToken;address buyToken;address oracleBase;address oracleQuote;uint128 amount;uint128 triggerPrice;uint128 minOut;uint64 expiry;uint64 nonce;bool triggerAbove;State state;}\n    address public immutable owner;IPulseRegistry public immutable registry;IOracleRouterPulse public immutable oracle;uint256 public nextOrderId=1;uint256 private locked=1;mapping(uint256=>Order) public orders;\n    event OrderCreated(uint256 indexed id,address indexed sellToken,address indexed buyToken,uint256 amount,uint256 triggerPrice,bool triggerAbove,uint256 minOut);\n    event OrderUpdated(uint256 indexed id,uint256 triggerPrice,bool triggerAbove,uint256 minOut,uint256 nonce);event OrderPaused(uint256 indexed id,bool paused);\n    event OrderFilled(uint256 indexed id,address indexed adapter,uint256 amountIn,uint256 amountOut);event OrderCancelled(uint256 indexed id,uint256 returnedAmount);\n    modifier onlyOwner(){require(msg.sender==owner,\"OWNER\");_;}modifier nonReentrant(){require(locked==1,\"REENTRANT\");locked=2;_;locked=1;}\n    constructor(address owner_,address registry_,address oracle_){require(owner_!=address(0)&&registry_!=address(0)&&oracle_!=address(0),\"ZERO\");owner=owner_;registry=IPulseRegistry(registry_);oracle=IOracleRouterPulse(oracle_);}\n    function createOrder(address sellToken,address buyToken,address oracleBase,address oracleQuote,uint128 amount,uint128 triggerPrice,bool triggerAbove,uint128 minOut,uint64 expiry) external onlyOwner nonReentrant returns(uint256 id){\n        require(sellToken!=address(0)&&buyToken!=address(0)&&sellToken!=buyToken&&oracleBase!=address(0)&&oracleQuote!=address(0)&&amount>0&&triggerPrice>0&&minOut>0&&expiry>block.timestamp,\"INPUT\");\n        require(IERC20Pulse(sellToken).transferFrom(owner,address(this),amount),\"TRANSFER\");id=nextOrderId++;orders[id]=Order(sellToken,buyToken,oracleBase,oracleQuote,amount,triggerPrice,minOut,expiry,1,triggerAbove,State.Active);emit OrderCreated(id,sellToken,buyToken,amount,triggerPrice,triggerAbove,minOut);\n    }\n    function updateOrder(uint256 id,uint128 triggerPrice,bool triggerAbove,uint128 minOut,uint64 expiry) external onlyOwner {Order storage o=orders[id];require(o.state==State.Active||o.state==State.Paused,\"STATE\");require(triggerPrice>0&&minOut>0&&expiry>block.timestamp,\"INPUT\");o.triggerPrice=triggerPrice;o.triggerAbove=triggerAbove;o.minOut=minOut;o.expiry=expiry;o.nonce++;emit OrderUpdated(id,triggerPrice,triggerAbove,minOut,o.nonce);}\n    function setPaused(uint256 id,bool value) external onlyOwner {Order storage o=orders[id];require(o.state==State.Active||o.state==State.Paused,\"STATE\");o.state=value?State.Paused:State.Active;emit OrderPaused(id,value);}\n    function execute(uint256 id,address adapter,bytes calldata adapterData) external nonReentrant returns(uint256 amountOut){Order storage o=orders[id];require(o.state==State.Active,\"STATE\");require(!registry.automationPaused()&&registry.spotKeepers(msg.sender),\"KEEPER\");require(registry.approvedAdapters(adapter),\"ADAPTER\");require(block.timestamp<=o.expiry,\"EXPIRED\");(uint256 price,)=oracle.readPrice(o.oracleBase,o.oracleQuote);require(o.triggerAbove?price>=o.triggerPrice:price<=o.triggerPrice,\"NOT_TRIGGERED\");o.state=State.Filled;uint256 beforeBalance=IERC20Pulse(o.buyToken).balanceOf(address(this));require(IERC20Pulse(o.sellToken).transfer(adapter,o.amount),\"TRANSFER\");(bool ok,bytes memory result)=adapter.call(adapterData);require(ok&&result.length>=32,\"EXECUTE\");amountOut=IERC20Pulse(o.buyToken).balanceOf(address(this))-beforeBalance;require(amountOut>=o.minOut&&amountOut==abi.decode(result,(uint256)),\"MIN_OUT\");require(IERC20Pulse(o.buyToken).transfer(owner,amountOut),\"PAYOUT\");emit OrderFilled(id,adapter,o.amount,amountOut);}\n    function cancelAndWithdraw(uint256 id) external onlyOwner nonReentrant {Order storage o=orders[id];require(o.state==State.Active||o.state==State.Paused,\"STATE\");o.state=State.Cancelled;require(IERC20Pulse(o.sellToken).transfer(owner,o.amount),\"TRANSFER\");emit OrderCancelled(id,o.amount);}\n    function cancelMany(uint256[] calldata ids) external onlyOwner nonReentrant {for(uint256 i=0;i<ids.length;i++){Order storage o=orders[ids[i]];if(o.state!=State.Active&&o.state!=State.Paused)continue;o.state=State.Cancelled;require(IERC20Pulse(o.sellToken).transfer(owner,o.amount),\"TRANSFER\");emit OrderCancelled(ids[i],o.amount);}}\n}\n"
+      },
+      "TestMocks.sol": {
+        "content": "// SPDX-License-Identifier: MIT\npragma solidity 0.8.26;\n\ncontract MockERC20Pulse {\n    string public name;string public symbol;uint8 public immutable decimals;uint256 public totalSupply;mapping(address=>uint256)public balanceOf;mapping(address=>mapping(address=>uint256))public allowance;\n    constructor(string memory name_,string memory symbol_,uint8 decimals_){name=name_;symbol=symbol_;decimals=decimals_;}\n    function mint(address to,uint256 amount)external{balanceOf[to]+=amount;totalSupply+=amount;}\n    function approve(address spender,uint256 amount)external returns(bool){allowance[msg.sender][spender]=amount;return true;}\n    function transfer(address to,uint256 amount)external returns(bool){_transfer(msg.sender,to,amount);return true;}\n    function transferFrom(address from,address to,uint256 amount)external returns(bool){uint256 allowed=allowance[from][msg.sender];require(allowed>=amount,\"ALLOWANCE\");if(allowed!=type(uint256).max)allowance[from][msg.sender]=allowed-amount;_transfer(from,to,amount);return true;}\n    function _transfer(address from,address to,uint256 amount)private{require(balanceOf[from]>=amount,\"BALANCE\");balanceOf[from]-=amount;balanceOf[to]+=amount;}\n}\ncontract MockRouterPulse {\n    function swap(address sell,address buy,uint256 amount,uint256 amountOut)external{require(MockERC20Pulse(sell).transferFrom(msg.sender,address(this),amount),\"SELL\");require(MockERC20Pulse(buy).transfer(msg.sender,amountOut),\"BUY\");}\n}\ncontract MockApprovalSpenderPulse {\n    function pull(address token,address from,address to,uint256 amount)external{require(MockERC20Pulse(token).transferFrom(from,to,amount),\"PULL\");}\n}\ncontract MockRouterWithSpenderPulse {\n    function swap(address spender,address sell,address buy,uint256 amount,uint256 amountOut)external{MockApprovalSpenderPulse(spender).pull(sell,msg.sender,address(this),amount);require(MockERC20Pulse(buy).transfer(msg.sender,amountOut),\"BUY\");}\n}\n"
+      }
+    },
+    "settings": {
+      "viaIR": true,
+      "evmVersion": "shanghai",
+      "optimizer": {
+        "enabled": true,
+        "runs": 500
+      },
+      "outputSelection": {
+        "*": {
+          "*": [
+            "abi",
+            "evm.bytecode.object",
+            "evm.deployedBytecode.object",
+            "metadata"
+          ]
+        }
+      }
+    }
+  },
+  "completedAt": "2026-09-19T19:41:07.484Z",
+  "remainingETH": "0.000497516022306675",
+  "verification": {
+    "provider": "Sourcify v2",
+    "results": {
+      "registry": {
+        "status": "verified",
+        "address": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "oracleRouter": {
+        "status": "verified",
+        "address": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "executionAdapter": {
+        "status": "verified",
+        "address": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "spotFactory": {
+        "status": "verified",
+        "address": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "autopilotFactory": {
+        "status": "verified",
+        "address": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "spotBracketFactory": {
+        "status": "verified",
+        "address": "0xa4546529b1174765d4d8e256c951365359c853fa",
+        "creationMatch": "exact_match",
+        "runtimeMatch": "exact_match"
+      },
+      "spotProtectionFactory": {
+        "status": "verified",
+        "address": "0x1e1f08e79f866df4819cf691c43b6efd9dec513c",
+        "verificationId": "c68a9819-3161-4cf6-a0e9-6f7beac55242",
+        "result": {
+          "isJobCompleted": true,
+          "verificationId": "c68a9819-3161-4cf6-a0e9-6f7beac55242",
+          "jobStartTime": "2026-09-24T05:27:33Z",
+          "jobFinishTime": "2026-09-24T05:27:39Z",
+          "compilationTime": "2419",
+          "externalVerifications": {
+            "etherscan": {
+              "verificationId": "k4f39egz2uyzd8s7xgxdyi8je7umzxiy3cnr2qp6jyqrcdpyvq",
+              "statusUrl": "https://api.etherscan.io/v2/api?chainid=4663&module=contract&action=checkverifystatus&guid=k4f39egz2uyzd8s7xgxdyi8je7umzxiy3cnr2qp6jyqrcdpyvq",
+              "explorerUrl": "https://robin.etherscan.io//address/0x1e1F08E79f866DF4819Cf691C43b6eFd9dec513c",
+              "contractApiUrl": "https://api.etherscan.io/v2/api?chainid=4663&module=contract&action=getabi&address=0x1e1F08E79f866DF4819Cf691C43b6eFd9dec513c"
+            },
+            "blockscout": {
+              "error": "Explorer verification request failed (403): <!DOCTYPE html><html lang=\"en-US\"><head><title>Just a moment...</title><meta http-equiv=\"Content-Type\" content=\"text/html; charset=UTF-8\"><meta http-equiv=\"X-UA-Compatible\" content=\"IE=Edge\"><meta name=\"robots\" content=\"noindex,nofollow\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><meta http-equiv=\"content-security-policy\" content=\"default-src &#39;none&#39;; script-src &#39;nonce-3UPip1qEP0tUkFXQXD9JVN&#39; &#39;unsafe-eval&#39; https://challenges.cloudflare.com; script-src-attr &#39;none&#39;; style-src &#39;unsafe-inline&#39;; img-src &#39;self&#39; https://challenges.cloudflare.com; connect-src &#39;self&#39; https://challenges.cloudflare.com; frame-src &#39;self&#39; https://challenges.cloudflare.com blob:; child-src &#39;self&#39; https://challenges.cloudflare.com blob:; worker-src blob:; form-action http: https:; base-uri &#39;self&#39;\"><style>*{box-sizing:border-box;margin:0;padding:0}html{line-height:1.15;-webkit-text-size-adjust:100%;color:#313131;font-family:system-ui,-apple-system,BlinkMacSystemFont,\"Segoe UI\",Roboto,\"Helvetica Neue\",Arial,\"Noto Sans\",sans-serif,\"Apple Color Emoji\",\"Segoe UI Emoji\",\"Segoe UI Symbol\",\"Noto Color Emoji\"}body{display:flex;flex-direction:column;height:100vh;min-height:100vh}.main-content{margin:8rem auto;padding-left:1.5rem;max-width:60rem}@media (width <= 720px){.main-content{margin-top:4rem}}#challenge-error-text{background-image:url(\"data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMiIgaGVpZ2h0PSIzMiIgZmlsbD0ibm9uZSI+PHBhdGggZmlsbD0iI0IyMEYwMyIgZD0iTTE2IDNhMTMgMTMgMCAxIDAgMTMgMTNBMTMuMDE1IDEzLjAxNSAwIDAgMCAxNiAzbTAgMjRhMTEgMTEgMCAxIDEgMTEtMTEgMTEuMDEgMTEuMDEgMCAwIDEtMTEgMTEiLz48cGF0aCBmaWxsPSIjQjIwRjAzIiBkPSJNMTcuMDM4IDE4LjYxNUgxNC44N0wxNC41NjMgOS41aDIuNzgzem0tMS4wODQgMS40MjdxLjY2IDAgMS4wNTcuMzg4LjQwNy4zODkuNDA3Ljk5NCAwIC41OTYtLjQwNy45ODQtLjM5Ny4zOS0xLjA1Ny4zODktLjY1IDAtMS4wNTYtLjM4OS0uMzk4LS4zODktLjM5OC0uOTg0IDAtLjU5Ny4zOTgtLjk4NS40MDYtLjM5NyAxLjA1Ni0uMzk3Ii8+PC9zdmc+\");background-repeat:no-repeat;background-size:contain;padding-left:34px}</style><meta http-equiv=\"refresh\" content=\"360\"></head><body><div class=\"main-wrapper\" role=\"main\"><div class=\"main-content\"><noscript><div class=\"h2\"><span id=\"challenge-error-text\">Enable JavaScript and cookies to continue</span></div></noscript></div></div><script nonce=\"3UPip1qEP0tUkFXQXD9JVN\">(function(){window._cf_chl_opt = {cFPWv: 'b',cH: '2vrfyWuHzslknGOiS3Mr.0PIHB0BI7FhEZCw_IUKZyg-1790227659-1.2.1.1-gOMxQsoUse0ue2bKUIeVSwxDd3R0o8uFFgIy0gfnvKIZFPlDJizAdcE_nj3wdNdf',cITimeS: '1790227659',cN: '3UPip1qEP0tUkFXQXD9JVN',cRay: 'a3ff6199df7eda95',cTplB: '0',cTplC:0,cTplO:0,cTplV:5,cType: 'managed',cUPMDTk:\"/api?module=contract\\u0026action=verifysourcecode\\u0026chainid=4663\\u0026__cf_chl_tk=d0NOHQQp.jAdQCj7KlxhpWFPynHqdWqWH_7_v0uKVKM-1790227659-1.0.1.1-1BRxQ5gWGnYsndclzbX_ngZ.sxXrN2dTFRUE2Vfw.mc\",cvId: '3',cZone: 'robinhoodchain.blockscout.com',fa:\"/api?module=contract\\u0026action=verifysourcecode\\u0026chainid=4663\\u0026__cf_chl_f_tk=d0NOHQQp.jAdQCj7KlxhpWFPynHqdWqWH_7_v0uKVKM-1790227659-1.0.1.1-1BRxQ5gWGnYsndclzbX_ngZ.sxXrN2dTFRUE2Vfw.mc\",md: 'HHKABqYG__Kl9h9639EyLTlrGkLpK7DK7zvzna.yaTE-1790227659-1.2.1.1-YeYaoCIwtpP33oxh2vK9RuDm.zESyQ5WLJBCCFDvA_zSq_bOBIsrH9uDKhWtHGrTWwNnfZsFkUi17Pi663s0O0gZ0zETD3ul5j02sqobu1_RLiJvJ65pWoeTRkA.sJAPgnve3oXFItH4yE9zFvd0c4Z2DJ9HapYcygHS6Qm4cKLMyjMS1XS3Ed86XeNp1UojIhWY5gE3Y7bv5VhCKRnQHBG91E1EYtOv2jyHRVr0m_ZfFSBOSHKe_tCproI8n2gf4xc..ovksRTh1j3hGyfVUaxjFopM2jSIUsCJ9HiCuLNIX_LU1ckf_jDaCz4UWgVFPqCVe1vWbu6iDKCbeMsSrldpGSvIO21xbzSfwxMgQccOQMaqhzYfC8B5zAbWDr.1Zf2594D8IKPPEk_Nk691ZCczSvuxai5bwJcaiW6cWd.2.PQ0WnRkqCSuJh8223BWIM4cV3ZYzsSGjzjvO4dKZ5A5qtwAYsmo9ozAa5aB65OshEwAqq0bRwXi5_e02K6PsPPMuoNy_QSnxX8ndKZJUfzDpbzKJrF86NxJJLNcBXs8Yix53ayoem6X98qrF3BBvDz5d0pKDl4o5VPAcZHL8jkZTgimS2b.cDcXkuDy63BuMbXhkfuzomyIaLsAoZob91yW.0zewCBHwdx15h1GvZ3DUhK_JvQa5asuXZuByQIz.Z4sUVxB4lMJ4s0JK_8JrdoyKNf.f21irIAo5Njc37Wsa5ooPJUIw3u0DStA89YUkyf.QwNvuEKC2CF3bjls88xQB0.wI6SrmbTVfspkLxkvAia56YABrfzxZsN4zrFJwDWHbD5.beML3q4_gH1urtI3pthUW3t5j4SyCqKdkxbE8JXvUmuPvgJNbELtm.QRzA_5tJNdVE68y_g6oX4XlMVTY_Nwqg9AxSVC.U6O8szH.Voyi5BoxYqvy7dxqiOaIdPcGLl6UGZ6SuQshbVYmb.1HARJRd31i9f2vBsf8bp9QL3CBSN6XYU_2iP85Q2NZQ8K1HCxdLal3_4x1dRjDD33pgRDpBtbCiQyadhYYS.qZpPkpDH9Sb70XmtQrst3BFveMBpxAu8wVS5b7eB4FvKTZl97UzlWXGe1JrkYEYVHna2EesDEMI58KWjBcqbNeE67M82qsrl0Nsh2sF2QHn1bk2SmlFHW9EU5KPJz.g',mdrd: 'LvNQ3JnmFfxVdDrPFFNDHgJze9cs2KZDd6dmD.ZGZto-1790227659-1.2.1.1-Y4jb3sRwVhMhy9nUvsD8bsR1wEo7Z2QOnbEnGSQAIviC25bLDrq5y2frjJ2ie.mjdwhEqKFyDeslEGFHCG9eFvbZfwfVjQfeyoE3gb5s00B0Dgob4TUkmHKsp0AaAfZVXd61D55ULp6lTeoNjhxawjaQY1JfGBIDVMPxN1b.rceTmlFteutFdqlikp1mIhHRiPELpoIGhbCLH89oPuwaZ_KbUdBOdiSn21OKXfprq9bM1Z8nCb0C.xUAgvxUJzatvfYKsDsE.PskawuUKt9VPy5EqKtd.Z0DZ4UFS1VgEJQVhFXJB1cdplKmTuYtcX68T4Q1MBkV2JimxvdG1OaxrIwTKhnepXAINwx2dLiasRk2HI_dLW2e4kMZ53wTSJ0du7cvAU_eP5p_NagZNhdtrFH3mVemJoztBglBk7Zt2WQnrhizT8Pi1u.yevOePPBsgs4Tkjx9yl7IJqXc_XPwowDThgBt0Xwk8ih9lWu1KSdR5r9baQtSVEpDYuDmXUWy6P9CudvJdAnes4Y51RVNS2AWCraVnBNlntyAI5HXxOMBFyW99r5SVlKL7y8qry._1Lb_QlczHd.gevp.JnLH.cQ.0aYEOctg5453eB14b8n6GjrUw.Z.WfpVpshNU6n1C5nVcdiL_fDMZw49nhEwX7nprrcdsI2qcLS1bHCKYEGKDvtayNi_JwAac6fkeZG4oGI9TNqxObRn9gladCdeEisfePdxQd4o4pU6PSWpep3eiA2LQ4c_PLK2sAzgqJ3_fXNikWqcHMsUt5i9W96qzL7.SCOTOX1U57KOCtl1D5_YuMfSXwzxGhswNtsJUER1llPMRyAdtLQFJpqFhFzGRVZ5uctFSbSMfQ3DXfhfgRITuWYDeY8YeiVD1wEolLFCYSfvMY38MYG9yVvbTi5V8JRKklTCD7HvuWftIwBRnnBhyW1vDCEAYt6UpqnMRSpWo6bPL0LWy5L6qJQSsvZ0vDaSgT75E_CKRJhQEaZjJLubN5B8z9sqML5ArH8_S0cpilpBe.A_5W8eMGBjAbAGX2tIaRD0AEgrMuWIxFJqSXJXv0TnoB7oRsVm3uvI.54cyrrGV_Oa05bJtyrqxvTP0h0XO3TYClyAqzSh17rV_8B0Ou3CDMbIOwyhOsYie.OcCSdn_LVJwQfbGW9l8yjbYJ9pcu9FTYOGvegUDWYBG53P2WnCsZ7WOOEl9Va4H0s.flEjAWMtZccKlfosDHiXENHX82P9Ddbe4JrFO8jWo.mignXufCuHRsM4LNzTSI7IHMhJG9rUhxyu1uS9DnP6xRIxZq66zeWYAaMycEI7QoWBTowV0ioLOrV9KESxuHUF_iTmTY5omyHO2FUMKj1SKrfvaGPVFKWO7lZYMfXxZkKfiEc9w_2mK2iuibNKhmUrMMq5UB5mtOUTMfZ.HC3FhKyIHaLyd6LkRtym89CO33DKsk5fTyXZJ6JXb2fC2MIwrK9M_8EhLjdl_m7UfC4i5BHE_u82gS6Gv19a0SxGYOEg0koItyOTHTw6mZgkum6KEvjKSsIPP4L3iEnP645DdqnImBhqzeKeDfEHFSTBqqIqBkJBlwH.5LyF.I0ONWf8gwNdq9aADeqIvEl_YckP.Yc5L37.qh8oZ6vhjv6jOdvAfPHCl0nkxcYTyVNp.KJtvAkbrDTCz39eDXUAFHgDKJ_rH354kYEZHnuGyICJDniweQqMuLBqnBalEb7QYlj518ZYtZLNMNZysO70Mu9QcaVn2j2tsGBLtUPsl3_wQtqVamtB6g9UH3ZGTODZ6P7f4IBiqDSOSfg4sHvBPQYVnegt3Jhk_ZJvTb.pgRKiRZl4KnOZjrZUii6o40W9mXfbnECYGTAY2mu7kTGi6QYu7fFaIJrczuceuQDWKfGL2obzTimF8fnTXos_j1F69PJuR2LkmNeDly16oz8uls.tGvcdQaJ0b6QCWd8zUVq5kPiW.TU9ix7ChX986hvhG5W3JdGf3BF97Zt5nAoc._flAh2WKYPPoRydxMtkhPTJdWI7mPVuS7UYmt0sJigahUFoRR1BZRybFTZbVyUPdLFhSTooVlKZ2BQIn0yqfom9R6oay6fcq0uYLfIGmhA.ZYTKTiG0RpWslybv5LF1gduv._vJWYg.9ZaokaaFwk2becFx0V0LzePYu9mMUYmJtX_Esbt0Fa6tuwp.fibEN.6cwudLZWIietzfYSOaety_ZprikhkTzO60sQJW3vOWDyOPrWhnN_MDrc2ihAf1NWqhgoojZG1CpJF9WkmCvCQECGUf_VAYXZUtII9oePR38e9HHJgeSaPh_g_8uLBE7v21COiARwnxxsTW4QWOXOeiGY2X5pA2h6TByhJO2irMTYW8nhiqKM1J7XEdQzOaIJmwqKn7rAzqbNmmBl1J3O4LsE1YzIPKTj3cVPeW4ao2g0s_RuL2EK1LmyzZSiu9iAbGYkdCw6Fxi3SLgVwT2xiQtQ8yB62cAY9KYgbvf8CaB.cXjnvY2U5OKLw6JmQukBJUsDIo3CtyFKfVyQGQPFdlpi6X31PA0UtWnCpEtoCdTH8QzMaNUkm2sle3D9BRApTl5dixoy2tJtfPKAvCXAZ4gJMdDhV9hEsQ7lTVPCXZDsXU6Pbgv2Gd9dEf6peX_UpwltAZV0_cXjpEh9i19TiK2D9Zk9fGBaubraDT27k_TL87yQremlPOEeNlsldjc.FUEGKJbigp.QwNpFwoMDc3cWpv.VPIgKFzAJfD1JjU9R1hvP9z.HFqZiIkNQiSPchDEH5RVuLbr4wF78YOu_B5wJuxQfbLfvq71AacHhqO7HHQvfucRsOyxiMa25nR83P6aLGe00gO5UWLFhQ0BuAao7xAOPUsPwle8TgfcDZtc5gjIDzyuDqs53VqRMjj9IaKAqRpTnEjlWPxegZEuWlu8GEhJGPKExR9IMJZRlerSxYOh7VVvS8.v_GNCpFj0itXlkqDXwKSfyyatHEfrp0yXT9CEDQozhWzSsc9SzjiN8_ewQTGiIHDa4b8V8B8Hr8a5AxSuaFwEkLwRy8SRaA0iJN.lFh7ZHJTXrq_7Bvwvl7XwqaA8zserZWfIJ7MyXyPn4eRBOihnO.iCyO2s29Tg_6ALRoNL9ip1nWM4KvfV4RgkfbVmOQPd6e3uunasVNyCgBHFhMZoBtXEeiXsUr.LAyhkHU.JjGRoHhoYyhW.CiNN7Dt8eQQKYFJY6GpNF3egjhbmGW4ljRZaCtHDs5qrruT_lbPNwx_wwhd7M2AZc30OVSTkJCNiC5UZPT2S.kUroPIYCPXXiuimnWLg676ZBKe8NqX7F6h1NYbghNp7zXbEiX9LyXcAffh0OPDKMUjzi9kDd4Eg5PVWo.GkkmkYW7N9hMpYxTnbbql0OuBjvrMpVxVslhHfBVlf3vo7y82Wk9FwmTsr6YNFfDDO2iHSu0dt5hDOrLfM0Z_8TV38uKDNv0ozRDOsVHWAjelwF2e5g',};var a = document.createElement('script');a.nonce = '3UPip1qEP0tUkFXQXD9JVN';a.src = '/cdn-cgi/challenge-platform/h/b/orchestrate/chl_page/v1?ray=a3ff6199df7eda95';window._cf_chl_opt.cOgUHash = location.hash === '' && location.href.indexOf('#') !== -1 ? '#' : location.hash;window._cf_chl_opt.cOgUQuery = location.search === '' && location.href.slice(0, location.href.length - window._cf_chl_opt.cOgUHash.length).indexOf('?') !== -1 ? '?' : location.search;if (window.history && window.history.replaceState) {var ogU = location.pathname + window._cf_chl_opt.cOgUQuery + window._cf_chl_opt.cOgUHash;history.replaceState(null, null,\"/api?module=contract\\u0026action=verifysourcecode\\u0026chainid=4663\\u0026__cf_chl_rt_tk=d0NOHQQp.jAdQCj7KlxhpWFPynHqdWqWH_7_v0uKVKM-1790227659-1.0.1.1-1BRxQ5gWGnYsndclzbX_ngZ.sxXrN2dTFRUE2Vfw.mc\"+ window._cf_chl_opt.cOgUHash);a.onload = function() {history.replaceState(null, null, ogU);}}document.getElementsByTagName('head')[0].appendChild(a);}());</script></body></html>"
+            }
+          },
+          "contract": {
+            "match": "exact_match",
+            "creationMatch": "exact_match",
+            "runtimeMatch": "exact_match",
+            "chainId": "4663",
+            "address": "0x1e1F08E79f866DF4819Cf691C43b6eFd9dec513c",
+            "verifiedAt": "2026-09-24T05:27:39Z",
+            "matchId": "51598766"
+          }
+        }
+      }
+    },
+    "verifiedAt": "2026-09-24T05:27:41.010Z"
+  }
+}

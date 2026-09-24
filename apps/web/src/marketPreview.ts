@@ -1,5 +1,8 @@
 export type MarketCandle = { ts: number; open: number; high: number; low: number; close: number; volume: number; volumeCcy?: number; confirmed?: boolean };
-export type MarketTicker = { instId: string; last: number; change24hPct: number; high24h: number; low24h: number; volCcy24h: number; ts: string };
+export type MarketTicker = { instId: string; priceCurrency?: string; last: number; change24hPct: number; high24h: number; low24h: number; volCcy24h: number; ts: string };
+export const isRobinhoodMarketPair = (pair: string) => /^[A-Z0-9_]{1,16}\.[A-F0-9]{16}-USDG$/.test(pair);
+export const marketPairLabel = (pair: string) => isRobinhoodMarketPair(pair) ? pair.replace(/\.[A-F0-9]{16}-USDG$/, "/USDG") : pair;
+export const marketPriceCurrency = (pair: string, ticker?: MarketTicker) => ticker?.priceCurrency || (isRobinhoodMarketPair(pair) ? "USD" : pair.split("-").at(-1) || "");
 export type MarketPreviewData = { ticker: MarketTicker; candles: MarketCandle[]; fetchedAt: number };
 export type TradeMarker = { id: string; side: "buy" | "sell"; price: number; ts: number; txHash: string };
 export type ChartActivity = { id: string; source: string; kind: string; status: string; pair?: string; account?: string; txHash?: string; fillPrice?: number; fillSide?: "buy" | "sell"; fillObservedAt?: string; createdAt: string };

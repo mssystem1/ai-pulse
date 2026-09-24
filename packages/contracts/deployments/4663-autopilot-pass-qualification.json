@@ -1,0 +1,15 @@
+{
+  "service": "autopilot-24h",
+  "transaction": "0x3c74f4cb6653524be61662e6531d197d9cbcfc8c80d8d5e8ded1d9cc26dd7385",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "vault": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+  "paidUSDG": "1.50",
+  "paused": true,
+  "remainingHours": 24,
+  "confirmations": 3,
+  "persisted": true,
+  "sameTransactionOnReplay": true,
+  "replayDidNotExtendPass": true,
+  "observedUSDGChange": "1.5",
+  "hostingChanged": false
+}

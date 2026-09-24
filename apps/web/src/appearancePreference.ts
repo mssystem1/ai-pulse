@@ -1,4 +1,4 @@
-export const APPEARANCE_IDS = ["xlayer", "base", "arbitrum", "arc-testnet"] as const;
+export const APPEARANCE_IDS = ["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"] as const;
 export type AppearanceId = typeof APPEARANCE_IDS[number];
 let appliedAppearance: AppearanceId | undefined;
 export function isAppearance(value: unknown): value is AppearanceId { return APPEARANCE_IDS.some(id => id === value); }

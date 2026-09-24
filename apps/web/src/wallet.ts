@@ -82,7 +82,7 @@ const EXPECTED_ROUTE_AMOUNTS: Readonly<Record<string, string>> = Object.freeze({
 function canonicalPaidPath(input: RequestInfo | URL): string {
   const base = typeof window === "undefined" ? "http://localhost" : window.location.href;
   const pathname = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, base).pathname;
-  return pathname.replace(/^\/(xlayer|base|arbitrum|arc)(?=\/)/, "");
+  return pathname.replace(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/, "");
 }
 
 export function validatePaymentChallenge(required: PaymentRequiredLike, input: RequestInfo | URL, selected: import("./networks").WebNetworkKey, network: { caip2: string; label: string; payment: { address: string } }, approvedAmount?: string) {
@@ -320,6 +320,20 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
     // runtime protocol shape is the same x402 v2 SchemeNetworkClient contract.
     const core = new x402Client().register(selected.caip2, scheme as never);
     const http = new x402HTTPClient(core);
+    if (networkKey === "robinhood") {
+      if (!navigator.locks) throw new Error("Robinhood payments require a browser with secure payment recovery support. Use a current browser over HTTPS.");
+      const { createRecoverableRobinhoodFetch } = await import("./robinhoodPaymentRecovery");
+      return createRecoverableRobinhoodFetch(userAddress, {
+        storage: localStorage, fetch,
+        exclusive: async (key, run) => await navigator.locks.request(key, run),
+        sign: async (first, request) => {
+          const body = await first.clone().json().catch(() => ({}));
+          const required = http.getPaymentRequiredResponse(name => first.headers.get(name), body);
+          validatePaymentChallenge(required as PaymentRequiredLike, request, networkKey, selected, await publishedAmount(request));
+          return http.encodePaymentSignatureHeader(await http.createPaymentPayload(required));
+        },
+      });
+    }
     return (async (input: RequestInfo | URL, init?: RequestInit) => {
       const first = await fetch(input, init);
       if (first.status !== 402) return first;

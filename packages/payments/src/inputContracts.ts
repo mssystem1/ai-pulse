@@ -340,10 +340,27 @@ routeInputs["/v1/preflight/event-risk"] = {
 };
 
 export function getX402InputDefinition(path: string): RouteInputDefinition | undefined {
-  const definition = routeInputs[path];
+  const alias = /^\/(xlayer|base|arbitrum|arc)(?=\/v1\/)/.exec(path)?.[1];
+  path = path.replace(/^\/(?:xlayer|base|arbitrum|arc)(?=\/v1\/)/, "");
+  let definition = routeInputs[path];
   if (!definition) return undefined;
+  if (alias) {
+    const chainId = { xlayer: "196", base: "8453", arbitrum: "42161", arc: "5042002" }[alias];
+    definition = { ...definition, fields: definition.fields.map(field => field.name === "chainId" ? { ...field, default: chainId, enum: [chainId!] } : field) };
+  }
+  if (path === "/v1/preflight" && !definition.fields.some(field => field.name === "lang")) {
+    definition = { ...definition, fields: [...definition.fields, { name: "lang", carrier: "body", type: "string", required: true, enum: ["en", "zh"], description: "Ask for the report language together with the exact token contract." }] };
+  }
+  if (definition.fields.some(field => field.name === "lang")) {
+    definition = { ...definition, requiredArgs: [...new Set([...(definition.requiredArgs || []), "lang"])], fields: definition.fields.map(field => field.name === "lang" ? { ...field, required: true } : field) };
+  }
+  definition = { ...definition, fields: definition.fields.map(field => {
+    if (field.name !== "lang" && field.name !== "timeframe") return field;
+    const { default: _default, ...explicitChoice } = field;
+    return explicitChoice;
+  }) };
   if (!/^\/v1\/analysis\/(base|premium|spot\/standard|spot\/premium)$/.test(path)) return definition;
-  return { ...definition, fields: definition.fields.map((field) => field.name === "instId"
+  return { ...definition, message: "Ask for the pair, timeframe and report language together before payment. Submit the answers as a POST JSON body.", requiredArgs: ["instId", "timeframe", "lang"], fields: definition.fields.map((field) => ({ ...field, required: ["instId", "timeframe", "lang"].includes(field.name) || field.required })).map((field) => field.name === "instId"
     ? { ...field, pattern: "^[A-Z0-9]+-[A-Z0-9]+$" }
     : field.name === "timeframe" ? { ...field, enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] } : field) };
 }
@@ -351,6 +368,7 @@ export function getX402InputDefinition(path: string): RouteInputDefinition | und
 export function getX402OutputSchema(path: string): X402InputContract | undefined {
   const definition = getX402InputDefinition(path);
   if (!definition) return undefined;
+  path = path.replace(/^\/(?:xlayer|base|arbitrum|arc)(?=\/v1\/)/, "");
   const asynchronous = [
     "/v1/analysis/spot/standard", "/v1/analysis/spot/premium",
     "/v1/analysis/prediction/standard", "/v1/analysis/prediction/premium",
@@ -398,6 +416,8 @@ export function buildX402InputRequired(
   }
   return {
     status: "input_required",
+    method: "POST",
+    requestSpec: { method: "POST", fields: definition.fields },
     message: definition.message,
     requiredAnyOf: definition.requiredAnyOf,
     requiredArgs: definition.requiredArgs,
@@ -413,6 +433,8 @@ export function buildX402InputRequired(
 export function buildX402PaymentRequiredBody(path: string) {
   return {
     status: "payment_required",
+    method: "POST",
+    requestSpec: { method: "POST", fields: getX402InputDefinition(path)?.fields || [] },
     message: "Settle the x402 payment, then replay this POST with the same JSON body.",
     outputSchema: getX402OutputSchema(path),
   };

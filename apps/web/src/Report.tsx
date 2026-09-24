@@ -18,13 +18,13 @@ export type ReportTradeIntent = {
 
 function gradeClass(grade: string): string {
   if (grade === "A" || grade === "B") return "good";
-  if (grade === "C") return "mid";
+  if (grade === "C" || grade === "Unknown" || grade === "—") return "mid";
   return "bad";
 }
 
 function verdictClass(v: string): string {
   if (v === "PASS") return "good";
-  if (v === "WARN") return "mid";
+  if (v === "WARN" || v === "UNKNOWN") return "mid";
   return "bad";
 }
 
@@ -131,7 +131,7 @@ export function SafetyTokenReport({ data }: { data: AnyRec }) {
           <div key={String(c.key)} className="sr-comp">
             <div className="sr-comp-top">
               <b>{String(c.label || c.key)}</b>
-              <span>{Number(c.score)} / 100</span>
+              <span>{typeof c.score === "number" ? `${c.score} / 100` : "Unknown · not scored"}</span>
             </div>
             <div className="sr-bar">
               <i style={{ width: `${Math.min(100, Number(c.score) || 0)}%` }} />
@@ -175,7 +175,7 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
       <div className="sr-hero">
         <div className={`sr-ring ${verdictClass(verdict)}`}>
           <strong>{typeof score === "number" ? score.toFixed(0) : "—"}</strong>
-          <span>overall</span>
+          <span>observed risk</span>
         </div>
         <div>
           <div className="sr-title-row">
@@ -190,12 +190,14 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
       </div>
 
       {String(data.summary || "") && <p className="sr-summary">{String(data.summary)}</p>}
+      {typeof intelligence.evidenceCoverage === "number" && <p className="sr-summary">Evidence coverage {intelligence.evidenceCoverage}% · assessment confidence {String(data.confidence)}%. Higher score means lower observed risk. Unmeasured components are excluded; incomplete evidence cannot establish safety.</p>}
 
       {sources.length > 0 && <>
         {provider.source === "GeckoTerminal" && <section className="provider-assessment" aria-label="GeckoTerminal market evidence">
           <div className="sr-section">GeckoTerminal · observed market evidence</div>
           <div className="risk-source-grid">
             <div className="risk-source"><span>Provider score · separate from PULSE</span><b>{typeof provider.score === "number" ? `${provider.score.toFixed(1)} / 100` : "Unavailable"}</b></div>
+            <div className="risk-source"><span>Provider metadata verification</span><b>{provider.metadataVerified === true ? "Verified" : provider.metadataVerified === false ? "Not verified" : "Unknown"}</b><small>Metadata verification is not a contract audit.</small></div>
             <div className="risk-source"><span>Market capitalization</span><b>{dollars(tokenEvidence.marketCapUsd)}</b></div>
             <div className="risk-source"><span>Liquidity</span><b>{dollars(tokenEvidence.liquidityUsd)}</b></div>
           </div>
@@ -228,7 +230,7 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
             <div key={String(c.id)} className={`sr-check ${st}`}>
               <div className={`dot ${st}`} />
               <div>
-                <b>{String(c.title)}</b>
+                <b>{String(c.title)}{st === "unknown" ? " · Unknown (not scored)" : ""}</b>
                 <p>{String(c.detail)}</p>
               </div>
             </div>
@@ -278,7 +280,9 @@ export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: stri
   const pair = String(execution.pair || data.instId || "");
   const reportTimeframe = String(execution.timeframe || data.timeframe || "");
   const [executionChoice, setExecutionChoice] = useState<"market" | "limit">(buyPlan.orderType === "limit" ? "limit" : "market");
-  const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, entryPrice: Number(buyPlan.trigger) || undefined, takeProfit: Number(buyPlan.takeProfit) || undefined, stopLoss: Number(buyPlan.stopLoss) || undefined, rationale: String(buyPlan.scenario || recommendation.reason || "Report buy setup"), sourceTier: tier });
+  const recommendedBuy = recommendation.action === "buy" && Number(a.confidence) > 60;
+  const validLevels = Number(buyPlan.trigger) > 0 && Number(buyPlan.stopLoss) > 0 && Number(buyPlan.stopLoss) < Number(buyPlan.trigger) && Number(buyPlan.takeProfit) > Number(buyPlan.trigger);
+  const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, ...(recommendedBuy && validLevels ? { entryPrice: Number(buyPlan.trigger), takeProfit: Number(buyPlan.takeProfit), stopLoss: Number(buyPlan.stopLoss) } : {}), rationale: recommendedBuy ? String(buyPlan.scenario || recommendation.reason || "Report buy setup") : `Manual trade at your own risk. Report: ${bias}, ${String(a.confidence ?? "unknown")}% confidence; recommendation: wait. Configure entry and protection yourself.`, sourceTier: tier });
   return (
     <div className={`sr tiered-report ${premium ? "premium-report" : "base-report"}`}>
       <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PRO" : "QUICK"}</span><strong>{premium ? "Trading intelligence · annotated structure" : "Market intelligence · concise evidence"}</strong></div>
@@ -302,13 +306,13 @@ export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: stri
           <div><span>Take profit</span><strong>{String(buyPlan.takeProfit ?? "—")}</strong><small>{String((wavePaths[0] as AnyRec)?.label || "primary Elliott path")}</small></div>
           <div><span>Stop loss</span><strong>{String(buyPlan.stopLoss ?? "—")}</strong><small>{buyPlan.riskReward != null ? `R:R ${String(buyPlan.riskReward)}` : "report invalidation"}</small></div>
         </div>
-        <div className="execution-copy"><b>How to use it</b><p>PULSE proposes only a new spot buy when the report supports one. Choose how to act below. A bearish or low-confidence report means wait; it never opens a short.</p></div>
+        <div className="execution-copy"><b>How to use it</b><p>{recommendedBuy ? "Review the report levels and a fresh quote before signing." : "The report recommends waiting. You can still open a manual Spot ticket at your own risk; set your own entry and protection."}</p></div>
         {onTrade && <div className="report-execution-launcher">
           <div className="report-execution-choice" role="group" aria-label="Choose how to use this report">
             <button type="button" className={executionChoice === "market" ? "active" : ""} onClick={() => setExecutionChoice("market")}><b>Market buy</b><span>Fresh quote · buy now</span></button>
             <button type="button" className={executionChoice === "limit" ? "active" : ""} onClick={() => setExecutionChoice("limit")}><b>Limit buy</b><span>Wait for report entry</span></button>
           </div>
-          <button className="trade-action buy" type="button" disabled={String(recommendation.action) !== "buy"} onClick={() => onTrade(buyIntent(executionChoice === "limit" ? "limit" : "market"))}><span>{String(recommendation.action) === "buy" ? `Open prefilled ${executionChoice} buy` : "Wait · no valid buy setup"}</span><small>Pair · timeframe · entry · TP · SL stay connected</small></button>
+          <button className="trade-action buy" type="button" onClick={() => onTrade(buyIntent(executionChoice === "limit" ? "limit" : "market"))}><span>{recommendedBuy && validLevels ? `Open prefilled ${executionChoice} buy` : `Open manual ${executionChoice} ticket · my risk`}</span><small>{recommendedBuy && validLevels ? "Review entry, TP and SL in Spot" : "Pair and timeframe carried over · review and sign in Spot"}</small></button>
         </div>}
       </section>}
 

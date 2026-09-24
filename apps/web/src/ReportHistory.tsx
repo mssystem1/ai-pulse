@@ -26,7 +26,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
     const response = await fetch(`${API_BASE}/v1/report-history?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" }, cache: "no-store" });
     if (!response.ok) throw new Error(response.status === 401 ? "Wallet history session expired. Sign again to continue." : `Wallet history failed (${response.status})`);
     const body = await response.json() as { reports?: RemoteReport[] };
-    setRemote((body.reports || []).filter((item) => scope === "spot" ? item.mode === "spot" : item.mode === "prediction"));
+    setRemote((body.reports || []).filter((item) => item.mode === scope));
   }
 
   async function syncWalletHistory() {
@@ -112,7 +112,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
       </article>;
     })}</div> : <div className="report-history-empty">{wallet ? "Sign once to load reports purchased by this wallet on the selected network." : "Connect the wallet that paid for the reports."}</div>}
     {items.length ? <details className="device-recovery"><summary>This-device recovery fallback · {items.length}</summary><p>Saved access on this browser can open recent reports without another wallet signature. Do not share or clear it while a report is being recovered.</p><div className="report-history-list">{items.map((item) => <article key={item.jobId}>
-      <div><strong>{item.label || `${scope === "spot" ? "Global" : "Prediction"} report`}</strong><span>{reportTierLabel(item.tier)} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : item.jobId.slice(0, 8)}</span></div>
+      <div><strong>{item.label || `${scope === "spot" ? "Global" : scope === "risk" ? "Risk Guard" : "Prediction"} report`}</strong><span>{reportTierLabel(item.tier)} · {item.createdAt ? new Date(item.createdAt).toLocaleString() : item.jobId.slice(0, 8)}</span></div>
       <button type="button" disabled={Boolean(busy)} onClick={() => void open(item.jobId, item.recoveryToken)}>{busy === item.jobId ? "Opening…" : "Open"}</button>
       <button type="button" className="forget" disabled={Boolean(busy)} aria-label="Forget this report on this device" onClick={() => { forgetJobRecovery(localStorage, networkKey, scope, item.jobId); rerender((value) => value + 1); }}>Forget</button>
     </article>)}</div></details> : null}

@@ -14,13 +14,14 @@ import { privateKeyToAccount } from "viem/accounts";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
-import { getTicker } from "@pulse/market";
+import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, robinhoodOrderMarket } from "./robinhoodMarkets.js";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
 import { recordV6Activity } from "./v6Store.js";
 import { executionPublicClient, executionRpcUrls, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
+import { validateRobinhoodSwap } from "./robinhoodFunding.js";
 
-type Network = "xlayer" | "base" | "arbitrum";
+type Network = import("./executionContracts.js").ExecutionNetwork;
 type RegisteredOrder = {
   id: string;
   owner: string;
@@ -59,6 +60,18 @@ type RegisteredOrder = {
 const address = /^0x[a-fA-F0-9]{40}$/;
 const hash = /^0x[a-fA-F0-9]{64}$/;
 const networks = {
+  robinhood: {
+    id: 4663,
+    rpc: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
+    rpcFallback: () => process.env.ROBINHOOD_RPC_FALLBACK_URL || "https://rpc.mainnet.chain.robinhood.com",
+    oracle: () => executionContractAddress("robinhood", "oracleRouter"),
+    adapter: () => executionContractAddress("robinhood", "executionAdapter"),
+    router: () => executionContractAddress("robinhood", "okxRouter"),
+    spender: () => executionContractAddress("robinhood", "okxApproval"),
+    ocoFactory: () => executionContractAddress("robinhood", "spotFactory"),
+    limitFactory: () => executionContractAddress("robinhood", "spotLimitFactory"),
+    bracketFactory: () => executionContractAddress("robinhood", "spotBracketFactory"),
+  },
   xlayer: {
     id: 196,
     rpc: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech",
@@ -98,7 +111,7 @@ const networks = {
 } as const;
 const schema = z.object({
   owner: z.string().regex(address),
-  network: z.enum(["xlayer", "base", "arbitrum"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
   account: z.string().regex(address),
   orderId: z.string().regex(/^\d+$/),
   version: z.enum(["oco-v1", "limit-v2", "bracket-v1"]),
@@ -146,7 +159,7 @@ export function normaliseSymbol(value: string) {
  * addresses and displayed execution symbols remain exact. */
 export function normaliseRouteSymbol(value: string) {
   const symbol = normaliseSymbol(value);
-  return symbol === "USDC" || symbol === "USDT" || symbol === "USDT0"
+  return symbol === "USDG" || symbol === "USDC" || symbol === "USDT" || symbol === "USDT0"
     ? "USD_STABLE"
     : symbol;
 }
@@ -374,7 +387,8 @@ async function verifiedExitPrice(
   return humanPrice(closed.amountOut, Number(settlementDecimals), closed.amountIn, Number(assetDecimals));
 }
 
-async function verifyRegistration(input: z.infer<typeof schema>) {
+async function verifyRegistration(input: z.infer<typeof schema>, cfg: AppConfig) {
+  assertExecutionMarketIdentity(input.network, input.instId);
   const { publicClient } = clients(input.network);
   const [receipt, tx] = await Promise.all([
     publicClient.getTransactionReceipt({ hash: input.txHash as `0x${string}` }),
@@ -440,7 +454,12 @@ async function verifyRegistration(input: z.infer<typeof schema>) {
     ? [pairBase, pairQuote]
     : [pairQuote, pairBase];
   const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(networks[input.network].id), name));
-  if (normalizeForChain(sellSymbol, sellName) !== normaliseRouteSymbol(expected[0]) || normalizeForChain(buySymbol, buyName) !== normaliseRouteSymbol(expected[1]))
+  if (input.network === "robinhood" && isRobinhoodMarket(input.instId)) {
+    const market = robinhoodOrderMarket({ address: actualSell, symbol: sellSymbol }, { address: actualBuy, symbol: buySymbol });
+    await verifyRobinhoodMarketBinding(cfg, input.instId, market.target, market.settlement);
+    if (input.version !== "oco-v1" && (String(record[2]).toLowerCase() !== market.target.toLowerCase() || String(record[3]).toLowerCase() !== market.settlement))
+      throw new Error("Robinhood order oracle must price the exact target contract in canonical USDG");
+  } else if (normalizeForChain(sellSymbol, sellName) !== normaliseRouteSymbol(expected[0]) || normalizeForChain(buySymbol, buyName) !== normaliseRouteSymbol(expected[1]))
     throw new Error(`On-chain tokens ${sellSymbol}/${buySymbol} do not match ${input.instId}`);
   const executionPair = input.version === "oco-v1" || triggerAbove
     ? `${sellSymbol}-${buySymbol}`
@@ -501,6 +520,7 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
         const triggerAbove = configuration.version === "limit-v2" ? Boolean(record[9]) : configuration.version === "bracket-v1" ? Boolean(record[12]) : true;
         const baseSymbol = configuration.version === "oco-v1" || triggerAbove ? sellSymbol : buySymbol;
         const quoteSymbol = configuration.version === "oco-v1" || triggerAbove ? buySymbol : sellSymbol;
+        const robinhoodMarket = network === "robinhood" ? robinhoodOrderMarket({ address: sellToken, symbol: sellSymbol }, { address: buyToken, symbol: buySymbol }) : undefined;
         const key = `${network}:${account.toLowerCase()}:${id}`;
         const previous = existing.find((item) => item.id === key);
         const incomingState = Number(record.at(-1));
@@ -513,8 +533,8 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
           account,
           orderId: String(id),
           version: configuration.version,
-          instId: `${reportSymbol(baseSymbol, network)}-${reportSymbol(quoteSymbol, network)}`,
-          executionPair: `${baseSymbol}-${quoteSymbol}`,
+          instId: robinhoodMarket?.pair || `${reportSymbol(baseSymbol, network)}-${reportSymbol(quoteSymbol, network)}`,
+          executionPair: robinhoodMarket?.executionPair || `${baseSymbol}-${quoteSymbol}`,
           sellToken,
           buyToken,
           ...lifecycle,
@@ -555,7 +575,7 @@ async function discoverOwnerOrders(owner: string, network: Network, existing: Re
   return request;
 }
 
-export function createTradeAutomationRouter() {
+export function createTradeAutomationRouter(cfg: AppConfig) {
   const router = Router();
   router.get("/v1/automation/orders", asyncRoute(async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
@@ -587,7 +607,7 @@ export function createTradeAutomationRouter() {
             : await publicClient.readContract({ address: order.account as `0x${string}`, abi: limitAbi, functionName: "orders", args: [BigInt(order.orderId)] });
         const state = Number(record.at(-1));
         const lifecycle = reconcileOrderLifecycle(order.version, state, order);
-        const ticker = await getTicker(order.instId);
+        const ticker = await executionSettlementTicker(cfg, order.instId);
         const currentPrice = ticker.last;
         let entryPrice = order.entryPrice;
         if (order.version === "bracket-v1" && state >= 3 && BigInt(record[5] as bigint) > 0n)
@@ -635,7 +655,7 @@ export function createTradeAutomationRouter() {
     if (!parsed.success)
       return res.status(400).json({ error: parsed.error.flatten() });
     try {
-      const verified = await verifyRegistration(parsed.data);
+      const verified = await verifyRegistration(parsed.data, cfg);
       const items = await list();
       const id = `${parsed.data.network}:${parsed.data.account.toLowerCase()}:${parsed.data.orderId}`;
       const now = new Date().toISOString();
@@ -780,7 +800,7 @@ const bracketAbi = [
   { type: "function", name: "executeExit", stateMutability: "nonpayable", inputs: [{ name: "id", type: "uint256" }, { name: "adapter", type: "address" }, { name: "adapterData", type: "bytes" }, { name: "minOut", type: "uint256" }], outputs: [{ name: "amountOut", type: "uint256" }] },
 ] as const;
 let running = false;
-export async function runTradeAutomationCycle(cfg: AppConfig) {
+export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network: Network; account: string; orderId: string }) {
   if (running) return;
   running = true;
   try {
@@ -788,9 +808,12 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
     if (!/^0x[a-fA-F0-9]{64}$/.test(rawKey || "")) return;
     const items = await list();
     for (const item of items
-      .filter((o) => o.status === "active" || o.status === "paused")
+      .filter((o) => Object.hasOwn(networks, o.network) && (o.status === "active" || o.status === "paused"))
+      .filter((o) => (o.network !== "robinhood" || process.env.FEATURE_ROBINHOOD_TRADING === "1")
+        && (!scope || (o.network === scope.network && o.account.toLowerCase() === scope.account.toLowerCase() && o.orderId === scope.orderId)))
       .slice(0, 100)) {
       try {
+        assertExecutionMarketIdentity(item.network, item.instId);
         const net = networks[item.network];
         const oracle = net.oracle();
         const adapter = net.adapter();
@@ -838,7 +861,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
           item.updatedAt = new Date().toISOString();
         }
         item.lastError = undefined;
-        const ticker = await getTicker(item.instId);
+        const ticker = await executionSettlementTicker(cfg, item.instId);
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const triggered =
           item.version === "oco-v1"
@@ -871,6 +894,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig) {
           userWalletAddress: adapter!,
           slippagePercent: "0.5",
         });
+        if (item.network === "robinhood") validateRobinhoodSwap(prepared, { from: swapFrom, to: swapTo, amount: String(amount), receiver: adapter!, slippageBps: 50 });
         if (
           prepared.tx.to.toLowerCase() !== approvedRouter!.toLowerCase() ||
           BigInt(prepared.tx.value) !== 0n

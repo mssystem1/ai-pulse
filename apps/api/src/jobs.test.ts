@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { randomBytes } from "node:crypto";
+import { canonicalJson, parseStoredReport } from "./jobs.js";
 import { MemoryJobStore, MemoryReportStore, VercelBlobReportStore, createPersistence, decodedJob, serializedJob, decryptReport, encryptReport, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type PaymentReceipt, type ReportStoreDependencies } from "./jobs.js";
 
 const receipt = (id = "receipt-1"): PaymentReceipt => ({
@@ -14,6 +15,14 @@ const receipt = (id = "receipt-1"): PaymentReceipt => ({
 });
 
 describe("paid jobs and private reports", () => {
+  it("serializes optional provider fields as valid JSON and reads legacy undefined values without modifying strings", () => {
+    const source = { symbol: "USDG", twitterHandle: undefined, nested: { unknown: undefined }, items: [undefined, 1] };
+    assert.deepEqual(JSON.parse(canonicalJson(source)), { symbol: "USDG", nested: {}, items: [null, 1] });
+    assert.equal(canonicalJson({ b: 2, a: 1 }), '{"a":1,"b":2}');
+    assert.deepEqual(parseStoredReport('{"twitterHandle":undefined,"description":"undefined is missing","nested":{"x":undefined}}'),
+      { twitterHandle: null, description: "undefined is missing", nested: { x: null } });
+    assert.throws(() => parseStoredReport('{"broken":}'));
+  });
   it("preserves empty arrays through Redis cjson rewrites and hides the storage snapshot", async () => {
     const input = { primaryMarketId: "pm:fixture", additionalMarketIds: [], nested: { outcomes: [], scalar: 0.1234567890123456 }, lang: "en" };
     const { job } = await new MemoryJobStore().acquire({ idempotencyKey: "arrays", requestHash: requestHash(input), resourceUrl: "/prediction", network: "eip155:42161", mode: "prediction", tier: "standard", payer: "owner", input, maxRegenerationAttempts: 2 });

@@ -90,6 +90,7 @@ export function createX402Middleware(cfg: AppConfig): RequestHandler {
     };
     const publicPath = req.originalUrl.split("?")[0] || path;
     const challenge = buildChallenge(effectiveCfg, publicPath, route.priceUsd, route.description, path);
+    if (networkKey === "robinhood") challenge.accepts[0].extra = { name: "Global Dollar", version: "1" };
     const encoded = Buffer.from(JSON.stringify(challenge), "utf8").toString("base64");
     res.setHeader("PAYMENT-REQUIRED", encoded);
     res.setHeader("Content-Type", "application/json");
@@ -134,7 +135,7 @@ function normalizePath(path: string): string {
 /**
  * Official OKX x402 middleware when paymentMode=okx, else mock gate.
  */
-export function createPaymentGate(cfg: AppConfig): RequestHandler {
+export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler } = {}): RequestHandler {
   const mock = createX402Middleware(cfg);
   const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_SELLER_ADDRESS
     ? createCircleGatewayPaymentMiddleware(cfg) : null;
@@ -146,7 +147,14 @@ export function createPaymentGate(cfg: AppConfig): RequestHandler {
   })() : mock;
   return (req, res, next) => {
     const networkKey = (req as Request & { pulseNetworkKey?: string }).pulseNetworkKey || "xlayer";
-    if (cfg.X402_MOCK || cfg.paymentMode === "mock") return mock(req, res, next);
+    if (cfg.X402_MOCK) return mock(req, res, next);
+    if (networkKey === "robinhood") {
+      const route = cfg.routes[`${req.method.toUpperCase()} ${normalizePath(req.path)}`];
+      if (!route || route.free || route.priceUsd <= 0) return next();
+      if (cfg.FEATURE_ROBINHOOD_PAYMENTS && adapters.robinhood) return adapters.robinhood(req, res, next);
+      return res.status(503).json({ error: "Robinhood USDG settlement is awaiting readiness verification; no payment requested", code: "robinhood_payments_unavailable" });
+    }
+    if (cfg.paymentMode === "mock") return mock(req, res, next);
     if (networkKey === "arc-testnet") {
       if (!circle) return res.status(503).json({ error: "Circle Gateway payment adapter is disabled" });
       return circle(req, res, next);
@@ -164,6 +172,11 @@ export { createOkxPaymentMiddleware } from "./okxMiddleware.js";
 export { createCircleGatewayPaymentMiddleware } from "./circleMiddleware.js";
 export { createCdpPaymentMiddleware } from "./cdpMiddleware.js";
 export { createCdpJwt } from "./cdpAuth.js";
+export { settleRobinhoodPayment, type RobinhoodAttempt, type RobinhoodJournal, type RobinhoodObserver } from "./robinhoodSettlement.js";
+export { robinhoodPaymentObserver } from "./robinhoodReceipt.js";
+export { createRobinhoodSelfHostedFacilitator } from "./robinhoodSelfHosted.js";
+export { createRobinhoodPaymentMiddleware } from "./robinhoodMiddleware.js";
+export { createRobinhoodGasSigner, type RobinhoodGasJournal, type RobinhoodGasSubmission } from "./robinhoodGasSigner.js";
 export { inlineSettlement, validateSignedPayment, type PulseSettlement, type SettlementRequest } from "./inlineSettlement.js";
 export {
   buildX402InputRequired,

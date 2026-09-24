@@ -1,0 +1,54 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "inputUSDG": "0.1",
+  "entries": [
+    {
+      "step": "buy-approve",
+      "to": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "nonce": 20,
+      "hash": "0x9b559c48bb3a956156f9771ab90f4b6ed0e14d22596fc3891d50eb983d400365",
+      "status": "success",
+      "maxGasETH": "0.000004486727028",
+      "gasETH": "0.000002948164968"
+    },
+    {
+      "inputToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "outputToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "inputAmount": "100000",
+      "minimumOutput": "37086522176182",
+      "step": "buy",
+      "to": "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919",
+      "nonce": 21,
+      "hash": "0xbcc766517177e552ef1555419171813942a847e28a389f08476c9e6166a4609a",
+      "status": "success",
+      "maxGasETH": "0.0000223064998848",
+      "gasETH": "0.000012025892318",
+      "outputAmount": "37267892037897"
+    },
+    {
+      "step": "sell-approve",
+      "to": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "nonce": 22,
+      "hash": "0x172623f643e06a97922bd26c4cbc76706e304e0d05f0d1e7dfa3a4d2c9f7d3f9",
+      "status": "success",
+      "maxGasETH": "0.00000416724",
+      "gasETH": "0.000002740941508"
+    },
+    {
+      "inputToken": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "outputToken": "0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168",
+      "inputAmount": "37267892037897",
+      "minimumOutput": "99411",
+      "step": "sell",
+      "to": "0x6e2a35a7ad683cf634d91492d73bb7ff774c6919",
+      "nonce": 23,
+      "hash": "0xbf05585103ee36f47cb858fc5debccd36c6d4db787d5fc0490caa7033cb8462c",
+      "status": "success",
+      "maxGasETH": "0.0000209254857696",
+      "gasETH": "0.00001092032939",
+      "outputAmount": "99910"
+    }
+  ],
+  "completed": true
+}

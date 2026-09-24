@@ -6,6 +6,16 @@ const input = { owner: "0xowner", network: "base" as const, vault: "0xvault", da
 const start = Date.parse("2026-09-08T18:00:00Z");
 const hour = 3_600_000;
 
+test("a Robinhood settled payment extends its pass exactly once across later purchases", () => {
+  const purchase = { ...input, network: "robinhood" as const, paymentId: "4663:transaction-one", paused: true };
+  const first = extendAutopilotPass(null, purchase, start);
+  assert.deepEqual(extendAutopilotPass(first, purchase, start + hour), first);
+  const second = extendAutopilotPass(first, { ...purchase, paymentId: "4663:transaction-two" }, start + hour);
+  assert.equal(autopilotPassRemainingMs(second, start + hour), 48 * hour);
+  assert.deepEqual(extendAutopilotPass(second, purchase, start + 2 * hour), second);
+  assert.equal(second.creditedPaymentIds?.length, 2);
+});
+
 test("cached AI confirmation is consumed once; new signals still enforce the limit", () => {
   let pass = extendAutopilotPass(null, input, start);
   pass = consumePassSignal(pass, input.owner, "signal-a", start + hour).pass!;

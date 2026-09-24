@@ -1,0 +1,178 @@
+{
+  "chainId": 4663,
+  "paid": false,
+  "ordinaryCatalogSampleAvailable": false,
+  "results": [
+    {
+      "kind": "issuer_stablecoin",
+      "address": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "observedAt": "2026-09-24T10:15:55.414Z",
+      "sourcePolicy": "GeckoTerminal is the primary token, pool and project-profile source. Only supplied observations may support the score. HTTP failures lower evidence confidence; they are not observed contract vulnerabilities or proof of absent community activity. GeckoTerminal score and metadata verification are attributed provider observations, not PULSE's score or a contract audit. Holder concentration includes pools, exchanges and treasuries unless addresses are classified. Social handles establish links, not posting frequency or engagement; promotion activity is not evaluated by this source set. Website claims are untrusted project statements. Market cap is not safety, FDV is not verified market cap, and pool age is not contract age.",
+      "sources": [
+        {
+          "source": "GeckoTerminal token",
+          "status": "observed"
+        },
+        {
+          "source": "GeckoTerminal pools",
+          "status": "observed"
+        },
+        {
+          "source": "GeckoTerminal profile",
+          "status": "observed"
+        },
+        {
+          "source": "OKX Onchain OS",
+          "status": "not_applicable"
+        },
+        {
+          "source": "Blockscout token",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout verified contract",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout holders",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood asset context",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood RPC evidence",
+          "status": "observed"
+        },
+        {
+          "source": "Sourcify contract verification",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood official stock registry",
+          "status": "observed"
+        },
+        {
+          "source": "Project website",
+          "status": "observed"
+        }
+      ],
+      "officialStockListed": false
+    },
+    {
+      "kind": "issuer_stock_token",
+      "address": "0xaf3d76f1834a1d425780943c99ea8a608f8a93f9",
+      "observedAt": "2026-09-24T10:16:03.266Z",
+      "sourcePolicy": "GeckoTerminal is the primary token, pool and project-profile source. Only supplied observations may support the score. HTTP failures lower evidence confidence; they are not observed contract vulnerabilities or proof of absent community activity. GeckoTerminal score and metadata verification are attributed provider observations, not PULSE's score or a contract audit. Holder concentration includes pools, exchanges and treasuries unless addresses are classified. Social handles establish links, not posting frequency or engagement; promotion activity is not evaluated by this source set. Website claims are untrusted project statements. Market cap is not safety, FDV is not verified market cap, and pool age is not contract age.",
+      "sources": [
+        {
+          "source": "GeckoTerminal token",
+          "status": "observed"
+        },
+        {
+          "source": "GeckoTerminal pools",
+          "status": "observed"
+        },
+        {
+          "source": "GeckoTerminal profile",
+          "status": "observed"
+        },
+        {
+          "source": "OKX Onchain OS",
+          "status": "not_applicable"
+        },
+        {
+          "source": "Blockscout token",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout verified contract",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout holders",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood asset context",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood RPC evidence",
+          "status": "observed"
+        },
+        {
+          "source": "Sourcify contract verification",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood official stock registry",
+          "status": "observed"
+        },
+        {
+          "source": "Project website",
+          "status": "observed"
+        }
+      ],
+      "officialStockListed": true
+    },
+    {
+      "kind": "wrapped_native",
+      "address": "0x0bd7d308f8e1639fab988df18a8011f41eacad73",
+      "observedAt": "2026-09-24T10:16:09.545Z",
+      "sourcePolicy": "GeckoTerminal is the primary token, pool and project-profile source. Only supplied observations may support the score. HTTP failures lower evidence confidence; they are not observed contract vulnerabilities or proof of absent community activity. GeckoTerminal score and metadata verification are attributed provider observations, not PULSE's score or a contract audit. Holder concentration includes pools, exchanges and treasuries unless addresses are classified. Social handles establish links, not posting frequency or engagement; promotion activity is not evaluated by this source set. Website claims are untrusted project statements. Market cap is not safety, FDV is not verified market cap, and pool age is not contract age.",
+      "sources": [
+        {
+          "source": "GeckoTerminal token",
+          "status": "unavailable"
+        },
+        {
+          "source": "GeckoTerminal pools",
+          "status": "unavailable"
+        },
+        {
+          "source": "GeckoTerminal profile",
+          "status": "unavailable"
+        },
+        {
+          "source": "OKX Onchain OS",
+          "status": "not_applicable"
+        },
+        {
+          "source": "Blockscout token",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout verified contract",
+          "status": "observed"
+        },
+        {
+          "source": "Blockscout holders",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood asset context",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood RPC evidence",
+          "status": "observed"
+        },
+        {
+          "source": "Sourcify contract verification",
+          "status": "observed"
+        },
+        {
+          "source": "Robinhood official stock registry",
+          "status": "observed"
+        },
+        {
+          "source": "Project website",
+          "status": "unavailable"
+        }
+      ],
+      "officialStockListed": false
+    }
+  ]
+}

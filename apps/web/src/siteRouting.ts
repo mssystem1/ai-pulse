@@ -1,3 +1,5 @@
+import { isAppearance } from "./appearancePreference";
+
 /** Public pages never receive wallet state or report recovery capabilities. */
 export function siteSurface(href: string, landingEnabled = false): "landing" | "app" | "shared" {
   const url = new URL(href);
@@ -17,6 +19,6 @@ export function applicationLink(href: string, path: string, theme: string, confi
   const url = new URL(path, origin);
   if (!/^\/(portfolio|global|prediction|safety|spot|autopilot|docs|telegram)$/.test(path)) throw new Error("Unsupported application destination");
   if (!["https:", ...(preview ? ["http:"] : [])].includes(url.protocol) || url.username || url.password) throw new Error("Invalid application origin");
-  if (["xlayer", "base", "arbitrum", "arc-testnet"].includes(theme)) url.searchParams.set("pulseTheme", theme);
+  if (isAppearance(theme)) url.searchParams.set("pulseTheme", theme);
   return url.href;
 }

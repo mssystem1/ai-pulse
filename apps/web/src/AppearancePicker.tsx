@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { WebNetworkKey } from "./networks";
+import type { AppearanceId } from "./appearancePreference";
 import "./appearance.css";
 
 export const APPEARANCES = [
@@ -7,9 +7,10 @@ export const APPEARANCES = [
   { id: "base", name: "Clarity", zh: "清晰", detail: "Light · electric blue", detailZh: "明亮白 · 电光蓝", color: "#0052ff" },
   { id: "arbitrum", name: "Midnight", zh: "午夜", detail: "Navy · ice blue", detailZh: "深海蓝 · 冰蓝", color: "#28a0f0" },
   { id: "arc-testnet", name: "Horizon", zh: "地平线", detail: "Ocean · warm sand", detailZh: "海洋蓝 · 暖沙色", color: "#d4c598" },
+  { id: "robinhood", name: "Robinhood", zh: "Robinhood", detail: "Ink black · electric lime", detailZh: "墨黑 · 电光青柠", color: "#ccff00" },
 ] as const;
 
-export function AppearancePicker({ value, onChange, lang }: { value: WebNetworkKey; onChange: (value: WebNetworkKey) => void; lang: string }) {
+export function AppearancePicker({ value, onChange, lang }: { value: AppearanceId; onChange: (value: AppearanceId) => void; lang: string }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);

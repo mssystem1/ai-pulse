@@ -1,0 +1,13 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "hash": "0x7beefb8303bfd92a08369e69487481e9a60490f6601ec40f6c54353583b925ea",
+  "nonce": 19,
+  "inputETH": "0.00004",
+  "minimumUSDG": "0.106737",
+  "minimumAtomic": "106737",
+  "status": "success",
+  "createdAt": "2026-09-23T15:16:39.637Z",
+  "gasETH": "0.00001210126976",
+  "receivedUSDG": "0.107274"
+}

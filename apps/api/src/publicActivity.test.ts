@@ -14,9 +14,11 @@ test("public analysis totals combine chains including Arc, with separate service
     for (const service of ["global", "prediction", "risk"] as const) await store.record(researchDelivery(receipt(key), service, "2026-09-12T10:00:00.000Z"));
   }
   const stats = await store.snapshot();
-  assert.equal(stats.research.global?.count, 4);
-  assert.equal(stats.research.prediction?.count, 4);
-  assert.equal(stats.research.risk?.count, 4);
+  const supportedChains = Object.keys(NETWORK_REGISTRY).length;
+  assert.equal(stats.research.global?.count, supportedChains);
+  assert.equal(stats.research.prediction?.count, supportedChains);
+  assert.equal(stats.research.risk?.count, supportedChains);
+  assert.equal(stats.networks.find(chain => chain.chain === "eip155:4663")?.research.risk?.count, 1);
   assert.equal(stats.networks.find(chain => chain.environment === "testnet")?.research.risk?.count, 1);
   assert.equal(stats.execution.spot, null);
   assert.equal(stats.historicalCoverageComplete, false);

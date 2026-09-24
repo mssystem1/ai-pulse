@@ -32,8 +32,8 @@ export function researchDelivery(receipt: PaymentReceipt | null, service: Resear
 }
 
 export function jobResearchDelivery(job: AnalysisJob): ResearchDelivery | null {
-  if (!job.reportId || !["completed", "completed_partial"].includes(job.stage) || !["spot", "prediction"].includes(job.mode)) return null;
-  return researchDelivery(job.receipt, job.mode === "spot" ? "global" : "prediction", job.receipt?.completedAt || job.updatedAt, job.stage === "completed_partial");
+  if (!job.reportId || !["completed", "completed_partial"].includes(job.stage) || !["spot", "prediction", "risk"].includes(job.mode)) return null;
+  return researchDelivery(job.receipt, job.mode === "spot" ? "global" : job.mode === "risk" ? "risk" : "prediction", job.receipt?.completedAt || job.updatedAt, job.stage === "completed_partial");
 }
 
 // One atomic dedupe + update. No expiry: job/report retention must not erase totals.

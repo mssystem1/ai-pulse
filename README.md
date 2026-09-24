@@ -29,7 +29,7 @@ PULSE is an independent intelligence product. Polymarket is a public read-only e
 
 ### Public website and application
 
-The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support four independent appearances: Pulse, Clarity, Midnight and Horizon.
+The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support five independent appearances: Pulse, Clarity, Midnight, Horizon and optional Robinhood. Appearance never changes the selected network or overwrites an existing saved choice.
 
 Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
 
@@ -130,6 +130,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 - Base and Arbitrum prepare native ETH → native USDC inside PULSE; Arbitrum explicitly rejects USDC.e as the payment asset.
 - Arc Testnet exposes faucet guidance, test-USDC balance, Circle Gateway balance, and Gateway deposit.
 - Arc displays wallet USDC and Circle Gateway USDC in separate tabs so onchain funds are not confused with spendable Gateway funds.
+- When Robinhood is enabled, its funding drawer prepares ETH → canonical USDG through OKX DEX. PULSE validates the deployed router's calldata, recipient, minimum received and expiry, checks gas reserves and simulates before the connected wallet signs. Funding never requires the facilitator key or an ERC-20 approval.
 - Before browser signing, PULSE switches to the selected chain and refreshes the exact payment-asset balance.
 
 ## Product surfaces
@@ -154,6 +155,9 @@ The web entry point publishes canonical, Open Graph, X card, robots, sitemap, we
 | Base (`eip155:8453`) | `/base` | Native USDC | CDP x402 | Native ETH to native USDC swap |
 | Arbitrum One (`eip155:42161`) | `/arbitrum` | Native USDC | CDP x402 | Native ETH to native USDC swap; USDC.e is not accepted |
 | Arc Testnet (`eip155:5042002`) | `/arc` | Test USDC | Circle Gateway | Faucet guidance and in-app Gateway deposit |
+| Robinhood mainnet (`eip155:4663`, opt-in) | `/robinhood` | USDG | PULSE self-hosted x402 SDK facilitator | ETH to USDG; confirmed mainnet funding swap |
+
+Robinhood is staged, not yet full-product production support. Seven contracts are deployed and source-verified. Mainnet qualification covers five paid research services with recoverable reports, ETH-to-USDG funding, wallet Spot and contract Limit roundtrips, Autopilot registration/funding, a paid 24-hour Entry Pass with replay protection, and a scoped worker Hold cycle with pause-timer and withdrawal checks. That Hold did not call AI or place an autonomous trade; live AI-approved entry and production scheduling are not proven by it. Automation and the qualification strategy remain paused for release review. The normal facilitator runtime requires a dedicated gas signer separate from admin and buyer wallets. See the [integration plan](docs/ROBINHOOD_MAINNET_PLAN.md) and [payment qualification evidence and operator guide](docs/ROBINHOOD_SELF_HOSTED_FACILITATOR.md).
 
 The shared unprefixed routes retain X Layer compatibility. Network aliases isolate chain IDs, assets, receipts, discovery metadata, and idempotency records while reusing the same business handlers.
 

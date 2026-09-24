@@ -17,18 +17,19 @@ import {
 import { t, type Lang } from "./i18n";
 import { useDocumentLocale } from "./uiLocale";
 import { formatMarketPrice } from "./format";
-import { loadMarketPreview, MarketChartPreview } from "./SpotMarketPreview";
+import { loadMarketPreview, ShortlistMarketChart } from "./SpotMarketPreview";
 import { AnalysisReport, ContractEvidenceReport, SafetyPreflightReport, SafetyTokenReport, type ReportTradeIntent } from "./Report";
 import { MarketPairPicker, NetworkTokenPicker, TimeframePicker } from "./Pickers";
 import { SwapPanel } from "./SwapPanel";
 import { PredictionWorkspace } from "./PredictionWorkspace";
 import { AppearancePicker } from "./AppearancePicker";
-import { applyAppearance, readAppearance } from "./appearancePreference";
+import { applyAppearance, readAppearance, type AppearanceId } from "./appearancePreference";
 import { AutopilotWorkspace, DocsWorkspace, OpportunityRadar, SpotWorkspace, TelegramWorkspace } from "./V6Workspaces";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { Tip } from "./Tip";
 import { NetworkLogo } from "./NetworkLogo";
 import { ReportHistory } from "./ReportHistory";
+import { ASSESSMENT_EVENT, rememberOpportunityAssessment } from "./opportunityAssessment";
 import { storeScopedReport, type ReportSlots } from "./reportScope";
 import { useExecutionAvailability } from "./executionAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
@@ -83,7 +84,7 @@ export function App() {
   const [neededUsdt, setNeededUsdt] = useState<number | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const [networkMenuOpen, setNetworkMenuOpen] = useState(false);
-  const [appearance, setAppearance] = useState<WebNetworkKey>(() => {
+  const [appearance, setAppearance] = useState<AppearanceId>(() => {
     try { return readAppearance(localStorage); } catch { return readAppearance(); }
   });
   const networkPopoverRef = useRef<HTMLDivElement>(null);
@@ -155,6 +156,15 @@ export function App() {
   useEffect(() => { setTicker(null); setCandles([]); }, [teaserScope]);
   const [reportSlots, setReportSlots] = useState<ReportSlots>({ global: null, risk: null });
   const result = tab === "safety" ? reportSlots.risk : reportSlots.global;
+  const assessmentNetworkRef = useRef(networkKey);
+  useEffect(() => {
+    if (assessmentNetworkRef.current !== networkKey) { assessmentNetworkRef.current = networkKey; return; }
+    if (!reportSlots.global) return;
+    try {
+      rememberOpportunityAssessment(localStorage, networkKey, reportSlots.global);
+      window.dispatchEvent(new Event(ASSESSMENT_EVENT));
+    } catch { /* Local shortlist context is optional. */ }
+  }, [reportSlots.global, networkKey]);
   const setResult = useCallback((report: Record<string, unknown> | null) => {
     setReportSlots(slots => storeScopedReport(slots, report, tab === "safety" ? "risk" : "global"));
   }, [tab]);
@@ -506,7 +516,13 @@ export function App() {
     setLoading(false);
     setBusyAction(null);
     navigateTo("analyze");
-    window.requestAnimationFrame(() => window.scrollTo({ top: 430, behavior: "smooth" }));
+    window.requestAnimationFrame(() => {
+      const discovery = document.querySelector<HTMLDetailsElement>(".workspace-discovery");
+      if (discovery) discovery.open = false;
+      const controls = document.getElementById("global-report-controls");
+      controls?.focus({ preventScroll: true });
+      controls?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }
 
   async function paidPost(path: string, body: unknown, action: string) {
@@ -524,7 +540,7 @@ export function App() {
     setNeedUsdt(false);
     setNeededUsdt(null);
     try {
-      const canonicalPath = path.replace(/^\/(xlayer|base|arbitrum|arc)(?=\/)/, "");
+      const canonicalPath = path.replace(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/, "");
       const required = routePrices[canonicalPath];
       if (!Number.isFinite(required)) throw new Error("This service has no published price and cannot be purchased.");
       // Always refresh balances right before pay
@@ -562,6 +578,9 @@ export function App() {
         );
       }
       if (res.status === 202) {
+        if (action === "token" || action === "preflight") {
+          throw new Error("This paid Risk Guard report is already processing. Open Paid report history → Sync with wallet to recover it. Do not purchase it again.");
+        }
         const accepted = data as { job?: { id?: string; stage?: string }; recoveryToken?: string };
         if (!accepted.job?.id || !accepted.recoveryToken) throw new Error("Paid job response is missing its recovery capability");
         const request = body as { instId?: string; timeframe?: string };
@@ -573,6 +592,9 @@ export function App() {
         setPaidMeta(`paid by ${shortAddr(wallet)} via x402`);
         await refreshBalances(wallet);
         return;
+      }
+      if (data?.history?.jobId && data?.history?.recoveryToken && (action === "token" || action === "preflight")) {
+        try { saveJobRecovery(localStorage, networkKey, { ...data.history, createdAt: data.generatedAt || new Date().toISOString(), label: `Risk Guard · ${tokenAddr}` }, "risk"); } catch { /* Wallet history remains available if browser storage is full. */ }
       }
       if (!isLatestRequest(reportRequestRef, requestId)) return;
       setResult(data as Record<string, unknown>);
@@ -818,7 +840,9 @@ export function App() {
         <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{d.symbol} <Tip text={d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><button type="button" className="btn btn-soft" disabled={marketLoading} onClick={() => void loadTeaser()}>{marketLoading ? d.loading : d.loadFree}</button></div>
         <p className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; Spot needs a mapped pair, a live route and wallet approval.</p>
         <div className="chart-head"><span>{instId}</span><span className="muted">{timeframe} · OKX · Free market preview</span></div>
-        {candles.length > 0 ? <MarketChartPreview candles={candles} pair={instId} timeframe={timeframe} lang={lang}/> : <div className="chart-empty" role="status">{marketError ? (lang === "zh" ? "市场数据暂不可用，请重试。" : "Market data temporarily unavailable. Retry the free preview.") : d.loading}</div>}
+        <details className="global-market-reference"><summary>{lang === "zh" ? "行情参考与图表" : "Market reference & chart"}<span>{ticker ? ` · ${formatMarketPrice(ticker.last, lang)}` : ""}</span></summary>
+        {candles.length > 0 ? <ShortlistMarketChart pair={instId} timeframe={timeframe} mark={Number(ticker?.last || candles.at(-1)?.close)} history={candles.map(candle => candle.close)} fetchedAt={new Date(candles.at(-1)!.ts).toISOString()} lang={lang}/> : <p role="status">{marketError ? (lang === "zh" ? "市场数据暂不可用，请重试。" : "Market data temporarily unavailable. Retry the free preview.") : d.loading}</p>}
+        </details>
         {marketError && candles.length > 0 && <p role="status">{lang === "zh" ? "更新失败，显示上次行情。" : "Refresh failed; showing the last market snapshot."}</p>}
         <p className="hint">{d.nfa}</p>
       </section>}
@@ -829,7 +853,7 @@ export function App() {
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace lang={lang} />
         : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>
-        <div className="card">
+        <div className="card" id={tab === "analyze" ? "global-report-controls" : undefined} tabIndex={-1}>
           {tab === "analyze" ? (
             <>
               <div className="field">
@@ -978,6 +1002,7 @@ export function App() {
               <pre className="raw">{JSON.stringify(result, null, 2)}</pre>
             )}
 
+          {tab === "safety" && <ReportHistory networkKey={networkKey} scope="risk" wallet={wallet} onOpen={(report) => { if (typeof report.address === "string") setTokenAddr(report.address); setResult(report); }} />}
           {result && (
             <details className="raw-details">
               <summary>Raw JSON</summary>

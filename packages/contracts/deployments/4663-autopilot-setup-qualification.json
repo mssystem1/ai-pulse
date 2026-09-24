@@ -1,0 +1,38 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "allow-WETH",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 34,
+      "hash": "0xe5351d910b0832542d015836c780f9fccf7cadb06dd12a04a8fd5cb4348672cd",
+      "status": "success",
+      "maxGasETH": "0.0000073519575408",
+      "gasETH": "0.0000048145338"
+    },
+    {
+      "step": "configure-limits",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 35,
+      "hash": "0xe95cb64dde00e3d235a55a62692a3111b8df686a86fa519bbea69e013d8e207a",
+      "status": "success",
+      "maxGasETH": "0.0000054265370544",
+      "gasETH": "0.00000357350664"
+    },
+    {
+      "step": "fund-vault",
+      "to": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "nonce": 36,
+      "hash": "0xadd4e2338517cd5e4efd645052d20b8411650e43967bfea9b23b10699e44bf51",
+      "status": "success",
+      "maxGasETH": "0.000004665081888",
+      "gasETH": "0.000003070502484"
+    }
+  ],
+  "data": {
+    "registered": true,
+    "strategyId": "robinhood:0x63df1de362a58a439f92ff2b52ddaa1399907b2a",
+    "vault": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a"
+  }
+}

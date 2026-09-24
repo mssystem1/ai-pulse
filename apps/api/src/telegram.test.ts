@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { inspectTelegramConfiguration, telegramMenu, telegramReportUrl } from "./telegram.js";
 import { createTelegramRouter } from "./telegram.js";
 import express from "express";
+import { createHmac } from "node:crypto";
+import { deliverTelegramReportDurably, runTelegramDeliveryCycle } from "./telegram.js";
 import type { AppConfig } from "@pulse/config";
 
 test("Telegram buttons open canonical destinations, not a stale configured tab", () => {
@@ -15,7 +17,7 @@ test("Telegram buttons open canonical destinations, not a stale configured tab",
   assert.equal(url.searchParams.get("tg"), "test-capability");
   assert.equal(url.searchParams.has("job"), false);
   assert.equal(url.searchParams.has("service"), false);
-  assert.deepEqual(new Set(menu.inline_keyboard.map(row => new URL(row[0].web_app.url).pathname)), new Set(["/overview", "/global", "/prediction", "/spot", "/autopilot"]));
+  assert.deepEqual(new Set(menu.inline_keyboard.map(row => new URL(row[0].web_app.url).pathname)), new Set(["/overview", "/global", "/prediction", "/safety", "/spot", "/autopilot"]));
 });
 
 test("Telegram report delivery opens the readable frontend with a fragment capability", () => {
@@ -45,6 +47,28 @@ test("Telegram configuration requires an absolute HTTPS Mini App URL", () => {
   };
   assert.equal(inspectTelegramConfiguration({ ...base, TELEGRAM_MINI_APP_URL: "http://ai-pulse.tech" }).miniAppUrlError, "TELEGRAM_MINI_APP_URL must use HTTPS");
   assert.equal(inspectTelegramConfiguration({ ...base, TELEGRAM_MINI_APP_URL: "https://www.ai-pulse.tech" }).complete, true);
+});
+
+test("report delivery retries a failed send and suppresses an already confirmed duplicate", async () => {
+  const saved = { token:process.env.TELEGRAM_BOT_TOKEN, secret:process.env.TELEGRAM_WEBHOOK_SECRET };
+  process.env.TELEGRAM_BOT_TOKEN="fixture-token";process.env.TELEGRAM_WEBHOOK_SECRET="fixture-secret";
+  const originalFetch=globalThis.fetch, originalNow=Date.now;
+  let now=originalNow(), calls=0;
+  Date.now=()=>now;
+  const payload=`123.${now+86400000}`;
+  const capability=`${payload}.${createHmac("sha256","fixture-secret").update(payload).digest("base64url")}`;
+  globalThis.fetch=async()=>{calls++;return Response.json(calls===1?{ok:false,description:"Temporary failure"}:{ok:true});};
+  try {
+    const result=await deliverTelegramReportDurably("fixture-report-delivery",capability,"Complete report ready","https://pulse.test/shared-report#share=fixture");
+    assert.equal(result.queued,true);
+    now+=61000;await runTelegramDeliveryCycle();assert.equal(calls,2);
+    await deliverTelegramReportDurably("fixture-report-delivery",capability,"Complete report ready","https://pulse.test/shared-report#share=fixture");
+    assert.equal(calls,2);
+  } finally {
+    globalThis.fetch=originalFetch;Date.now=originalNow;
+    if(saved.token===undefined)delete process.env.TELEGRAM_BOT_TOKEN;else process.env.TELEGRAM_BOT_TOKEN=saved.token;
+    if(saved.secret===undefined)delete process.env.TELEGRAM_WEBHOOK_SECRET;else process.env.TELEGRAM_WEBHOOK_SECRET=saved.secret;
+  }
 });
 
 test("webhook ignores groups, verifies its secret, acknowledges callbacks and deduplicates private updates", async () => {
