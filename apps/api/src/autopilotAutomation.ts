@@ -20,7 +20,8 @@ import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } fro
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
 import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
-import { listV6Activity, recordV6Activity } from "./v6Store.js";
+import { listV6Activity, recordV6Activity, reconcileV6Activity } from "./v6Store.js";
+import { autopilotExecutionFailure, pendingAutopilotTrade, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
 import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient, executionRpcUrls } from "./onchainDiscovery.js";
@@ -974,6 +975,8 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
       if (!lease) continue;
       let analysisAttempted = false;
       let aiAttemptedThisCycle = false;
+      let executionPhase: AutopilotExecutionPhase = "not_submitted";
+      let executionHash: `0x${string}` | undefined;
       let evaluatedDecision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
       try {
         assertExecutionMarketIdentity(s.network, s.pair);
@@ -1053,6 +1056,23 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         }
         const strategyType = s.strategyType || identifyAutopilotStrategy(s.policy.strategy);
         s.strategyType = strategyType;
+        if (pendingAutopilotTrade(await listV6Activity(s.owner, s.network), s)) {
+          const pending = pendingAutopilotTrade(await reconcileV6Activity(s.owner, s.network, c.rpc()), s);
+          if (pending) {
+            s.lastDecision = "hold_receipt_pending";
+            s.lastError = undefined;
+            await appendEvaluation(s, { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(), strategyType,
+              action: "hold", status: "held", reason: "A previously submitted vault trade is awaiting receipt reconciliation. No additional trade was submitted.",
+              bias: "unknown", confidence: 0, metrics: {}, rules: [], txHash: pending.txHash });
+            continue;
+          }
+          // Receipt reconciliation may have changed balances and the action
+          // nonce after readRuntime(). Start fresh instead of buying AI analysis
+          // or attempting execution from the stale pre-reconciliation snapshot.
+          s.lastDecision = "hold_receipt_reconciled";
+          s.lastError = undefined;
+          continue;
+        }
         const positionTicker = targetBalance > 0n ? await executionSettlementTicker(cfg, s.pair) : undefined;
         const policyBalance = valuedPositionBalance(targetBalance, positionTicker ? parseUnits(positionTicker.last.toFixed(18), 18) : 0n, Number(targetDecimals), Number(settlementDecimals));
         if (policyBalance === 0n && s.lastTxHash && s.lastDecision !== "sell_filled") {
@@ -1489,13 +1509,22 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           ],
           account: walletClient.account,
         });
+        executionPhase = "submitted";
         const txHash = await walletClient.writeContract(simulation.request);
+        executionHash = txHash;
+        s.lastTxHash = txHash;
+        const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;
+        await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
+          kind: partialExit ? "sell_partial_filled" : `${decision.action}_filled`, status: "pending",
+          txHash, account: s.vault, pair: s.pair, amount: String(amount) });
         const receipt = await publicClient.waitForTransactionReceipt({
           hash: txHash,
         });
-        if (receipt.status !== "success")
+        if (receipt.status !== "success") {
+          executionPhase = "reverted";
           throw new Error("Autopilot execution reverted");
-        const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;
+        }
+        executionPhase = "confirmed";
         s.lastDecision = partialExit ? "sell_partial_filled" : `${decision.action}_filled`;
         s.lastRunAt = new Date().toISOString();
         s.lastRiskCheckAt = new Date().toISOString();
@@ -1514,7 +1543,6 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             s.activeStopLoss = undefined;
           }
         }
-        await appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
         await recordV6Activity({
           owner: s.owner,
           network: s.network,
@@ -1526,6 +1554,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           pair: s.pair,
           amount: String(amount),
         });
+        await appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
         } finally {
           if (actionLease) await releaseStrategyLease(s.id, "execution", actionLease).catch(() => undefined);
         }
@@ -1548,9 +1577,8 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             : "provider_backoff";
         }
         s.lastError = detail;
-        s.lastDecision = transient
-          ? "hold_dependency_retry"
-          : "hold_failed_closed";
+        const failure = autopilotExecutionFailure(executionPhase, transient);
+        s.lastDecision = failure.lastDecision;
         if (analysisAttempted) s.lastRunAt = new Date().toISOString();
         await appendEvaluation(s, {
           id: crypto.randomUUID(),
@@ -1558,9 +1586,8 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           strategyType: s.strategyType || identifyAutopilotStrategy(s.policy.strategy),
           action: "hold",
           status: "failed",
-          reason: transient
-            ? "A temporary dependency was unavailable. No assets moved; the scheduler will retry automatically."
-            : "The evaluation or protected execution failed closed. No assets moved.",
+          reason: failure.reason,
+          txHash: executionHash,
           bias: evaluatedDecision?.bias || "unknown",
           confidence: evaluatedDecision?.confidence || 0,
           metrics: evaluatedDecision?.metrics || {},

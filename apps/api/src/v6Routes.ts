@@ -125,7 +125,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     const query = String(req.query.q || "").trim().toUpperCase().slice(0, 80);
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1_000);
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
-    if (!chain) return res.status(400).json({ error: "Select X Layer, Base or Arbitrum" });
+    if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum or Robinhood" });
     if (network === "robinhood") {
       try {
         const catalog = await robinhoodMarketCatalog(cfg, erc20Custody);

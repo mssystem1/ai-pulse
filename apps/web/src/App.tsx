@@ -363,11 +363,7 @@ export function App() {
 
   async function onNetworkChange(next: WebNetworkKey) {
     if (isCircleWalletConnected() && next !== "arc-testnet") return;
-    setNetworkKey(next);
-    setBalances(null);
-    setGatewayBalance(null);
-    setNeedUsdt(false);
-    setNeededUsdt(null);
+    setError(null);
     const provider = getInjectedProvider();
     if (wallet && provider) {
       try {
@@ -376,8 +372,14 @@ export function App() {
         if (accounts?.[0]) setWallet(accounts[0]);
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
+        return;
       }
     }
+    setNetworkKey(next);
+    setBalances(null);
+    setGatewayBalance(null);
+    setNeedUsdt(false);
+    setNeededUsdt(null);
   }
 
   async function onDisconnect() {
@@ -690,7 +692,7 @@ export function App() {
   }
 
   const analysisReady = Boolean(result) && ["analysis_base", "analysis_premium", "spot_analysis_standard", "spot_analysis_premium"].includes(service);
-  const riskOnchainSource = networkKey === "xlayer" ? "OKX API" : networkKey === "base" || networkKey === "arbitrum" ? "Blockscout API" : "available indexed chain evidence";
+  const riskOnchainSource = networkKey === "xlayer" ? "OKX API" : networkKey === "robinhood" ? "Blockscout, Robinhood RPC, Sourcify and official stock-registry" : networkKey === "base" || networkKey === "arbitrum" ? "Blockscout API" : "available indexed chain evidence";
   const experience = tab === "analyze"
     ? { title: "Global market intelligence", lead: "Explore every live OKX spot instrument—including crypto, xStocks and RWA—then choose Quick or Pro analysis." }
     : tab === "prediction"
@@ -759,7 +761,7 @@ export function App() {
             {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"}>
               <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "设置支付资产、钱包链和链上流动性，不改变外观。" : "Sets payment asset, wallet chain and on-chain liquidity. Appearance stays unchanged."}</p></div>
               <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
-              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "主网执行可用" : "Mainnet execution available")}</span></div>
+              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "各功能单独检查可用性" : "Availability checked per feature")}</span></div>
             </div>}
           </div>
           <AppearancePicker value={appearance} lang={lang} onChange={setAppearance} />

@@ -1,7 +1,8 @@
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { executionPublicClient, executionRpcUrls, type ExecutionNetwork } from "./onchainDiscovery.js";
-import { executionContractAddress } from "./executionContracts.js";
-import { keccak256, toHex } from "viem";
+import { executionContractAddress, executionContracts } from "./executionContracts.js";
+import { keccak256, toHex, parseAbi } from "viem";
+import { verifiedAutopilotReceipt } from "./autopilotExecutionRecovery.js";
 import { getNetwork } from "@pulse/config";
 import { applyConfirmedPassPause, mutateAutopilotPass } from "./autopilotPassStore.js";
 
@@ -270,14 +271,27 @@ export async function reconcileV6Activity(owner: string, network: string, rpcUrl
     catch { /* Keep existing state and still enrich previously confirmed fills. */ }
   }
   const pendingByIndex = new Map(pending.map((entry, batchIndex) => [entry.index, batchIndex]));
-  let next = items.map((item, index) => {
+  let ownedAutopilotVaults: Promise<readonly string[]> | undefined;
+  let next = await Promise.all(items.map(async (item, index) => {
     const batchIndex = pendingByIndex.get(index);
     if (batchIndex === undefined) return item;
     const receipt = receipts.get(batchIndex);
     if (!receipt) return item;
-    const status: Activity["status"] = receipt.from?.toLowerCase() === owner.toLowerCase() && receipt.status === "0x1" ? "confirmed" : "failed";
+    let status: Activity["status"] = receipt.from?.toLowerCase() === owner.toLowerCase() && receipt.status === "0x1" ? "confirmed" : "failed";
+    if (item.source === "autopilot" && item.account && /^(buy_filled|sell_partial_filled|sell_filled)$/.test(item.kind)
+      && ["xlayer", "base", "arbitrum", "robinhood"].includes(network) && receipt.status === "0x1") {
+      try {
+        const chain = network as ExecutionNetwork;
+        const factory = executionContracts(chain).autopilotFactory;
+        if (!factory) return item;
+        ownedAutopilotVaults ??= executionPublicClient(chain).readContract({ address: factory,
+          abi: parseAbi(["function vaultsOf(address) view returns(address[])"]), functionName: "vaultsOf", args: [owner as `0x${string}`] });
+        const owned = await ownedAutopilotVaults;
+        status = verifiedAutopilotReceipt(receipt, item.account, owned) ? "confirmed" : "failed";
+      } catch { return item; } // Missing ownership evidence is pending, not failure.
+    }
     changed = true; return { ...item, status, updatedAt: new Date().toISOString() };
-  });
+  }));
   const enrich = async (item: Activity, index: number) => {
     if (item.status !== "confirmed" || (item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue)) return item;
     const batchIndex = pendingByIndex.get(index);

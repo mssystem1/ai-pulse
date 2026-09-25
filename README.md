@@ -29,7 +29,7 @@ PULSE is an independent intelligence product. Polymarket is a public read-only e
 
 ### Public website and application
 
-The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support five independent appearances: Pulse, Clarity, Midnight, Horizon and optional Robinhood. Appearance never changes the selected network or overwrites an existing saved choice.
+The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support five independent appearances: Pulse, Clarity, Midnight, Horizon and Dawn (ink black/electric lime). Dawn preserves the existing `robinhood` preference ID. Appearance never changes the selected network or overwrites an existing saved choice.
 
 Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
 
@@ -863,8 +863,8 @@ Start with [`.env.local.example`](.env.local.example) for local integration and 
 Key controls:
 
 ```dotenv
-ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet,robinhood
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet,robinhood
 
 FEATURE_PREDICTION_ANALYSIS=1
 FEATURE_FUSED_ANALYSIS=0

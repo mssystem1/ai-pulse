@@ -7262,7 +7262,7 @@ function DisabledArc({ feature }: { feature: string }) {
       <h2>{feature} is hidden on this network</h2>
       <p>
         Arc Testnet remains available for analysis and x402 payment testing.
-        Select X Layer, Base, or Arbitrum for mainnet execution.
+        Select X Layer, Base, Arbitrum or Robinhood for supported mainnet workflows.
       </p>
     </div>
   );
@@ -7738,7 +7738,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <h3>Separate raw evidence from a complete risk report</h3>
               <ol>
                 <li>
-                  Select X Layer, Base, Arbitrum or Arc Testnet in Network &amp;
+                  Select X Layer, Base, Arbitrum, Robinhood or Arc Testnet in Network &amp;
                   Payment.
                 </li>
                 <li>
@@ -7751,8 +7751,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 </li>
                 <li>
                   The paid report uses OKX API on X Layer, Blockscout API on
-                  Base/Arbitrum and GeckoTerminal for market, website, X-profile
-                  and provider-rating observations. Social links alone do not establish promotion activity. It does not run automatic RPC calls.
+                  Base/Arbitrum/Robinhood and GeckoTerminal for market, website, X-profile
+                  and provider-rating observations. Robinhood also checks RPC evidence, Sourcify and the official stock registry. Social links alone do not establish promotion activity; unavailable sources remain unknown.
                 </li>
                 <li>
                   If you have exact calldata, optionally simulate it without broadcasting.
@@ -7771,7 +7771,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <div>
                 <small>1 · CHAIN CATALOG</small>
                 <b>Exact contract</b>
-                <span>X Layer · Base · Arbitrum · Arc</span>
+                <span>X Layer · Base · Arbitrum · Robinhood · Arc</span>
               </div>
               <i>→</i>
               <div>
@@ -8571,7 +8571,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <span className="eyebrow">AGENTS &amp; API</span>
               <h3>Discover eight services on every supported execution mainnet</h3>
               <p>
-                X Layer, Base and Arbitrum expose five analysis/risk services
+                X Layer, Base, Arbitrum and enabled Robinhood deployments expose five analysis/risk services
                 plus three duration-specific Autopilot start services. Global
                 Spot and Autopilot contract calls remain owned and confirmed by
                 the caller&apos;s Agentic Wallet. Circle/Arc exposes only the five

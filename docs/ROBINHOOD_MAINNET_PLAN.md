@@ -7,7 +7,19 @@ All five research tiers have passed real USDG payment-to-report qualification th
 
 The free mainnet evidence check covered canonical USDG, an official stock token and canonical WETH. Blockscout token, verified-contract and holder responses, RPC evidence, Sourcify and official registry context were observed for all three. GeckoTerminal token/pool/profile responses were observed for USDG and the stock token, but unavailable for WETH during this check. Missing WETH coverage remains unknown, not a contract vulnerability. The current catalog supplied no ordinary non-stock sample; negative classification cases are covered by regression tests, not claimed as a live ordinary-token test. Public source-status evidence is recorded in `packages/contracts/deployments/4663-risk-evidence-qualification.json`.
 
+## Receipt recovery regression — September 25
+
+Autopilot records a pending execution hash before waiting for its receipt. Subsequent cycles reconcile unresolved trades before evaluating another entry. Reconciliation accepts executor-signed fills only when the receipt targets a factory-owned vault and includes that vault's execution event; it no longer incorrectly requires the executor to be the owner. Missing receipts or unavailable ownership evidence stay pending. Confirmed, reverted and pre-submission failures have different journal explanations; a confirmation timeout never claims that no assets moved.
+
+The actual activity-store regression uses isolated RPC fixtures for confirmed/reverted/missing receipts, ownership outages, a foreign vault and a missing execution event. It also checks recovery into the original records and coalesced ownership queries. The API suite passed 247 tests with one external-service skip, and the web suite passed all 97 tests. These tests do not establish crash-safe persistence between broadcast and hash storage, or a deployed scheduler's behavior. The on-chain qualification accounts remain paused; no hosting deployment was performed.
+
 ## Manual release order
+
+**Network-selector deployment requirement:** both `ENABLED_NETWORKS` (API/worker) and `VITE_ENABLED_NETWORKS` (web build) must include `robinhood`. The corrected template is `xlayer,base,arbitrum,arc-testnet,robinhood`. Existing hosting variables are not changed by committing this template; the web must be rebuilt after its variable changes. The network selector is separate from payment/trading feature gates. Do not claim the deployed selector is fixed until the new build and hosting values are checked.
+
+The appearance label is now **Dawn**, retaining the `robinhood` storage ID so existing preferences survive. The network remains named **Robinhood Chain**. A dedicated network logo replaces the previous accidental Arc fallback. Wallet selection is published only after a successful chain switch, including an explicit switch after adding an unknown chain and a verified `eth_chainId` response. Browser fixture checks cover actual selector clicks, USDG/header labels, persistent selection across eight routes and independent appearance changes at 390/1440px in light and lime themes; they do not prove a deployed wallet connection.
+
+The follow-up surface audit corrected the landing page's three-mainnet assumption, included Robinhood in the network list/FAQ, and updated Risk Guard's visible/API methodology to describe Robinhood RPC and stock-registry evidence. Landing fixtures now include a fifth research-statistics row and correctly summed totals; light/Dawn checks passed at 390/1440px with unavailable-data recovery still covered. The GET-only `scripts/robinhood-free-workflow-check.ts` also passed against the actual local application and live providers: 138 catalog assets, exact WETH/USDG and AAPL/USDG roundtrip mappings, positive USD chart prices and 100 candles for each. It uses no wallet signing, paid endpoints or background workers.
 
 Local verification on September 24: the complete workspace test/build run passed; after the final quote-identity guard, the API suite passed 243 tests with one external-service skip and both API/web builds passed. The app-shell fixture sweep covered eight routes across five appearances and four widths (160 route checks). Reported-flow checks passed at 390/768/1440/1920px, funding fixtures at 390/1440px across five themes, and Robinhood asset/chart fixtures at 390/1440px. Browser fixtures do not sign transactions. Known build warnings remain for large wallet/application bundles and third-party annotations/unused Tempo exports. Configured-secret-value scanning and whitespace checks passed before commit.
 
@@ -25,9 +37,9 @@ The public catalog currently exposes 138 exact token identities. This is mapping
 
 - Mainnet only: chain 4663. No Robinhood testnet deployments.
 - Preserve the existing PULSE deployer, admin, oracle signer and executor arrangement; verify each role against existing manifests/config before signing.
-- USDG is the proposed payment and settlement asset. ETH remains necessary for gas.
+- USDG is the payment and settlement asset. ETH remains necessary for gas.
 - Wallet funding: explicit user-approved ETH-to-USDG quote/swap with a gas reserve; never automatically swap all ETH.
-- Optional fifth appearance named Robinhood, lime/ink-black, across landing and app. Preserve saved appearances, default and network selection; retain PULSE branding.
+- Optional fifth appearance named Dawn, lime/ink-black, across landing and app. Its persisted ID remains `robinhood`. Preserve saved appearances, default and network selection; retain PULSE branding.
 
 ## Evidence and readiness gates
 

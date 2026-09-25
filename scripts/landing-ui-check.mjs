@@ -8,7 +8,8 @@ const browser = await chromium.launch({ channel: 'msedge', headless: true });
 await mkdir('.codex-ui-review', { recursive: true });
 const bucket = {count:3,partial:1,firstAt:'2026-09-10T00:00:00Z',lastAt:'2026-09-12T00:00:00Z'};
 const fixture = {version:1,scope:'platform',persistence:'durable',asOf:'2026-09-12T12:00:00Z',stale:false,research:{global:{...bucket,count:12},prediction:{...bucket,count:12},risk:{...bucket,count:12}},networks:[['196','X Layer'],['8453','Base'],['42161','Arbitrum'],['5042002','Arc Testnet']].map(([chain,label])=>({chain:`eip155:${chain}`,label,environment:label==='Arc Testnet'?'testnet':'mainnet',research:{global:bucket,prediction:bucket,risk:bucket}}))};
-for (const service of ['global','prediction','risk']) fixture.research[service].partial=4;
+fixture.networks.push({chain:'eip155:4663',label:'Robinhood Chain',environment:'mainnet',research:{global:bucket,prediction:bucket,risk:bucket}});
+for (const service of ['global','prediction','risk']) { fixture.research[service].partial=5; fixture.research[service].count=15; }
 fixture.execution={spot:{count:2,byChain:[{count:2,firstAt:bucket.firstAt,lastAt:bucket.lastAt,amount:'12.340000',symbol:'USDC',chain:'eip155:8453',label:'Base'}]},autopilot:null};
 try {
   for (const width of process.env.UI_WIDTHS?.split(',').map(Number)||[360,390,768,1440]) for (const theme of process.env.UI_THEMES?.split(',')||['xlayer','base','arbitrum','arc-testnet','robinhood']) {
@@ -28,7 +29,9 @@ try {
     assert.equal(await page.locator('html').getAttribute('data-pulse-theme'),theme);
     assert.equal(await page.locator('.landing-research-services article').count(),3);
     assert.match(await page.locator('.landing-activity-table').innerText(),/Arc Testnet/);
-    assert.equal(await page.locator('.landing-research-count>strong').first().innerText(),'12');
+    assert.match(await page.locator('.landing-activity-table').innerText(),/Robinhood Chain/);
+    assert.match(await page.locator('.landing-network-line').innerText(),/Robinhood/);
+    assert.equal(await page.locator('.landing-research-count>strong').first().innerText(),'15');
     assert.match(await page.locator('.landing-execution-stats').innerText(),/12.34 USDC/);
     const launch=await page.getByRole('link',{name:'Launch app',exact:false}).first().getAttribute('href');
     assert.equal(new URL(launch).pathname,'/portfolio');

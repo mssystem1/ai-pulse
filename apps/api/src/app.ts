@@ -1856,7 +1856,9 @@ export function createApp(cfg: AppConfig, dependencies: {
       summary: analysis.summary, confidence: analysis.confidence,
       checklist: analysis.components.map((component) => ({ id: component.key, title: component.label, status: component.score === null ? "unknown" : component.score >= 75 ? "pass" : component.score >= 45 ? "warn" : "fail", detail: component.reason, evidence: component.evidence })),
       token, intelligence: analysis, recommendations: [analysis.recommendedAction], mostLikelyLossScenario: analysis.mostLikelyLossScenario,
-      sourceCoverage: sources, evidence, evidenceMethod: "OKX API on X Layer or Blockscout API on Base/Arbitrum + GeckoTerminal token/pool/profile + bounded project website + Grok synthesis; no automatic RPC eth_call",
+      sourceCoverage: sources, evidence, evidenceMethod: key === "robinhood"
+        ? "Robinhood RPC, Blockscout, Sourcify and official stock registry + GeckoTerminal token/pool/profile + bounded project website + Grok synthesis; unavailable observations remain unknown"
+        : "OKX API on X Layer or Blockscout API on Base/Arbitrum + GeckoTerminal token/pool/profile + bounded project website + Grok synthesis; no automatic RPC eth_call",
       analysisProfile: { mode: ai ? "live" : "fixture", model: ai?.model || "fixture", reasoningEffort: ai ? "low" : "none" },
       aiUsage: ai?.usage, shareId: legacy.shareId, limitations: analysis.unknowns, generatedAt: new Date().toISOString(),
     };

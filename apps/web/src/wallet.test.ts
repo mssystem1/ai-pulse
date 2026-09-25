@@ -53,18 +53,19 @@ test("rejects a substituted chain, token, price, or resource before wallet signi
 
 test("switches an existing chain without attempting to add it", async () => {
   const calls: string[] = [];
-  await switchWalletNetwork({ request: async ({ method }) => { calls.push(method); return null; } }, "base");
-  assert.deepEqual(calls, ["wallet_switchEthereumChain"]);
+  await switchWalletNetwork({ request: async ({ method }) => { calls.push(method); return method === "eth_chainId" ? WEB_NETWORKS.base.chainHex : null; } }, "base");
+  assert.deepEqual(calls, ["wallet_switchEthereumChain", "eth_chainId"]);
 });
 
 test("adds a missing chain after EIP-4902", async () => {
   const calls: Array<{ method: string; params?: unknown[] }> = [];
   await switchWalletNetwork({ request: async (request) => {
     calls.push(request);
-    if (request.method === "wallet_switchEthereumChain") throw Object.assign(new Error("missing"), { code: 4902 });
-    return null;
+    if (calls.length === 1) throw Object.assign(new Error("missing"), { code: 4902 });
+    return request.method === "eth_chainId" ? WEB_NETWORKS.arbitrum.chainHex : null;
   } }, "arbitrum");
   assert.equal(calls[1]?.method, "wallet_addEthereumChain");
+  assert.deepEqual(calls.map(call => call.method), ["wallet_switchEthereumChain", "wallet_addEthereumChain", "wallet_switchEthereumChain", "eth_chainId"]);
   assert.deepEqual((calls[1]?.params?.[0] as { chainId: string }).chainId, WEB_NETWORKS.arbitrum.chainHex);
 });
 

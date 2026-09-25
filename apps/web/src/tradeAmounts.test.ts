@@ -11,8 +11,8 @@ test("Spot and Autopilot leave financial decisions empty by default", () => {
   assert.equal(DEFAULT_AUTOPILOT_CAPITAL, "");
 });
 
-test("0.1 USDC and USDT0 are valid on every six-decimal settlement network", () => {
-  for (const network of ["xlayer", "base", "arbitrum"]) {
+test("0.1 USDC, USDT0 and USDG are valid on every six-decimal settlement network", () => {
+  for (const network of ["xlayer", "base", "arbitrum", "robinhood"]) {
     assert.equal(positiveTokenAmount("0.1", 6), 100_000n, network);
   }
 });
