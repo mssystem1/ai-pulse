@@ -23,6 +23,8 @@ The harness blocks external fetches and uses only a fixed dummy signing key with
 
 ## Manual release order
 
+**Live compact classifier, September 27:** `scripts/robinhood-compact-signal-check.ts --run` passed with 119 completed WETH/USDG-market candles and the real configured `grok-4.3` provider. The technical candidate gate was false; the diagnostic returned bearish/trend-down at 72% confidence. Provider usage reported one call costing $0.0030656. No Entry Pass was consumed, no transaction submitted and no customer-report/statistics entry created. Public evidence is in `4663-compact-signal-qualification.json`. This verifies the live classifier dependency, not a live autonomous entry; the diagnostic intentionally does not run the scheduler.
+
 **September 27 wallet-modal correction:** commit `66537c6` removes AppKit's independent four-chain allowlist. Its Wagmi adapter and Reown modal now derive their networks from the same configuration as the PULSE selector. All 100 web tests and the web TypeScript check passed. A local Chrome DevTools inspection of the actual AppKit instance returned all five chains; clicking Robinhood in its rendered network modal selected `eip155:4663`. The repeatable `scripts/robinhood-appkit-ui-check.mjs` passed at 390px and 1440px against the real SDK/modal, not a replacement picker. These checks used disconnected browsers and did not sign or spend. Existing remote WalletConnect sessions may need reconnection after the frontend update; a production connected-wallet check remains separate.
 
 **Network-selector deployment requirement:** both `ENABLED_NETWORKS` (API/worker) and `VITE_ENABLED_NETWORKS` (web build) must include `robinhood`. The corrected template is `xlayer,base,arbitrum,arc-testnet,robinhood`. Existing hosting variables are not changed by committing this template; the web must be rebuilt after its variable changes. The network selector is separate from payment/trading feature gates. Do not claim the deployed selector is fixed until the new build and hosting values are checked.
@@ -115,7 +117,7 @@ Verify live ETH/USDG and asset/USDG routes, spender/router identities, oracle av
 
 ## Current progress
 
-The entries below are a chronological implementation log; later qualification results supersede earlier pending statuses.
+The entries below are historical checkpoints. Use the dated qualification sections above for current evidence; archived early-stage pending statements are not the current release status.
 
 ### September 23 integration checkpoint (not release qualification)
 
@@ -151,6 +153,8 @@ The entries below are a chronological implementation log; later qualification re
 - The scoped live Autopilot cycle resumed its pass timer, evaluated real contract-specific candles and returned a valid trend-following Hold (close below SMA20 and SMA20 below SMA50). No Grok call or buy was appropriate under those conditions. Pause froze the timer; a 0.01 USDG owner withdrawal was verified and returned to the vault. Both vault and registry were left paused. See `4663-autopilot-cycle-qualification.json`. This is not evidence of a live AI-approved Buy/Sell cycle.
 - The shared Redis journal exposed an older independently running worker that does not recognize Robinhood (`Cannot read properties of undefined (reading 'oracle')`). Its failed evaluations were preserved, not erased. The qualification registration was separately paused using a compare-and-swap update; the 0.20 USDG capital and remaining paid time stay owner-controlled. The current workers also skip unrecognized network records. The unrelated local Mantle MCP process was not modified or stopped. Deploying this release is still manual and is required before a hosting worker can process Robinhood.
 - Market-buy TP/SL required one additional deployed contract: the separate `SpotOrderAccountFactoryV1`, recorded as `spotProtectionFactory` in the manifest. All seven contracts have exact Sourcify creation/runtime matches. Local `.env`, `.env.example`, published API addresses and regression tests now distinguish that V1 protection factory from the existing V2 limit factory. No hosting deployment was performed.
+
+### Archived September 19–21 checkpoints (superseded by dated results above)
 
 - Added optional appearance and decoupled appearance typing from supported networks.
 - Added preference regressions and Robinhood network metadata/API aliases. The new network is not enabled by default; live settlement and funding swaps remain gated.

@@ -1,0 +1,27 @@
+{
+  "kind": "analysis-only-live-provider-qualification",
+  "network": "robinhood",
+  "chainId": 4663,
+  "pair": "WETH.0BD7D308F8E1639F-USDG",
+  "timeframe": "1H",
+  "strategyType": "trend_following",
+  "generatedAt": "2026-09-27T18:14:40.501Z",
+  "completedCandles": 119,
+  "candleTs": 1790528400000,
+  "technicalCandidateReady": false,
+  "model": "grok-4.3",
+  "signal": { "bias": "bearish", "regime": "trend_down", "confidence": 72 },
+  "usage": {
+    "promptTokens": 2416,
+    "completionTokens": 72,
+    "totalTokens": 2488,
+    "cachedTokens": 128,
+    "reasoningTokens": 0,
+    "costUsd": 0.0030656
+  },
+  "providerCalls": 1,
+  "passConsumed": false,
+  "tradeSubmitted": false,
+  "transactionHashes": [],
+  "limitations": "Direct classifier diagnostic, not a scheduler entry, paid customer report, or proof of profitable trading."
+}
