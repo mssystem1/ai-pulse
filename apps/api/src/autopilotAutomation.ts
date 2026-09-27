@@ -20,7 +20,7 @@ import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } fro
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
 import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
-import { listV6Activity, recordV6Activity, reconcileV6Activity } from "./v6Store.js";
+import { listV6Activity, recordV6Activity, confirmV6Activity, reconcileV6Activity } from "./v6Store.js";
 import { autopilotExecutionFailure, pendingAutopilotTrade, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
 import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
@@ -1514,7 +1514,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         executionHash = txHash;
         s.lastTxHash = txHash;
         const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;
-        await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
+        const submittedActivity = await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
           kind: partialExit ? "sell_partial_filled" : `${decision.action}_filled`, status: "pending",
           txHash, account: s.vault, pair: s.pair, amount: String(amount) });
         const receipt = await publicClient.waitForTransactionReceipt({
@@ -1543,17 +1543,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             s.activeStopLoss = undefined;
           }
         }
-        await recordV6Activity({
-          owner: s.owner,
-          network: s.network,
-          source: "autopilot",
-          kind: s.lastDecision,
-          status: "confirmed",
-          txHash,
-          account: s.vault,
-          pair: s.pair,
-          amount: String(amount),
-        });
+        await confirmV6Activity(submittedActivity);
         await appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
         } finally {
           if (actionLease) await releaseStrategyLease(s.id, "execution", actionLease).catch(() => undefined);

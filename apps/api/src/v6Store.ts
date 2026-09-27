@@ -232,6 +232,23 @@ export async function recordV6Activity(input: Omit<Activity, "id" | "createdAt" 
   return item;
 }
 
+/** Confirm a worker-submitted activity in place after verifying its receipt. */
+export async function confirmV6Activity(submitted: Activity): Promise<Activity> {
+  const items = await listV6Activity(submitted.owner, submitted.network);
+  const current = items.find(item => item.id === submitted.id);
+  if (!current || current.txHash !== submitted.txHash || current.account !== submitted.account
+    || current.source !== submitted.source || current.kind !== submitted.kind)
+    throw new Error("Submitted activity is unavailable or its execution identity changed");
+  if (current.status === "confirmed") return current;
+  const confirmed: Activity = { ...current, status: "confirmed", updatedAt: new Date().toISOString() };
+  memory.set(key(submitted.owner, submitted.network), items.map(item => item.id === confirmed.id ? confirmed : item));
+  if (kvConfigured()) {
+    try { await writeActivityHash(submitted.owner, submitted.network, [confirmed]); }
+    catch (error) { if (!isKvUnavailableError(error)) throw error; }
+  }
+  return confirmed;
+}
+
 async function writeActivityHash(owner: string, network: string, items: Activity[]) {
   if (!items.length) return;
   await upstash(["HSET", hashKey(owner, network), ...items.flatMap((item) => [item.id, JSON.stringify(item)])]);

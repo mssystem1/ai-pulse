@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { encodeAbiParameters, keccak256, toHex } from "viem";
-import { recordV6Activity, reconcileV6Activity } from "./v6Store.js";
+import { recordV6Activity, reconcileV6Activity, confirmV6Activity, listV6Activity } from "./v6Store.js";
 import { executionContracts } from "./executionContracts.js";
 
 test("activity reconciliation verifies executor trades against factory ownership and receipts", async (t) => {
@@ -57,4 +57,19 @@ test("activity reconciliation verifies executor trades against factory ownership
       assert.deepEqual(recovered.map(row => row.id).sort(), rows.map(row => row.id).sort(), "recovery updates the original records");
     }
   }
+  const owner = `0x${"9".repeat(40)}`;
+  for (const [index, kind] of ["buy_filled", "sell_partial_filled", "sell_filled"].entries()) {
+    const submitted = await recordV6Activity({ owner, network: "robinhood", source: "autopilot",
+      account: vault, kind, status: "pending", txHash: `0x${String(index + 5).repeat(64)}`, amount: "100000" });
+    const confirmed = await confirmV6Activity(submitted);
+    assert.equal(confirmed.id, submitted.id);
+    assert.equal(confirmed.createdAt, submitted.createdAt);
+    assert.equal(confirmed.status, "confirmed");
+    assert.deepEqual(await confirmV6Activity(submitted), confirmed, "confirmation replay is idempotent");
+    await assert.rejects(confirmV6Activity({ ...submitted, account: executor }), /identity changed/);
+    await assert.rejects(confirmV6Activity({ ...submitted, txHash: `0x${"f".repeat(64)}` }), /identity changed/);
+  }
+  const confirmedRows = await listV6Activity(owner, "robinhood");
+  assert.equal(confirmedRows.length, 3, "one activity row per submitted trade, not pending/confirmed duplicates");
+  assert.ok(confirmedRows.every(row => row.status === "confirmed"));
 });
