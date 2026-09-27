@@ -13,6 +13,7 @@
     "build": "npm run build -w @pulse/contracts && npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
     "build:vercel": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
     "e2e:paid": "node scripts/e2e-paid.mjs",
+    "test:robinhood-worker": "tsx --experimental-test-module-mocks --test scripts/robinhood-worker-flow.test.mjs",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:web:safe": "scripts\\dev-web.cmd",
