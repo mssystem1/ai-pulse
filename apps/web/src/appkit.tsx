@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createAppKit } from "@reown/appkit/react";
-import type { AppKitNetwork } from "@reown/appkit/networks";
+import { appKitNetworks } from "./appkitNetworks";
+export { appKitNetworks } from "./appkitNetworks";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -8,16 +9,6 @@ import type { InjectedProvider } from "./wallet";
 
 const projectId = String(import.meta.env.VITE_REOWN_PROJECT_ID || "").trim();
 export const appKitEnabled = /^(1|true)$/i.test(String(import.meta.env.VITE_FEATURE_WALLET_APPKIT || "")) && Boolean(projectId);
-
-const allNetworks: Record<string, AppKitNetwork> = {
-  xlayer: { id: 196, chainNamespace: "eip155", caipNetworkId: "eip155:196", name: "X Layer", nativeCurrency: { name: "OKB", symbol: "OKB", decimals: 18 }, rpcUrls: { default: { http: ["https://rpc.xlayer.tech"] } }, blockExplorers: { default: { name: "OKX Explorer", url: "https://www.okx.com/web3/explorer/xlayer" } } },
-  base: { id: 8453, chainNamespace: "eip155", caipNetworkId: "eip155:8453", name: "Base", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: ["https://mainnet.base.org"] } }, blockExplorers: { default: { name: "BaseScan", url: "https://basescan.org" } } },
-  arbitrum: { id: 42161, chainNamespace: "eip155", caipNetworkId: "eip155:42161", name: "Arbitrum One", nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 }, rpcUrls: { default: { http: ["https://arb1.arbitrum.io/rpc"] } }, blockExplorers: { default: { name: "Arbiscan", url: "https://arbiscan.io" } } },
-  "arc-testnet": { id: 5042002, chainNamespace: "eip155", caipNetworkId: "eip155:5042002", name: "Arc Testnet", nativeCurrency: { name: "Test USDC", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } }, testnet: true },
-};
-const requested = String(import.meta.env.VITE_ENABLED_NETWORKS || "xlayer").split(",").map((item) => item.trim()).filter(Boolean);
-export const appKitNetworks = requested.map((key) => allNetworks[key]).filter(Boolean) as [AppKitNetwork, ...AppKitNetwork[]];
-if (!appKitNetworks.length) appKitNetworks.push(allNetworks.xlayer);
 
 const adapter = new WagmiAdapter({ projectId: projectId || "disabled", networks: appKitNetworks });
 const queryClient = new QueryClient();
