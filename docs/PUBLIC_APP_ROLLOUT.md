@@ -75,6 +75,10 @@ npx.cmd tsx apps/api/src/publicActivityBackfill.ts --source-namespace pulse:loca
 
 Use the actual deployment namespace, not a new name. Source jobs and report bodies stay in their original namespaces. Only receipt-verified public aggregates are published in the target. Original payment identities deduplicate across namespaces, including genuine live developer tests; fixtures and unsettled receipts remain excluded. Cross-namespace writes require an explicit `--target-namespace`.
 
+**Robinhood history recovery — September 28, 2026:** the real mainnet qualification reports were stored under `pulse-robinhood-qualification`, separately from the live `pulse:production` statistics. A read-only preview verified all five surviving receipt-bound, checksum-checked live reports: two Global, two Prediction and one Risk Guard, with no excluded or unverifiable records. After matching the destination aggregates against the public endpoint, the bounded backfill published those five delivery identities into `pulse:production`. The completed scan changed research totals from 66/12/5 to 68/14/6 (Global/Prediction/Risk Guard). This published genuine historical developer activity, not new purchases, artificial counts or private report contents. Execution totals were not modified. The public endpoint caches aggregates for one minute; intermediary caches may take longer to refresh.
+
+The live public endpoint was subsequently checked and returned 68 Global, 14 Prediction and 6 Risk Guard deliveries, including Robinhood's 2/2/1 breakdown with `stale: false`. A second complete recovery scan examined the same five reports and added zero deliveries, confirming replay deduplication against the live destination.
+
 Spot history includes legacy direct-wallet fills, protected market buys and confirmed protected limit entries. The activity source label alone is not trade evidence: server reconciliation must verify the successful receipt, approved router or owner-matched PULSE account, net token transfers and block time. Funding, approvals, withdrawals and failed/cancelled orders never become trading volume.
 
 ### Arc mainnet readiness
