@@ -7,7 +7,7 @@ const workflows = [
     intro: "Global Quick and Pro are complete research services. Their trade plans can prefill a Spot ticket; buying a report never places an order.",
     steps: [
       ["Explore", "Choose a market", "Route available is selected by default. Filter by asset class or choose All assets for the broader catalog. Market data and the compact chart load automatically."],
-      ["Research", "Global Quick or Pro", "Pay for your chosen report. Review evidence, scenarios and invalidation."],
+      ["Optional research", "Global Quick or Pro", "Buy a report for evidence, scenarios and invalidation, or go directly to Spot without purchasing research."],
       ["Prepare", "Market or Limit ticket", "Load a report plan or configure a pair directly. Check amount, route and protection."],
       ["Authorize", "Review & sign", "Your wallet authorizes execution. Track confirmations and fills in the dashboard."],
     ],
@@ -83,7 +83,7 @@ export function DocsWorkflowVisuals() {
       </div>}
       {selected === 1 && <p className="docs-flow-note">Default AI budget: at most 3 fresh confirmations per vault per UTC day, at least 4 hours apart, and 3 confirmations per purchased 24h. Eligible shared results can be reused without charging a second confirmation. These are ceilings, not a schedule: a failed technical setup causes a Hold without asking Grok. Protection checks do not consume AI confirmations. Frequency alone cannot establish profitability.</p>}
       <p className="docs-flow-note">{workflow.note}</p>
-      {selected === 3 && <p className="docs-flow-note">Market charts use free TradingView Lightweight Charts with PULSE's existing OKX data—not a TradingView subscription. Expand to inspect O/H/L/C and volume, drag or pinch to navigate, and Reset view to restore readable spacing. Times are UTC. Green/red candles keep the same meaning in every theme. B/S arrows identify a fill's candle; execution prices remain in the fill list rather than changing the chart scale.</p>}
+      {selected === 3 && <p className="docs-flow-note">Market charts use free TradingView Lightweight Charts—not a TradingView subscription. Data comes from the selected market provider; Robinhood uses exact-token DEX history rather than substituting an exchange ticker or underlying stock. Expand to inspect O/H/L/C and volume, drag or pinch to navigate, and Reset view to restore readable spacing. Times are UTC. Green/red candles keep the same meaning in every theme. B/S arrows identify a fill's candle; execution prices remain in the fill list rather than changing the chart scale.</p>}
     </figure>
   </section>;
 }

@@ -7600,7 +7600,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <i>→</i>
                 <b>Preview live data</b>
                 <i>→</i>
-                <b>Buy report</b>
+                <b>Optional report</b>
                 <i>→</i>
                 <b>Review setup</b>
                 <i>→</i>
@@ -7741,8 +7741,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               </span>
               <h3>One selection follows the report into execution</h3>
               <p>
-                The themed timeframe picker changes its visual language with X
-                Layer, Base, Arbitrum and Arc while preserving the same candle
+                The timeframe picker follows your chosen appearance, independently
+                of the selected network, while preserving the same candle
                 meaning. Selecting a new interval clears stale report state so
                 chart indicators and the paid analysis cannot silently disagree.
               </p>
@@ -7792,19 +7792,15 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <small>CHOOSE</small>
                 <b>Market or Limit</b>
               </div>
-              <i>or</i>
-              <div>
-                <small>AUTOMATE</small>
-                <b>Guarded Autopilot</b>
-              </div>
             </div>
             <div className="docs-callout">
               <b>What is carried forward</b>
               <span>
                 Pair, timeframe, Buy/Wait decision, entry condition, take
                 profit, stop loss, analysis snapshot and selected RPC context.
-                Spot and Autopilot then independently re-check token identity,
-                live route and wallet or vault balance.
+                Spot re-checks token identity, live route and wallet balance.
+                Autopilot is configured separately: it does not inherit the report's
+                recommendation or use that report as its live entry signal.
               </span>
             </div>
           </section>
@@ -8528,8 +8524,9 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             <div className="docs-callout">
               <b>If a dependency disconnects</b>
               <span>
-                PULSE fails closed and moves no assets. A temporary provider or
-                RPC failure appears as dependency retry. Every xAI attempt is
+                Before submission, unavailable dependencies prevent a new trade.
+                After submission, a timeout does not prove failure: PULSE reconciles
+                the transaction before attempting another trade. Every xAI attempt is
                 timestamped before the request, so even a failed call observes
                 the 15-minute minimum. Billing, permission and quota failures
                 open a six-hour circuit breaker instead of retrying every worker
@@ -8650,7 +8647,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               </p>
               <div className="docs-callout">
                 <b>Robinhood: research payments and funding</b>
-                <span>When enabled, Global Quick/Pro, Prediction Quick/Pro and Risk Guard use USDG on Robinhood mainnet. Wallet &amp; funding offers an ETH → USDG quote, shows the minimum received, then simulates before your wallet signs. Keep ETH for gas. An appearance change does not switch networks. Robinhood Spot and Autopilot remain unavailable until their separate execution checks are complete.</span>
+                <span>When enabled, Global Quick/Pro, Prediction Quick/Pro and Risk Guard use USDG on Robinhood mainnet. Wallet &amp; funding offers an ETH → USDG quote, shows the minimum received, then simulates before your wallet signs. Keep ETH for gas. Dawn changes appearance, not the network. Wallet Spot, Limit/protection and Autopilot have separate readiness checks; wallet swaps can remain available while automated execution is paused. Follow the selected feature's availability message before funding or paying.</span>
               </div>
               <div className="docs-glossary payment-price-grid">
                 <div><b>Global Quick</b><span>$0.20 per report</span></div>

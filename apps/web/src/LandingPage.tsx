@@ -83,7 +83,8 @@ export default function LandingPage() {
           <div className="landing-mode-copy"><div className="landing-mode-switch" role="group" aria-label="Explore trading modes"><button aria-pressed={mode==="spot"} onClick={()=>setMode("spot")}>Spot trading</button><button aria-pressed={mode==="autopilot"} onClick={()=>setMode("autopilot")}>Autopilot</button></div>
             <h3>{mode==="spot" ? "Your decision. Your wallet." : "Your strategy. Working autonomously."}</h3>
             <p>{mode==="spot" ? "Choose a pair directly or bring a plan from Global Market. Review a Market or Limit order, then approve it in your wallet." : "Configure an account, market, strategy and risk limits. After activation, PULSE monitors conditions and can trade within your approved policy."}</p>
-            <ul>{(mode==="spot" ? ["Market and Limit orders", "Free market previews", "No research purchase required"] : ["Independent of Global reports", "Prepaid AI Entry Pass; no auto-renewal", "Owner pause and withdrawal controls"]).map(text=><li key={text}>{text}</li>)}</ul>
+            <ul>{(mode==="spot" ? ["Market and Limit orders where enabled", "Free market previews", "No research purchase required"] : ["Independent of Global reports", "Prepaid AI Entry Pass; no auto-renewal", "Owner pause and withdrawal controls"]).map(text=><li key={text}>{text}</li>)}</ul>
+            <p>Availability depends on the selected network, live routes and execution readiness. A network integration does not mean every trading feature is active.</p>
             <a className="landing-text-link" href={link(mode==="spot"?"/spot":"/autopilot")}>{mode==="spot"?"Explore Spot":"Explore Autopilot"} <span aria-hidden>↗</span></a>
           </div>
           <div className="landing-execution-figure" role="img" aria-label={mode==="spot" ? "Spot workflow: choose pair, review order, sign with wallet" : "Autopilot workflow: configure policy, activate, monitor and execute when rules pass"}>

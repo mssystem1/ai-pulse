@@ -48,8 +48,8 @@ Markets move continuously, but most analysis products still require an account, 
 - Read deterministic Fibonacci, pivot, and Elliott-wave structure; Pro reports add an annotated chart and executable Buy-or-Wait plan.
 - Move a valid Global plan into connected-wallet Market or Limit Spot execution with route, balance, slippage, entry, TP, and SL carried forward.
 - Run a policy-bounded Autopilot that can Buy, Hold, partially Sell, fully Sell, and later Buy again only inside owner-signed limits.
-- Run network-scoped Risk Guard evidence and pre-trade checks on X Layer, Base, Arbitrum, and Arc Testnet.
-- Settle through USD₮0 on X Layer, native USDC on Base and Arbitrum, or test USDC on Arc Testnet.
+- Run network-scoped Risk Guard evidence and pre-trade checks, with source coverage disclosed for each chain, including Robinhood.
+- Settle through USD₮0 on X Layer, native USDC on Base and Arbitrum, USDG on Robinhood, or test USDC on Arc Testnet.
 - Recover an idempotent paid job without paying twice and reopen wallet-owned report history on another device.
 - Use the same product through the responsive web console, REST, MCP, or TypeScript SDK.
 
@@ -162,6 +162,10 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X now reference the exact same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v7.png`; changing the filename prevents one platform from retaining an older image while another uses the current card. Updating these local files does not refresh any remote crawler cache until the next deployment and crawler refresh.
 
 ## Networks and payments
+
+Network support is feature-specific. Selecting a chain does not enable every order type or start a strategy. Wallet Spot, contract Limit/protection and Autopilot each check live capabilities, deployed contracts, routes and runtime readiness. Robinhood uses canonical USDG for service payments and trading capital, with ETH reserved for gas; see its release limitations below.
+
+For a deployment, keep `ENABLED_NETWORKS` (API) and `VITE_ENABLED_NETWORKS` (web) aligned. The five-network list is `xlayer,base,arbitrum,arc-testnet,robinhood`. Rebuild the frontend after changing browser variables: the PULSE selector and wallet connection modal must advertise the same chains. Never put facilitator, admin or buyer private keys in `VITE_*` variables.
 
 | Network | Public prefix | Payment asset | Provider | Funding inside PULSE |
 | --- | --- | --- | --- | --- |
@@ -968,7 +972,7 @@ npm run validate:alerts
 ### Autopilot shows zero or unavailable connected-wallet balance
 
 1. Confirm the header wallet address and selected network are the intended account and chain.
-2. Confirm the balance is the network settlement asset: USDT0 on X Layer or native USDC on Base/Arbitrum. A target asset such as WETH, xBTC, or cbBTC is not creation capital.
+2. Confirm the balance is the network settlement asset: USDT0 on X Layer, native USDC on Base/Arbitrum, or USDG on Robinhood. Keep the network's native token separately for gas. A target asset such as WETH, xBTC, or cbBTC is not creation capital.
 3. Use the Autopilot refresh/retry action. Settlement and target balances are read independently; an unavailable target-token read must not erase a valid settlement balance.
 4. Do not create or fund a vault while the settlement balance explicitly says unavailable. PULSE fails closed instead of treating an unknown value as zero or sufficient funds.
 
@@ -1033,8 +1037,8 @@ The exact Autopilot strategies, entry/exit rules, risk profiles, contract author
 | Prediction Market Quick and Pro services | Implemented |
 | Receipt-bound durable jobs and private recovery | Implemented |
 | Desktop/mobile PULSE layouts and mobile service switcher | Locally reviewed |
-| Automated tests | 194/194 passing locally through the root `npm test` command on 2026-08-29 |
-| Production build | Passing locally |
+| Robinhood mainnet | USDG research payments, funding and Spot qualified; automated execution remains release-gated. See the dated evidence in the [integration plan](docs/ROBINHOOD_MAINNET_PLAN.md) |
+| Tests and builds | Results apply to the revision and workflow checked, not blanket production certification. See the [service reliability audit](docs/SERVICE_RELIABILITY_AUDIT.md) and network-specific evidence |
 | Base dashboard verification tag | Implemented locally |
 | Marketplace publication and agent #8355 mutation | Not executed; requires explicit operator approval |
 
