@@ -3,6 +3,24 @@
 Status: seven contracts deployed and source-verified on mainnet; automation paused pending final release review.
 All five research tiers have passed real USDG payment-to-report qualification through localhost, including receipt replay. Funding, wallet Spot, contract Limit execution and Autopilot registration/pass/pause/withdrawal have mainnet evidence. The scoped Autopilot worker held without calling AI or buying; this is not proof of an AI-approved autonomous trade. Full Spot/Autopilot release qualification remains in progress, not advertised as supported.
 
+## Release handoff check — September 28
+
+This is a scoped completion audit, not a declaration of full production readiness. The reviewed branch includes integration commit `5e7884b` and the accompanying service corrections described in [SERVICE_RELIABILITY_AUDIT.md](SERVICE_RELIABILITY_AUDIT.md). Later route-catalog and workspace improvements are retained.
+
+| Requirement | Evidence and remaining boundary |
+| --- | --- |
+| Deploy and verify execution contracts | Seven addresses and source-verification evidence are recorded in `packages/contracts/deployments/4663.json`; deployment status remains `deployed_verified_paused`. |
+| USDG funding and research | Recorded real mainnet funding and five payment-to-report qualifications. These localhost qualifications do not certify the deployed facilitator's signer configuration. |
+| Wallet Spot | Mainnet roundtrip evidence exists; live API currently advertises Market enabled. |
+| Limit and protected Spot | Mainnet Limit qualification and local exact-contract protection tests exist. Live API currently advertises Limit, bracket and protected orders disabled by the automation pause. |
+| Autonomous Autopilot | Setup, paid pass, pause, withdrawal and Hold have mainnet evidence. Local worker entry/partial/full exit tests and a separate real compact-AI call passed. An AI-approved autonomous mainnet fill and deployed scheduler execution remain unproven. |
+| Risk Guard | Mainnet source evidence covers USDG, WETH and an issuer stock token; absent provider coverage remains Unknown. This is not a safety certification or coverage of every catalog token. |
+| Network selection and appearance | Shared AppKit/PULSE chain configuration and Dawn preference preservation are implemented. A rebuilt frontend and connected-wallet production check are still needed for deployment-specific confirmation. |
+| Landing, guides and historical activity | README/in-app corrections committed as `daeae79`; cross-chain chart as `ab22a3f`, with mobile/desktop five-theme fixture checks. Robinhood's five genuine research deliveries were recovered into live aggregates; the public API returned 68 Global, 14 Prediction and 6 Risk Guard reports. Recovery replay added zero duplicates. |
+| Manual hosting deployment | Not performed by this agent. Deploy the reviewed revision yourself; a deployment does not clear an on-chain pause. |
+
+Read-only production capabilities checked on September 28 returned `spot.market=true`, `spot.limit=false`, `spot.bracket=false`, `spot.protectedOrders=false`, and `autopilot.enabled=false`, with the explicit reason that Robinhood automated execution is paused on-chain. No attempt was made to clear that pause during the documentation/statistics work. Do not advertise full automated execution until the remaining release checks below are complete.
+
 ## Latest Risk Guard source check — September 24
 
 The free mainnet evidence check covered canonical USDG, an official stock token and canonical WETH. Blockscout token, verified-contract and holder responses, RPC evidence, Sourcify and official registry context were observed for all three. GeckoTerminal token/pool/profile responses were observed for USDG and the stock token, but unavailable for WETH during this check. Missing WETH coverage remains unknown, not a contract vulnerability. The current catalog supplied no ordinary non-stock sample; negative classification cases are covered by regression tests, not claimed as a live ordinary-token test. Public source-status evidence is recorded in `packages/contracts/deployments/4663-risk-evidence-qualification.json`.
