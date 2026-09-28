@@ -1,3 +1,5 @@
+import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
+import "./tradingWorkspace.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   decodeFunctionResult,
@@ -421,20 +423,24 @@ export function OpportunityRadar({
   }, [initialTimeframe]);
   useEffect(() => {
     let current = true;
-    if (!scanRefresh) setStatus("Scanning live market structure…");
+    const scanScope = `${networkKey}:${context}:${radarTimeframe}`;
+    if (loadedTimeframeRef.current !== scanScope) {
+      setItems([]);
+      setStatus("Scanning live market structure…");
+    }
     void apiGet(
-      `/v1/opportunities?timeframe=${encodeURIComponent(radarTimeframe)}`,
+      `/v1/opportunities?timeframe=${encodeURIComponent(radarTimeframe)}&network=${networkKey === "arc-testnet" || networkKey === "robinhood" ? "xlayer" : networkKey}&custody=${context === "autopilot" ? "erc20" : "wallet"}`,
     ).then((response) => {
       if (!current) return;
       // A background request already in flight must not replace expanded cards.
-      if (expandedRef.current && loadedTimeframeRef.current === radarTimeframe) return;
+      if (expandedRef.current && loadedTimeframeRef.current === scanScope) return;
       if (!response.ok) {
         setStatus(context === "autopilot"
           ? "Market shortlist is temporarily unavailable. Configure any supported pair directly below."
           : "Opportunity scan is temporarily unavailable. Pair search and analysis remain available.");
         return;
       }
-      loadedTimeframeRef.current = radarTimeframe;
+      loadedTimeframeRef.current = scanScope;
       setItems(
         (
           (response.data as { candidates?: PotentialGainer[] }).candidates || []
@@ -447,7 +453,7 @@ export function OpportunityRadar({
     return () => {
       current = false;
     };
-  }, [context, radarTimeframe, scanRefresh]);
+  }, [context, radarTimeframe, scanRefresh, networkKey]);
   const title =
     context === "global"
       ? "Markets worth analyzing now"
@@ -461,7 +467,8 @@ export function OpportunityRadar({
       : "OPPORTUNITY RADAR · RESEARCH FIRST";
   const collapsedCount = compactMobile ? 2 : 4;
   const eligibleItems = items.filter(candidate => (context === "global" || executionAvailability(candidate.pair).mapped)
-    && (showTechnical || isConfirmedSpotSetup(currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe))));
+    && (showTechnical || isConfirmedSpotSetup(currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe))))
+    .sort((a, b) => Number(executionAvailability(b.pair).mapped) - Number(executionAvailability(a.pair).mapped));
   const visibleItems = eligibleItems.slice(0, expanded ? 8 : collapsedCount);
   return (
     <section
@@ -1169,6 +1176,8 @@ export function SpotWorkspace({
   onAnalyzeCandidate?: (pair: string, timeframe: string) => void;
   lang?: Lang;
 }) {
+  const [spotPage, setSpotPage] = useState("setup");
+  useEffect(() => { setSpotPage("setup"); }, [incomingTrade, initialPair]);
   const [dismissedTrade, setDismissedTrade] = useState<ReportTradeIntent | null>(null);
   const initialTrade = incomingTrade && incomingTrade !== dismissedTrade ? incomingTrade : null;
   const [capability, setCapability] = useState<Capability | null>(null);
@@ -2718,7 +2727,10 @@ export function SpotWorkspace({
     }
   }
   return (
-    <div className="v6-workspace spot-workspace">
+    <div className="v6-workspace spot-workspace trading-workspace-shell">
+      <TradingWorkspaceNav title="Spot trading" items={SPOT_WORKSPACE_PAGES} value={spotPage} disabled={Boolean(busy)} onChange={setSpotPage} />
+      <div className="trading-workspace-content">
+      <section hidden={spotPage !== "setup"} aria-label="Trade setup workspace">
         <details className="workspace-discovery"><summary>Explore other pairs <span>Free market previews · optional research</span></summary>
         <OpportunityRadar
           networkKey={networkKey}
@@ -3637,6 +3649,8 @@ export function SpotWorkspace({
         </aside>
       </div>
 
+      </section>
+      <section hidden={spotPage !== "dashboard"} aria-label="Spot dashboard">
       <ActivityDashboard
         title="Spot orders, protected positions and activity"
         activity={activity.filter((item) => item.source !== "autopilot")}
@@ -3648,6 +3662,7 @@ export function SpotWorkspace({
         onCloseAll={closeAllOrders}
         syncNotice={activitySyncNotice}
       />
+      </section></div>
     </div>
   );
 
@@ -4114,7 +4129,14 @@ export function AutopilotWorkspace({
   initialTrade?: ReportTradeIntent | null;
   onAnalyzeCandidate?: (pair: string, timeframe: string) => void;
 }) {
-  const [setupOpen, setSetupOpen] = useState(false);
+  const [autopilotPage, setAutopilotPage] = useState("dashboard");
+  const setupOpen = autopilotPage === "create" || autopilotPage === "edit";
+  const setSetupOpen = (open: boolean) => setAutopilotPage(open ? (selectedVault ? "edit" : "create") : "dashboard");
+  const [launchStage, setLaunchStage] = useState<number | null>(null);
+  const [launchState, setLaunchState] = useState<"running" | "complete" | "interrupted">("running");
+  useEffect(() => {
+    if (launchStage === 0) document.querySelector(".autopilot-progress")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [launchStage]);
   useEffect(() => { setSetupOpen(false); }, [networkKey, wallet]);
   const [capability, setCapability] = useState<Capability | null>(null);
   const [settlement, setSettlement] = useState<string>(
@@ -4248,6 +4270,35 @@ export function AutopilotWorkspace({
     activeStrategy?.settlementSymbol ||
     activeVault?.settlementSymbol ||
     WEB_NETWORKS[networkKey].payment.symbol;
+  const [editConfiguration, setEditConfiguration] = useState<{ scope: string; capital: string; tradePct: number; turnoverPct: number; exposurePct: number; maxTradeValue: string; dailyTurnoverCap: string; exposureCap: string; maxSlippageBps: string; maxDailyLossBps: string; cooldown: string; expiry: string; assetAllowed: boolean } | null>(null);
+  const [editLoadError, setEditLoadError] = useState("");
+  const savedEditDraft = useRef("");
+  const draftFingerprint = JSON.stringify([pair, timeframe, strategy, Number(maxTrade), Number(dailyLoss), Number(exposurePct), Number(dailyTurnoverPct), Number(maxSlippagePct), Number(cooldownSeconds), Number(minConfidence)]);
+  const editScope = networkKey + ":" + selectedVault.toLowerCase();
+  const unchangedEdit = autopilotPage === "edit" && Boolean(activeStrategy) && savedEditDraft.current === draftFingerprint;
+  useEffect(() => {
+    if (autopilotPage !== "edit" || !activeStrategy) return;
+    let cancelled = false;
+    setEditConfiguration(null); setEditLoadError(""); savedEditDraft.current = "";
+    void apiGet("/v1/autopilot/configuration?network=" + networkKey + "&vault=" + selectedVault + "&asset=" + activeStrategy.targetAsset).then(response => {
+      if (cancelled) return;
+      if (!response.ok) throw new Error("Could not load this vault's current risk limits. Return to Dashboard and reopen Edit to retry.");
+      const config = (response.data as { configuration: Record<string, unknown> }).configuration;
+      if (!config || !["maxTradeValue", "dailyTurnoverCap", "exposureCap", "maxSlippageBps", "maxDailyLossBps", "cooldown", "expiry"].every(key => /^\d+$/.test(String(config[key])))) throw new Error("Risk configuration is incomplete. Editing is blocked until it can be verified.");
+      const tradePct = activeStrategy.policy?.maxTradePct || 50;
+      const capital = BigInt(String(config.maxTradeValue)) * 10000n / BigInt(Math.max(1, Math.round(tradePct * 100)));
+      if (capital <= 0n) throw new Error("This strategy has no configured trade capital. Finish setup first.");
+      const percentage = (value: unknown) => Number(BigInt(String(value)) * 10000n / capital) / 100;
+      const exposure = percentage(config.exposureCap), turnover = percentage(config.dailyTurnoverCap);
+      const loss = Number(config.maxDailyLossBps) / 100, slippage = Number(config.maxSlippageBps) / 100;
+      const strategyText = activeStrategy.policy?.strategy || activeStrategy.strategyType?.replaceAll("_", " ") || "Trend following";
+      const confidence = activeStrategy.minConfidence ?? 70;
+      setPair(activeStrategy.pair); setTimeframe(activeStrategy.timeframe); setStrategy(strategyText); setMaxTrade(String(tradePct)); setDailyLoss(String(loss)); setExposurePct(String(exposure)); setDailyTurnoverPct(String(turnover)); setMaxSlippagePct(String(slippage)); setCooldownSeconds(String(config.cooldown)); setMinConfidence(String(confidence)); setRiskProfile("custom");
+      savedEditDraft.current = JSON.stringify([activeStrategy.pair, activeStrategy.timeframe, strategyText, tradePct, loss, exposure, turnover, slippage, Number(config.cooldown), confidence]);
+      setEditConfiguration({ ...(config as unknown as NonNullable<typeof editConfiguration>), scope: editScope, capital: String(capital), tradePct, turnoverPct: turnover, exposurePct: exposure });
+    }).catch(error => { if (!cancelled) setEditLoadError(error instanceof Error ? error.message : String(error)); });
+    return () => { cancelled = true; };
+  }, [autopilotPage, networkKey, selectedVault, activeStrategy?.id]);
   const hydratedVaultRef = useRef("");
   useEffect(() => {
     if (!selectedVault) { hydratedVaultRef.current = ""; return; }
@@ -4273,23 +4324,24 @@ export function AutopilotWorkspace({
       ? BigInt(knownSettlementBalance)
       : 0n;
   const reusingFundedVault = Boolean(
-    ADDRESS.test(selectedVault) && existingVaultCapital > 0n,
+    ADDRESS.test(selectedVault) && (existingVaultCapital > 0n || (autopilotPage === "edit" && Boolean(activeStrategy))),
   );
-  const effectiveCapital = reusingFundedVault
-    ? existingVaultCapital
-    : parsedCapital;
+  const effectiveCapital = autopilotPage === "edit" && editConfiguration?.scope === editScope
+    ? BigInt(editConfiguration.capital)
+    : reusingFundedVault ? existingVaultCapital : parsedCapital;
   const percentOf = (amountValue: bigint, percentValue: string) =>
     (amountValue *
       BigInt(Math.max(0, Math.round((Number(percentValue) || 0) * 100)))) /
     10_000n;
-  const maxTradeAtomic = String(percentOf(effectiveCapital, maxTrade));
-  const dailyCapAtomic = String(
+  const loadedEdit = autopilotPage === "edit" && editConfiguration?.scope === editScope ? editConfiguration : null;
+  const maxTradeAtomic = loadedEdit && Number(maxTrade) === loadedEdit.tradePct ? loadedEdit.maxTradeValue : String(percentOf(effectiveCapital, maxTrade));
+  const dailyCapAtomic = loadedEdit && Number(dailyTurnoverPct) === loadedEdit.turnoverPct && BigInt(loadedEdit.dailyTurnoverCap) >= BigInt(maxTradeAtomic) ? loadedEdit.dailyTurnoverCap : String(
     [
       percentOf(effectiveCapital, dailyTurnoverPct),
       BigInt(maxTradeAtomic || "0"),
     ].reduce((a, b) => (a > b ? a : b)),
   );
-  const exposureCapAtomic = String(percentOf(effectiveCapital, exposurePct));
+  const exposureCapAtomic = loadedEdit && Number(exposurePct) === loadedEdit.exposurePct ? loadedEdit.exposureCap : String(percentOf(effectiveCapital, exposurePct));
   const buyAmountAtomic = maxTradeAtomic;
   const maxSlippageBps = String(
     Math.max(
@@ -4824,7 +4876,9 @@ export function AutopilotWorkspace({
       return setMessage(
         "PULSE is still calculating safe trade sizes from the live route.",
       );
+    if (unchangedEdit || editNotReady) return;
     setBusy(true);
+    setLaunchStage(0); setLaunchState("running");
     setMessage("Preparing your guarded strategy…");
     let safelyPaused = false;
     let passPurchased = false;
@@ -4871,9 +4925,19 @@ export function AutopilotWorkspace({
           amount,
         });
       };
+      setLaunchStage(1);
       let vault = selectedVault;
       const wasExisting = ADDRESS.test(vault);
-      safelyPaused = !wasExisting || activeVault?.paused !== false;
+      type CurrentConfiguration = NonNullable<typeof editConfiguration> & { paused: boolean; policyHash: string; targetBalance: string };
+      let currentConfiguration: CurrentConfiguration | null = null;
+      if (wasExisting) {
+        const current = await apiGet("/v1/autopilot/configuration?network=" + networkKey + "&vault=" + vault + "&asset=" + (activeStrategy?.targetAsset || targetAsset));
+        if (!current.ok) throw new Error("Could not verify current on-chain settings. No wallet transaction was requested.");
+        currentConfiguration = (current.data as { configuration: CurrentConfiguration }).configuration;
+        if (!currentConfiguration || typeof currentConfiguration.paused !== "boolean") throw new Error("Current vault state is incomplete. Retry without signing.");
+        if (activeStrategy?.targetAsset && activeStrategy.targetAsset.toLowerCase() !== targetAsset.toLowerCase() && BigInt(currentConfiguration.targetBalance || "0") > 0n) throw new Error("Close or withdraw the existing invested asset in Dashboard before changing this Autopilot's trading pair.");
+      }
+      safelyPaused = !wasExisting || currentConfiguration?.paused === true;
       if (!wasExisting) {
         setMessage(
           "Wallet confirmation · Confirm the owner-controlled strategy wallet.",
@@ -4913,9 +4977,7 @@ export function AutopilotWorkspace({
               !vaults.some(
                 (known) => known.toLowerCase() === item.toLowerCase(),
               ),
-          ) ||
-          found.at(-1) ||
-          "";
+          ) || "";
         if (!ADDRESS.test(vault))
           throw new Error(
             "The strategy wallet was confirmed but has not appeared on the RPC yet. Retry after the network updates.",
@@ -4934,7 +4996,7 @@ export function AutopilotWorkspace({
           JSON.stringify(found),
         );
       } else {
-        if (activeVault?.paused === false) {
+        if (currentConfiguration?.paused === false) {
           setMessage(
             "Wallet confirmation · Pausing the existing strategy before changing its policy.",
           );
@@ -4951,6 +5013,7 @@ export function AutopilotWorkspace({
           await record("vault_pause", pauseHash, vault);
           safelyPaused = true;
         }
+        if (policyHash !== currentConfiguration?.policyHash) {
         setMessage("Wallet confirmation · Confirm the updated strategy policy.");
         const updateHash = await sendPrepared(networkKey, wallet, {
           to: vault,
@@ -4963,11 +5026,13 @@ export function AutopilotWorkspace({
         });
         await waitForWalletReceipt(provider, updateHash);
         await record("vault_policy_update", updateHash, vault);
+        }
       }
 
       setMessage(
         "Wallet confirmation · Confirm the selected asset and maximum exposure.",
       );
+      setLaunchStage(2);
       const staleAssets = [wasExisting ? activeStrategy?.targetAsset : undefined]
         .filter((asset): asset is string => Boolean(asset && ADDRESS.test(asset)))
         .filter((asset) => asset.toLowerCase() !== targetAsset.toLowerCase())
@@ -4985,6 +5050,7 @@ export function AutopilotWorkspace({
         await waitForWalletReceipt(provider, removeHash);
         await record("vault_asset_removed", removeHash, vault);
       }
+      if (!wasExisting || !currentConfiguration?.assetAllowed || activeStrategy?.targetAsset?.toLowerCase() !== targetAsset.toLowerCase() || currentConfiguration.exposureCap !== exposureCapAtomic) {
       const assetHash = await sendPrepared(networkKey, wallet, {
         to: vault,
         data: encodeFunctionData({
@@ -4996,8 +5062,11 @@ export function AutopilotWorkspace({
       });
       await waitForWalletReceipt(provider, assetHash);
       await record("vault_asset_policy", assetHash, vault);
+      }
 
       setMessage("Wallet confirmation · Confirm the risk limits.");
+      setLaunchStage(3);
+      if (!wasExisting || !currentConfiguration || currentConfiguration.maxTradeValue !== maxTradeAtomic || currentConfiguration.dailyTurnoverCap !== dailyCapAtomic || currentConfiguration.maxSlippageBps !== maxSlippageBps || currentConfiguration.maxDailyLossBps !== maxDailyLossBps || currentConfiguration.cooldown !== cooldownSeconds || Number(currentConfiguration.expiry) <= Date.now() / 1000) {
       const limitsHash = await sendPrepared(networkKey, wallet, {
         to: vault,
         data: encodeFunctionData({
@@ -5016,7 +5085,9 @@ export function AutopilotWorkspace({
       });
       await waitForWalletReceipt(provider, limitsHash);
       await record("vault_risk_policy", limitsHash, vault);
+      }
 
+      setLaunchStage(4);
       if (!reusingFundedVault) {
         setMessage(
           `Wallet confirmation · Confirm the ${capitalHuman} ${WEB_NETWORKS[networkKey].payment.symbol} allocation.`,
@@ -5052,6 +5123,7 @@ export function AutopilotWorkspace({
       setMessage(
         "Wallet confirmation · Authorize the strategy configuration.",
       );
+      setLaunchStage(5);
       const strategyType = strategy.toLowerCase().includes("breakout")
         ? "breakout"
         : strategy.toLowerCase().includes("mean-reversion")
@@ -5093,6 +5165,8 @@ export function AutopilotWorkspace({
       } else {
         setMessage("Wallet confirmation · Existing AI Entry Pass verified; no additional payment is required.");
       }
+      setLaunchStage(6);
+      setMessage("Wallet confirmation · Start the configured Autopilot, then wait for network confirmation.");
       const resumeHash = await sendPrepared(networkKey, wallet, {
         to: vault,
         data: encodeFunctionData({
@@ -5116,7 +5190,10 @@ export function AutopilotWorkspace({
         `Autopilot is running for ${pair}. AI Entry Pass active until ${passExpiry ? new Date(passExpiry).toLocaleString() : "the purchased expiry"}; pause stops its timer.`,
       );
       await refresh();
+      setLaunchState("complete"); setAutopilotPage("dashboard");
     } catch (error) {
+      setLaunchState(resumeConfirmed ? "complete" : "interrupted");
+      if (resumeConfirmed) setAutopilotPage("dashboard");
       setMessage(
         `${error instanceof Error ? error.message : String(error)} ${autopilotSetupFailureState({ resumed: resumeConfirmed, paid: passPurchased, safelyPaused })}`,
       );
@@ -5607,8 +5684,9 @@ export function AutopilotWorkspace({
   const requiredWalletFunds = (reusingFundedVault ? 0 : capitalNumber) + (needsActivationPass ? passPrice : 0);
   const passFundingUnavailable = needsActivationPass && fundingWalletBalance === null;
   const passFundingInsufficient = fundingWalletBalance !== null && fundingWalletBalance + 1e-9 < requiredWalletFunds;
+  const editNotReady = autopilotPage === "edit" && Boolean(activeStrategy) && editConfiguration?.scope !== editScope;
   const startDisabled =
-    busy ||
+    busy || unchangedEdit || editNotReady ||
     !wallet ||
     !capability?.autopilot.enabled ||
     !autopilotRouteAvailable ||
@@ -5619,7 +5697,7 @@ export function AutopilotWorkspace({
     !sellAmountAtomic ||
     vaultStatus === "checking" ||
     vaultStatus === "error";
-  const startLabel = busy
+  const startLabel = unchangedEdit ? "No changes to save" : editNotReady ? "Loading current risk limits…" : busy
     ? message || "Preparing Autopilot…"
     : !wallet
       ? "Connect wallet to continue"
@@ -5644,14 +5722,25 @@ export function AutopilotWorkspace({
               : "Create & start new Autopilot";
 
   return (
-    <div className="v6-workspace autopilot-simple">
-      <div className="autopilot-workspace-actions">
-        <p>{vaultStatus === "checking" ? "Checking your Autopilot accounts…" : "Manage existing accounts below, or configure a separate strategy."}</p>
-        <button type="button" className="btn btn-primary" disabled={busy || vaultStatus === "checking"} onClick={() => { accountBeforeSetupRef.current = selectedVault; createNewVaultRef.current = true; setSelectedVault(""); setRecoveryCheck(null); setPreparedCandidate(""); setSetupOpen(true); requestAnimationFrame(() => document.getElementById("autopilot-configuration")?.scrollIntoView({ block: "start" })); }}>New Autopilot</button>
-        {selectedVault && activeStrategy && <button type="button" className="btn btn-soft" disabled={busy} onClick={() => setSetupOpen(true)}>Edit selected strategy</button>}
-      </div>
-      <section id="autopilot-configuration" className="autopilot-configuration" hidden={!setupOpen && Boolean(wallet) && vaultStatus !== "absent"}>
-      {setupOpen && <button type="button" className="btn btn-soft" disabled={busy} onClick={() => { createNewVaultRef.current = false; if (!selectedVault) setSelectedVault(vaults.find(vault => vault.toLowerCase() === accountBeforeSetupRef.current.toLowerCase()) || vaults[0] || ""); setSetupOpen(false); requestAnimationFrame(() => document.getElementById("autopilot-dashboard-controls")?.scrollIntoView({ block: "start" })); }}>Back to accounts</button>}
+    <div className="v6-workspace autopilot-simple trading-workspace-shell">
+      <TradingWorkspaceNav title="Autopilot" items={AUTOPILOT_WORKSPACE_PAGES} value={autopilotPage} disabled={busy} onChange={(page) => {
+        if (page === "create") { accountBeforeSetupRef.current = selectedVault; createNewVaultRef.current = true; setSelectedVault(""); setRecoveryCheck(null); setPreparedCandidate(""); setLaunchStage(null); }
+        else { createNewVaultRef.current = false; if (!selectedVault) setSelectedVault(accountBeforeSetupRef.current || vaults[0] || ""); }
+        if (page === "edit") setLaunchStage(null);
+        setAutopilotPage(page);
+      }} />
+      <div className="trading-workspace-content">
+      {launchStage !== null && <section className={"card autopilot-progress " + launchState} role="status" aria-live="polite">
+        <span className="eyebrow">{launchState === "complete" ? "AUTOPILOT STARTED" : launchState === "interrupted" ? "SETUP INTERRUPTED" : "SETUP IN PROGRESS"}</span>
+        <h3>{launchState === "complete" ? "Your Autopilot is running" : launchState === "interrupted" ? "Review the completed steps before continuing" : "Step " + (launchStage + 1) + " of 7"}</h3>
+        <progress max={7} value={launchState === "complete" ? 7 : launchStage} />
+        <ol>{["Check market & account", "Create or update vault", "Set asset exposure", "Set risk limits", "Allocate capital", "Authorize strategy & pass", "Start & verify"].map((label, index) => <li key={label} data-state={launchState === "complete" || index < launchStage ? "complete" : index === launchStage ? "current" : "pending"}><span>{index < launchStage || launchState === "complete" ? "✓" : index + 1}</span>{label}</li>)}</ol>
+        <p>{message}</p><small>Each wallet prompt belongs to the current step. A confirmed vault-creation transaction is only one part of setup.</small>
+      </section>}
+      <section id="autopilot-configuration" className="autopilot-configuration" hidden={!setupOpen}>
+      <fieldset className="autopilot-form-lock" disabled={busy}>
+      {autopilotPage === "edit" && <div className="card autopilot-edit-selector"><h2>Edit Autopilot</h2><p>Select the account to load its current strategy. Review changes, then save and restart.</p><AutopilotAccountPicker value={selectedVault} options={existingVaultPickerOptions} onChange={(vault) => { createNewVaultRef.current = false; setSelectedVault(vault); }} />{!vaults.length && <p>Connect the owning wallet or create an Autopilot first.</p>}{editLoadError && <p role="alert">{editLoadError}</p>}{editNotReady && !editLoadError && <p role="status">Loading the selected account’s on-chain risk limits…</p>}</div>}
+      <div hidden={autopilotPage === "edit" && (!selectedVault || editNotReady)}>
       <OpportunityRadar
         networkKey={networkKey}
         initialTimeframe={timeframe}
@@ -5660,8 +5749,8 @@ export function AutopilotWorkspace({
           onAnalyzeCandidate?.(candidate.pair, candidate.timeframe)
         }
         onPrepare={(candidate) => {
-          createNewVaultRef.current = !recoveringVault;
-          if (!recoveringVault) setSelectedVault("");
+          createNewVaultRef.current = autopilotPage === "create" && !recoveringVault;
+          if (createNewVaultRef.current) setSelectedVault("");
           setPair(candidate.pair);
           setTimeframe(candidate.timeframe);
           setStrategy(
@@ -5685,7 +5774,7 @@ export function AutopilotWorkspace({
         <section className="card autopilot-builder">
           <div className="setup-target-field" id="autopilot-setup-target">
             <span>SETUP TARGET</span>
-            <AutopilotAccountPicker value={selectedVault} options={vaultPickerOptions} onChange={(vault) => { createNewVaultRef.current = !vault; setSelectedVault(vault); setCloseConfirming(false); }} />
+            <strong>{selectedVault ? `Autopilot #${selectedVaultNumber} · ${selectedVault.slice(0, 8)}…${selectedVault.slice(-6)}` : "New owner-controlled account"}</strong>
             <small>{recoveringVault ? "This existing account has no saved strategy registration. Select its market and review every risk limit below. These are draft settings, not recovered trading instructions. Completing setup reuses this account and its available funds." : selectedVault ? (lang === "zh" ? "已载入此账户的交易对和策略。下方风险参数是待审核草案；签署更新前请逐项检查。暂停、充值和提现请使用仪表板。" : "The saved market and strategy are loaded for this account. Risk inputs below are a reviewable draft: check every limit before signing an update. Use the dashboard to pause, fund or withdraw.") : "A new isolated owner-controlled vault will be created."}</small>
           </div>
           <div className="autopilot-step-head">
@@ -5800,7 +5889,8 @@ export function AutopilotWorkspace({
               </strong>
               <small>
                 PULSE will update the policy without depositing this amount
-                again. Add or withdraw capital from Your Autopilot.
+                again. Add or withdraw capital from Dashboard.
+                {loadedEdit && <> Risk percentages use the saved configured capital of {formatUnits(BigInt(loadedEdit.capital), settlementDecimals)} {activeSettlementSymbol}, so opening Edit does not resize existing limits.</>}
               </small>
             </div>
           ) : (
@@ -6007,6 +6097,7 @@ export function AutopilotWorkspace({
                   <option value="300">5 minutes</option>
                   <option value="900">15 minutes</option>
                   <option value="3600">1 hour</option>
+                  {!["120", "300", "900", "3600"].includes(cooldownSeconds) && <option value={cooldownSeconds}>{Number(cooldownSeconds) / 60} minutes · current setting</option>}
                 </select>
               </label>
             </div>
@@ -6046,7 +6137,7 @@ export function AutopilotWorkspace({
 
           <div id="autopilot-review-target" className="autopilot-step-head">
             <span>5</span>
-            <div><small>REVIEW</small><h3>Verify the complete Autopilot</h3></div>
+            <div><small>REVIEW BEFORE SIGNING</small><h3>Review your strategy and limits</h3></div>
           </div>
 
           <div className="autopilot-review">
@@ -6085,14 +6176,14 @@ export function AutopilotWorkspace({
             {startLabel}
           </button>
           <div className="wallet-confirmation-plan">
-            <strong>Six setup steps, separate wallet confirmations</strong>
+            <strong>Wallet confirmations explained</strong>
             <p>A new Autopilot normally asks for five on-chain transactions and two signatures. Each confirmation has a different purpose:</p>
             <ol>
               <li>Create your vault, approve its asset exposure, and set risk limits (3 transactions).</li>
               <li>Transfer the initial deposit (1 transaction), then sign the strategy authorization.</li>
               <li>Sign the AI Entry Pass payment, then resume the configured vault (1 transaction).</li>
             </ol>
-            <p>Existing vaults skip creation. Existing funds and a valid pass are reused. Changing a running strategy first pauses it; changing assets may require removing the old asset. Cancelling a prompt leaves completed transactions on-chain and the vault paused until activation.</p>
+            <p>Existing vaults skip creation. Existing funds, a valid pass, and unchanged on-chain settings are reused. Changing a running strategy first pauses it; changing assets may require removing the old asset. Cancelling a prompt leaves completed transactions on-chain; the progress panel shows where setup stopped.</p>
           </div>
           {sizingStatus && <div className="sizing-status">{sizingStatus}</div>}
           {vaultStatus === "error" && (
@@ -6382,9 +6473,9 @@ export function AutopilotWorkspace({
           </div>
         </aside>
       </div>
-      </section>
+      </div></fieldset></section>
 
-      <section className="card activity-dashboard autopilot-unified-dashboard">
+      <section hidden={autopilotPage !== "dashboard"} className="card activity-dashboard autopilot-unified-dashboard">
         <div className="dashboard-head">
           <div>
             <span className="eyebrow">AUTOPILOT DASHBOARD</span>
@@ -6752,7 +6843,8 @@ export function AutopilotWorkspace({
             })}
           </div>
         )}
-        <section className="autopilot-chain-activity">
+      </section>
+        <section hidden={autopilotPage !== "activity"} className="card autopilot-chain-activity">
           <div className="dashboard-head"><div><span className="eyebrow">ON-CHAIN ACTIVITY</span><h4>Wallet confirmations, fills and owner actions</h4></div><small>Separate from strategy decisions · newest first</small></div>
           {activitySyncNotice && <div className="capital-inline-warning">{activitySyncNotice}</div>}
           {activity.filter((entry) => entry.source === "autopilot").length ? activity.filter((entry) => entry.source === "autopilot").slice().sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).map((entry) => (
@@ -6765,7 +6857,7 @@ export function AutopilotWorkspace({
             </div>
           )) : <div className="empty-dashboard compact"><strong>No on-chain activity yet</strong><span>Wallet confirmations and executed trades will appear here.</span></div>}
         </section>
-      </section>
+      </div>
     </div>
   );
 

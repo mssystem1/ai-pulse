@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { readAutopilotConfiguration } from "./autopilotConfiguration.js";
 import { z } from "zod";
 import {
   createWalletClient,
@@ -12,14 +13,15 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { put } from "@vercel/blob";
-import { buildMarketContext } from "@pulse/market";
+import { opportunityUniverse } from "./opportunityUniverse.js";
+import { buildMarketContext, listSpotInstruments } from "@pulse/market";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, assertRobinhoodAutomationHistory } from "./robinhoodMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
-import { analysisSymbolForExecutionToken, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
+import { analysisSymbolForExecutionToken, getOkxTradeTokens, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
 import { listV6Activity, recordV6Activity, confirmV6Activity, reconcileV6Activity } from "./v6Store.js";
 import { autopilotExecutionFailure, pendingAutopilotTrade, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
 import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
@@ -315,27 +317,32 @@ const POTENTIAL_GAINER_PAIRS = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT",
 const potentialGainerCache = new Map<string, { expiresAt: number; value: unknown[] }>();
 const potentialGainerInflight = new Map<string, Promise<unknown[]>>();
 
-async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D") {
-  const cached = potentialGainerCache.get(timeframe);
+async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D", cfg: AppConfig, network: "xlayer" | "base" | "arbitrum", erc20: boolean) {
+  const cacheKey = `${network}:${erc20 ? "erc20" : "wallet"}:${timeframe}`;
+  const cached = potentialGainerCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
   if (kvConfigured()) {
-    const persisted = await kv(["GET", `pulse:v6:autopilot:potential-gainers:${timeframe}`]).catch(() => null);
+    const persisted = await kv(["GET", `pulse:v6:autopilot:potential-gainers:v2:${cacheKey}`]).catch(() => null);
     if (typeof persisted === "string") {
       try {
         const value = JSON.parse(persisted) as unknown[];
-        potentialGainerCache.set(timeframe, { value, expiresAt: Date.now() + 60_000 });
+        potentialGainerCache.set(cacheKey, { value, expiresAt: Date.now() + 60_000 });
         return value;
       } catch {
         // Rebuild an invalid cache entry from authoritative OKX candles.
       }
     }
   }
-  const pending = potentialGainerInflight.get(timeframe);
+  const pending = potentialGainerInflight.get(cacheKey);
   if (pending) return pending;
   const request = (async () => {
+    const chainId = network === "arbitrum" ? "42161" : network === "base" ? "8453" : "196";
+    const [tokens, instruments] = await Promise.all([getOkxTradeTokens(cfg, chainId, "", 5000), listSpotInstruments(5000)]);
+    const universe = opportunityUniverse({ chainId, erc20, tokens, instruments, researchPairs: POTENTIAL_GAINER_PAIRS });
+    const scanPairs = universe.pairs;
     const rows: Array<Record<string, unknown>> = [];
-    for (let offset = 0; offset < POTENTIAL_GAINER_PAIRS.length; offset += 3) {
-      const batch = POTENTIAL_GAINER_PAIRS.slice(offset, offset + 3);
+    for (let offset = 0; offset < scanPairs.length; offset += 3) {
+      const batch = scanPairs.slice(offset, offset + 3);
       const results = await Promise.all(batch.map(async (pair) => {
         try {
           const market = await buildMarketContext({ instId: pair, timeframe, candleLimit: 120 });
@@ -368,11 +375,11 @@ async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D") {
     // Keep the full scan so network filtering cannot hide supported pairs that
     // ranked below research-only assets in a global top-eight list.
     const value = rows.sort((a, b) => Number(b.technicalReady) - Number(a.technicalReady) || Number(b.score) - Number(a.score));
-    potentialGainerCache.set(timeframe, { value, expiresAt: Date.now() + 5 * 60_000 });
-    if (kvConfigured()) await kv(["SET", `pulse:v6:autopilot:potential-gainers:${timeframe}`, JSON.stringify(value), "EX", 300]).catch(() => undefined);
+    potentialGainerCache.set(cacheKey, { value, expiresAt: Date.now() + 5 * 60_000 });
+    if (kvConfigured()) await kv(["SET", `pulse:v6:autopilot:potential-gainers:v2:${cacheKey}`, JSON.stringify(value), "EX", 300]).catch(() => undefined);
     return value;
-  })().finally(() => potentialGainerInflight.delete(timeframe));
-  potentialGainerInflight.set(timeframe, request);
+  })().finally(() => potentialGainerInflight.delete(cacheKey));
+  potentialGainerInflight.set(cacheKey, request);
   return request;
 }
 async function list(allowCached = true) {
@@ -693,10 +700,19 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     res.setHeader("Cache-Control", "no-store");
     res.json({ ready: true });
   }));
+  router.get("/v1/autopilot/configuration", asyncRoute(async (req, res) => {
+    const parsed = z.object({ network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]), vault: z.string().regex(/^0x[a-fA-F0-9]{40}$/), asset: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: "Select a valid network, vault and asset" });
+    res.setHeader("Cache-Control", "no-store");
+    const { network, vault, asset } = parsed.data;
+    res.json({ configuration: await readAutopilotConfiguration(network, vault as `0x${string}`, asset as `0x${string}`) });
+  }));
   const potentialGainersHandler = asyncRoute(async (req, res) => {
     const parsed = z.enum(["15m", "1H", "4H", "1D"]).safeParse(String(req.query.timeframe || "1H"));
     if (!parsed.success) return res.status(400).json({ error: "timeframe must be 15m, 1H, 4H or 1D" });
-    const candidates = await scanPotentialGainers(parsed.data);
+    const network = z.enum(["xlayer", "base", "arbitrum"]).safeParse(req.query.network || "xlayer");
+    if (!network.success) return res.status(400).json({ error: "Select a supported execution network" });
+    const candidates = await scanPotentialGainers(parsed.data, cfg, network.data, req.query.custody === "erc20");
     res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=240");
     res.json({ candidates, methodology: "Read-only OKX candle prefilter. Score is not a forecast or trading authorization. Global research and Autopilot setup are separate workflows; selected-network route validation is always required.", premiumRequired: false, routeCheckedAfterSelection: true });
   });

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { apiGet } from "./api";
 import { useExecutionAvailability } from "./executionAvailability";
@@ -239,6 +239,7 @@ export function TimeframePicker({
   const [mobile, setMobile] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const [popoverPosition, setPopoverPosition] = useState<CSSProperties>({});
   const network = WEB_NETWORKS[networkKey];
   const visibleOptions = values?.length
     ? timeframeOptions.filter((item) => values.includes(item.value))
@@ -277,10 +278,24 @@ export function TimeframePicker({
     };
   }, [open]);
 
+  useLayoutEffect(() => {
+    if (!open || mobile) return;
+    const position = () => {
+      const anchor = rootRef.current?.getBoundingClientRect();
+      if (!anchor) return;
+      const width = Math.min(384, window.innerWidth - 24);
+      const height = Math.min(480, window.innerHeight - 24);
+      setPopoverPosition({ position: "fixed", zIndex: 1000, width, left: Math.max(12, Math.min(anchor.right - width, window.innerWidth - width - 12)), top: Math.max(12, Math.min(anchor.bottom + 8, window.innerHeight - height - 12)), right: "auto", bottom: "auto", maxHeight: height, overflowY: "auto" });
+    };
+    position(); window.addEventListener("resize", position); window.addEventListener("scroll", position, true);
+    return () => { window.removeEventListener("resize", position); window.removeEventListener("scroll", position, true); };
+  }, [open, mobile]);
+
   const popover = open ? (
     <div
       ref={popoverRef}
       className="timeframe-popover"
+      style={mobile ? undefined : popoverPosition}
       role="listbox"
       aria-label={purpose === "strategy" ? "Strategy decision timeframe" : "Analysis timeframe"}
     >
@@ -357,7 +372,7 @@ export function TimeframePicker({
           </svg>
         </span>
       </button>
-      {popover && (mobile ? createPortal(popover, document.body) : popover)}
+      {popover && createPortal(popover, document.body)}
     </div>
   );
 }
@@ -419,10 +434,8 @@ export function MarketPairPicker({
   }, [open, query, reload]);
 
   const [base, quote] = value.split("-");
-  const visibleItems =
-    assetFilter === "all"
-      ? items
-      : items.filter((item) => item.assetClass === assetFilter);
+  const visibleItems = (assetFilter === "all" ? [...items] : items.filter((item) => item.assetClass === assetFilter))
+    .sort((a, b) => Number(executionAvailability(b.instId).mapped) - Number(executionAvailability(a.instId).mapped));
   return (
     <>
       <button

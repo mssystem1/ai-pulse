@@ -1,0 +1,44 @@
+.trading-workspace-shell { display:grid; grid-template-columns:240px minmax(0,1fr); gap:24px; align-items:start; }
+.trading-workspace-content { min-width:0; display:grid; gap:20px; }
+.trading-workspace-content > section { min-width:0; }
+.trading-workspace-shell [hidden] { display:none !important; }
+.trading-workspace-nav { position:sticky; top:94px; padding:14px; border:1px solid var(--line); border-radius:22px; background:linear-gradient(155deg,color-mix(in srgb,var(--mint) 9%,var(--card)),var(--card) 65%); box-shadow:0 16px 40px #0002; display:grid; gap:8px; }
+.trading-nav-heading { display:grid; gap:8px; padding:12px 8px 20px; }
+.trading-nav-heading > strong { font:800 1.4rem var(--display); }
+.trading-nav-heading > span:last-child { font-size:.7rem; color:var(--muted); }
+.trading-workspace-nav button { width:100%; display:grid; grid-template-columns:24px minmax(0,1fr) 12px; gap:9px; align-items:center; text-align:left; padding:15px 10px; border:1px solid transparent; border-radius:14px; background:transparent; color:var(--muted); cursor:pointer; }
+.trading-workspace-nav button > span:nth-child(2) { display:grid; gap:6px; }
+.trading-workspace-nav button strong { color:var(--text); font:700 .82rem var(--display); }
+.trading-workspace-nav button small { font-size:.62rem; line-height:1.55; }
+.trading-nav-number { font-size:.65rem; font-weight:800; }
+.trading-workspace-nav button[aria-current="page"] { color:var(--mint); background:color-mix(in srgb,var(--mint) 12%,var(--card)); border-color:var(--mint); box-shadow:inset 3px 0 var(--mint); }
+.trading-workspace-nav button:hover:not(:disabled) { background:color-mix(in srgb,var(--mint) 7%,var(--card)); }
+.trading-workspace-nav button:disabled { cursor:wait; opacity:.55; }
+.trading-workspace-content .spot-trade-layout { grid-template-columns:minmax(0,1fr); }
+.trading-workspace-content .potential-gainer-grid { grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); }
+.trading-workspace-content .candidate-actions { display:flex; flex-direction:column; }
+.trading-workspace-content .candidate-actions .btn { width:100%; white-space:normal; }
+.autopilot-progress { border-color:var(--mint); }
+.autopilot-progress progress { width:100%; height:7px; accent-color:var(--mint); }
+.autopilot-progress ol { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; padding:0; list-style:none; }
+.autopilot-progress li { display:flex; align-items:center; gap:8px; padding:10px; border:1px solid var(--line); border-radius:10px; font-size:.7rem; color:var(--muted); }
+.autopilot-progress li span { font-weight:800; }
+.autopilot-progress li[data-state="current"] { border-color:var(--mint); color:var(--text); }
+.autopilot-progress li[data-state="complete"] { color:var(--mint); }
+.autopilot-progress.interrupted { border-color:var(--amber,#ffba55); }
+.autopilot-edit-selector { margin-bottom:20px; }
+.autopilot-form-lock { border:0; padding:0; margin:0; min-width:0; }
+.trading-workspace-content section[aria-label="Trade setup workspace"] { display:grid; gap:20px; }
+.global-market-reference .shortlist-market-snapshot { width:100%; max-width:none; }
+.global-market-reference .shortlist-sparkline { height:110px; }
+.market-auto-status { color:var(--muted); font-size:.65rem; align-self:center; }
+@media(max-width:1000px) {
+  .trading-workspace-shell { grid-template-columns:minmax(0,1fr); }
+  .trading-workspace-nav { position:static; grid-template-columns:repeat(2,minmax(0,1fr)); padding:10px; }
+  .trading-nav-heading { grid-column:1/-1; padding:8px; }
+  .trading-workspace-nav button { padding:12px 8px; }
+}
+@media(max-width:440px) {
+  .trading-workspace-nav button { grid-template-columns:18px minmax(0,1fr); }
+  .trading-workspace-nav button > span:last-child { display:none; }
+}

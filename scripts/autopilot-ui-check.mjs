@@ -1,6 +1,8 @@
 // Local browser regression tests. All API/RPC traffic is fulfilled by fixtures;
-// no private key, signing, external API request or production write is possible.
+// Wallet responses are simulated: no private key, real signing, external API
+// request or production write is possible.
 import assert from "node:assert/strict";
+import { keccak256, toHex, toFunctionSelector } from "viem";
 import { mkdir } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 const { chromium } = await import(process.env.PLAYWRIGHT_MODULE ? pathToFileURL(process.env.PLAYWRIGHT_MODULE).href : "playwright");
@@ -35,6 +37,8 @@ try {
       if (url.pathname.includes("opportunities")) { scans++; return json({ candidates }); }
       if (url.pathname.includes("capabilities")) return json({ network: "base", spot: { visible: true, enabled: true }, autopilot: { visible: true, enabled: true }, contracts: { autopilotFactory: addresses[0] } });
       if (url.pathname.includes("/strategies")) return json({ persistence: { state: "online" }, strategies: [{ id: "base:fixture", vault: addresses[1], owner, network: "base", pair: "DOGE-USDT", timeframe: "4H", policy: { strategy: "Breakout", maxTradePct: 50, dailyLossPct: 3 }, status: "active", runtimeState: "paused", paused: true, settlementAsset: settlement, settlementBalance: "700000", portfolioValueAtomic: "700000", pnlAtomic: null, pnlCashFlow: { state: "recovering", progressPct: 42, detail: "Historical cash-flow recovery is in progress; PnL waits for complete coverage." }, settlementDecimals: 6, settlementSymbol: "USDC", targetAsset: addresses[0], targetBalance: "0", targetDecimals: 18, targetSymbol: "DOGE", evaluations: [], aiPass: { expiresAt: new Date(Date.now() + 86400000).toISOString(), pausedAt: new Date().toISOString(), signalLimit: 3, signalsUsed: 0 } }] });
+      if (url.pathname.includes('/autopilot/configuration')) return json({configuration:{maxTradeValue:'350000',dailyTurnoverCap:'700000',exposureCap:'420000',maxSlippageBps:'75',maxDailyLossBps:'250',cooldown:'600',expiry:String(Math.floor(Date.now()/1000)+86400),assetAllowed:true,paused:true,targetBalance:'0',policyHash:keccak256(toHex(JSON.stringify({pair:'DOGE-USDT',timeframe:'4H',maxTradePct:50,dailyLossPct:2.5,strategy:'Breakout'})))}});
+      if (url.pathname.endsWith('/trading/quote')) return json({quote:{toTokenAmount:'1000000000000000'}});
       if (url.pathname.includes("/accounts")) return json({ accounts: { protection: null, limit: null, bracket: null }, vaults: addresses.map((address, i) => ({ address, settlementAsset: settlement, settlementSymbol: "USDC", settlementDecimals: 6, balanceAtomic: i === 0 ? "0" : i === 1 ? "700000" : "200000", paused: true })) });
       if (url.pathname.includes("/activity")) return json({ activity: [], persistence: { state: "online" } });
       if (url.pathname.endsWith("/pairs")) return json({ pairs: candidates.map(item => ({ pair: item.pair, baseSymbol: item.pair.split("-")[0], quoteSymbol: "USDC" })) });
@@ -72,25 +76,28 @@ try {
     assert.match(await page.locator('#autopilot-setup-target').innerText(), /draft settings, not recovered trading instructions/);
     await page.getByRole('button', { name: 'Use for Autopilot', exact: true }).first().click();
     await page.getByRole('heading', { name: 'Finish Autopilot #4 setup', exact: true }).waitFor();
+    await page.getByRole('navigation',{name:'Autopilot navigation'}).getByRole('button',{name:'Dashboard',exact:true}).click();
     await page.locator(`#autopilot-journal-${addresses[1]} > summary`).click();
     assert.equal(await page.locator(`#autopilot-journal-${addresses[1]}`).evaluate(el => el.open), true);
     await page.getByRole("button", { name: "Open Autopilot #2 controls", exact: true }).click();
     await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
     assert.match(await page.locator('.cash-flow-coverage').innerText(), /Synchronizing · 42%/);
     assert.match(await page.locator('.cash-flow-coverage').innerText(), /No new payment is needed/);
-    await page.getByRole('button',{name:'New Autopilot',exact:true}).click();
+    await page.getByRole('button',{name:'Create new Autopilot',exact:true}).click();
     assert.equal(await page.locator('#autopilot-configuration').isVisible(),true);
-    await page.getByRole('button',{name:'Back to accounts',exact:true}).click();
+    await page.getByRole('navigation',{name:'Autopilot navigation'}).getByRole('button',{name:'Dashboard',exact:true}).click();
     assert.equal(await page.locator('#autopilot-configuration').isVisible(),false);
     await page.waitForFunction(() => !Array.from(document.querySelectorAll('button')).find(b => b.textContent === 'Resume · run timer')?.disabled);
     // Restore the setup drawer only to exercise its optional shortlist below.
-    await page.getByRole('button',{name:'Edit selected strategy',exact:true}).click();
+    await page.getByRole('button',{name:'Edit Autopilot',exact:true}).click();
+    await page.getByRole('button',{name:'No changes to save',exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'No changes to save',exact:true}).isDisabled(),true);
     }
     const countBefore = scans;
     await page.getByRole("button", { name: /Show \d+ more candidates/ }).click();
     assert.equal(await page.locator(".potential-gainer-grid>article").count(), 8);
     assert.equal(await page.locator('.potential-gainer-grid .shortlist-sparkline').count(), 8, 'Global, Spot and Autopilot all provide market charts');
-    const allShown = page.getByRole("button", { name: /All 8 candidates shown/ });
+    const allShown = page.getByRole("button", { name: /8 candidates shown/ });
     assert.equal(await allShown.isDisabled(), true);
     await allShown.evaluate(button => { button.click(); button.click(); button.click(); });
     assert.equal(scans, countBefore, "expansion does not refetch market data");
@@ -99,6 +106,32 @@ try {
     assert.equal(await page.locator(".potential-gainer-grid>article").count(), width < 650 ? 2 : 4);
     await page.screenshot({ path: `.codex-ui-review/${context}-${width}.png`, fullPage: true });
     if (context === "autopilot") {
+    await page.evaluate(() => {
+      window.testTransactions = [];
+      window.confirmResume = false;
+      window.ethereum = { request: async ({method,params}) => {
+        if (method === 'eth_chainId') return '0x2105';
+        if (method === 'wallet_switchEthereumChain') return null;
+        if (method === 'personal_sign') return '0x' + 'ab'.repeat(65);
+        if (method === 'eth_sendTransaction') { window.testTransactions.push(params[0]); return '0x' + String(window.testTransactions.length).padStart(64,'0'); }
+        if (method === 'eth_getTransactionReceipt') return params[0].endsWith('1') || window.confirmResume ? {status:'0x1'} : null;
+        throw new Error('Unexpected wallet method: '+method);
+      }};
+    });
+    await page.locator('.autopilot-advanced > summary').click();
+    await page.getByLabel('Maximum slippage', {exact:false}).fill('0.8');
+    const save = page.getByRole('button',{name:/Save.*restart/i});
+    await save.click();
+    await page.waitForFunction(() => window.testTransactions.length === 2);
+    assert.equal(await page.locator('#autopilot-configuration').isVisible(),true,'stay in progress until resume receipt');
+    assert.equal(await page.getByRole('button',{name:'Dashboard',exact:true}).isDisabled(),true);
+    const selectors = await page.evaluate(() => window.testTransactions.map(tx=>tx.data.slice(0,10)));
+    assert.deepEqual(selectors,[toFunctionSelector('configureLimits(uint128,uint128,uint16,uint16,uint64,uint64)'),toFunctionSelector('setPaused(bool)')],'only changed limits and restart need transactions');
+    await page.evaluate(() => {window.confirmResume=true;});
+    await page.waitForFunction(() => document.querySelector('#autopilot-configuration')?.hidden);
+    assert.match(await page.locator('.autopilot-progress').innerText(),/complete|running/i);
+    console.log(`PASS mocked edit ${width}px: only changed limits signed; no duplicate funding or policy; completion waits for receipt.`);
+    await page.getByRole('navigation',{name:'Autopilot navigation'}).getByRole('button',{name:'Dashboard',exact:true}).click();
     await page.locator(".order-monitor").last().screenshot({ path: `.codex-ui-review/autopilot-accounts-${width}.png` });
     await page.locator("#autopilot-dashboard-controls").screenshot({ path: `.codex-ui-review/autopilot-controls-${width}.png` });
     }
