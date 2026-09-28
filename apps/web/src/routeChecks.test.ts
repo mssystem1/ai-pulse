@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRouteChecks, routeSortRank, type RouteCheck } from "./routeChecks";
+import { createRouteChecks, routeSortRank, scanRoutePairs, type RouteCheck } from "./routeChecks";
 
 test("route checks deduplicate, expire and isolate network and custody", async () => {
   let time = 0, calls = 0;
@@ -29,6 +29,20 @@ test("route-first ordering updates on completion without losing chain/custody is
   assert.equal(updates,2);
   unsubscribe(); time=60_001;
   assert.equal(check.peek("arbitrum", "CRV", "wallet"),undefined);
+});
+
+test("route-only scans discover offscreen assets with bounded concurrency and stop on close", async () => {
+  let active=0, peak=0;
+  const progress: number[]=[];
+  await scanRoutePairs(["A","B","C","D"],async pair=>{
+    active++;peak=Math.max(peak,active);
+    await new Promise(resolve=>setTimeout(resolve,1));active--;
+    return {status:pair==="D"?"available":"unavailable"};
+  },()=>false,(checked)=>progress.push(checked));
+  assert.equal(peak,2);assert.deepEqual(progress,[1,2,3,4]);
+  let cancelled=false,calls=0;
+  await scanRoutePairs(["A","B","C","D"],async()=>{calls++;cancelled=true;return {status:"available"};},()=>cancelled,()=>assert.fail("closed scan must not publish"));
+  assert.equal(calls,1);
 });
 
 test("automatic catalog checks cap concurrency and recover after transport failure", async () => {

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSP
 import { createPortal } from "react-dom";
 import { apiGet } from "./api";
 import { useExecutionAvailability } from "./executionAvailability";
-import { RouteAvailability, checkRoute, useRouteResults } from "./RouteAvailability";
+import { RouteAvailability, checkRoute, useRouteResults, useRouteCatalogScan } from "./RouteAvailability";
 import { routeSortRank } from "./routeChecks";
 import type { Lang } from "./i18n";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
@@ -31,6 +31,16 @@ function AssetCategoryFilters({ value, onChange, items }: { value: AssetFilter; 
       return <button type="button" key={category} aria-pressed={value === category} className={value === category ? "is-active" : ""} onClick={() => onChange(category)}>{category === "all" ? "All" : assetClassLabel[category]} <span>({count})</span></button>;
     })}
   </div>;
+}
+
+function RouteFilter({ active, onChange, count, total, progress }: { active: boolean; onChange: (value: boolean) => void; count: number; total: number; progress: { checked: number; errors: number; scanning: boolean } }) {
+  return <>
+    <div className="asset-filter-row" role="group" aria-label="Route availability">
+      <button type="button" aria-pressed={!active} className={!active ? "is-active" : ""} onClick={() => onChange(false)}>All assets</button>
+      <button type="button" aria-pressed={active} className={active ? "is-active" : ""} onClick={() => onChange(true)}>Route available ({count})</button>
+    </div>
+    {active && <p className="picker-disclosure" role="status">{progress.scanning ? `Checking routes · ${progress.checked} of ${total} mapped pairs checked. Results appear automatically.` : `Route scan complete · ${progress.checked} mapped pairs checked.`}{progress.errors > 0 ? ` ${progress.errors} checks could not be completed; those pairs are excluded until verified.` : ""}</p>}
+  </>;
 }
 
 export type XLayerToken = {
@@ -412,6 +422,10 @@ export function MarketPairPicker({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
+  const [routedOnly, setRoutedOnly] = useState(false);
+  const mappedPairs = items.filter(item => executionAvailability(item.instId).mapped).map(item => item.instId);
+  const routeScan = useRouteCatalogScan(networkKey, mappedPairs, "wallet", open && routedOnly);
+  const routedCount = mappedPairs.filter(pair => routeResult(networkKey, pair, "wallet")?.status === "available").length;
 
   useEffect(() => {
     if (!open) return;
@@ -448,6 +462,7 @@ export function MarketPairPicker({
 
   const [base, quote] = value.split("-");
   const visibleItems = (assetFilter === "all" ? [...items] : items.filter((item) => item.assetClass === assetFilter))
+    .filter(item => !routedOnly || (executionAvailability(item.instId).mapped && routeResult(networkKey, item.instId, "wallet")?.status === "available"))
     .sort((a, b) => routeSortRank(executionAvailability(a.instId).mapped, routeResult(networkKey, a.instId, "wallet")) - routeSortRank(executionAvailability(b.instId).mapped, routeResult(networkKey, b.instId, "wallet")));
   return (
     <>
@@ -501,6 +516,7 @@ export function MarketPairPicker({
           />
         </div>
         <AssetCategoryFilters value={assetFilter} onChange={setAssetFilter} items={items}/>
+        <RouteFilter active={routedOnly} onChange={setRoutedOnly} count={routedCount} total={mappedPairs.length} progress={routeScan}/>
         <div className="picker-disclosure">
           Global Market includes crypto and OKX-listed tokenized assets.
           Analysis availability does not guarantee an identity-safe on-chain
@@ -525,7 +541,7 @@ export function MarketPairPicker({
             </div>
           )}
           {!loading && !error && !visibleItems.length && (
-            <div className="picker-state">{c.pairEmpty}</div>
+            <div className="picker-state">{routedOnly ? routeScan.scanning ? "Checking this network’s routes…" : "No verified routes match this category and search on the selected network." : c.pairEmpty}</div>
           )}
           {visibleItems.map((item) => (
             <button
@@ -584,6 +600,9 @@ export function ExecutionPairPicker({
   const [verifyingPair, setVerifyingPair] = useState("");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const routeResult = useRouteResults();
+  const [routedOnly, setRoutedOnly] = useState(false);
+  const routeScan = useRouteCatalogScan(networkKey, items.map(item => item.pair), custody, open && routedOnly);
+  const routedCount = items.filter(item => routeResult(networkKey, item.pair, custody)?.status === "available").length;
   const selectionScope = `${networkKey}:${custody}:${open}`;
   const selectionScopeRef = useRef(selectionScope);
   selectionScopeRef.current = selectionScope;
@@ -612,6 +631,7 @@ export function ExecutionPairPicker({
 
   const [rawBase, quote] = value.split("-");
   const visibleItems = items.filter(item => assetFilter === "all" || (item.assetClass || "crypto") === assetFilter)
+    .filter(item => !routedOnly || routeResult(networkKey, item.pair, custody)?.status === "available")
     .sort((a, b) => routeSortRank(true, routeResult(networkKey, a.pair, custody)) - routeSortRank(true, routeResult(networkKey, b.pair, custody)));
   const base = networkKey === "robinhood" ? rawBase.replace(/\.[A-F0-9]{16}$/, "") : rawBase;
   return <>
@@ -622,6 +642,7 @@ export function ExecutionPairPicker({
     <PickerDialog open={open} title={`Choose a live pair on ${network.label}`} lead={`PULSE verifies the identity-safe token and a live OKX Onchain OS route before accepting your choice. A token contract by itself is not enough.`} closeLabel="Close" onClose={() => setOpen(false)}>
       <div className="picker-search-wrap"><span aria-hidden="true">⌕</span><input autoFocus className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, DOGE or token name…" aria-label="Search executable pairs"/></div>
       <AssetCategoryFilters value={assetFilter} onChange={setAssetFilter} items={items}/>
+      <RouteFilter active={routedOnly} onChange={setRoutedOnly} count={routedCount} total={items.length} progress={routeScan}/>
       <div className="picker-disclosure">{networkKey === "robinhood"
         ? "Choose an asset by name or contract address. Trades settle in USDG. Visible routes are checked automatically; Autopilot also requires usable price history."
         : "Verified live routes appear first, followed by assets still being checked, then unavailable routes. Checks run automatically as you browse; your order amount is quoted again before signing."}</div>
@@ -629,7 +650,7 @@ export function ExecutionPairPicker({
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}
         {error && <div className="picker-state error-state"><span>{error}</span><button type="button" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
-        {!loading && !error && !visibleItems.length && <div className="picker-state">No matching assets in this category on {network.label}. Choose All or change your search.</div>}
+        {!loading && !error && !visibleItems.length && <div className="picker-state">{routedOnly && routeScan.scanning ? "Checking this network’s routes…" : `No ${routedOnly ? "verified routes" : "matching assets"} in this category on ${network.label}. Change your filters or search.`}</div>}
         {visibleItems.map((item) => { const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""}`} key={`${networkKey}-${custody}-${item.pair}-${item.token.address}`} onClick={() => {
           setVerifyingPair(item.pair);
           void checkRoute(networkKey, item.pair, custody).then((result) => {

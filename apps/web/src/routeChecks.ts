@@ -47,3 +47,17 @@ export function routeSortRank(mapped: boolean, result?: RouteCheck) {
   if (result?.status === "error") return 2;
   return 1;
 }
+
+export async function scanRoutePairs(pairs: readonly string[], check: (pair: string) => Promise<RouteCheck>, cancelled: () => boolean, progress: (checked: number, errors: number) => void) {
+  let next = 0, checked = 0, errors = 0;
+  const worker = async () => {
+    while (!cancelled() && next < pairs.length) {
+      const pair = pairs[next++];
+      const result = await check(pair);
+      if (cancelled()) return;
+      checked++; if (result.status === "error") errors++;
+      progress(checked, errors);
+    }
+  };
+  await Promise.all([worker(), worker()]);
+}

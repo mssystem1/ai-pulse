@@ -23,6 +23,12 @@ Provider rate-limit, timeout and authentication errors now return an unavailable
 
 ## Boundaries
 
+The three pair pickers also offer a separate **Route available** filter that combines with asset categories. Opening it scans the loaded mapped catalog, including offscreen rows, with two concurrent checks and progress reporting. Only successful checks for the selected network and custody mode qualify; switching networks cannot reuse another network's results. Closing the picker stops scheduling further checks. These are provider API requests, not AI screening calls.
+
+Route status currently refers to **OKX**. Read-only Arbitrum checks returned OKX code `82000` (insufficient liquidity) for AAPLx, SPYx, BSPx and BEx; AAPLx and SPYx also failed a ten-USDC probe. This does not establish absence of liquidity at other providers. PAXG and XAUT were not mapped in the tested catalog.
+
+Coinbase CDP is already integrated in `apps/api/src/cdpSwap.ts`, but only for native ETH-to-USDC funding on Base and Arbitrum. General pair resolution, trading preparation and Autopilot currently call OKX. [Coinbase's ERC-20 swap API](https://docs.cdp.coinbase.com/api-reference/v2/rest-api/evm-swaps/create-swap-quote) includes a Permit2 signing payload. The present swap adapter only approves a spender and calls an allowlisted router; Coinbase execution therefore requires explicit signing and adapter compatibility work. A Coinbase quote alone must not qualify an asset for automated execution. General Coinbase routing is not implemented by this filter update.
+
 Deployment metadata is not a liquidity guarantee. Added candidates still need a fresh route; actual order amounts are quoted again before signing. Global-linked execution still requires a live matching analysis instrument. Unsupported DEX-only assets are not relabeled as exchange-listed assets, and staking derivatives are not substituted for their underlying coin. This update does not fabricate additional X Layer contracts or guarantee liquidity for every tokenized stock.
 
 ## Validation
