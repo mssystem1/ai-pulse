@@ -12,6 +12,7 @@ import {
 import { API_BASE, apiGet, apiPost } from "./api";
 import { parseExecutionCapability, type ExecutionCapability as Capability } from "./executionCapability";
 import { useExecutionAvailability } from "./executionAvailability";
+import { RouteAvailability } from "./RouteAvailability";
 import { ASSESSMENT_EVENT, currentOpportunityAssessment, isConfirmedSpotSetup, readOpportunityAssessments } from "./opportunityAssessment";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
@@ -523,7 +524,7 @@ export function OpportunityRadar({
                 </div>
                 <small>Technical match {candidate.score}/100 · {candidate.technicalReady ? "candle conditions met" : "waiting for candle conditions"}</small>
                 <p>{candidate.reason}</p>
-                <small className="execution-availability" data-status={executionAvailability(candidate.pair).status}>{executionAvailability(candidate.pair).label}</small>
+                <RouteAvailability network={networkKey} pair={candidate.pair} custody={context === "autopilot" ? "erc20" : "wallet"} mapped={executionAvailability(candidate.pair).mapped} fallback={executionAvailability(candidate.pair).label}/>
                 <small>
                   {candidate.strategyType.replaceAll("_", " ")} · RSI{" "}
                   {candidate.rsi14.toFixed(1)} · volume{" "}

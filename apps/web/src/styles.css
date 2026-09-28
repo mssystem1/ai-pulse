@@ -1260,6 +1260,8 @@ html[data-pulse-theme="base"] .trade-mode-tabs button.active,html[data-pulse-the
 @media(max-width:350px){.overview-metrics{grid-template-columns:1fr}.overview-metrics>button{min-height:0}.overview-strategy-list dl{grid-template-columns:1fr}}
 .execution-availability{display:block;padding:8px 10px;border:1px solid var(--line);border-radius:8px;color:var(--muted);font-size:.68rem;line-height:1.5;overflow-wrap:anywhere;margin:8px 0}
 .execution-availability[data-status="mapped"]{color:var(--mint)}
+.execution-availability[data-status="available"]{color:var(--mint)}
+.execution-availability[data-status="unavailable"],.execution-availability[data-status="error"]{color:var(--warn)}
 .execution-availability[data-status="research"]{color:var(--warn)}
 .provider-assessment{border:1px solid var(--line);border-radius:12px;padding:14px;margin:16px 0}
 .provider-assessment p{font-size:.75rem;line-height:1.6;color:var(--muted)}

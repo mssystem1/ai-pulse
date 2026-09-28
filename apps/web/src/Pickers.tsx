@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSP
 import { createPortal } from "react-dom";
 import { apiGet } from "./api";
 import { useExecutionAvailability } from "./executionAvailability";
+import { RouteAvailability, checkRoute } from "./RouteAvailability";
 import type { Lang } from "./i18n";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { NetworkLogo } from "./NetworkLogo";
@@ -550,14 +551,14 @@ export function MarketPairPicker({
                   <i>/</i>
                   {item.quoteCcy}
                 </strong>
-                <small>{executionAvailability(item.instId).label}</small>
+                <RouteAvailability network={networkKey} pair={item.instId} mapped={executionAvailability(item.instId).mapped} fallback={executionAvailability(item.instId).label} enabled={open}/>
               </span>
               <span className="pair-item-status">
                 <small className={`asset-class-badge ${item.assetClass}`}>
                   {assetClassLabel[item.assetClass]}
                 </small>
                 <span className="live-chip">
-                  {item.instId === value ? c.selected : "LIVE"}
+                  {item.instId === value ? c.selected : "OKX LISTED"}
                 </span>
               </span>
             </button>
@@ -588,8 +589,12 @@ export function ExecutionPairPicker({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [verifyingPair, setVerifyingPair] = useState("");
-  const [unavailable, setUnavailable] = useState<Record<string, string>>({});
+  const selectionScope = `${networkKey}:${custody}:${open}`;
+  const selectionScopeRef = useRef(selectionScope);
+  selectionScopeRef.current = selectionScope;
   const network = WEB_NETWORKS[networkKey];
+
+  useEffect(() => { setItems([]); setError(null); setVerifyingPair(""); }, [networkKey, custody]);
 
   useEffect(() => {
     if (!open || networkKey === "arc-testnet") return;
@@ -620,28 +625,28 @@ export function ExecutionPairPicker({
     <PickerDialog open={open} title={`Choose a live pair on ${network.label}`} lead={`PULSE verifies the identity-safe token and a live OKX Onchain OS route before accepting your choice. A token contract by itself is not enough.`} closeLabel="Close" onClose={() => setOpen(false)}>
       <div className="picker-search-wrap"><span aria-hidden="true">⌕</span><input autoFocus className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, DOGE or token name…" aria-label="Search executable pairs"/></div>
       <div className="picker-disclosure">{networkKey === "robinhood"
-        ? "Choose an asset by name or contract address. Trades settle in USDG. A live route is checked on selection; Autopilot also requires usable price history."
-        : "The left name is the market symbol. The right name is its verified on-chain representation. Select it to run the final live route check; unavailable choices remain unselected."}</div>
+        ? "Choose an asset by name or contract address. Trades settle in USDG. Visible routes are checked automatically; Autopilot also requires usable price history."
+        : "Mapped assets are listed below. Routes are checked automatically as you browse. Your actual order is quoted again for its amount before signing."}</div>
       <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{items.length} results</span></div>
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}
         {error && <div className="picker-state error-state"><span>{error}</span><button type="button" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
         {!loading && !error && !items.length && <div className="picker-state">No matching on-chain asset found on this network.</div>}
-        {items.map((item) => { const unavailableReason = unavailable[item.pair]; const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair) || Boolean(unavailableReason)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""} ${unavailableReason ? "is-unavailable" : ""}`} key={`${item.pair}-${item.token.address}`} onClick={() => {
+        {items.map((item) => { const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""}`} key={`${networkKey}-${custody}-${item.pair}-${item.token.address}`} onClick={() => {
           setVerifyingPair(item.pair);
-          void apiGet(`/v1/trading/resolve-pair?network=${networkKey}&pair=${encodeURIComponent(item.pair)}${custody === "erc20" ? "&custody=erc20" : ""}`).then((response) => {
-            const result = response.data as { available?: boolean; reason?: string; explanation?: string };
-            if (response.ok && result.available) {
+          void checkRoute(networkKey, item.pair, custody).then((result) => {
+            if (selectionScopeRef.current !== selectionScope) return;
+            if (result.status === "available") {
               onSelect(item);
               setOpen(false);
               return;
             }
-            setUnavailable((current) => ({ ...current, [item.pair]: result.reason || `No safe live route on ${network.label}` }));
-          }).catch((reason) => setUnavailable((current) => ({ ...current, [item.pair]: reason instanceof Error ? reason.message : String(reason) }))).finally(() => setVerifyingPair(""));
+            setError(result.reason || (result.status === "error" ? "Route check temporarily unavailable. Retrying automatically." : `No live route for ${item.pair} on ${network.label}`));
+          }).finally(() => setVerifyingPair(""));
         }}>
           <span className="pair-avatar">{item.token.logoUrl ? <img src={item.token.logoUrl} alt=""/> : item.analysisBase.slice(0, 2)}</span>
-          <span className="picker-item-main"><strong>{networkKey === "robinhood" ? item.executionPair : item.pair.replace("-", "/")}</strong><small>{unavailableReason || (networkKey === "robinhood" ? item.token.name : `Candidate ${item.executionPair}`)}</small>{networkKey === "robinhood" && <small title={item.token.address}>{item.token.address.slice(0, 8)}…{item.token.address.slice(-6)}</small>}</span>
-          <span className="pair-item-status"><small className="asset-class-badge crypto">{unavailableReason ? "UNAVAILABLE" : "ON-CHAIN"}</small><span className="live-chip">{checking ? "VERIFYING…" : unavailableReason ? "TRY ANOTHER" : item.pair === value ? "RECHECK" : "VERIFY ROUTE"}</span></span>
+          <span className="picker-item-main"><strong>{networkKey === "robinhood" ? item.executionPair : item.pair.replace("-", "/")}</strong><small>{networkKey === "robinhood" ? item.token.name : item.executionPair}</small><RouteAvailability network={networkKey} pair={item.pair} custody={custody} mapped enabled={open}/>{networkKey === "robinhood" && <small title={item.token.address}>{item.token.address.slice(0, 8)}…{item.token.address.slice(-6)}</small>}</span>
+          <span className="pair-item-status"><small className="asset-class-badge crypto">MAPPED</small><span className="live-chip">{checking ? "SELECTING…" : item.pair === value ? "SELECTED" : "SELECT"}</span></span>
         </button>; })}
       </div>
     </PickerDialog>

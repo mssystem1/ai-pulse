@@ -32,3 +32,11 @@ The scan is bounded to 24 mapped instruments plus the existing research pairs, c
 - Mocked wallet tests at 390 and 1440 pixels change only slippage: exactly the limits transaction and restart transaction are requested, with no repeated funding, asset configuration, policy update or pass payment. Dashboard completion waits for the simulated restart receipt.
 
 No real wallet transaction or paid service call was made. These are local changes; deploy both API and web together because editing uses the new read-only configuration endpoint.
+
+## Automatic route visibility follow-up
+
+Global and execution pair lists, discovery cards and the selected Global market now automatically check routes when visible. Mapped-first ordering is retained; the execution catalog already contains mapped assets only. Global uses `OKX LISTED` for exchange listing status, separately from `Route available`, `No live route`, or `Checking route automatically`. A transport failure is shown as an unavailable check, not as proof that a route does not exist.
+
+Visible rows share a network/pair/custody-specific cache with a 60-second lifetime and a two-request concurrency limit. Hidden catalog rows are not proactively checked. Visible results refresh automatically; closing a picker stops its refresh timers. Selecting an execution asset uses the same check, without a separate Verify route action. Actual order sizing and fresh pre-signing quotes remain mandatory. These checks do not call an AI service or create a payment.
+
+Regression coverage includes automatic positive and negative route badges before selection in Global and Autopilot, mapped-first discovery, shared checks across the selected market and catalog, concurrency limits, expiration, network/custody isolation and retry after transport errors.

@@ -32,6 +32,7 @@ import { ReportHistory } from "./ReportHistory";
 import { ASSESSMENT_EVENT, rememberOpportunityAssessment } from "./opportunityAssessment";
 import { storeScopedReport, type ReportSlots } from "./reportScope";
 import { useExecutionAvailability } from "./executionAvailability";
+import { RouteAvailability } from "./RouteAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import { OverviewWorkspace } from "./OverviewWorkspace";
@@ -840,7 +841,7 @@ export function App() {
 
       {tab === "analyze" && <section className="card global-market-workspace" aria-label="Selected market and chart">
         <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{d.symbol} <Tip text={d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><span className="market-auto-status" role="status">{marketLoading ? d.loading : lang === "zh" ? "行情自动更新" : "Market data updates automatically"}</span></div>
-        <p className="execution-availability" data-status={selectedExecution.status}>{selectedExecution.label}. Global research remains available; Spot needs a mapped pair, a live route and wallet approval.</p>
+        <p><RouteAvailability network={networkKey} pair={instId} mapped={selectedExecution.mapped} fallback={selectedExecution.label}/></p>
         <div className="chart-head"><span>{instId}</span><span className="muted">{timeframe} · OKX · Free market preview</span></div>
         <div className="global-market-reference" aria-label="Market reference chart">
         {candles.length > 0 ? <ShortlistMarketChart pair={instId} timeframe={timeframe} mark={Number(ticker?.last || candles.at(-1)?.close)} history={candles.map(candle => candle.close)} fetchedAt={new Date(candles.at(-1)!.ts).toISOString()} lang={lang}/> : <p role="status">{marketError ? (lang === "zh" ? "市场数据暂不可用，请重试。" : "Market data temporarily unavailable. Retrying automatically.") : d.loading}</p>}
