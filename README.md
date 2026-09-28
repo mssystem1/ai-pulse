@@ -76,6 +76,20 @@ The browser keeps funding in context: connect once, inspect the selected chain�
 
 The main application opens on **Portfolio** (the existing `/overview` URL remains compatible). Spot orders and matched-fill performance, autonomous Autopilot capital/runtime, and saved Global/Prediction research stay in separate sections. Values are scoped to the selected network. Missing cost basis is shown as unavailable, not zero; Spot and Autopilot percentages are never averaged together.
 
+### Asset catalogs and automatic route checks
+
+Global Market, Spot Trading and Autopilot pair pickers default to **Route available** on the selected network. Automatic checks scan mapped pairs, including offscreen rows, and show progress as verified results arrive. Combine this view with **All / Crypto / Tokenized stock / Tokenized ETF / RWA** and search. Category counts describe the catalog; visible results also reflect route availability and search.
+
+Choose **All assets** to inspect unchecked or unavailable candidates; Global also includes unmapped research-only markets. Available routes sort first. Checks are cached separately by chain and execution mode, use bounded concurrency, and stop scheduling when the picker closes. Provider errors remain unknown and are retried.
+
+**Route available · OKX** means an indicative OKX quote succeeded. The actual order amount is quoted again before signing. **No OKX route found** does not imply no liquidity at other providers. Coinbase CDP supports native ETH-to-USDC funding on Base and Arbitrum; general Coinbase routing is deferred. Stocks, ETFs and RWA need both a verified representation and a live route on the selected chain.
+
+Expanded catalogs combine live provider discovery with reviewed chain-specific deployments. Global requests up to 5,000 analysis instruments and execution pickers up to 1,000 pairs; catalog membership does not guarantee tradability. See [catalog coverage, sources and validation](docs/TRADING_CATALOG_COVERAGE.md).
+
+Market data loads automatically after pair or timeframe selection. The compact Global chart stays visible and expands on demand; timeframe selection works independently of chart expansion. Technical shortlist scores are separate from AI report confidence. Recent bullish reports above 60% use existing reports, without automatic paid AI screening. Low confidence does not itself block a manually reviewed Spot trade.
+
+Spot navigation separates **Trade setup** and **Dashboard**. Autopilot provides **Create new Autopilot**, **Edit Autopilot**, **Dashboard** and **On-chain activity**. Editing loads the selected vault's current configuration; save-and-restart shows confirmation progress and reuses existing capital and a valid pass. The in-app Docs sidebar includes an **Assets & routes** guide.
+
 ### Global Market
 
 Choose a live OKX instrument instead of typing an arbitrary pair. Select a timeframe and PULSE fetches public ticker/OHLCV data, renders the chart locally, and sends bounded structured context—not a screenshot—to Grok. Base and Premium reports have distinct marks. Premium adds an annotated, click-to-enlarge chart with Fibonacci levels, pivots, the current Elliott candidate, its invalidation, and wave-consistent next paths. The recommendation is deliberately **Buy or Wait**; PULSE never turns a bearish report into a new short. Changing pair, timeframe, network, or request tier supersedes the earlier request so a late response cannot replace the current context.

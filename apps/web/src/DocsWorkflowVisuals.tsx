@@ -6,7 +6,7 @@ const workflows = [
     name: "Research & Spot", title: "Research informs. Your wallet executes.",
     intro: "Global Quick and Pro are complete research services. Their trade plans can prefill a Spot ticket; buying a report never places an order.",
     steps: [
-      ["Explore", "Choose a market", "View live market data and chart context without placing a trade."],
+      ["Explore", "Choose a market", "Route available is selected by default. Filter by asset class or choose All assets for the broader catalog. Market data and the compact chart load automatically."],
       ["Research", "Global Quick or Pro", "Pay for your chosen report. Review evidence, scenarios and invalidation."],
       ["Prepare", "Market or Limit ticket", "Load a report plan or configure a pair directly. Check amount, route and protection."],
       ["Authorize", "Review & sign", "Your wallet authorizes execution. Track confirmations and fills in the dashboard."],

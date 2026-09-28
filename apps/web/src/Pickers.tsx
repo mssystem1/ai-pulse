@@ -422,7 +422,7 @@ export function MarketPairPicker({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
-  const [routedOnly, setRoutedOnly] = useState(false);
+  const [routedOnly, setRoutedOnly] = useState(true);
   const mappedPairs = items.filter(item => executionAvailability(item.instId).mapped).map(item => item.instId);
   const routeScan = useRouteCatalogScan(networkKey, mappedPairs, "wallet", open && routedOnly);
   const routedCount = mappedPairs.filter(pair => routeResult(networkKey, pair, "wallet")?.status === "available").length;
@@ -518,9 +518,8 @@ export function MarketPairPicker({
         <AssetCategoryFilters value={assetFilter} onChange={setAssetFilter} items={items}/>
         <RouteFilter active={routedOnly} onChange={setRoutedOnly} count={routedCount} total={mappedPairs.length} progress={routeScan}/>
         <div className="picker-disclosure">
-          Global Market includes crypto and OKX-listed tokenized assets.
-          Analysis availability does not guarantee an identity-safe on-chain
-          route on the selected network.
+          Route available shows verified OKX routes on the selected network by default.
+          Choose All assets to include research-only markets. Asset categories and search apply within either view.
         </div>
         <div className="picker-result-head">
           <span>OKX GLOBAL SPOT</span>
@@ -600,7 +599,7 @@ export function ExecutionPairPicker({
   const [verifyingPair, setVerifyingPair] = useState("");
   const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
   const routeResult = useRouteResults();
-  const [routedOnly, setRoutedOnly] = useState(false);
+  const [routedOnly, setRoutedOnly] = useState(true);
   const routeScan = useRouteCatalogScan(networkKey, items.map(item => item.pair), custody, open && routedOnly);
   const routedCount = items.filter(item => routeResult(networkKey, item.pair, custody)?.status === "available").length;
   const selectionScope = `${networkKey}:${custody}:${open}`;
@@ -645,7 +644,7 @@ export function ExecutionPairPicker({
       <RouteFilter active={routedOnly} onChange={setRoutedOnly} count={routedCount} total={items.length} progress={routeScan}/>
       <div className="picker-disclosure">{networkKey === "robinhood"
         ? "Choose an asset by name or contract address. Trades settle in USDG. Visible routes are checked automatically; Autopilot also requires usable price history."
-        : "Verified live routes appear first, followed by assets still being checked, then unavailable routes. Checks run automatically as you browse; your order amount is quoted again before signing."}</div>
+        : "Route available shows verified OKX routes by default. Choose All assets to include unchecked or unavailable candidates, with verified routes first. Checks run automatically; your order amount is quoted again before signing."}</div>
       <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{visibleItems.length} of {items.length} assets</span></div>
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}

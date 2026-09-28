@@ -34,7 +34,12 @@ try {
    return json({});
   });
   await page.goto(origin+'/__catalog_test'); await page.locator('#pair').click();
-  const rows=page.locator('.picker-results .pair-item');
+   const rows=page.locator('.picker-results .pair-item');
+   const routeFilters=page.getByRole('group',{name:'Route availability'});
+   assert.equal(await routeFilters.getByRole('button',{name:/^Route available/}).getAttribute('aria-pressed'),'true','route availability is selected by default');
+   await page.getByText(/Route scan complete/).waitFor();
+   assert.equal(await rows.count(),4,'default view includes only verified routes');
+   await routeFilters.getByRole('button',{name:'All assets',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('.picker-results .pair-item')?.textContent.includes('CRV')&&document.querySelector('.picker-results .pair-item [data-status="available"]'));
   assert.match(await rows.first().innerText(),/CRV/,'available crypto moves ahead of unavailable stock');
   const categories=page.getByRole('group',{name:'Asset class'});
@@ -48,7 +53,6 @@ try {
   assert.equal(await rows.count(),1);assert.match(await rows.first().innerText(),/PAXG/);
   await categories.getByRole('button',{name:/^All/}).click();
    if(mode==='global')assert.equal(await rows.count(),91,'category assets after the old 80-row cutoff remain accessible');
-   const routeFilters=page.getByRole('group',{name:'Route availability'});
    await routeFilters.getByRole('button',{name:/^Route available/}).click();
    await page.getByText(/Route scan complete/).waitFor();
    assert.equal(await rows.count(),4,'route filter scans hidden pairs and excludes unavailable routes');

@@ -23,7 +23,7 @@ Provider rate-limit, timeout and authentication errors now return an unavailable
 
 ## Boundaries
 
-The three pair pickers also offer a separate **Route available** filter that combines with asset categories. Opening it scans the loaded mapped catalog, including offscreen rows, with two concurrent checks and progress reporting. Only successful checks for the selected network and custody mode qualify; switching networks cannot reuse another network's results. Closing the picker stops scheduling further checks. These are provider API requests, not AI screening calls.
+The three pair pickers default to the separate **Route available** filter, which combines with asset categories and search. Opening the picker scans the loaded mapped catalog, including offscreen rows, with two concurrent checks and progress reporting. Choose **All assets** to see the broader catalog. Only successful checks for the selected network and custody mode qualify; switching networks cannot reuse another network's results. Closing the picker stops scheduling further checks. These are provider API requests, not AI screening calls.
 
 Route status currently refers to **OKX**. Read-only Arbitrum checks returned OKX code `82000` (insufficient liquidity) for AAPLx, SPYx, BSPx and BEx; AAPLx and SPYx also failed a ten-USDC probe. This does not establish absence of liquidity at other providers. PAXG and XAUT were not mapped in the tested catalog.
 

@@ -7525,6 +7525,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-workflows", "Workflow maps"],
     ["docs-start", "Quick start"],
     ["docs-global", "Global reports"],
+    ["docs-catalog", "Assets & routes"],
     ["docs-global-flow", "Timeframes & handoff"],
     ["docs-prediction", "Prediction reports"],
     ["docs-safety", "Risk Guard"],
@@ -7575,7 +7576,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <h3>Exact assets. USDG settlement.</h3>
               <p>When Robinhood is enabled, use USDG for payments and trading capital, and keep ETH for network fees. Wallet funding lets you review an ETH-to-USDG swap before signing. Changing appearance never changes your network.</p>
               <ul>
-                <li>Choose the token by its name and contract. A catalog listing is not a promise of liquidity; PULSE checks the route when selected and again before execution.</li>
+                <li>Choose the token by its name and contract. Route available is selected by default and checks run automatically. A catalog listing is not a promise of liquidity; the actual order is quoted again before execution.</li>
                 <li>Charts use the actual token’s DEX prices in USD. Trading levels and settlement use USDG with a fresh conversion. A stock token’s price must not be replaced with the underlying share price.</li>
                 <li>A Global research report does not authorize a trade. When moving to a Robinhood token, review fresh execution levels instead of reusing levels for a different asset.</li>
                 <li>Autopilot requires sufficient closed-candle history, a verified route, your signed risk policy and an active Entry Pass. A failed entry condition means Hold, not an automatic paid AI call.</li>
@@ -7597,7 +7598,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <div className="docs-journey">
                 <b>Choose market</b>
                 <i>→</i>
-                <b>Load free data</b>
+                <b>Preview live data</b>
                 <i>→</i>
                 <b>Buy report</b>
                 <i>→</i>
@@ -7632,6 +7633,23 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
+          <section id="docs-catalog" className="docs-section" hidden={article !== "docs-catalog"}>
+            <div className="docs-copy">
+              <span className="eyebrow">MARKET DISCOVERY</span>
+              <h3>Find assets with a verified route on your network</h3>
+              <p>Global Market, Spot Trading and Autopilot open their pair pickers with <b>Route available</b> selected. Checks run automatically across the mapped catalog, including offscreen rows. Results appear as checks finish, with progress showing how many mapped pairs have been checked.</p>
+              <ul>
+                <li>Combine route availability with All, Crypto, Tokenized stock, Tokenized ETF or RWA and search. Category counts describe the catalog; visible results also depend on route status and search.</li>
+                <li>Choose <b>All assets</b> to inspect unchecked or unavailable candidates. Global also includes unmapped research-only markets. Verified routes appear first. A listing or token mapping alone does not prove a route.</li>
+                <li>Routes belong to the selected network and execution mode. Switching networks checks that network independently. An empty category means no matching route has been verified; try All assets to inspect the broader catalog.</li>
+                <li><b>Route available · OKX</b> means an indicative OKX quote succeeded. <b>No OKX route found</b> does not establish that every provider lacks liquidity. Failed provider checks remain unknown, are retried and do not qualify for this filter.</li>
+                <li>Your actual order amount is quoted again before signing. Autopilot also requires usable price history, an authorized policy and activation. Browsing or selecting a pair never places a trade.</li>
+              </ul>
+              <p>Stock, ETF and RWA coverage varies by chain, verified representation and liquidity. Catalog additions use reviewed contract metadata. Coinbase supports the existing funding flow; general Coinbase Spot and Autopilot routing is deferred.</p>
+              <p>Free technical candidates use market candles, not paid AI screening. Technical match scores are separate from report confidence. Recent bullish reports above 60% use your existing reports. A low-confidence report can still lead to a manually reviewed Spot trade at your discretion.</p>
+              <p>Spot navigation separates Trade setup and Dashboard. Autopilot separates Create new Autopilot, Edit Autopilot, Dashboard and On-chain activity. Editing loads the selected vault's settings; save and restart shows confirmation progress and reuses existing funds and a valid pass.</p>
+            </div>
+          </section>
           <section id="docs-global" className="docs-section" hidden={article !== "docs-global"}>
             <span className="docs-number">01</span>
             <div className="docs-copy">
@@ -7646,8 +7664,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   live OKX pair.
                 </li>
                 <li>
-                  Select a timeframe and load free market data to confirm
-                  freshness.
+                  Select a timeframe. Free market data loads automatically;
+                  the compact chart remains visible and expands on demand.
                 </li>
                 <li>
                   Choose Quick for concise context or Pro for chart structure
