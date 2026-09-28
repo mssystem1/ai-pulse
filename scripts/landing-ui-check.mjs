@@ -31,6 +31,10 @@ try {
     assert.match(await page.locator('.landing-activity-table').innerText(),/Arc Testnet/);
     assert.match(await page.locator('.landing-activity-table').innerText(),/Robinhood Chain/);
     assert.match(await page.locator('.landing-network-line').innerText(),/Robinhood/);
+    assert.equal(await page.locator('.landing-chart-rows>li').count(),5);
+    assert.match(await page.locator('.landing-network-chart').innerText(),/Testnet analyses/);
+    assert.deepEqual(await page.locator('.landing-chart-total').allTextContents(),Array(5).fill('9'));
+    assert.equal(await page.locator('.landing-chart-track [title="Global: 3"]').count(),5);
     assert.equal(await page.locator('.landing-research-count>strong').first().innerText(),'15');
     assert.match(await page.locator('.landing-execution-stats').innerText(),/12.34 USDC/);
     const launch=await page.getByRole('link',{name:'Launch app',exact:false}).first().getAttribute('href');
@@ -66,6 +70,23 @@ try {
     console.log(`PASS landing ${theme} ${width}px: cross-chain research, CTA, motion, no wallet initialization or overflow`);
     await page.close();
   }
+  const partial=await browser.newPage({viewport:{width:390,height:900}});
+  const partialFixture=structuredClone(fixture);
+  partialFixture.networks.at(-1).research={global:null,prediction:null,risk:null};
+  for(const service of ['global','prediction','risk']) { partialFixture.research[service].count=12; partialFixture.research[service].partial=4; }
+  await partial.route('**/*',route=>{
+    const url=new URL(route.request().url());
+    if(url.pathname==='/v1/public/activity') return route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(partialFixture)});
+    return url.origin===origin ? route.continue() : route.abort();
+  });
+  await partial.goto(`${origin}/landing`,{waitUntil:'networkidle'});
+  await partial.locator('.landing-network-chart').waitFor();
+  const missingRow=partial.locator('.landing-chart-rows>li').last();
+  assert.match(await missingRow.innerText(),/Coverage unavailable/);
+  assert.equal(await missingRow.locator('.landing-chart-total').innerText(),'—');
+  assert.equal(await missingRow.locator('.landing-chart-track [title]').count(),0);
+  await partial.close();
+  console.log('PASS chart missing coverage: no fabricated zero or bar');
   const unavailable=await browser.newPage();
   await unavailable.addInitScript(()=>{Storage.prototype.getItem=()=>{throw new Error('storage blocked');};Storage.prototype.setItem=()=>{throw new Error('storage blocked');};});
   await unavailable.route('**/*',route=>{
@@ -78,6 +99,7 @@ try {
   await unavailable.getByRole('button',{name:'Retry statistics'}).waitFor();
   assert.deepEqual(await unavailable.locator('.landing-research-count>strong').allTextContents(),['—','—','—']);
   assert.equal(await unavailable.locator('.landing-activity-table').count(),0);
+  assert.equal(await unavailable.locator('.landing-network-chart').count(),0);
   await unavailable.close();
   console.log('PASS unavailable activity: no fabricated zero totals; retry remains available');
 } finally { await browser.close(); }

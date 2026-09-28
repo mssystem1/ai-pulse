@@ -37,6 +37,8 @@ See the [13–14 September deployment audit](docs/PULSE_POST_DEPLOY_AUDIT_2026-0
 
 Public activity combines chains independently of the selected RPC. Research counts include Arc Testnet with explicit labeling; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
 
+The landing page compares research deliveries with a shared-scale stacked bar chart, split into Global, Prediction and Risk Guard. Patterns and labels distinguish services across all five appearances; the table retains exact counts. Missing coverage is shown explicitly, and testnet research is not presented as mainnet trading volume.
+
 Markets move continuously, but most analysis products still require an account, subscription, or separate checkout. Agents need something stricter: structured intelligence they can discover, pay for, recover after a refresh, and consume without a human checkout.
 
 **PULSE turns market intelligence into a multichain onchain service while preserving the original X Layer product.**
