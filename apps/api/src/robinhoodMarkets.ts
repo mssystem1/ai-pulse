@@ -1,5 +1,5 @@
 import type { AppConfig } from "@pulse/config";
-import { buildMarketContext, getTicker, summarizeCandles, toOkxBar, type Candle, type SpotMarketContext } from "@pulse/market";
+import { buildMarketContext, classifyGlobalInstrument, getTicker, summarizeCandles, toOkxBar, type Candle, type SpotMarketContext } from "@pulse/market";
 import { getOkxTradeTokens, okxDexGetMany } from "./okxDex.js";
 import { ROBINHOOD_USDG, NATIVE_ETH, ROBINHOOD_WETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodStockCatalog } from "./robinhoodAssetRegistry.js";
@@ -33,7 +33,8 @@ export async function robinhoodMarketCatalog(cfg: AppConfig, erc20Only = false) 
   const candidates = tokens.filter(token => token.address.toLowerCase() !== ROBINHOOD_USDG && (!erc20Only || token.address.toLowerCase() !== NATIVE_ETH))
     .map(token => ({ pair: robinhoodMarketId(token), analysisBase: token.symbol,
       researchPairs: researchSymbols.has(token.address.toLowerCase()) ? [researchSymbols.get(token.address.toLowerCase())!] : [],
-      executionPair: `${token.symbol}/USDG`, token, routeStatus: "checked-when-selected" }));
+      assetClass: classifyGlobalInstrument(token.symbol, stocks.some(stock => stock.address.toLowerCase() === token.address.toLowerCase()) ? "3" : undefined),
+      executionPair: `${token.symbol}/USDG`, token, routeStatus: "checked-automatically" }));
   const seen = new Set<string>();
   for (const item of candidates) {
     if (seen.has(item.pair)) throw new Error("Ambiguous Robinhood market identifier");

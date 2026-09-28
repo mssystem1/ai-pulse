@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createRouteChecks, type RouteCheck } from "./routeChecks";
+import { createRouteChecks, routeSortRank, type RouteCheck } from "./routeChecks";
 
 test("route checks deduplicate, expire and isolate network and custody", async () => {
   let time = 0, calls = 0;
@@ -14,6 +14,21 @@ test("route checks deduplicate, expire and isolate network and custody", async (
   time = 60_001;
   await check("arbitrum", "BTC-USDT", "wallet");
   assert.equal(calls, 4);
+});
+
+test("route-first ordering updates on completion without losing chain/custody isolation", async () => {
+  let time = 0, updates = 0;
+  const check = createRouteChecks(async (_network, pair) => ({ status: pair === "CRV" ? "available" : "unavailable" }), () => time);
+  const unsubscribe = check.subscribe(() => { updates++; });
+  await check("arbitrum", "XBSP", "wallet");
+  await check("arbitrum", "CRV", "wallet");
+  assert.deepEqual(["XBSP", "CRV", "COMP"].sort((a,b) => routeSortRank(true,check.peek("arbitrum",a,"wallet"))-routeSortRank(true,check.peek("arbitrum",b,"wallet"))), ["CRV", "COMP", "XBSP"]);
+  assert.equal(check.peek("base", "CRV", "wallet"), undefined);
+  assert.equal(check.peek("arbitrum", "CRV", "erc20"), undefined);
+  assert.ok(routeSortRank(false) > routeSortRank(true, {status:"unavailable"}));
+  assert.equal(updates,2);
+  unsubscribe(); time=60_001;
+  assert.equal(check.peek("arbitrum", "CRV", "wallet"),undefined);
 });
 
 test("automatic catalog checks cap concurrency and recover after transport failure", async () => {

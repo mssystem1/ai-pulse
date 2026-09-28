@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type CSSP
 import { createPortal } from "react-dom";
 import { apiGet } from "./api";
 import { useExecutionAvailability } from "./executionAvailability";
-import { RouteAvailability, checkRoute } from "./RouteAvailability";
+import { RouteAvailability, checkRoute, useRouteResults } from "./RouteAvailability";
+import { routeSortRank } from "./routeChecks";
 import type { Lang } from "./i18n";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { NetworkLogo } from "./NetworkLogo";
@@ -23,6 +24,15 @@ const assetClassLabel: Record<SpotInstrument["assetClass"], string> = {
   rwa: "RWA",
 };
 
+function AssetCategoryFilters({ value, onChange, items }: { value: AssetFilter; onChange: (value: AssetFilter) => void; items: { assetClass?: SpotInstrument["assetClass"] }[] }) {
+  return <div className="asset-filter-row" role="group" aria-label="Asset class">
+    {(["all", "crypto", "tokenized_stock", "tokenized_etf", "rwa"] as AssetFilter[]).map(category => {
+      const count = category === "all" ? items.length : items.filter(item => (item.assetClass || "crypto") === category).length;
+      return <button type="button" key={category} aria-pressed={value === category} className={value === category ? "is-active" : ""} onClick={() => onChange(category)}>{category === "all" ? "All" : assetClassLabel[category]} <span>({count})</span></button>;
+    })}
+  </div>;
+}
+
 export type XLayerToken = {
   address: string;
   symbol: string;
@@ -42,7 +52,8 @@ export type ExecutionPair = {
   pair: string;
   analysisBase: string;
   executionPair: string;
-  routeStatus: "checked-when-selected";
+  routeStatus: "checked-automatically" | "checked-when-selected";
+  assetClass?: SpotInstrument["assetClass"];
   token: {
     address: string;
     symbol: string;
@@ -392,6 +403,7 @@ export function MarketPairPicker({
   networkKey: WebNetworkKey;
 }) {
   const executionAvailability = useExecutionAvailability(networkKey);
+  const routeResult = useRouteResults();
   const c = copy[lang];
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -409,7 +421,7 @@ export function MarketPairPicker({
         setLoading(true);
         setError(null);
         const response = await apiGet(
-          `/v1/market/instruments?q=${encodeURIComponent(query)}&limit=80`,
+          `/v1/market/instruments?q=${encodeURIComponent(query)}&limit=5000`,
         );
         if (!current) return;
         if (response.ok) {
@@ -436,7 +448,7 @@ export function MarketPairPicker({
 
   const [base, quote] = value.split("-");
   const visibleItems = (assetFilter === "all" ? [...items] : items.filter((item) => item.assetClass === assetFilter))
-    .sort((a, b) => Number(executionAvailability(b.instId).mapped) - Number(executionAvailability(a.instId).mapped));
+    .sort((a, b) => routeSortRank(executionAvailability(a.instId).mapped, routeResult(networkKey, a.instId, "wallet")) - routeSortRank(executionAvailability(b.instId).mapped, routeResult(networkKey, b.instId, "wallet")));
   return (
     <>
       <button
@@ -488,26 +500,7 @@ export function MarketPairPicker({
             aria-label={c.pairSearch}
           />
         </div>
-        <div className="asset-filter-row" role="group" aria-label="Asset class">
-          {(
-            [
-              "all",
-              "crypto",
-              "tokenized_stock",
-              "tokenized_etf",
-              "rwa",
-            ] as AssetFilter[]
-          ).map((filter) => (
-            <button
-              type="button"
-              key={filter}
-              className={assetFilter === filter ? "is-active" : ""}
-              onClick={() => setAssetFilter(filter)}
-            >
-              {filter === "all" ? "All" : assetClassLabel[filter]}
-            </button>
-          ))}
-        </div>
+        <AssetCategoryFilters value={assetFilter} onChange={setAssetFilter} items={items}/>
         <div className="picker-disclosure">
           Global Market includes crypto and OKX-listed tokenized assets.
           Analysis availability does not guarantee an identity-safe on-chain
@@ -589,12 +582,14 @@ export function ExecutionPairPicker({
   const [error, setError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
   const [verifyingPair, setVerifyingPair] = useState("");
+  const [assetFilter, setAssetFilter] = useState<AssetFilter>("all");
+  const routeResult = useRouteResults();
   const selectionScope = `${networkKey}:${custody}:${open}`;
   const selectionScopeRef = useRef(selectionScope);
   selectionScopeRef.current = selectionScope;
   const network = WEB_NETWORKS[networkKey];
 
-  useEffect(() => { setItems([]); setError(null); setVerifyingPair(""); }, [networkKey, custody]);
+  useEffect(() => { setItems([]); setError(null); setVerifyingPair(""); setAssetFilter("all"); }, [networkKey, custody]);
 
   useEffect(() => {
     if (!open || networkKey === "arc-testnet") return;
@@ -602,7 +597,7 @@ export function ExecutionPairPicker({
     const timeout = window.setTimeout(async () => {
       setLoading(true);
       setError(null);
-      const response = await apiGet(`/v1/trading/pairs?network=${networkKey}&q=${encodeURIComponent(query)}&limit=160${custody === "erc20" ? "&custody=erc20" : ""}`);
+      const response = await apiGet(`/v1/trading/pairs?network=${networkKey}&q=${encodeURIComponent(query)}&limit=1000${custody === "erc20" ? "&custody=erc20" : ""}`);
       if (!current) return;
       if (response.ok) {
         setItems(((response.data as { pairs?: ExecutionPair[] }).pairs || []));
@@ -616,6 +611,8 @@ export function ExecutionPairPicker({
   }, [open, networkKey, query, reload, custody]);
 
   const [rawBase, quote] = value.split("-");
+  const visibleItems = items.filter(item => assetFilter === "all" || (item.assetClass || "crypto") === assetFilter)
+    .sort((a, b) => routeSortRank(true, routeResult(networkKey, a.pair, custody)) - routeSortRank(true, routeResult(networkKey, b.pair, custody)));
   const base = networkKey === "robinhood" ? rawBase.replace(/\.[A-F0-9]{16}$/, "") : rawBase;
   return <>
     <button id={id} type="button" className="selector-trigger execution-pair-trigger" aria-haspopup="dialog" aria-expanded={open} disabled={networkKey === "arc-testnet"} onClick={() => setOpen(true)}>
@@ -624,15 +621,16 @@ export function ExecutionPairPicker({
     </button>
     <PickerDialog open={open} title={`Choose a live pair on ${network.label}`} lead={`PULSE verifies the identity-safe token and a live OKX Onchain OS route before accepting your choice. A token contract by itself is not enough.`} closeLabel="Close" onClose={() => setOpen(false)}>
       <div className="picker-search-wrap"><span aria-hidden="true">⌕</span><input autoFocus className="picker-search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search BTC, ETH, DOGE or token name…" aria-label="Search executable pairs"/></div>
+      <AssetCategoryFilters value={assetFilter} onChange={setAssetFilter} items={items}/>
       <div className="picker-disclosure">{networkKey === "robinhood"
         ? "Choose an asset by name or contract address. Trades settle in USDG. Visible routes are checked automatically; Autopilot also requires usable price history."
-        : "Mapped assets are listed below. Routes are checked automatically as you browse. Your actual order is quoted again for its amount before signing."}</div>
-      <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{items.length} results</span></div>
+        : "Verified live routes appear first, followed by assets still being checked, then unavailable routes. Checks run automatically as you browse; your order amount is quoted again before signing."}</div>
+      <div className="picker-result-head"><span>{network.label.toUpperCase()} EXECUTION CATALOG</span><span>{visibleItems.length} of {items.length} assets</span></div>
       <div className="picker-results" aria-live="polite" aria-busy={loading}>
         {loading && !items.length && <div className="picker-state">Loading network assets…</div>}
         {error && <div className="picker-state error-state"><span>{error}</span><button type="button" onClick={() => setReload((value) => value + 1)}>Try again</button></div>}
-        {!loading && !error && !items.length && <div className="picker-state">No matching on-chain asset found on this network.</div>}
-        {items.map((item) => { const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""}`} key={`${networkKey}-${custody}-${item.pair}-${item.token.address}`} onClick={() => {
+        {!loading && !error && !visibleItems.length && <div className="picker-state">No matching assets in this category on {network.label}. Choose All or change your search.</div>}
+        {visibleItems.map((item) => { const checking = verifyingPair === item.pair; return <button type="button" disabled={Boolean(verifyingPair)} className={`picker-item pair-item ${item.pair === value ? "is-selected" : ""}`} key={`${networkKey}-${custody}-${item.pair}-${item.token.address}`} onClick={() => {
           setVerifyingPair(item.pair);
           void checkRoute(networkKey, item.pair, custody).then((result) => {
             if (selectionScopeRef.current !== selectionScope) return;
@@ -646,7 +644,7 @@ export function ExecutionPairPicker({
         }}>
           <span className="pair-avatar">{item.token.logoUrl ? <img src={item.token.logoUrl} alt=""/> : item.analysisBase.slice(0, 2)}</span>
           <span className="picker-item-main"><strong>{networkKey === "robinhood" ? item.executionPair : item.pair.replace("-", "/")}</strong><small>{networkKey === "robinhood" ? item.token.name : item.executionPair}</small><RouteAvailability network={networkKey} pair={item.pair} custody={custody} mapped enabled={open}/>{networkKey === "robinhood" && <small title={item.token.address}>{item.token.address.slice(0, 8)}…{item.token.address.slice(-6)}</small>}</span>
-          <span className="pair-item-status"><small className="asset-class-badge crypto">MAPPED</small><span className="live-chip">{checking ? "SELECTING…" : item.pair === value ? "SELECTED" : "SELECT"}</span></span>
+          <span className="pair-item-status"><small className={`asset-class-badge ${item.assetClass || "crypto"}`}>{assetClassLabel[item.assetClass || "crypto"]}</small><span className="live-chip">{checking ? "SELECTING…" : item.pair === value ? "SELECTED" : "SELECT"}</span></span>
         </button>; })}
       </div>
     </PickerDialog>

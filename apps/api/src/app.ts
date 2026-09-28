@@ -338,7 +338,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.get("/v1/market/instruments", async (req, res) => {
     try {
       const q = String(req.query.q || "");
-      const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 100);
+      const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 5_000);
       const list = await observeProvider("okx", "spot_instruments", () => searchSpotInstruments(q, limit));
       res.json({ service: "instruments", query: q, count: list.length, instruments: list });
     } catch (e) {

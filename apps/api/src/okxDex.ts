@@ -1,5 +1,6 @@
 import { createHmac } from "node:crypto";
 import type { AppConfig } from "@pulse/config";
+import { CURATED_EXECUTION_TOKENS } from "./curatedExecutionTokens.js";
 
 const CHAIN_ID = "196";
 const NATIVE_OKB = "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
@@ -546,7 +547,11 @@ export async function getOkxTradeTokens(
       return identity ? { ...item, ...identity, tokenSource: "Robinhood canonical deployment · OKX route" } : item;
     });
   }
-  const candidates = [...(OFFICIAL_WRAPPED_ASSETS[chainId] || []), ...chainTokens]
+  const curated: Record<string, unknown>[] = CURATED_EXECUTION_TOKENS.filter(token => String(token.chainId) === chainId).map(token => ({
+    tokenSymbol: token.symbol, tokenName: token.name, tokenContractAddress: token.address,
+    decimals: token.decimals, tokenSource: token.source,
+  }));
+  const candidates = [...(OFFICIAL_WRAPPED_ASSETS[chainId] || []), ...curated, ...chainTokens]
     .filter((item, index, all) => all.findIndex((candidate) => String(candidate.tokenContractAddress).toLowerCase() === String(item.tokenContractAddress).toLowerCase()) === index);
   return candidates.filter((item) => !query || [item.tokenSymbol, item.tokenName, item.tokenContractAddress]
     .some((value) => [...aliases].some((alias) => String(value || "").toLowerCase().includes(alias))))

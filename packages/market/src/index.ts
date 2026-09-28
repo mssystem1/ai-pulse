@@ -15,7 +15,7 @@ export type SpotInstrument = {
 
 export type GlobalAssetClass = "crypto" | "tokenized_stock" | "tokenized_etf" | "rwa";
 
-const TOKENIZED_ETF_TICKERS = new Set(["ARKK", "DIA", "GLD", "IBIT", "IWM", "QQQ", "SLV", "SPY", "TLT", "VOO"]);
+const TOKENIZED_ETF_TICKERS = new Set(["ARKK", "DIA", "EWY", "GLD", "IBIT", "INDA", "IWM", "QQQ", "SGOV", "SHY", "SLV", "SMH", "SOXL", "SOXX", "SPY", "TLT", "TQQQ", "USO", "VOO", "VTI", "XLE"]);
 const NON_EQUITY_RWA = new Set(["PAXG", "XAUT"]);
 /** Classify a live OKX instrument without implying an on-chain execution route. */
 export function classifyGlobalInstrument(baseCcy: string, instCategory?: string): GlobalAssetClass {
@@ -23,7 +23,7 @@ export function classifyGlobalInstrument(baseCcy: string, instCategory?: string)
   if (NON_EQUITY_RWA.has(symbol)) return "rwa";
   if (instCategory === "3") {
     const underlying = symbol.startsWith("X") ? symbol.slice(1) : symbol;
-    return TOKENIZED_ETF_TICKERS.has(underlying) ? "tokenized_etf" : "tokenized_stock";
+    return TOKENIZED_ETF_TICKERS.has(symbol) || TOKENIZED_ETF_TICKERS.has(underlying) ? "tokenized_etf" : "tokenized_stock";
   }
   return "crypto";
 }

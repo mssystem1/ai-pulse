@@ -159,8 +159,9 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
           pair: analysisPair,
           analysisBase,
           executionPair: `${token.symbol}/${settlementSymbol}`,
+          assetClass: instrument.assetClass,
           token,
-          routeStatus: "checked-when-selected",
+          routeStatus: "checked-automatically",
           rank: aliasRank < 0 ? Number.MAX_SAFE_INTEGER : aliasRank,
         }];
       });
@@ -169,9 +170,10 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
         const current = preferred.get(candidate.pair);
         if (!current || candidate.rank < current.rank) preferred.set(candidate.pair, candidate);
       }
-      const pairs = [...preferred.values()].slice(0, limit).map(({ rank: _rank, ...pair }) => pair);
+      const allPairs = [...preferred.values()];
+      const pairs = allPairs.slice(0, limit).map(({ rank: _rank, ...pair }) => pair);
       res.setHeader("Cache-Control", "public, max-age=120, stale-while-revalidate=300");
-      return res.json({ network, chainId: chain.chainId, settlementSymbol, custody: erc20Custody ? "erc20" : "wallet", provider: "OKX Onchain OS token catalog", pairs });
+      return res.json({ network, chainId: chain.chainId, settlementSymbol, custody: erc20Custody ? "erc20" : "wallet", provider: "OKX catalog and curated chain deployments", total: allPairs.length, pairs });
     } catch (error) {
       return res.status(502).json({ error: error instanceof Error ? error.message : String(error), retryable: true });
     }
@@ -237,6 +239,8 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
           });
           return res.json({ network, pair, available: true, base: option, quote, ...(network === "robinhood" ? { executionMarketPair: robinhoodMarketId(option), requiresFreshExecutionLevels: true } : {}), aliasesChecked: aliases, custody: erc20Custody ? "erc20" : "wallet", representationsChecked: baseOptions.map((item) => ({ symbol: item.symbol, address: item.address })), mapping: option.symbol.toUpperCase() === baseSymbol ? "native-symbol" : "verified-wrapper", explanation: `${pair} analysis executes as ${option.symbol}/${quote.symbol} on ${network}.` });
         } catch (error) {
+          // A provider outage or quota error is not evidence of missing liquidity.
+          if ((error as { retryable?: boolean }).retryable === true || /TimeoutError|AbortError/.test(String((error as Error)?.name)) || /fetch failed|HTTP (401|403)|credentials|not configured/i.test(String((error as Error)?.message))) throw error;
           routeErrors.push(`${option.symbol} ${option.address}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }

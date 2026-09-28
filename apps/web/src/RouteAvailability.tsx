@@ -10,6 +10,12 @@ export const checkRoute = createRouteChecks(async (network, pair, custody) => {
   return { status: data.available ? "available" : "unavailable", reason: data.reason };
 });
 
+export function useRouteResults() {
+  const [, update] = useState(0);
+  useEffect(() => checkRoute.subscribe(() => update(value => value + 1)), []);
+  return checkRoute.peek;
+}
+
 export function RouteAvailability({ network, pair, mapped, fallback, custody = "wallet", enabled = true }: {
   network: WebNetworkKey; pair: string; mapped: boolean; fallback?: string; custody?: "wallet" | "erc20"; enabled?: boolean;
 }) {

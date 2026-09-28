@@ -12,7 +12,8 @@ import {
 import { API_BASE, apiGet, apiPost } from "./api";
 import { parseExecutionCapability, type ExecutionCapability as Capability } from "./executionCapability";
 import { useExecutionAvailability } from "./executionAvailability";
-import { RouteAvailability } from "./RouteAvailability";
+import { RouteAvailability, useRouteResults } from "./RouteAvailability";
+import { routeSortRank } from "./routeChecks";
 import { ASSESSMENT_EVENT, currentOpportunityAssessment, isConfirmedSpotSetup, readOpportunityAssessments } from "./opportunityAssessment";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import {
@@ -394,6 +395,7 @@ export function OpportunityRadar({
     return () => { window.removeEventListener(ASSESSMENT_EVENT, refresh); window.removeEventListener("storage", refresh); };
   }, [networkKey]);
   const executionAvailability = useExecutionAvailability(networkKey, context === "autopilot" ? "erc20" : "spot");
+  const routeResult = useRouteResults();
   const [status, setStatus] = useState("Scanning live market structure…");
   const [expanded, setExpanded] = useState(false);
   const expandedRef = useRef(expanded);
@@ -469,7 +471,7 @@ export function OpportunityRadar({
   const collapsedCount = compactMobile ? 2 : 4;
   const eligibleItems = items.filter(candidate => (context === "global" || executionAvailability(candidate.pair).mapped)
     && (showTechnical || isConfirmedSpotSetup(currentOpportunityAssessment(assessments, candidate.pair, candidate.timeframe))))
-    .sort((a, b) => Number(executionAvailability(b.pair).mapped) - Number(executionAvailability(a.pair).mapped));
+    .sort((a, b) => routeSortRank(executionAvailability(a.pair).mapped, routeResult(networkKey, a.pair, context === "autopilot" ? "erc20" : "wallet")) - routeSortRank(executionAvailability(b.pair).mapped, routeResult(networkKey, b.pair, context === "autopilot" ? "erc20" : "wallet")));
   const visibleItems = eligibleItems.slice(0, expanded ? 8 : collapsedCount);
   return (
     <section

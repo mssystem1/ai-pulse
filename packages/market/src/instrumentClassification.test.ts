@@ -10,6 +10,11 @@ test("classifies Global Market instruments distinctly", () => {
   assert.equal(classifyGlobalInstrument("PAXG"), "rwa");
   assert.equal(classifyGlobalInstrument("XAAPL", "3"), "tokenized_stock");
   assert.equal(classifyGlobalInstrument("XSPY", "3"), "tokenized_etf");
+  assert.equal(classifyGlobalInstrument("XTQQQ", "3"), "tokenized_etf");
+  assert.equal(classifyGlobalInstrument("XSOXL", "3"), "tokenized_etf");
+  assert.equal(classifyGlobalInstrument("SGOV", "3"), "tokenized_etf");
+  assert.equal(classifyGlobalInstrument("XLE", "3"), "tokenized_etf");
+  assert.equal(classifyGlobalInstrument("XXLE", "3"), "tokenized_etf");
   assert.equal(classifyGlobalInstrument("XLM", "1"), "crypto");
   assert.equal(classifyGlobalInstrument("XSN", "1"), "crypto");
 });
