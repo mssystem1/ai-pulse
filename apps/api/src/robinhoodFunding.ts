@@ -20,6 +20,20 @@ export const ROBINHOOD_FUNDING_ABI = parseAbi([
 ]);
 type PreparedSwap = Awaited<ReturnType<typeof getGenericOkxSwap>>;
 
+/** Only fixed diagnostic codes leave the server; upstream errors can contain URLs or credentials. */
+export function robinhoodFundingFailureCode(error: unknown): string {
+  const message = error instanceof Error ? error.message : "";
+  if (message === "OKX DEX credentials are not configured") return "funding_provider_not_configured";
+  const upstream = /^OKX DEX upstream HTTP (\d{3})(?: code=(\d{1,8}))?:/.exec(message);
+  if (upstream) return `funding_provider_http_${upstream[1]}${upstream[2] ? `_code_${upstream[2]}` : ""}`;
+  if (message === "Funding RPC network mismatch") return "funding_rpc_wrong_chain";
+  if (message === "Funding router is unavailable on Robinhood") return "funding_router_unavailable";
+  if (message === "Funding price impact exceeds the 1% limit") return "funding_price_impact_limit";
+  if (message === "Funding transaction expired; request a fresh quote") return "funding_quote_expired";
+  if (/^Funding (quote asset|transaction mismatch|calldata recipient|minimum received)/.test(message)) return "funding_route_validation_failed";
+  return "funding_provider_or_rpc_unavailable";
+}
+
 /** Validate the executable DAG, not just its provider-supplied quote. Used by
  * wallet Spot and the contract-account keeper/executor paths. */
 export function validateRobinhoodSwap(swap: PreparedSwap, input: { from: string; to: string; amount: string; receiver: string; slippageBps: number }, now = Date.now()) {

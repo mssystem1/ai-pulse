@@ -22,6 +22,7 @@ if (appKitEnabled) {
     const target = window as Window & { __pulseAppKitProvider?: InjectedProvider };
     if (account?.isConnected) target.__pulseAppKitProvider = appKit.getWalletProvider() as InjectedProvider;
     else delete target.__pulseAppKitProvider;
+    window.dispatchEvent(new CustomEvent("pulse:wallet-session-changed", { detail: { connected: Boolean(account?.isConnected) } }));
   }, "eip155");
 }
 

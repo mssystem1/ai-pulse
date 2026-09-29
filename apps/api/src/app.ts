@@ -90,7 +90,7 @@ import { optionalNumber } from "./geckoEvidence.js";
 import { createPublicActivityStore, jobResearchDelivery, researchDelivery } from "./publicActivity.js";
 import { createRobinhoodPaymentRuntime } from "./robinhoodPaymentRuntime.js";
 import { paidReplayRecoveryToken, verifyPaidReplayRecoveryToken } from "./paidJobRecovery.js";
-import { prepareRobinhoodFunding } from "./robinhoodFunding.js";
+import { prepareRobinhoodFunding, robinhoodFundingFailureCode } from "./robinhoodFunding.js";
 
 const AnalysisBodySchema = z.object({
   instId: z.string().min(3).max(32).regex(/^[A-Z0-9]+-[A-Z0-9]+$/, "Use an OKX instrument such as BTC-USDT"),
@@ -829,8 +829,10 @@ export function createApp(cfg: AppConfig, dependencies: {
       if (!cfg.enabledNetworks.includes("robinhood")) return res.status(503).json({ error: "Robinhood funding is not enabled on this deployment" });
       res.json(await prepareRobinhoodFunding(cfg, body.amount, body.userWalletAddress));
     } catch (error) {
+      const code = error instanceof z.ZodError ? "funding_input_invalid" : robinhoodFundingFailureCode(error);
+      console.warn("[robinhood-funding]", code);
       res.status(error instanceof z.ZodError ? 400 : 502).json({ error: error instanceof z.ZodError
-        ? "Enter a positive ETH amount and valid wallet address" : "A verified ETH to USDG route is unavailable. No transaction was submitted; try a fresh quote." });
+        ? "Enter a positive ETH amount and valid wallet address" : `ETH to USDG preparation failed (${code}). No transaction was submitted.`, code });
     }
   });
 

@@ -27,6 +27,15 @@ test("unsafe signer, missing durable Redis and external providers fail closed wi
       () => assert.fail("must not continue"));
     assert.equal(status, 503);
     assert.equal((body as { retrySamePayment: boolean }).retrySamePayment, true);
+    assert.match((body as { reason: string }).reason, /^[a-z_]+$/);
+    assert.ok(!JSON.stringify(body).includes("redis://"));
     assert.ok(!JSON.stringify(body).includes(key));
   }
+});
+
+test("shared facilitator gives an actionable non-secret readiness reason", () => {
+  const middleware = createRobinhoodPaymentRuntime(cfg)!;
+  let body: { reason?: string } = {};
+  middleware({} as never, { status: () => ({ json: (value: typeof body) => { body = value; } }) } as never, () => assert.fail("must not continue"));
+  assert.equal(body.reason, "dedicated_facilitator_signer_required");
 });

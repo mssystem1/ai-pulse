@@ -259,22 +259,31 @@ export function App() {
     }
     const p = getInjectedProvider();
     if (!p) return;
+    let active = true;
     p.request({ method: "eth_accounts" })
       .then((accs) => {
+        if (!active || wasWalletDisconnected()) return;
         const list = accs as string[];
         if (list?.[0]) {
           setWallet(list[0]);
           setWalletName(walletProviderName(p));
           void refreshBalances(list[0]);
+        } else {
+          setWallet(null);
+          setWalletName("");
+          setBalances(null);
         }
       })
       .catch(() => undefined);
+    return () => { active = false; };
   }, [refreshBalances]);
 
   useEffect(() => {
     const p = getInjectedProvider();
-    if (!p?.on) return;
+    if (!p) return;
+    let active = true;
     const onAccountsChanged = (...args: unknown[]) => {
+      if (!active) return;
       const accounts = args[0] as string[] | undefined;
       if (!accounts?.[0]) {
         setWallet(null);
@@ -295,10 +304,35 @@ export function App() {
       if (selected) { setNetworkKey(selected); setError(null); }
       else setError(`Wallet changed to unsupported chain ${chainId}. Select a supported PULSE network before payment.`);
     };
-    p.on("accountsChanged", onAccountsChanged);
-    p.on("chainChanged", onChainChanged);
-    return () => { p.removeListener?.("accountsChanged", onAccountsChanged); p.removeListener?.("chainChanged", onChainChanged); };
-  }, [refreshBalances]);
+    const recheck = () => {
+      if (document.visibilityState === "hidden") return;
+      void p.request({ method: "eth_accounts" }).then(accounts => onAccountsChanged(accounts)).catch(() => onAccountsChanged([]));
+    };
+    const onDisconnect = () => onAccountsChanged([]);
+    const onSessionChanged = (event: Event) => {
+      const host = window as Window & { __pulseDirectProvider?: unknown; __pulseCircleProvider?: unknown };
+      if (host.__pulseDirectProvider || host.__pulseCircleProvider) return;
+      if ((event as CustomEvent<{ connected: boolean }>).detail?.connected === false) onDisconnect();
+      else recheck();
+    };
+    p.on?.("accountsChanged", onAccountsChanged);
+    p.on?.("chainChanged", onChainChanged);
+    p.on?.("disconnect", onDisconnect);
+    window.addEventListener("focus", recheck);
+    window.addEventListener("pulse:wallet-session-changed", onSessionChanged);
+    document.addEventListener("visibilitychange", recheck);
+    const timer = window.setInterval(recheck, 15_000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", recheck);
+      window.removeEventListener("pulse:wallet-session-changed", onSessionChanged);
+      document.removeEventListener("visibilitychange", recheck);
+      p.removeListener?.("accountsChanged", onAccountsChanged);
+      p.removeListener?.("chainChanged", onChainChanged);
+      p.removeListener?.("disconnect", onDisconnect);
+    };
+  }, [refreshBalances, wallet]);
 
   useEffect(() => {
     if (wallet) void refreshBalances(wallet);
@@ -605,7 +639,14 @@ export function App() {
       await refreshBalances(wallet);
       if (path.includes("analysis") && !candles.length) void loadTeaser();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
+      let msg = e instanceof Error ? e.message : String(e);
+      try {
+        const detail = JSON.parse(msg) as { error?: unknown; reason?: unknown };
+        if (typeof detail.error === "string") {
+          msg = detail.error;
+          if (typeof detail.reason === "string" && /^[a-z_]+$/.test(detail.reason)) msg += ` (${detail.reason})`;
+        }
+      } catch { /* Plain wallet/provider errors are already readable. */ }
       if (msg.toLowerCase().includes("usdt") || msg.includes("USD₮0") || msg.includes("不足")) {
         setNeedUsdt(true);
       }
