@@ -22,3 +22,21 @@ test("automation readiness rejects paused, wrong-chain and unavailable RPC witho
     assert.match((await robinhoodAutomationReadiness(cfg)).reason!, /temporarily unavailable/);
   } finally { globalThis.fetch = original; }
 });
+
+test("readiness checks the fallback chain after primary RPC failure", async () => {
+  const original = globalThis.fetch, previous = process.env.ROBINHOOD_RPC_FALLBACK_URL;
+  process.env.ROBINHOOD_RPC_FALLBACK_URL = "https://fallback.fixture.invalid";
+  const methods: string[] = [];
+  globalThis.fetch = async (input, init) => {
+    if (String(input).includes("primary")) return new Response("unavailable", { status: 503 });
+    const request = JSON.parse(String(init?.body)); methods.push(request.method);
+    return Response.json({ jsonrpc: "2.0", id: request.id, result: request.method === "eth_chainId" ? "0x1237" : `0x${"0".repeat(64)}` });
+  };
+  try {
+    assert.deepEqual(await robinhoodAutomationReadiness({ ROBINHOOD_RPC_URL: "https://primary.fixture.invalid" } as AppConfig), { ready: true });
+    assert.deepEqual(methods, ["eth_chainId", "eth_call"]);
+  } finally {
+    globalThis.fetch = original;
+    if (previous === undefined) delete process.env.ROBINHOOD_RPC_FALLBACK_URL; else process.env.ROBINHOOD_RPC_FALLBACK_URL = previous;
+  }
+});

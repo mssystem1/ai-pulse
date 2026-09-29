@@ -10,7 +10,7 @@ import { getOnchainAccountSnapshot } from "./onchainDiscovery.js";
 import { createExecutionProjector } from "./publicExecution.js";
 import type { PublicActivityStore } from "./publicActivity.js";
 import { validateRobinhoodSwap } from "./robinhoodFunding.js";
-import { isRobinhoodMarket, resolveRobinhoodMarket, robinhoodMarketCatalog, robinhoodMarketId } from "./robinhoodMarkets.js";
+import { isRobinhoodMarket, resolveRobinhoodMarket, robinhoodMarketCatalog, robinhoodMarketId, executionSettlementTicker } from "./robinhoodMarkets.js";
 import { ROBINHOOD_USDG, NATIVE_ETH, robinhoodExecutionIdentity } from "./robinhoodExecutionAssets.js";
 import { robinhoodAutomationReadiness } from "./robinhoodExecutionReadiness.js";
 import {
@@ -237,7 +237,9 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
             amount: String(10 ** Math.min(quote.decimals, 15)),
             slippagePercent: "1",
           });
-          return res.json({ network, pair, available: true, base: option, quote, ...(network === "robinhood" ? { executionMarketPair: robinhoodMarketId(option), requiresFreshExecutionLevels: true } : {}), aliasesChecked: aliases, custody: erc20Custody ? "erc20" : "wallet", representationsChecked: baseOptions.map((item) => ({ symbol: item.symbol, address: item.address })), mapping: option.symbol.toUpperCase() === baseSymbol ? "native-symbol" : "verified-wrapper", explanation: `${pair} analysis executes as ${option.symbol}/${quote.symbol} on ${network}.` });
+          const executionMark = network === "robinhood" && req.query.includeExecutionMark === "1"
+            ? await executionSettlementTicker(cfg, robinhoodMarketId(option)) : undefined;
+          return res.json({ network, pair, available: true, base: option, quote, ...(network === "robinhood" ? { executionMarketPair: robinhoodMarketId(option), requiresFreshExecutionLevels: true, executionMark } : {}), aliasesChecked: aliases, custody: erc20Custody ? "erc20" : "wallet", representationsChecked: baseOptions.map((item) => ({ symbol: item.symbol, address: item.address })), mapping: option.symbol.toUpperCase() === baseSymbol ? "native-symbol" : "verified-wrapper", explanation: `${pair} analysis executes as ${option.symbol}/${quote.symbol} on ${network}.` });
         } catch (error) {
           // A provider outage or quota error is not evidence of missing liquidity.
           if ((error as { retryable?: boolean }).retryable === true || /TimeoutError|AbortError/.test(String((error as Error)?.name)) || /fetch failed|HTTP (401|403)|credentials|not configured/i.test(String((error as Error)?.message))) throw error;

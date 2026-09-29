@@ -1,6 +1,6 @@
 import type { AppConfig } from "@pulse/config";
 import { buildMarketContext, classifyGlobalInstrument, getTicker, summarizeCandles, toOkxBar, type Candle, type SpotMarketContext } from "@pulse/market";
-import { getOkxTradeTokens, okxDexGetMany } from "./okxDex.js";
+import { getOkxTradeTokens, okxDexGetMany, createOkxDexHeaders } from "./okxDex.js";
 import { ROBINHOOD_USDG, NATIVE_ETH, ROBINHOOD_WETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodStockCatalog } from "./robinhoodAssetRegistry.js";
 
@@ -128,7 +128,7 @@ export function robinhoodSettlementMark(asset: Pick<Candle, "ts" | "close">, set
     if (!Number.isFinite(mark.close) || mark.close <= 0 || !Number.isSafeInteger(mark.ts)
       || now - mark.ts > 180_000 || mark.ts > now + 30_000) throw new Error("Robinhood settlement mark is stale or invalid");
   }
-  if (asset.ts !== settlement.ts) throw new Error("Robinhood asset and USDG marks are not synchronized");
+  if (Math.abs(asset.ts - settlement.ts) > 30_000) throw new Error("Robinhood asset and USDG marks are not synchronized");
   const value = asset.close / settlement.close;
   if (!Number.isFinite(value) || value <= 0) throw new Error("Invalid Robinhood settlement price");
   return value;
@@ -136,18 +136,37 @@ export function robinhoodSettlementMark(asset: Pick<Candle, "ts" | "close">, set
 
 export async function executionSettlementTicker(cfg: AppConfig, pair: string) {
   if (!isRobinhoodMarket(pair)) return getTicker(pair);
-  const [asset, settlement] = await Promise.all([
-    robinhoodCandles(cfg, pair, "1m", 2), robinhoodTokenCandles(cfg, ROBINHOOD_USDG, "1m", 2),
-  ]);
-  const latestAsset = asset.at(-1), latestSettlement = settlement.at(-1);
-  if (!latestAsset || !latestSettlement) throw new Error("Robinhood settlement price is unavailable");
+  const market = await resolveRobinhoodMarket(cfg, pair);
+  const [latestAsset, latestSettlement] = await robinhoodLiveMarks(cfg, [market.token.address, ROBINHOOD_USDG]);
   return { instId: pair, last: robinhoodSettlementMark(latestAsset, latestSettlement), priceCurrency: "USDG" as const,
     usdPerSettlement: latestSettlement.close, ts: String(latestAsset.ts) };
 }
+/** Last-trade candles are history, not a live quote clock on quiet markets. */
+export async function robinhoodLiveMarks(cfg: AppConfig, addresses: string[]) {
+  if (!cfg.hasOkxCredentials) throw new Error("OKX DEX credentials are not configured");
+  const tokens = addresses.map(address => address.toLowerCase() === NATIVE_ETH ? ROBINHOOD_WETH : address.toLowerCase());
+  const path = "/api/v6/dex/market/price";
+  const body = JSON.stringify([...new Set(tokens)].map(tokenContractAddress => ({ chainIndex: "4663", tokenContractAddress })));
+  const response = await fetch(`${cfg.OKX_BASE_URL.replace(/\/$/, "")}${path}`, {
+    method: "POST", headers: { ...createOkxDexHeaders(cfg, new Date().toISOString(), "POST", path, body), "Content-Type": "application/json" },
+    body, signal: AbortSignal.timeout(12_000),
+  });
+  const result = await response.json() as { code?: string; data?: Array<{ chainIndex: string; tokenContractAddress: string; time: string; price: string }> };
+  if (!response.ok || result.code !== "0" || !Array.isArray(result.data)) throw new Error("Robinhood live price provider is unavailable; retry before signing");
+  return tokens.map(token => {
+    const matches = result.data!.filter(row => row.chainIndex === "4663" && row.tokenContractAddress?.toLowerCase() === token);
+    if (matches.length !== 1) throw new Error("Robinhood live price identity is missing or ambiguous");
+    const mark = { ts: Number(matches[0].time), close: Number(matches[0].price) };
+    // Validate the provider timestamp, never replace it with the request time.
+    robinhoodSettlementMark(mark, mark);
+    return mark;
+  });
+}
 export async function robinhoodMarketContext(cfg: AppConfig, input: { instId: string; timeframe: string; candleLimit: number; completedOnly?: boolean }): Promise<SpotMarketContext> {
-  const [rawCandles, minute] = await Promise.all([robinhoodCandles(cfg, input.instId, input.timeframe, input.candleLimit), robinhoodCandles(cfg, input.instId, "1m", 2)]);
+  const market = await resolveRobinhoodMarket(cfg, input.instId);
+  const [rawCandles, marks] = await Promise.all([robinhoodCandles(cfg, input.instId, input.timeframe, input.candleLimit), robinhoodLiveMarks(cfg, [market.token.address])]);
   const candles = input.completedOnly ? rawCandles.filter(candle => candle.confirmed === true) : rawCandles;
-  const latest = minute.at(-1);
+  const latest = marks[0];
   if (!latest || Date.now() - latest.ts > 180_000 || latest.ts > Date.now() + 30_000) throw new Error("Robinhood live mark is stale or unavailable");
   if (candles.length < 2) throw new Error("Robinhood price history is not yet available");
   // These are per-token DEX prices, not underlying-equity quotes. Do not apply

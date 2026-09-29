@@ -319,6 +319,13 @@ body.picker-open { overflow: hidden; }
   background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
   padding: 1.15rem 1.2rem; backdrop-filter: blur(12px);
 }
+/* A filtered card is a stacking context: raise the containing card, not just
+   the account menu, while its picker is open. Keep it below global navigation. */
+.card:has(.vault-account-trigger[aria-expanded="true"]) {
+  position: relative;
+  z-index: 20;
+  overflow: visible;
+}
 .hero-copy h2 {
   margin: 0 0 0.45rem; font-family: var(--display); font-size: clamp(1.25rem, 2.5vw, 1.65rem);
   letter-spacing: -0.02em; line-height: 1.15;
@@ -664,13 +671,15 @@ body.picker-open { overflow: hidden; }
 }
 
 .ticker {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0.85rem 0 0.2rem;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr)); gap: 0.5rem; margin: 0.85rem 0 0.2rem;
 }
 @media (max-width: 700px) { .ticker { grid-template-columns: 1fr 1fr; } }
 .stat {
   border: 1px solid var(--line); border-radius: 12px; padding: 0.6rem 0.65rem; background: rgba(0,0,0,0.22);
 }
 .stat b { display: block; font-family: var(--display); font-size: 0.98rem; color: var(--mint); }
+.ticker .stat { min-width:0; }
+.ticker .stat b { overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
 .stat.down b { color: var(--fail); }
 .stat small { color: var(--muted); font-size: 0.62rem; }
 

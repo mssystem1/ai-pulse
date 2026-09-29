@@ -1,0 +1,19 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "owner-approved-automation-enable",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 46,
+      "hash": "0x41e75e7ffc965bc23c84e7b25db494476c70b7cf7dab2fadcc169379955ec39b",
+      "status": "success",
+      "maxGasETH": "0.000000882418992",
+      "gasETH": "0.00000058559022"
+    }
+  ],
+  "data": {
+    "automationPaused": false,
+    "individualVaultsUnchanged": true
+  }
+}

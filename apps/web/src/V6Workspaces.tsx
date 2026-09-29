@@ -23,6 +23,7 @@ import {
   type WebNetworkKey,
 } from "./networks";
 import type { ReportTradeIntent } from "./Report";
+import { rebaseReportTrade } from "./reportTradeHandoff";
 import { reportTierLabel } from "./reportLabels";
 import type { Lang } from "./i18n";
 import { ShortlistMarketChart, SpotMarketPreview } from "./SpotMarketPreview";
@@ -1182,12 +1183,14 @@ export function SpotWorkspace({
   const [spotPage, setSpotPage] = useState("setup");
   useEffect(() => { setSpotPage("setup"); }, [incomingTrade, initialPair]);
   const [dismissedTrade, setDismissedTrade] = useState<ReportTradeIntent | null>(null);
-  const initialTrade = incomingTrade && incomingTrade !== dismissedTrade ? incomingTrade : null;
+  const [rebasedTrade, setRebasedTrade] = useState<{ source: ReportTradeIntent; network: WebNetworkKey; intent: ReportTradeIntent } | null>(null);
+  const initialTrade = incomingTrade && incomingTrade !== dismissedTrade
+    ? rebasedTrade?.source === incomingTrade && rebasedTrade.network === networkKey ? rebasedTrade.intent : incomingTrade : null;
   const [capability, setCapability] = useState<Capability | null>(null);
   const [pair, setPair] = useState(initialPair);
   const [marketTimeframe, setMarketTimeframe] = useState(initialTrade?.timeframe || "1H");
   const [capabilityUnavailable, setCapabilityUnavailable] = useState(false);
-  useEffect(() => setPair(initialPair), [initialPair]);
+  useEffect(() => setPair(initialPair), [initialPair, incomingTrade, networkKey]);
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [executionMode, setExecutionMode] = useState<"market" | "limit">(
     "market",
@@ -1311,7 +1314,7 @@ export function SpotWorkspace({
       `Mapping ${pair} to ${WEB_NETWORKS[networkKey].label} token contracts…`,
     );
     void apiGet(
-      `/v1/trading/resolve-pair?network=${networkKey}&pair=${encodeURIComponent(pair)}`,
+      `/v1/trading/resolve-pair?network=${networkKey}&pair=${encodeURIComponent(pair)}${initialTrade?.entryPrice ? "&includeExecutionMark=1" : ""}`,
     )
       .then((response) => {
         if (cancelled) return;
@@ -1320,6 +1323,7 @@ export function SpotWorkspace({
           base?: TradeToken;
           quote?: TradeToken;
           executionMarketPair?: string;
+          executionMark?: { last: number; priceCurrency: string; ts: string };
           explanation?: string;
           reason?: string;
         };
@@ -1327,6 +1331,16 @@ export function SpotWorkspace({
         // different facts. Keep the real contracts visible even when OKX
         // rejects the route, but never enable an order without both.
         if (response.ok && result.available && networkKey === "robinhood" && result.executionMarketPair && result.executionMarketPair !== pair) {
+          if (incomingTrade && initialTrade?.entryPrice && incomingTrade.pair === pair) {
+            const mark = result.executionMark;
+            if (!mark || mark.priceCurrency !== "USDG" || !Number.isFinite(Number(mark.ts)) || Date.now() - Number(mark.ts) > 180_000 || Number(mark.ts) > Date.now() + 30_000)
+              throw new Error("A fresh USDG price is required to carry the report levels. Retry mapping; your report draft has been kept.");
+            const intent = rebaseReportTrade(incomingTrade, result.executionMarketPair, mark.last);
+            setRebasedTrade({ source: incomingTrade, network: networkKey, intent });
+            setPair(result.executionMarketPair);
+            setMessage("Report entry, TP and SL converted to the Robinhood token's USDG price. Review the adjusted levels before signing. No transaction was sent.");
+            return;
+          }
           selectSpotPair(result.executionMarketPair);
           setMessage("Robinhood token market loaded. Review fresh USDG order levels; Global report prices were not copied because token and underlying-share prices can differ. No transaction was sent.");
           return;
@@ -1360,7 +1374,7 @@ export function SpotWorkspace({
     return () => {
       cancelled = true;
     };
-  }, [pair, networkKey, mappingAttempt]);
+  }, [pair, networkKey, mappingAttempt, incomingTrade]);
 
   useEffect(() => {
     if (networkKey === "arc-testnet") {
@@ -1528,15 +1542,15 @@ export function SpotWorkspace({
     if (!initialTrade) return;
     setSide(initialTrade.side);
     setExecutionMode(initialTrade.orderType);
-    if (initialTrade.entryPrice)
-      setLimitTrigger(String(initialTrade.entryPrice));
-    if (initialTrade.takeProfit) setTakeProfit(String(initialTrade.takeProfit));
-    if (initialTrade.stopLoss) setStopLoss(String(initialTrade.stopLoss));
+    setLimitTrigger(initialTrade.entryPrice ? String(initialTrade.entryPrice) : "");
+    setTakeProfit(initialTrade.takeProfit ? String(initialTrade.takeProfit) : "");
+    setStopLoss(initialTrade.stopLoss ? String(initialTrade.stopLoss) : "");
+    setMarketTimeframe(initialTrade.timeframe || "1H");
     setProtectAfterFill(
       initialTrade.side === "buy" &&
         Boolean(initialTrade.takeProfit && initialTrade.stopLoss),
     );
-    setLimitAbove(initialTrade.side === "sell");
+    setLimitAbove(initialTrade.side === "sell" || Boolean(initialTrade.entryPrice && initialTrade.observedPrice && initialTrade.entryPrice > initialTrade.observedPrice));
   }, [initialTrade]);
 
   const refresh = useCallback(async (freshOrders = false) => {
@@ -7578,7 +7592,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <ul>
                 <li>Choose the token by its name and contract. Route available is selected by default and checks run automatically. A catalog listing is not a promise of liquidity; the actual order is quoted again before execution.</li>
                 <li>Charts use the actual token’s DEX prices in USD. Trading levels and settlement use USDG with a fresh conversion. A stock token’s price must not be replaced with the underlying share price.</li>
-                <li>A Global research report does not authorize a trade. When moving to a Robinhood token, review fresh execution levels instead of reusing levels for a different asset.</li>
+                <li>A Global research report does not authorize a trade. Recommended buy setups carry entry, TP and SL into Spot. On Robinhood, these are rebased to a fresh token/USDG price, preserving the report’s percentage distances from its reference price. Review the labelled adjusted levels before signing; they are not the original research prices. Manual/wait reports do not attach automatic protection.</li>
                 <li>Autopilot requires sufficient closed-candle history, a verified route, your signed risk policy and an active Entry Pass. A failed entry condition means Hold, not an automatic paid AI call.</li>
                 <li>Risk Guard distinguishes issuer stock tokens, USDG and wrapped ETH. Missing provider evidence stays unknown; market capitalization and an issuer listing do not establish safety.</li>
               </ul>

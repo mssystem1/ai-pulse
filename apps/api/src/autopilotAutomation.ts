@@ -15,7 +15,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { put } from "@vercel/blob";
 import { opportunityUniverse } from "./opportunityUniverse.js";
 import { buildMarketContext, listSpotInstruments } from "@pulse/market";
-import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, assertRobinhoodAutomationHistory } from "./robinhoodMarkets.js";
+import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, assertRobinhoodAutomationHistory, robinhoodCandles } from "./robinhoodMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
@@ -749,11 +749,11 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       if (network === "robinhood" && isRobinhoodMarket(pair)) {
         await verifyRobinhoodMarketBinding(cfg, pair, targetAsset, settlementAsset);
         if (!parsed.data.timeframe) throw new Error("Choose the Robinhood Autopilot timeframe before setup");
-        const [market] = await Promise.all([
-          executionMarketContext(cfg, { instId: pair, timeframe: parsed.data.timeframe, candleLimit: 120, completedOnly: true }),
+        const [candles] = await Promise.all([
+          robinhoodCandles(cfg, pair, parsed.data.timeframe, 120),
           executionSettlementTicker(cfg, pair),
         ]);
-        assertRobinhoodAutomationHistory(market.candles, parsed.data.timeframe);
+        assertRobinhoodAutomationHistory(candles.filter(candle => candle.confirmed === true), parsed.data.timeframe);
       } else if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
         throw new Error(`Contract route ${targetSymbol}/${settlementSymbol} does not represent ${pair}`);
       await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic, slippagePercent: "1.5" });

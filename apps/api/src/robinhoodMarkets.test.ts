@@ -4,6 +4,25 @@ import type { AppConfig } from "@pulse/config";
 import { isRobinhoodMarket, robinhoodMarketId, parseRobinhoodCandles, assertRobinhoodMarketBinding, robinhoodSettlementMark, assertRobinhoodAutomationHistory, robinhoodDayWindow } from "./robinhoodMarkets.js";
 import { ROBINHOOD_USDG, NATIVE_ETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodCandles, robinhoodMarketCatalog, assertExecutionMarketIdentity, robinhoodOrderMarket } from "./robinhoodMarkets.js";
+import { robinhoodLiveMarks } from "./robinhoodMarkets.js";
+
+test("live marks use the price endpoint and verify identity and provider freshness", async () => {
+  const original = globalThis.fetch;
+  const cfg = { hasOkxCredentials: true, OKX_API_KEY: "fixture", OKX_SECRET_KEY: "fixture", OKX_PASSPHRASE: "fixture", OKX_BASE_URL: "https://fixture.invalid" } as AppConfig;
+  let time = Date.now(), chainIndex = "4663";
+  globalThis.fetch = async (input, init) => {
+    assert.equal(String(input), "https://fixture.invalid/api/v6/dex/market/price");
+    assert.equal(init?.method, "POST");
+    return Response.json({ code: "0", data: [{ chainIndex, tokenContractAddress: ROBINHOOD_USDG, time: String(time), price: "0.999" }] });
+  };
+  try {
+    assert.equal((await robinhoodLiveMarks(cfg, [ROBINHOOD_USDG]))[0].close, 0.999);
+    time -= 180_001;
+    await assert.rejects(robinhoodLiveMarks(cfg, [ROBINHOOD_USDG]), /stale/);
+    time = Date.now(); chainIndex = "1";
+    await assert.rejects(robinhoodLiveMarks(cfg, [ROBINHOOD_USDG]), /identity/);
+  } finally { globalThis.fetch = original; }
+});
 
 test("recovered buy and sell orders retain the same contract-specific USDG market", () => {
   const target = { address: "0x1111111111111111111111111111111111111111", symbol: "NEW" };

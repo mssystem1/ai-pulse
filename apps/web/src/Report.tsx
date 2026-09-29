@@ -9,6 +9,7 @@ export type ReportTradeIntent = {
   side: "buy" | "sell";
   orderType: "market" | "limit";
   entryPrice?: number;
+  observedPrice?: number;
   takeProfit?: number;
   stopLoss?: number;
   downsideReference?: number;
@@ -282,7 +283,7 @@ export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: stri
   const [executionChoice, setExecutionChoice] = useState<"market" | "limit">(buyPlan.orderType === "limit" ? "limit" : "market");
   const recommendedBuy = recommendation.action === "buy" && Number(a.confidence) > 60;
   const validLevels = Number(buyPlan.trigger) > 0 && Number(buyPlan.stopLoss) > 0 && Number(buyPlan.stopLoss) < Number(buyPlan.trigger) && Number(buyPlan.takeProfit) > Number(buyPlan.trigger);
-  const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, ...(recommendedBuy && validLevels ? { entryPrice: Number(buyPlan.trigger), takeProfit: Number(buyPlan.takeProfit), stopLoss: Number(buyPlan.stopLoss) } : {}), rationale: recommendedBuy ? String(buyPlan.scenario || recommendation.reason || "Report buy setup") : `Manual trade at your own risk. Report: ${bias}, ${String(a.confidence ?? "unknown")}% confidence; recommendation: wait. Configure entry and protection yourself.`, sourceTier: tier });
+  const buyIntent = (orderType: "market" | "limit"): ReportTradeIntent => ({ pair, timeframe: reportTimeframe, side: "buy", orderType, observedPrice: Number(execution.observedPrice), ...(recommendedBuy && validLevels ? { entryPrice: Number(buyPlan.trigger), takeProfit: Number(buyPlan.takeProfit), stopLoss: Number(buyPlan.stopLoss) } : {}), rationale: recommendedBuy ? String(buyPlan.scenario || recommendation.reason || "Report buy setup") : `Manual trade at your own risk. Report: ${bias}, ${String(a.confidence ?? "unknown")}% confidence; recommendation: wait. Configure entry and protection yourself.`, sourceTier: tier });
   return (
     <div className={`sr tiered-report ${premium ? "premium-report" : "base-report"}`}>
       <div className={`report-tier-banner ${premium ? "premium" : "base"}`}><span>{premium ? "PRO" : "QUICK"}</span><strong>{premium ? "Trading intelligence · annotated structure" : "Market intelligence · concise evidence"}</strong></div>
