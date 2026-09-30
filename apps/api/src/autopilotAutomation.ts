@@ -695,6 +695,24 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppCon
 }
 export function createAutopilotAutomationRouter(cfg: AppConfig) {
   const router = Router();
+  router.get("/v1/autopilot/market-readiness", asyncRoute(async (req, res) => {
+    const parsed = z.object({ network: z.literal("robinhood"), pair: z.string().max(64).refine(isRobinhoodMarket), timeframe: z.enum(["15m", "1H", "4H", "1D"]), alternatives: z.enum(["1"]).optional() }).safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: "Choose a Robinhood token and a supported timeframe" });
+    const { pair, timeframe, alternatives } = parsed.data;
+    const check = async (value: string) => {
+      try {
+        const candles = (await robinhoodCandles(cfg, pair, value, 120)).filter(candle => candle.confirmed === true);
+        assertRobinhoodAutomationHistory(candles, value);
+        return { timeframe: value, ready: true, reason: "Completed strategy history is available. Route and wallet checks still run before setup." };
+      } catch (error) {
+        return { timeframe: value, ready: false, reason: error instanceof Error ? error.message : "Market history is temporarily unavailable" };
+      }
+    };
+    const selected = await check(timeframe);
+    const other = alternatives === "1" ? await Promise.all(["15m", "1H", "4H", "1D"].filter(value => value !== timeframe).map(check)) : [];
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ pair, ...selected, alternatives: other, walletTransactionsSent: false });
+  }));
   router.post("/v1/autopilot/readiness", asyncRoute(async (_req, res) => {
     await assertAutopilotStorageReady();
     res.setHeader("Cache-Control", "no-store");

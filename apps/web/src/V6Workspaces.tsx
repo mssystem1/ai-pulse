@@ -4162,6 +4162,24 @@ export function AutopilotWorkspace({
   const [capabilityUnavailable, setCapabilityUnavailable] = useState(false);
   const [pair, setPair] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("4H");
+  const historyScope = `${networkKey}:${pair}:${timeframe}`;
+  const [historyCheck, setHistoryCheck] = useState<{ scope: string; ready: boolean; reason: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> } | null>(null);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
+  const [checkOtherTimeframes, setCheckOtherTimeframes] = useState(false);
+  useEffect(() => {
+    if (!setupOpen || networkKey !== "robinhood" || !/\.[A-F0-9]{16}-USDG$/.test(pair)) return;
+    let cancelled = false;
+    setHistoryCheck(null);
+    const timer = setTimeout(() => {
+      void apiGet(`/v1/autopilot/market-readiness?network=robinhood&pair=${encodeURIComponent(pair)}&timeframe=${encodeURIComponent(timeframe)}${checkOtherTimeframes ? "&alternatives=1" : ""}`)
+        .then(response => {
+          if (cancelled) return;
+          const data = response.data as { ready?: boolean; reason?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> };
+          setHistoryCheck({ scope: historyScope, ready: response.ok && data.ready === true, reason: data.reason || "Market history could not be checked. Retry before setup.", alternatives: data.alternatives });
+        }).catch(() => { if (!cancelled) setHistoryCheck({ scope: historyScope, ready: false, reason: "Market history check is temporarily unavailable. Retry before setup." }); });
+    }, 400);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [setupOpen, historyScope, historyAttempt, checkOtherTimeframes]);
   const [maxTrade, setMaxTrade] = useState("50");
   const [dailyLoss, setDailyLoss] = useState("3");
   const [riskProfile, setRiskProfile] = useState<
@@ -5704,6 +5722,7 @@ export function AutopilotWorkspace({
   const editNotReady = autopilotPage === "edit" && Boolean(activeStrategy) && editConfiguration?.scope !== editScope;
   const startDisabled =
     busy || unchangedEdit || editNotReady ||
+    (networkKey === "robinhood" && (historyCheck?.scope !== historyScope || !historyCheck.ready)) ||
     !wallet ||
     !capability?.autopilot.enabled ||
     !autopilotRouteAvailable ||
@@ -5722,6 +5741,10 @@ export function AutopilotWorkspace({
         ? "Autopilot execution unavailable"
         : !autopilotRouteAvailable
           ? "Choose a pair with a live route"
+          : networkKey === "robinhood" && historyCheck?.scope !== historyScope
+            ? "Checking strategy history…"
+          : networkKey === "robinhood" && !historyCheck?.ready
+            ? "Choose a market/timeframe with sufficient history"
           : effectiveCapital <= 0n
             ? `Enter ${WEB_NETWORKS[networkKey].payment.symbol} capital to continue`
       : autopilotInsufficientCapital
@@ -5825,6 +5848,16 @@ export function AutopilotWorkspace({
               />
             </div>
           </div>
+          {networkKey === "robinhood" && <section className="v6-message" role="status" aria-label="Autopilot market history">
+            <strong>{historyCheck?.scope !== historyScope ? "Checking strategy history…" : historyCheck.ready ? "Strategy history available" : "This market/timeframe is not ready for Autopilot"}</strong>
+            <p>{historyCheck?.scope === historyScope ? historyCheck.reason : "Checking completed candles before any funding, payment or wallet signature."}</p>
+            {historyCheck?.scope === historyScope && !historyCheck.ready && <>
+              <p>A live swap route does not guarantee enough candle history for an autonomous strategy. Choose another market or check other timeframes; no funds have moved.</p>
+              <button type="button" className="btn btn-soft" onClick={() => setHistoryAttempt(value => value + 1)}>Retry history check</button>{" "}
+              <button type="button" className="btn btn-soft" onClick={() => { setCheckOtherTimeframes(true); setHistoryAttempt(value => value + 1); }}>Check other timeframes</button>
+              {historyCheck.alternatives?.map(item => <p key={item.timeframe}>{item.ready ? <button type="button" className="btn btn-soft" onClick={() => setTimeframe(item.timeframe)}>Use {item.timeframe} · history available</button> : `${item.timeframe}: ${item.reason}`}</p>)}
+            </>}
+          </section>}
           <div
             className={`autopilot-route-card ${autopilotRouteAvailable ? "ready" : "warning"}`}
           >
@@ -7592,7 +7625,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <ul>
                 <li>Choose the token by its name and contract. Route available is selected by default and checks run automatically. A catalog listing is not a promise of liquidity; the actual order is quoted again before execution.</li>
                 <li>Charts use the actual token’s DEX prices in USD. Trading levels and settlement use USDG with a fresh conversion. A stock token’s price must not be replaced with the underlying share price.</li>
-                <li>A Global research report does not authorize a trade. Recommended buy setups carry entry, TP and SL into Spot. On Robinhood, these are rebased to a fresh token/USDG price, preserving the report’s percentage distances from its reference price. Review the labelled adjusted levels before signing; they are not the original research prices. Manual/wait reports do not attach automatic protection.</li>
+                <li>A Global research report does not authorize a trade. Valid trigger, TP and SL levels carry into Spot, including manual trades opened with risk acceptance from low-confidence reports. On Robinhood, these are rebased to a fresh token/USDG price, preserving the report’s percentage distances from its reference price. Review the labelled adjusted levels before signing; they are not the original research prices. Invalid or missing protection levels must be configured manually.</li>
                 <li>Autopilot requires sufficient closed-candle history, a verified route, your signed risk policy and an active Entry Pass. A failed entry condition means Hold, not an automatic paid AI call.</li>
                 <li>Risk Guard distinguishes issuer stock tokens, USDG and wrapped ETH. Missing provider evidence stays unknown; market capitalization and an issuer listing do not establish safety.</li>
               </ul>
