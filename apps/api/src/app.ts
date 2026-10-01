@@ -317,7 +317,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       ...service,
       requestSpec: service.free ? undefined : { method: "POST", fields: buildX402InputRequired(service.path).fields },
       serviceGuide: service.free ? undefined : service.path.includes("/analysis/spot/")
-        ? "Ask for pair, timeframe and report language together. POST JSON; preserve the method through input collection. After the authorized payment, poll the returned job without paying again and display the complete reportMarkdown. A wait recommendation still allows the user to configure a manual Spot ticket; no trade is executed by this service."
+        ? "Ask for pair, timeframe and report language together. POST JSON; preserve the method through input collection. When paying through OKX CLI, repeat all three inputs on payment pay with --param instId=PAIR --param timeframe=INTERVAL --param lang=LANG; quote-time parameters are not replayed automatically. After the authorized payment, poll the returned job without paying again and display the complete reportMarkdown. A wait recommendation still allows the user to configure a manual Spot ticket; no trade is executed by this service."
         : service.path.includes("/autopilot/pass/")
           ? "Collect owner and an already configured, funded and registered vault on the selected network. Verify ownership and setup before payment. This service activates or extends AI runtime; the owner's separately signed start/resume call controls trading."
           : "Collect the selected market or exact token contract together with report language. POST JSON. Deliver every report section and preserve the recovery information; report retrieval and retry never require a second payment.",
