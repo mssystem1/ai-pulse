@@ -66,3 +66,20 @@ test("bearish invalidations never become buy stops and 60% is not above the reco
     if (plan.recommendation.action === "buy") assert.ok(plan.buy.valid);
   }
 });
+
+test("Autopilot protection uses its actual market entry rather than a conditional Spot entry", () => {
+  const structure = buildTechnicalStructure(candles);
+  const technical = { ...structure, possibleMoves: { ...structure.possibleMoves,
+    bullish: { ...structure.possibleMoves.bullish, trigger: 95, target: 110, invalidation: 96 } } };
+  const input = { instId: "ETH-USDT", timeframe: "1H", tier: "premium", lastPrice: 100,
+    analysis: { bias: "bullish", confidence: 90, keyLevels: { support: [95], resistance: [110] } }, technical };
+  const conditional = buildSpotExecutionPlan(input);
+  assert.equal(conditional.buy.trigger, 95);
+  assert.equal(conditional.buy.stopLoss, null);
+  const immediate = buildSpotExecutionPlan({ ...input, entryMode: "market" });
+  assert.equal(immediate.buy.trigger, 100);
+  assert.equal(immediate.buy.orderType, "market");
+  assert.equal(immediate.buy.stopLoss, 96);
+  assert.equal(immediate.buy.takeProfit, 110);
+  assert.equal(immediate.buy.valid, true);
+});

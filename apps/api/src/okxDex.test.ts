@@ -1,8 +1,40 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHmac } from "node:crypto";
-import { createOkxDexHeaders, createOkxSignature, matchesUnderlyingToken, getOkxTradeTokens, executionAssetAliases } from "./okxDex.js";
+import { createOkxDexHeaders, createOkxSignature, matchesUnderlyingToken, getOkxTradeTokens, executionAssetAliases, getGenericOkxSwap, betterGenericOkxExitSwap } from "./okxDex.js";
 import type { AppConfig } from "@pulse/config";
+
+test("a better exit route discovers venue IDs and preserves exact amount, recipient and slippage", async () => {
+  const originalFetch = globalThis.fetch;
+  const from = `0x${"1".repeat(40)}`, to = `0x${"2".repeat(40)}`, wallet = `0x${"3".repeat(40)}`;
+  const cfg = { hasOkxCredentials: true, OKX_BASE_URL: "https://fixture.invalid", OKX_API_KEY: "fixture", OKX_SECRET_KEY: "fixture", OKX_PASSPHRASE: "fixture" } as AppConfig;
+  const input = { chainId: "4663", fromTokenAddress: from, toTokenAddress: to, amount: "1000", userWalletAddress: wallet, slippagePercent: "1" };
+  let alternativeAmount = "70", substituted = false;
+  globalThis.fetch = async value => {
+    const url = new URL(String(value));
+    if (url.pathname.endsWith("get-liquidity")) return Response.json({ code: "0", data: [
+      { id: "53", name: "Default" }, { id: "53&unsafe=true", name: "Default" }, { id: "438", name: "Alternative" },
+    ] });
+    assert.ok(url.pathname.endsWith("/swap"));
+    const alternative = url.searchParams.has("excludeDexIds");
+    if (alternative) assert.equal(url.searchParams.get("excludeDexIds"), "53");
+    for (const [key, expected] of Object.entries({ amount: "1000", userWalletAddress: wallet, slippagePercent: "1", fromTokenAddress: from, toTokenAddress: to, chainIndex: "4663" }))
+      assert.equal(url.searchParams.get(key), expected);
+    return Response.json({ code: "0", data: [{ tx: { to: wallet, data: "0x", value: "0" }, routerResult: {
+      fromToken: { tokenContractAddress: from, decimal: "18" }, toToken: { tokenContractAddress: substituted ? wallet : to, decimal: "6" },
+      fromTokenAmount: "1000", toTokenAmount: alternative ? alternativeAmount : "50",
+      dexRouterList: [{ dexProtocol: { dexName: alternative ? "Alternative" : "Default" } }],
+    } }] });
+  };
+  try {
+    const original = await getGenericOkxSwap(cfg, input);
+    assert.equal((await betterGenericOkxExitSwap(cfg, input, original)).quote?.toTokenAmount, "70");
+    alternativeAmount = "40";
+    assert.equal(await betterGenericOkxExitSwap(cfg, input, original), original, "never select a worse alternative");
+    substituted = true;
+    await assert.rejects(betterGenericOkxExitSwap(cfg, input, original), /assets or chain/);
+  } finally { globalThis.fetch = originalFetch; }
+});
 
 test("OKX signing includes the exact path and query in the prehash", () => {
   const timestamp = "2026-08-03T12:34:56.789Z";

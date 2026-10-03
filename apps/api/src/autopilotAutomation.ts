@@ -15,13 +15,13 @@ import { privateKeyToAccount } from "viem/accounts";
 import { put } from "@vercel/blob";
 import { opportunityUniverse } from "./opportunityUniverse.js";
 import { buildMarketContext, listSpotInstruments } from "@pulse/market";
-import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, assertRobinhoodAutomationHistory, robinhoodCandles } from "./robinhoodMarkets.js";
+import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, robinhoodAutopilotContext, resolveRobinhoodMarket } from "./robinhoodMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
-import { analysisSymbolForExecutionToken, getOkxTradeTokens, getGenericOkxQuote, getGenericOkxSwap } from "./okxDex.js";
+import { analysisSymbolForExecutionToken, getOkxTradeTokens, getGenericOkxQuote, getGenericOkxSwap, betterGenericOkxExitSwap } from "./okxDex.js";
 import { listV6Activity, recordV6Activity, confirmV6Activity, reconcileV6Activity } from "./v6Store.js";
 import { autopilotExecutionFailure, pendingAutopilotTrade, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
 import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
@@ -49,7 +49,7 @@ type StrategyEvaluation = {
   bias: string;
   confidence: number;
   metrics: Record<string, number | null>;
-  context?: { pair?: string; strategyType?: string; timeframe: string; candleClosedAt?: string; aiSource?: string; aiStatus?: string; nextAiEligibleAt?: string; minConfidence: number; maxTradePct: number; dailyLossPct: number };
+  context?: { pair?: string; signalMarket?: string; strategyType?: string; timeframe: string; candleClosedAt?: string; aiSource?: string; aiStatus?: string; nextAiEligibleAt?: string; minConfidence: number; maxTradePct: number; dailyLossPct: number };
   rules: AutopilotRuleResult[];
   evidenceHash?: string;
   txHash?: string;
@@ -71,6 +71,7 @@ type Strategy = {
   sellAmountAtomic: string;
   minConfidence: number;
   policy: {
+    signalMarket?: string;
     pair: string;
     timeframe: string;
     maxTradePct: number;
@@ -93,6 +94,7 @@ type Strategy = {
   baselineBlockNumber?: string;
   configurationHash?: string;
   exitPending?: boolean;
+  entryQuoteRetryPending?: boolean;
   activeTakeProfit?: number;
   activeStopLoss?: number;
   positionEntryPrice?: number;
@@ -191,6 +193,7 @@ const StrategySchema = z.object({
     maxTradePct: z.number(),
     dailyLossPct: z.number(),
     strategy: z.string(),
+    signalMarket: z.string().max(64).optional(),
   }),
   authorization: z.object({
     expiresAt: z.number().int().positive(),
@@ -204,6 +207,8 @@ const StrategyPreflightSchema = z.object({
   pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
   timeframe: z.enum(["15m", "1H", "4H", "1D"]).optional(),
   amountAtomic: z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n),
+  maxTradeValueAtomic: z.string().regex(/^\d+$/).refine(value => BigInt(value) > 0n).optional(),
+  maxSlippageBps: z.number().int().min(0).max(1000).default(100),
 });
 async function kv(command: unknown[]) {
   return runKvCommand(command, "Autopilot");
@@ -439,7 +444,7 @@ async function save(items: Strategy[], mode: "full" | "runtime" = "full") {
     return latest ? mergeStrategyRuntime(latest, item) : item;
   });
   await writeStrategyEntries(merged);
-  memory = merged;
+  memory = [...new Map([...current, ...merged].map(item => [item.id, item])).values()].slice(-500);
 }
 function clients(network: Network, key?: `0x${string}`) {
   const c = configs[network];
@@ -686,6 +691,9 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppCon
   const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[input.network].id), name));
   if (input.network === "robinhood" && isRobinhoodMarket(input.pair)) {
     await verifyRobinhoodMarketBinding(cfg, input.pair, input.targetAsset, input.settlementAsset);
+    const binding = await resolveRobinhoodMarket(cfg, input.pair);
+    if (input.policy.signalMarket && ![input.pair, ...binding.researchPairs].includes(input.policy.signalMarket))
+      throw new Error("Signed signal market is not verified for this Robinhood contract");
   } else if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
     throw new Error(`On-chain tokens ${targetSymbol}/${settlementSymbol} do not match ${input.pair}`);
   if (keccak256(toHex(JSON.stringify(input.policy))) !== policyHash)
@@ -701,9 +709,9 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     const { pair, timeframe, alternatives } = parsed.data;
     const check = async (value: string) => {
       try {
-        const candles = (await robinhoodCandles(cfg, pair, value, 120)).filter(candle => candle.confirmed === true);
-        assertRobinhoodAutomationHistory(candles, value);
-        return { timeframe: value, ready: true, reason: "Completed strategy history is available. Route and wallet checks still run before setup." };
+        const context = await robinhoodAutopilotContext(cfg, { instId: pair, timeframe: value });
+        return { timeframe: value, ready: true, signalMarket: context.signalMarket, signalSource: context.signalSource,
+          reason: context.signalSource === "verified-reference" ? `Signals use verified ${context.signalMarket} history. Trades and protection use the actual Robinhood token/USDG price. This source is included in your signed policy.` : "Token DEX strategy history is available. Route and wallet checks still run before setup." };
       } catch (error) {
         return { timeframe: value, ready: false, reason: error instanceof Error ? error.message : "Market history is temporarily unavailable" };
       }
@@ -743,6 +751,8 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     try {
       const { network, settlementAsset, targetAsset, pair, amountAtomic } = parsed.data;
+      let signalMarket: string | undefined;
+      let settlementMark: number | undefined;
       assertExecutionMarketIdentity(network, pair);
       if (network === "robinhood") {
         const readiness = await robinhoodAutomationReadiness(cfg);
@@ -757,6 +767,8 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
           { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "symbol" },
           { address: targetAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
           { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "name" },
+          { address: targetAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" },
+          { address: settlementAsset as `0x${string}`, abi: erc20Abi, functionName: "decimals" },
         ] }),
       ]);
       if (!settlementCode || settlementCode === "0x" || !targetCode || targetCode === "0x")
@@ -767,15 +779,26 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       if (network === "robinhood" && isRobinhoodMarket(pair)) {
         await verifyRobinhoodMarketBinding(cfg, pair, targetAsset, settlementAsset);
         if (!parsed.data.timeframe) throw new Error("Choose the Robinhood Autopilot timeframe before setup");
-        const [candles] = await Promise.all([
-          robinhoodCandles(cfg, pair, parsed.data.timeframe, 120),
-          executionSettlementTicker(cfg, pair),
-        ]);
-        assertRobinhoodAutomationHistory(candles.filter(candle => candle.confirmed === true), parsed.data.timeframe);
+        const context = await robinhoodAutopilotContext(cfg, { instId: pair, timeframe: parsed.data.timeframe });
+        signalMarket = context.signalMarket;
+        settlementMark = context.settlementTicker.last;
       } else if (!base || !quote || extra || normalizeForChain(targetSymbol, targetName) !== normaliseRouteSymbol(base) || normalizeForChain(settlementSymbol, settlementName) !== normaliseRouteSymbol(quote))
         throw new Error(`Contract route ${targetSymbol}/${settlementSymbol} does not represent ${pair}`);
-      await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic, slippagePercent: "1.5" });
-      res.json({ ready: true, pair, executionPair: `${targetSymbol}/${settlementSymbol}`, targetAsset, settlementAsset });
+      const entryQuote = await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: settlementAsset, toTokenAddress: targetAsset, amount: amountAtomic });
+      if (settlementMark !== undefined) {
+        const price = parseUnits(settlementMark.toFixed(18), 18);
+        const targetDecimals = Number(metadata[4]), settlementDecimals = Number(metadata[5]);
+        const slippageBps = BigInt(parsed.data.maxSlippageBps);
+        const entryMinimum = minimumOracleOutput({ action: "buy", sellAmount: BigInt(amountAtomic), priceE18: price, targetDecimals, settlementDecimals, slippageBps });
+        if (BigInt(entryQuote.toTokenAmount) < entryMinimum) throw new Error("The current entry route is outside the selected vault tolerance. No funding or payment was requested.");
+        const exitAmount = boundedTargetSellAmount({ targetBalance: BigInt(entryQuote.toTokenAmount), maxTradeValue: BigInt(parsed.data.maxTradeValueAtomic || amountAtomic), priceE18: price, targetDecimals, settlementDecimals });
+        if (exitAmount <= 0n) throw new Error("The selected trade size has no cap-compliant exit amount");
+        const exitQuote = await getGenericOkxQuote(cfg, { chainId: String(configs[network].id), fromTokenAddress: targetAsset, toTokenAddress: settlementAsset, amount: String(exitAmount) });
+        const exitMinimum = minimumOracleOutput({ action: "sell", sellAmount: exitAmount, priceE18: price, targetDecimals, settlementDecimals, slippageBps });
+        if (BigInt(exitQuote.toTokenAmount) <= 0n || BigInt(exitQuote.toTokenAmount) < exitMinimum)
+          throw new Error("The current sell route is outside the selected vault tolerance. No funding or payment was requested. A listed market still needs a guard-compliant exit route at your trade size.");
+      }
+      res.json({ ready: true, pair, executionPair: `${targetSymbol}/${settlementSymbol}`, targetAsset, settlementAsset, signalMarket });
     } catch (error) {
       res.status(422).json({ error: error instanceof Error ? error.message : String(error), walletTransactionsSent: false });
     }
@@ -957,6 +980,7 @@ async function evidence(strategy: Strategy, payload: unknown) {
 async function appendEvaluation(strategy: Strategy, evaluation: StrategyEvaluation) {
   evaluation.context = {
     pair: strategy.pair,
+    signalMarket: strategy.policy.signalMarket || strategy.pair,
     strategyType: strategy.strategyType,
     timeframe: strategy.timeframe,
     candleClosedAt: strategy.lastEvaluatedCandleTs ? new Date(strategy.lastEvaluatedCandleTs).toISOString() : undefined,
@@ -1017,7 +1041,9 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
         const lastRiskCheck = Date.parse(s.lastRiskCheckAt || "");
-        const analysisDue = !Number.isFinite(lastAnalysis) || now - lastAnalysis >= analysisInterval;
+        // A paused-status poll is not an entry evaluation. Resume may evaluate
+        // immediately; closed-candle dedupe and paid-AI cooldowns still apply.
+        const analysisDue = s.lastDecision === "hold_paused" || !Number.isFinite(lastAnalysis) || now - lastAnalysis >= analysisInterval;
         const riskDue = !Number.isFinite(lastRiskCheck) || now - lastRiskCheck >= riskInterval;
         if ((mode === "risk" && !riskDue) || (mode === "analysis" && !analysisDue)) continue;
         if (mode === "risk") s.riskCheckCount = (s.riskCheckCount || 0) + 1;
@@ -1126,6 +1152,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         let executionPrice = 0;
         let analysisToSettlement = 1;
         let evidenceContext: unknown;
+        let signalProvenance: unknown;
         let executionPlan: ReturnType<typeof buildSpotExecutionPlan> | undefined;
 
         // Protection is intentionally independent of Premium analysis. A live
@@ -1174,28 +1201,38 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
 
         if (!decision) {
           analysisAttempted = true;
-          const market = await executionMarketContext(cfg, {
+          const robinhoodContext = isRobinhoodMarket(s.pair) ? await robinhoodAutopilotContext(cfg, { instId: s.pair, timeframe: s.timeframe, signalMarket: s.policy.signalMarket || s.pair }) : null;
+          if (robinhoodContext) signalProvenance = {
+            executionPair: s.pair, signalMarket: robinhoodContext.signalMarket,
+            signalSource: robinhoodContext.signalSource, analysisToSettlement: robinhoodContext.analysisToSettlement,
+            executionPrice: robinhoodContext.settlementTicker.last, executionPriceTimestamp: robinhoodContext.settlementTicker.ts,
+          };
+          const market = robinhoodContext?.market || await executionMarketContext(cfg, {
             instId: s.pair,
             timeframe: s.timeframe,
             candleLimit: 120,
             completedOnly: true,
           });
           const candleTs = market.candles.at(-1)?.ts || 0;
-          if (isRobinhoodMarket(s.pair)) assertRobinhoodAutomationHistory(market.candles, s.timeframe);
-          if (s.lastEvaluatedCandleTs === candleTs) {
+          // A quote rejected before submission did not execute the approved
+          // entry. Recheck its real route without fabricating another signal;
+          // AI cooldown/pass dedupe and pending-receipt reconciliation still apply.
+          const lastEvaluation = s.evaluations?.at(-1);
+          const rejectedQuoteMessage = "The live route is below the vault oracle minimum; the latched action will retry with a fresh quote";
+          const retryRejectedQuote = policyBalance === 0n && (s.entryQuoteRetryPending || s.lastError === rejectedQuoteMessage
+            || (lastEvaluation?.context?.pair === s.pair && lastEvaluation.error === rejectedQuoteMessage));
+          if (s.lastEvaluatedCandleTs === candleTs && !retryRejectedQuote) {
             if (!s.lastError) s.lastDecision = "hold_same_candle";
             s.sameCandleSkipCount = (s.sameCandleSkipCount || 0) + 1;
             s.lastRunAt = new Date().toISOString();
             continue;
           }
+          s.entryQuoteRetryPending = false;
           const technical = buildTechnicalStructure(market.candles);
           executionPrice = market.ticker.last;
-          if (isRobinhoodMarket(s.pair)) {
-            const settlementTicker = await executionSettlementTicker(cfg, s.pair);
-            if (settlementTicker.ts !== market.ticker.ts) throw new Error("Robinhood analysis and execution marks changed; retry with synchronized prices");
-            executionPrice = settlementTicker.last;
-            if (!("usdPerSettlement" in settlementTicker)) throw new Error("Robinhood USDG conversion is unavailable");
-            analysisToSettlement = 1 / settlementTicker.usdPerSettlement;
+          if (robinhoodContext) {
+            executionPrice = robinhoodContext.settlementTicker.last;
+            analysisToSettlement = robinhoodContext.analysisToSettlement;
           }
           s.lastEvaluatedCandleTs = candleTs;
           const neutralAnalysis = { bias: "neutral", confidence: 0, regime: "transition", keyLevels: { support: [] as number[], resistance: [] as number[] } };
@@ -1219,9 +1256,13 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
               evidenceContext = { mode: "deterministic_entry_prefilter", candidate, technical };
             } else {
               const pass = await getAutopilotPass(s.network, s.vault);
-              const passReady = Boolean(pass && autopilotPassRemainingMs(pass) > 0 && pass.signalsUsed < pass.signalLimit);
-              let signal = passReady ? await cachedAutopilotSignal(s.pair, s.timeframe) : null;
+              const passActive = Boolean(pass && autopilotPassRemainingMs(pass) > 0);
+              const signalIdentity = robinhoodContext ? `${s.pair}@${robinhoodContext.signalMarket}` : s.pair;
+              let signal = passActive ? await cachedAutopilotSignal(signalIdentity, s.timeframe) : null;
+              const alreadyConfirmed = Boolean(signal && pass?.consumedSignalIds?.includes(`${s.pair}:${s.timeframe}:${signal.generatedAt}:${signal.candleTs}`));
+              const passReady = passActive && Boolean(pass && (pass.signalsUsed < pass.signalLimit || alreadyConfirmed));
               if (!passReady) {
+                signal = null;
                 s.aiSignalSource = "deterministic";
                 s.aiBudgetStatus = pass && autopilotPassRemainingMs(pass) > 0 ? "signals_exhausted" : "pass_expired";
               } else if (signal) {
@@ -1241,15 +1282,15 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
                 } else if (!cfg.hasXaiKey) {
                   s.aiBudgetStatus = "provider_not_configured";
                 } else {
-                  const signalLeaseId = `signal:${s.pair}:${s.timeframe}`;
+                  const signalLeaseId = `signal:${signalIdentity}:${s.timeframe}`;
                   const signalLease = await acquireStrategyLease(signalLeaseId, "analysis");
                   if (!signalLease) {
-                    signal = await cachedAutopilotSignal(s.pair, s.timeframe);
+                    signal = await cachedAutopilotSignal(signalIdentity, s.timeframe);
                     s.aiBudgetStatus = signal ? "ready" : "signal_generation_in_progress";
                     s.aiSignalSource = signal ? "cache" : "deterministic";
                   } else {
                     try {
-                      signal = await cachedAutopilotSignal(s.pair, s.timeframe);
+                      signal = await cachedAutopilotSignal(signalIdentity, s.timeframe);
                       if (!signal) {
                         // Record the attempt before any network call. A rejected
                         // request must throttle the next cycle exactly like a
@@ -1283,7 +1324,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
                         aiAttemptedThisCycle = true;
                         signal = await observeProvider("xai", "autopilot_compact_signal", () => runPreparedAutopilotSignal(
                           { apiKey: cfg.XAI_API_KEY, baseUrl: cfg.XAI_BASE_URL, model: cfg.GROK_AUTOPILOT_MODEL },
-                          { instId: s.pair, timeframe: s.timeframe, strategyType, market, maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT, maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT },
+                          { instId: market.instId, timeframe: s.timeframe, strategyType, market, maxInputTokens: cfg.GROK_MAX_INPUT_AUTOPILOT, maxOutputTokens: cfg.GROK_MAX_OUTPUT_AUTOPILOT },
                         ));
                         aiAttemptedThisCycle = false;
                         const usage = signal.usage;
@@ -1296,7 +1337,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
                         s.aiFailureStreak = 0;
                         s.aiRetryAt = undefined;
                         s.lastAiSignalCandleTs = signal.candleTs;
-                        await cacheAutopilotSignal(s.pair, s.timeframe, signal, cfg.AUTOPILOT_AI_SIGNAL_TTL_MS);
+                        await cacheAutopilotSignal(signalIdentity, s.timeframe, signal, cfg.AUTOPILOT_AI_SIGNAL_TTL_MS);
                         s.aiSignalSource = "live";
                       } else {
                         s.aiSignalSource = "cache";
@@ -1322,7 +1363,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
               }
               if (signal) {
                 const analysis = { bias: signal.signal.bias, confidence: signal.signal.confidence, regime: signal.signal.regime, keyLevels: { support: [...signal.signal.support], resistance: [...signal.signal.resistance] } };
-                executionPlan = buildSpotExecutionPlan({ instId: s.pair, timeframe: s.timeframe, tier: "premium", lastPrice: market.ticker.last, analysis, technical });
+                executionPlan = buildSpotExecutionPlan({ instId: s.pair, timeframe: s.timeframe, tier: "premium", lastPrice: market.ticker.last, entryMode: "market", analysis, technical });
                 const compactReport = { analysis, executionPlan };
                 decision = evaluateAutopilotPolicy({ strategyType, candles: market.candles, report: compactReport, minConfidence: s.minConfidence, hasPosition: false });
                 evidenceContext = { mode: "event_driven_compact_signal", signal, candidate, technical, executionPlan };
@@ -1335,6 +1376,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           }
         }
 
+        if (signalProvenance) evidenceContext = { ...(evidenceContext as Record<string, unknown>), signalProvenance };
         evaluatedDecision = decision;
         const evaluationBase = { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(), strategyType, action: decision.action, reason: decision.reason, bias: decision.bias, confidence: decision.confidence, metrics: decision.metrics, rules: decision.rules };
         if (decision.action === "hold") {
@@ -1455,6 +1497,17 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           }
           if (valueOf(BigInt(String(prepared.quote?.toTokenAmount || "0"))) > headroom) throw new Error("EXPOSURE: refreshed quote exceeds the signed asset exposure cap; no vault trade sent");
         }
+        const oracleMinimum = minimumOracleOutput({
+          action: decision.action, sellAmount: amount, priceE18: price,
+          targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals), slippageBps: BigInt(slippage),
+        });
+        if (decision.action === "sell" && s.network === "robinhood" && BigInt(String(prepared.quote?.toTokenAmount || "0")) < oracleMinimum) {
+          // Gas-optimized default routing can return less than another source.
+          // Probe once; unavailable alternatives never relax the vault guard.
+          prepared = await betterGenericOkxExitSwap(cfg, { chainId: String(c.id), fromTokenAddress: sellToken,
+            toTokenAddress: buyToken, amount: String(amount), userWalletAddress: adapter!,
+            slippagePercent: String(Number(slippage) / 100) }, prepared).catch(() => prepared);
+        }
         if (
           prepared.tx.to.toLowerCase() !== router!.toLowerCase() ||
           BigInt(prepared.tx.value) !== 0n
@@ -1465,21 +1518,44 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         if (s.network === "robinhood") validateRobinhoodSwap(prepared, { from: sellToken, to: buyToken, amount: String(amount), receiver: adapter!, slippageBps: Number(slippage) });
         const quoted = BigInt(String(prepared.quote?.toTokenAmount || "0"));
         const quoteMinimum = (quoted * (10000n - BigInt(slippage))) / 10000n;
-        const oracleMinimum = minimumOracleOutput({
-          action: decision.action,
-          sellAmount: amount,
-          priceE18: price,
-          targetDecimals: Number(targetDecimals),
-          settlementDecimals: Number(settlementDecimals),
-          slippageBps: BigInt(slippage),
-        });
-        if (quoted < oracleMinimum) throw new Error("The live route is below the vault oracle minimum; the latched action will retry with a fresh quote");
+        if (quoted < oracleMinimum) {
+          if (decision.action === "buy") s.entryQuoteRetryPending = true;
+          const baseline = minimumOracleOutput({ action: decision.action, sellAmount: amount, priceE18: price,
+            targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals), slippageBps: 0n });
+          const outputGapPct = baseline > 0n ? Number((baseline - quoted) * 10000n / baseline) / 100 : 0;
+          throw new Error(`The live route is below the vault oracle minimum; the latched action will retry with a fresh quote. Quoted output is ${outputGapPct.toFixed(2)}% below valuation; configured tolerance is ${(Number(slippage) / 100).toFixed(2)}%.`);
+        }
+        let entryExitQuote: Awaited<ReturnType<typeof getGenericOkxQuote>> | undefined;
+        if (decision.action === "buy") {
+          // A cheap buy can hide a large issuer/venue basis or an unquoteable
+          // sell. Check the real bounded exit before custody changes, using
+          // the same owner-approved valuation and tolerance as execution.
+          s.entryQuoteRetryPending = true;
+          const exitAmount = boundedTargetSellAmount({ targetBalance: quoted, maxTradeValue, priceE18: price,
+            targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals) });
+          if (exitAmount <= 0n) throw new Error("Autopilot entry has no cap-compliant exit amount; no buy was sent");
+          entryExitQuote = await getGenericOkxQuote(cfg, { chainId: String(c.id), fromTokenAddress: buyToken,
+            toTokenAddress: sellToken, amount: String(exitAmount) });
+          const exitMinimum = minimumOracleOutput({ action: "sell", sellAmount: exitAmount, priceE18: price,
+            targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals), slippageBps: BigInt(slippage) });
+          if (BigInt(entryExitQuote.toTokenAmount) <= 0n || BigInt(entryExitQuote.toTokenAmount) < exitMinimum)
+            throw new Error("Autopilot entry blocked: the current sell route is below the vault oracle minimum. No buy was sent; the existing AI confirmation can be retried while valid.");
+          s.entryQuoteRetryPending = false;
+        }
         const minOut = quoteMinimum > oracleMinimum ? quoteMinimum : oracleMinimum;
+        const entryProtection = decision.action === "buy" ? {
+          takeProfit: Number(executionPlan?.buy.takeProfit) * analysisToSettlement,
+          stopLoss: Number(executionPlan?.buy.stopLoss) * analysisToSettlement,
+        } : undefined;
+        if (entryProtection && (!Number.isFinite(entryProtection.takeProfit) || !Number.isFinite(entryProtection.stopLoss)
+          || entryProtection.stopLoss <= 0 || entryProtection.stopLoss >= executionPrice || entryProtection.takeProfit <= executionPrice))
+          throw new Error("Autopilot entry requires valid market-entry TP/SL levels");
         const proof = await evidence(s, {
           decision: decision.action,
           evaluation: decision,
           report: evidenceContext,
           quote: prepared.quote,
+          entryExitQuote,
           quoteMinimum: String(quoteMinimum),
           oracleMinimum: String(oracleMinimum),
           enforcedMinimum: String(minOut),
@@ -1543,6 +1619,15 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           ],
           account: walletClient.account,
         });
+        if (entryProtection) {
+          // Save protection before the transaction can land. A receipt timeout
+          // or process restart must not leave the resulting position unprotected.
+          s.activeTakeProfit = entryProtection.takeProfit;
+          s.activeStopLoss = entryProtection.stopLoss;
+          s.exitPending = false;
+          s.updatedAt = new Date().toISOString();
+          await save([s], "runtime");
+        }
         executionPhase = "submitted";
         const txHash = await walletClient.writeContract(simulation.request);
         executionHash = txHash;

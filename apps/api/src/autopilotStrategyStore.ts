@@ -161,6 +161,7 @@ const RUNTIME_FIELDS = [
   "lastExitPrice",
   "realizedPositionPnlPct",
   "exitPending",
+  "entryQuoteRetryPending",
   "lastRiskCheckAt",
   "riskCheckCount",
   "sameCandleSkipCount",

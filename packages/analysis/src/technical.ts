@@ -132,6 +132,8 @@ export function buildSpotExecutionPlan(input: {
   timeframe: string;
   tier: string;
   lastPrice: number;
+  /** Autopilot enters immediately after its strategy rules pass. */
+  entryMode?: "market";
   analysis: AnalysisLike;
   technical: ReturnType<typeof buildTechnicalStructure>;
 }) {
@@ -150,12 +152,12 @@ export function buildSpotExecutionPlan(input: {
   const levels = analysis.keyLevels && typeof analysis.keyLevels === "object" ? analysis.keyLevels as { support?: unknown; resistance?: unknown } : {};
   const reportInvalidation = analysis.invalidation && typeof analysis.invalidation === "object"
     ? finite((analysis.invalidation as { price?: unknown }).price) : null;
-  const buyEntry = nearest(levels.support, last, "below") || finite(technical.pivots.pivot) || last;
+  const buyEntry = input.entryMode === "market" ? last : nearest(levels.support, last, "below") || finite(technical.pivots.pivot) || last;
   const sellTrigger = nearest(levels.support, last, "below") || finite(technical.possibleMoves.bearish.trigger) || last;
   const bullTarget = finite(continuationPath?.target) || finite(scenario("bull")?.target) || finite(technical.possibleMoves.bullish.target) || last;
   const bearTarget = finite(correctionPath?.target) || finite(scenario("bear")?.target) || finite(technical.possibleMoves.bearish.target) || last;
   // A bearish thesis invalidation above entry is never a long stop.
-  const stop = [finite(continuationPath?.invalidation), finite(scenario("bull")?.invalidation), finite(wave.invalidation), reportInvalidation, finite(technical.possibleMoves.bullish.invalidation)]
+  const stop = [finite(continuationPath?.invalidation), finite(scenario("bull")?.invalidation), finite(wave.invalidation), reportInvalidation, finite(technical.possibleMoves.bullish.invalidation), ...(input.entryMode === "market" ? [nearest(levels.support, last, "below")] : [])]
     .find((value): value is number => value !== null && value > 0 && value < buyEntry) ?? null;
   const validBuyLevels = buyEntry > 0 && stop !== null && bullTarget > Math.max(buyEntry, last);
   const risk = stop === null ? 0 : buyEntry - stop;

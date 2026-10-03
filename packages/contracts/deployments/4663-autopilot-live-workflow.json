@@ -1,0 +1,96 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "policy",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 54,
+      "hash": "0xe455fc902490325f150c4e403ef61c11425d9db1e5624f2e2bf78a8507f9ff95",
+      "status": "success",
+      "maxGasETH": "0.000001165105404",
+      "gasETH": "0.000000766928118"
+    },
+    {
+      "step": "asset",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 55,
+      "hash": "0xef09f064891eeb552ee3b721a7b6be4091522b9d8bc18d24df7f7190bcb31297",
+      "status": "success",
+      "maxGasETH": "0.0000034527374352",
+      "gasETH": "0.000002269773"
+    },
+    {
+      "step": "limits",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 56,
+      "hash": "0x943a83989c167d21f28e26c71f20193a6637575a82d1f7517f6bdb5919c5afe5",
+      "status": "success",
+      "maxGasETH": "0.00000130949028",
+      "gasETH": "0.00000086422203"
+    },
+    {
+      "step": "fund",
+      "to": "0x5fc5360d0400a0fd4f2af552add042d716f1d168",
+      "nonce": 57,
+      "hash": "0x1d60035c1dfda308c6fc6c92dd98afa171ac622bd386a60867bf8d6a9a7ce480",
+      "status": "success",
+      "maxGasETH": "0.000002214061728",
+      "gasETH": "0.00000144589592"
+    },
+    {
+      "step": "pause",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 58,
+      "hash": "0xebd2e377ed18573d1bf458d06dfba85968f860027fc332120da1dad23d0d9204",
+      "status": "success",
+      "maxGasETH": "0.0000008715897216",
+      "gasETH": "0.000000563393988"
+    },
+    {
+      "step": "resume",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 59,
+      "hash": "0xee8661889b636bcf88febb50416f54668340ec732842c41f281d49ee26e0256f",
+      "status": "success",
+      "maxGasETH": "0.0000010080661896",
+      "gasETH": "0.000000665195728"
+    },
+    {
+      "step": "pause-after-resume",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 60,
+      "hash": "0xccabeda85c236aae4745e1c4ef0c909f9437ae5a845a98d9fb7fb69fcadf07b2",
+      "status": "success",
+      "maxGasETH": "0.0000009313733664",
+      "gasETH": "0.000000613534008"
+    },
+    {
+      "step": "resume-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 61,
+      "hash": "0x939d2b79925cffd3098f2e90f99f9fffd5b92f7d1ce23c8d7134c195be336fce",
+      "status": "success",
+      "maxGasETH": "0.0000010163786472",
+      "gasETH": "0.000000668767888"
+    },
+    {
+      "step": "pause-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 62,
+      "hash": "0x1efaa31a1d5855da6a94c147cb275dd24079a92bdd01f0961ceaf32a32df560e",
+      "status": "success",
+      "maxGasETH": "0.00000092576016",
+      "gasETH": "0.0000006095622"
+    }
+  ],
+  "data": {
+    "cycleAttempted": true,
+    "safelyPaused": true,
+    "attempt": "2",
+    "lastDecision": "hold_mean_reversion",
+    "targetBalance": "0",
+    "evaluationCount": "19",
+    "tradeConfirmed": false
+  }
+}

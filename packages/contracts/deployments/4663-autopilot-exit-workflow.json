@@ -1,0 +1,139 @@
+{
+  "chainId": 4663,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "refresh-expiry-1",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 74,
+      "hash": "0x9cca61e551725b5c5ec2e5f58a04808e35f7563e7730e58ab1de627b8bb2deb3",
+      "status": "success",
+      "maxGasETH": "0.000001449902556",
+      "gasETH": "0.000000960067758"
+    },
+    {
+      "step": "resume-exit-1",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 75,
+      "hash": "0x456e9669afdc2bcf6491db52679f0186e324a18e976198d98b3c6913f8282381",
+      "status": "success",
+      "maxGasETH": "0.0000011079870096",
+      "gasETH": "0.000000725590656"
+    },
+    {
+      "step": "pause-exit-1",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 76,
+      "hash": "0xa12d210e983038671c082d3513fb1202b40c260ec8220f032f45d35a043b81e0",
+      "status": "success",
+      "maxGasETH": "0.0000010257135552",
+      "gasETH": "0.000000674046324"
+    },
+    {
+      "step": "risk-limits-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 77,
+      "hash": "0x2bb4504fd3faf706424c745550b511345aa068e1dc3bd454f96774adcf1faa56",
+      "status": "success",
+      "maxGasETH": "0.0000014556423336",
+      "gasETH": "0.000000965134248"
+    },
+    {
+      "step": "resume-exit-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 78,
+      "hash": "0x14486829ccf0d8de4c737608df34d5d207e1bc4873e9ca7bfb51b281d139c0a8",
+      "status": "success",
+      "maxGasETH": "0.0000011190686016",
+      "gasETH": "0.00000072830534"
+    },
+    {
+      "step": "pause-exit-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 79,
+      "hash": "0x6c2fe540c725140edada418df5f145e6d30aaaa9962b817f5d498d04fa27e1de",
+      "status": "success",
+      "maxGasETH": "0.00000102733152",
+      "gasETH": "0.000000678603108"
+    },
+    {
+      "step": "restore-risk-limits-2",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 80,
+      "hash": "0x0c89338b61278bcf3e1f647ceb1dcd8553e2da017005d8e671c21b9d8c58202b",
+      "status": "success",
+      "maxGasETH": "0.000001454953872",
+      "gasETH": "0.000000963759852"
+    },
+    {
+      "step": "risk-limits-3",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 81,
+      "hash": "0xecd382e5ec7eae6f7722f03dd23dd3ca230b44a57fdb1be68ff37fe1983dc1a8",
+      "status": "success",
+      "maxGasETH": "0.0000014220741024",
+      "gasETH": "0.000000931429922"
+    },
+    {
+      "step": "resume-exit-3",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 82,
+      "hash": "0x17b7cd90fdefb634837daf9c0082b253f014ca447354531c0ec43de2442d4294",
+      "status": "success",
+      "maxGasETH": "0.0000010862161728",
+      "gasETH": "0.000000710169304"
+    },
+    {
+      "step": "pause-exit-3",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 88,
+      "hash": "0x6861e5275407341143c16f5a95b0020f42e1f216f5db3feb4cfa596044e8eb86",
+      "status": "success",
+      "maxGasETH": "0.0000010085038488",
+      "gasETH": "0.0000006683014"
+    },
+    {
+      "step": "restore-risk-limits-3",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 89,
+      "hash": "0xd314a9fb5ec165a76ca017977fbb3efe43b46d25ed9b46559d7674db52ac8c44",
+      "status": "success",
+      "maxGasETH": "0.0000014350924728",
+      "gasETH": "0.000000936591642"
+    }
+  ],
+  "data": {
+    "buyHash": "0xfe4d8648ca143cea4f8e0be524a6ab084830bf94c48ad6495e24fc2be4a63617",
+    "buyBlock": "76782960",
+    "buyAmount": "100000",
+    "buyAmountOut": "212587696488829",
+    "buyEvidenceHash": "0x33cc0dd1771620b74bad84523b9c20d564f3c7008aad75d9924a82ac6ecf7f67",
+    "takeProfit": "515.5080312043573",
+    "stopLoss": "506.822112651435",
+    "checkedMark": "535.7591763033909",
+    "trigger": "Live take-profit reached",
+    "attempt": "3",
+    "lastDecision": "sell_filled",
+    "exitConfirmed": true,
+    "targetBalance": "0",
+    "settlementBalance": "203629",
+    "safelyPaused": true,
+    "previousSlippageBps": "100",
+    "testSlippageBps": "1000",
+    "dailyLossBps": "500",
+    "originalLimits": "[\"110000\",\"400000\",\"100\",\"500\",\"60\",\"1791044571\"]",
+    "riskControlsRestored": true,
+    "sell1Hash": "0x5e60bc8db4566efc4af33928f3aeab08d013c38066b27ad3280f909f533f6ba2",
+    "sell1Block": "79187408",
+    "sell1Amount": "106293848244415",
+    "sell1AmountOut": "51815",
+    "sell1EvidenceHash": "0x91ef4f4161dfd115ea3db7ac8c49bac5c5c613061cf1126ccc59e33d9b970ded",
+    "soldAtomic": "212587696488829",
+    "sellHashes": "[\"0x5e60bc8db4566efc4af33928f3aeab08d013c38066b27ad3280f909f533f6ba2\",\"0x79748c433c96eed593f870613b6ad05a17a6538a3d7ae47829dde1cd26761b48\"]",
+    "sell3Hash": "0x79748c433c96eed593f870613b6ad05a17a6538a3d7ae47829dde1cd26761b48",
+    "sell3Block": "79189414",
+    "sell3Amount": "106293848244414",
+    "sell3AmountOut": "51814",
+    "sell3EvidenceHash": "0xad25534c06f59cdd7f268e3ea17574b8c5d880ea8fb37101cae50aefdc522745"
+  }
+}

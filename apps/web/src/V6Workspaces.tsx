@@ -150,7 +150,7 @@ type AutopilotStrategyView = {
   strategyType?: "trend_following" | "breakout" | "mean_reversion";
   minConfidence?: number;
   buyAmountAtomic?: string;
-  policy?: { maxTradePct?: number; dailyLossPct?: number; strategy?: string };
+  policy?: { maxTradePct?: number; dailyLossPct?: number; strategy?: string; signalMarket?: string };
   status: string;
   registrationStatus?: string;
   runtimeState?: "running" | "paused" | "protecting_position" | "entry_pass_expired" | "entry_signals_exhausted" | "telemetry_unavailable" | "failed" | "inactive";
@@ -4163,7 +4163,7 @@ export function AutopilotWorkspace({
   const [pair, setPair] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("4H");
   const historyScope = `${networkKey}:${pair}:${timeframe}`;
-  const [historyCheck, setHistoryCheck] = useState<{ scope: string; ready: boolean; reason: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> } | null>(null);
+  const [historyCheck, setHistoryCheck] = useState<{ scope: string; ready: boolean; reason: string; signalMarket?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> } | null>(null);
   const [historyAttempt, setHistoryAttempt] = useState(0);
   const [checkOtherTimeframes, setCheckOtherTimeframes] = useState(false);
   useEffect(() => {
@@ -4174,8 +4174,8 @@ export function AutopilotWorkspace({
       void apiGet(`/v1/autopilot/market-readiness?network=robinhood&pair=${encodeURIComponent(pair)}&timeframe=${encodeURIComponent(timeframe)}${checkOtherTimeframes ? "&alternatives=1" : ""}`)
         .then(response => {
           if (cancelled) return;
-          const data = response.data as { ready?: boolean; reason?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> };
-          setHistoryCheck({ scope: historyScope, ready: response.ok && data.ready === true, reason: data.reason || "Market history could not be checked. Retry before setup.", alternatives: data.alternatives });
+          const data = response.data as { ready?: boolean; reason?: string; signalMarket?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> };
+          setHistoryCheck({ scope: historyScope, ready: response.ok && data.ready === true, reason: data.reason || "Market history could not be checked. Retry before setup.", signalMarket: data.signalMarket, alternatives: data.alternatives });
         }).catch(() => { if (!cancelled) setHistoryCheck({ scope: historyScope, ready: false, reason: "Market history check is temporarily unavailable. Retry before setup." }); });
     }, 400);
     return () => { cancelled = true; clearTimeout(timer); };
@@ -4310,7 +4310,8 @@ export function AutopilotWorkspace({
   const savedEditDraft = useRef("");
   const draftFingerprint = JSON.stringify([pair, timeframe, strategy, Number(maxTrade), Number(dailyLoss), Number(exposurePct), Number(dailyTurnoverPct), Number(maxSlippagePct), Number(cooldownSeconds), Number(minConfidence)]);
   const editScope = networkKey + ":" + selectedVault.toLowerCase();
-  const unchangedEdit = autopilotPage === "edit" && Boolean(activeStrategy) && savedEditDraft.current === draftFingerprint;
+  const signalSourceChanged = networkKey === "robinhood" && historyCheck?.scope === historyScope && historyCheck.ready && Boolean(activeStrategy) && historyCheck.signalMarket !== (activeStrategy?.policy?.signalMarket || activeStrategy?.pair);
+  const unchangedEdit = autopilotPage === "edit" && Boolean(activeStrategy) && savedEditDraft.current === draftFingerprint && !signalSourceChanged;
   useEffect(() => {
     if (autopilotPage !== "edit" || !activeStrategy) return;
     let cancelled = false;
@@ -4929,15 +4930,23 @@ export function AutopilotWorkspace({
         pair,
         timeframe,
         amountAtomic: buyAmountAtomic,
+        maxTradeValueAtomic: maxTradeAtomic,
+        maxSlippageBps: Number(maxSlippageBps),
       });
       if (!preflight.ok)
         throw new Error(`${errorText(preflight.data)} No wallet transaction was sent.`);
+      const signalMarket = (preflight.data as { signalMarket?: string }).signalMarket;
+      if (networkKey === "robinhood" && (!signalMarket || historyCheck?.scope !== historyScope || historyCheck.signalMarket !== signalMarket)) {
+        setHistoryAttempt(value => value + 1);
+        throw new Error("The strategy signal source changed. Review the refreshed history source before starting. No wallet transaction was sent.");
+      }
       const policy = {
         pair,
         timeframe,
         maxTradePct: Number(maxTrade),
         dailyLossPct: Number(dailyLoss),
         strategy,
+        ...(networkKey === "robinhood" ? { signalMarket } : {}),
       };
       const policyHash = keccak256(toHex(JSON.stringify(policy)));
       const provider = getInjectedProvider();
@@ -5851,6 +5860,7 @@ export function AutopilotWorkspace({
           {networkKey === "robinhood" && <section className="v6-message" role="status" aria-label="Autopilot market history">
             <strong>{historyCheck?.scope !== historyScope ? "Checking strategy history…" : historyCheck.ready ? "Strategy history available" : "This market/timeframe is not ready for Autopilot"}</strong>
             <p>{historyCheck?.scope === historyScope ? historyCheck.reason : "Checking completed candles before any funding, payment or wallet signature."}</p>
+            {signalSourceChanged && <p>The existing strategy uses {activeStrategy?.policy?.signalMarket || activeStrategy?.pair}. Saving this change requires a new owner-signed policy; it does not change the asset traded.</p>}
             {historyCheck?.scope === historyScope && !historyCheck.ready && <>
               <p>A live swap route does not guarantee enough candle history for an autonomous strategy. Choose another market or check other timeframes; no funds have moved.</p>
               <button type="button" className="btn btn-soft" onClick={() => setHistoryAttempt(value => value + 1)}>Retry history check</button>{" "}
@@ -7621,6 +7631,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             <div className="docs-copy">
               <span className="eyebrow">ROBINHOOD MAINNET</span>
               <h3>Exact assets. USDG settlement.</h3>
+              <p>Stock-token order marks use fresh issuer USD quotes adjusted once by the verified on-chain token multiplier, then converted to USDG. Trading halts, paused token oracles and stale prices block execution. A valuation is not a swap quote: the actual route is checked separately before trading.</p>
               <p>When Robinhood is enabled, use USDG for payments and trading capital, and keep ETH for network fees. Wallet funding lets you review an ETH-to-USDG swap before signing. Changing appearance never changes your network.</p>
               <ul>
                 <li>Choose the token by its name and contract. Route available is selected by default and checks run automatically. A catalog listing is not a promise of liquidity; the actual order is quoted again before execution.</li>
@@ -7691,6 +7702,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <li>Routes belong to the selected network and execution mode. Switching networks checks that network independently. An empty category means no matching route has been verified; try All assets to inspect the broader catalog.</li>
                 <li><b>Route available · OKX</b> means an indicative OKX quote succeeded. <b>No OKX route found</b> does not establish that every provider lacks liquidity. Failed provider checks remain unknown, are retried and do not qualify for this filter.</li>
                 <li>Your actual order amount is quoted again before signing. Autopilot also requires usable price history, an authorized policy and activation. Browsing or selecting a pair never places a trade.</li>
+                <li>Robinhood Autopilot prefers the token’s own completed DEX history. Where that history is sparse, a registry-verified reference market can supply strategy signals. Setup names the source and commits it in your signed policy; existing strategies never switch silently. Orders and TP/SL use fresh prices and quotes for the actual Robinhood token in USDG, not an assumed executable reference price.</li>
               </ul>
               <p>Stock, ETF and RWA coverage varies by chain, verified representation and liquidity. Catalog additions use reviewed contract metadata. Coinbase supports the existing funding flow; general Coinbase Spot and Autopilot routing is deferred.</p>
               <p>Free technical candidates use market candles, not paid AI screening. Technical match scores are separate from report confidence. Recent bullish reports above 60% use your existing reports. A low-confidence report can still lead to a manually reviewed Spot trade at your discretion.</p>
@@ -8446,6 +8458,14 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 signed confidence threshold and every preset rule must still
                 pass; narrative text cannot override a failed rule.
               </p>
+              <p>
+                Robinhood setup checks both buy and sell quotes against your
+                selected vault tolerance before funding or payment. Every entry
+                checks the bounded sell route again before buying. These checks
+                do not guarantee future liquidity: TP/SL exits still require a
+                fresh executable route, the signed limits and contract simulation.
+                Open-position protection does not request another AI signal.
+              </p>
             </div>
             <div className="worked-examples autopilot-rule-docs">
               <article>
@@ -8456,8 +8476,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   SMA20, SMA20 above SMA50.
                 </p>
                 <p>
-                  <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish compact signal, or close below SMA20.
+                  <b>Sell when any passes:</b> TP, SL, a previously triggered
+                  partial exit, or close below SMA20.
                 </p>
               </article>
               <article>
@@ -8469,8 +8489,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   and trend-up/transition regime.
                 </p>
                 <p>
-                  <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish compact signal, or close below SMA20.
+                  <b>Sell when any passes:</b> TP, SL, a previously triggered
+                  partial exit, or close below SMA20.
                 </p>
               </article>
               <article>
@@ -8481,8 +8501,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   RSI14 ≤ 42, plus range/transition regime.
                 </p>
                 <p>
-                  <b>Sell when any passes:</b> TP, SL, threshold-qualified
-                  bearish compact signal, or price reaches SMA20.
+                  <b>Sell when any passes:</b> TP, SL, a previously triggered
+                  partial exit, or price reaches SMA20.
                 </p>
               </article>
             </div>

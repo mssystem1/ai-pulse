@@ -73,7 +73,9 @@ export async function runPreparedAutopilotSignal(
     instId: string;
     timeframe: string;
     strategyType: string;
-    market: SpotMarketContext;
+    market: Omit<SpotMarketContext, "ticker"> & {
+      ticker: Pick<SpotMarketContext["ticker"], "instId" | "last" | "ts"> & Partial<SpotMarketContext["ticker"]>;
+    };
     maxInputTokens?: number;
     maxOutputTokens?: number;
   },

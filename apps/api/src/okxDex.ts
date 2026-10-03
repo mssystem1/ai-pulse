@@ -91,6 +91,7 @@ export type GenericDexRequest = {
   slippagePercent?: string;
   autoSlippage?: boolean;
   maxAutoSlippagePercent?: string | number;
+  excludeDexIds?: string;
 };
 
 export type DefiOpportunity = {
@@ -242,6 +243,7 @@ export async function getGenericOkxSwap(cfg: AppConfig, input: GenericDexRequest
     // that value automatically, but the value submitted to OKX is explicit.
     slippagePercent: input.slippagePercent || "0.5",
     userWalletAddress: input.userWalletAddress,
+    ...(input.excludeDexIds ? { excludeDexIds: input.excludeDexIds } : {}),
   });
   const tx = raw.tx as Record<string, unknown> | undefined;
   const router = raw.routerResult as Record<string, unknown> | undefined;
@@ -266,6 +268,22 @@ export async function getGenericOkxSwap(cfg: AppConfig, input: GenericDexRequest
       maxPercent: input.autoSlippage ? String(input.maxAutoSlippagePercent || "1") : null,
     },
   };
+}
+
+/** One risk-preserving alternative when a default exit quote misses valuation.
+ * Discover IDs from the provider; never guess a venue ID or change slippage.
+ * The caller must validate and simulate the selected calldata as usual.
+ */
+export async function betterGenericOkxExitSwap(cfg: AppConfig, input: GenericDexRequest & { userWalletAddress: string },
+  original: Awaited<ReturnType<typeof getGenericOkxSwap>>) {
+  if (!original.quote?.route.length) return original;
+  const sources = await okxDexGetMany(cfg, "/api/v6/dex/aggregator/get-liquidity", { chainIndex: input.chainId });
+  const names = new Set(original.quote.route.map(name => name.toLowerCase()));
+  const ids = [...new Set(sources.filter(source => names.has(String(source.name).toLowerCase()))
+    .map(source => String(source.id)).filter(id => /^\d+$/.test(id)))];
+  if (!ids.length) return original;
+  const alternative = await getGenericOkxSwap(cfg, { ...input, excludeDexIds: ids.join(",") });
+  return BigInt(alternative.quote?.toTokenAmount || "0") > BigInt(original.quote.toTokenAmount) ? alternative : original;
 }
 
 function routeNames(value: unknown): string[] {

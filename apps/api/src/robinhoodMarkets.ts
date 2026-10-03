@@ -3,6 +3,7 @@ import { buildMarketContext, classifyGlobalInstrument, getTicker, summarizeCandl
 import { getOkxTradeTokens, okxDexGetMany, createOkxDexHeaders } from "./okxDex.js";
 import { ROBINHOOD_USDG, NATIVE_ETH, ROBINHOOD_WETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodStockCatalog } from "./robinhoodAssetRegistry.js";
+import { robinhoodIssuerPrice } from "./robinhoodIssuerPrice.js";
 
 const candleCaches = new WeakMap<AppConfig, Map<string, { expiresAt: number; request: Promise<Candle[]> }>>();
 
@@ -65,6 +66,10 @@ export function assertRobinhoodAutomationHistory(candles: Candle[], timeframe: s
   if (!interval) throw new Error("Unsupported Robinhood Autopilot timeframe");
   const history = candles.slice(-50);
   if (history.length < 50 || history.some(candle => candle.confirmed !== true)) throw new Error("Robinhood Autopilot requires at least 50 completed candles before setup");
+  if (candles.some(candle => ![candle.ts, candle.open, candle.high, candle.low, candle.close, candle.volume, candle.volumeCcy].every(Number.isFinite)
+    || !Number.isSafeInteger(candle.ts) || candle.ts <= 0 || candle.low <= 0 || candle.high < Math.max(candle.open, candle.close)
+    || candle.low > Math.min(candle.open, candle.close) || candle.volume < 0 || candle.volumeCcy < 0))
+    throw new Error("Robinhood Autopilot signal history contains invalid values");
   if (history.some((candle, index) => index > 0 && candle.ts - history[index - 1].ts !== interval)) throw new Error("Robinhood Autopilot price history has gaps; retry when coverage is available");
   const last = history.at(-1)!;
   if (last.ts + interval > now || now - (last.ts + interval) > interval) throw new Error("Robinhood Autopilot completed price history is stale or invalid");
@@ -139,10 +144,20 @@ export async function executionSettlementTicker(cfg: AppConfig, pair: string) {
   const market = await resolveRobinhoodMarket(cfg, pair);
   const [latestAsset, latestSettlement] = await robinhoodLiveMarks(cfg, [market.token.address, ROBINHOOD_USDG]);
   return { instId: pair, last: robinhoodSettlementMark(latestAsset, latestSettlement), priceCurrency: "USDG" as const,
-    usdPerSettlement: latestSettlement.close, ts: String(latestAsset.ts) };
+    usdPerSettlement: latestSettlement.close, ts: String(latestAsset.ts), priceSource: latestAsset.source };
 }
 /** Last-trade candles are history, not a live quote clock on quiet markets. */
-export async function robinhoodLiveMarks(cfg: AppConfig, addresses: string[]) {
+export async function robinhoodLiveMarks(cfg: AppConfig, addresses: string[]): Promise<Array<{ ts: number; close: number; source: string }>> {
+  const tokens = addresses.map(address => address.toLowerCase() === NATIVE_ETH ? ROBINHOOD_WETH : address.toLowerCase());
+  const stocks = tokens.some(token => token !== ROBINHOOD_WETH && token !== ROBINHOOD_USDG) ? await robinhoodStockCatalog() : [];
+  if (tokens.some(token => stocks.filter(stock => stock.address === token).length > 1)) throw new Error("Robinhood issuer registry contract identity is ambiguous");
+  const issuer = new Map(stocks.map(stock => [stock.address, stock]));
+  const dexTokens = tokens.filter(token => !issuer.has(token));
+  const dex = dexTokens.length ? await robinhoodDexLiveMarks(cfg, dexTokens) : [];
+  return Promise.all(tokens.map(token => issuer.has(token) ? robinhoodIssuerPrice(issuer.get(token)!)
+    : Promise.resolve({ ...dex[dexTokens.indexOf(token)], source: "okx-token-market" })));
+}
+async function robinhoodDexLiveMarks(cfg: AppConfig, addresses: string[]) {
   if (!cfg.hasOkxCredentials) throw new Error("OKX DEX credentials are not configured");
   const tokens = addresses.map(address => address.toLowerCase() === NATIVE_ETH ? ROBINHOOD_WETH : address.toLowerCase());
   const path = "/api/v6/dex/market/price";
@@ -183,3 +198,41 @@ export const executionMarketContext = (cfg: AppConfig, input: { instId: string; 
   isRobinhoodMarket(input.instId) ? robinhoodMarketContext(cfg, input) : buildMarketContext(input);
 export const executionTicker = async (cfg: AppConfig, pair: string) => isRobinhoodMarket(pair)
   ? (await robinhoodMarketContext(cfg, { instId: pair, timeframe: "1H", candleLimit: 25 })).ticker : getTicker(pair);
+
+/** Reference candles are signals, never prices or liquidity for the traded token. */
+export async function robinhoodAutopilotContext(cfg: AppConfig, input: { instId: string; timeframe: string; signalMarket?: string }) {
+  const binding = await resolveRobinhoodMarket(cfg, input.instId);
+  const allowed = [input.instId, ...binding.researchPairs];
+  if (input.signalMarket && !allowed.includes(input.signalMarket)) throw new Error("Signed signal market is not verified for this Robinhood contract");
+  const candidates = input.signalMarket ? [input.signalMarket] : allowed;
+  let lastError: unknown;
+  const nativeContext = async () => {
+    const [raw, marks] = await Promise.all([
+      robinhoodTokenCandles(cfg, binding.token.address, input.timeframe, 120),
+      robinhoodDexLiveMarks(cfg, [binding.token.address]),
+    ]);
+    const candles = raw.filter(candle => candle.confirmed === true);
+    // Display-only 24h statistics must not prevent a strategy with valid
+    // completed timeframe history. Missing statistics are omitted, never zeroed.
+    return { source: "okx-robinhood-dex" as const, instId: input.instId, bar: toOkxBar(input.timeframe), candles,
+      ticker: { instId: input.instId, last: marks[0].close, ts: String(marks[0].ts), priceCurrency: "USD" as const },
+      summary: summarizeCandles(candles), fetchedAt: new Date().toISOString() };
+  };
+  for (const signalMarket of candidates) {
+    try {
+      const market = signalMarket === input.instId
+        ? await nativeContext()
+        : await buildMarketContext({ instId: signalMarket, timeframe: input.timeframe, candleLimit: 120, completedOnly: true });
+      assertRobinhoodAutomationHistory(market.candles, input.timeframe);
+      if (market.ticker.instId !== signalMarket) throw new Error("Signal ticker identity does not match the signed market");
+      const settlementTicker = await executionSettlementTicker(cfg, input.instId);
+      const ts = Number(market.ticker.ts);
+      if (!Number.isSafeInteger(ts) || Date.now() - ts > 180_000 || ts > Date.now() + 30_000 || Math.abs(ts - Number(settlementTicker.ts)) > 30_000)
+        throw new Error("Signal and Robinhood execution prices are not fresh and synchronized");
+      if (!Number.isFinite(market.ticker.last) || market.ticker.last <= 0) throw new Error("Signal reference price is invalid");
+      return { market, signalMarket, signalSource: signalMarket === input.instId ? "token-dex" as const : "verified-reference" as const,
+        settlementTicker, analysisToSettlement: settlementTicker.last / market.ticker.last };
+    } catch (error) { lastError = error; }
+  }
+  throw lastError instanceof Error ? lastError : new Error("No verified signal history is available for this token");
+}
