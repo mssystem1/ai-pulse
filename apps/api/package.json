@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
-    "test": "tsx --test src/**/*.test.ts",
+    "test": "tsx --tsconfig ../../tsconfig.base.json --test src/**/*.test.ts",
     "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {

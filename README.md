@@ -35,6 +35,8 @@ Local previews: `/landing` for the public site and `/portfolio` for the applicat
 
 See the [13–14 September deployment audit](docs/PULSE_POST_DEPLOY_AUDIT_2026-09-14.md) for verified live workflows, payment recovery, historical statistics, test coverage and remaining validation limits.
 
+PULSE uses one Telegram bot, `@pulsemi_bot`: all five chat research services, persistent read-only EVM history, and a TON Connect Mini App on the same token, webhook and Telegram account. Start with the [full BotFather configuration](docs/PULSE_BOTFATHER_SETUP.md), [deployment package](docs/PULSE_TELEGRAM_DEPLOYMENT.md), [rollout playbook](docs/TELEGRAM_ROLLOUT_GUIDE.md) and [marketing strategy](docs/PULSE_MARKETING_STRATEGY.md). TON purchases also appear in chat history; the TON interface displays its own research subset. Local preparation does not establish real payment/client acceptance or platform eligibility of the combined links. The [operator kit](docs/launch/README.md) provides configuration templates, readiness checks, evidence/campaign records and the offline economics workbook.
+
 Public activity combines chains independently of the selected RPC. Research counts include Arc Testnet with explicit labeling; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
 
 The landing page compares research deliveries with a shared-scale stacked bar chart, split into Global, Prediction and Risk Guard. Patterns and labels distinguish services across all five appearances; the table retains exact counts. Missing coverage is shown explicitly, and testnet research is not presented as mainnet trading volume.
@@ -161,7 +163,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 ### Link previews and search metadata
 
-The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X now reference the exact same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v7.png`; changing the filename prevents one platform from retaining an older image while another uses the current card. Updating these local files does not refresh any remote crawler cache until the next deployment and crawler refresh.
+The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X now reference the exact same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v8.png`; changing the filename prevents one platform from retaining an older image while another uses the current card. Updating these local files does not refresh any remote crawler cache until the next deployment and crawler refresh.
 
 ## Networks and payments
 
@@ -590,7 +592,7 @@ The price path is near-real-time polling, not a continuously streaming Chainlink
 - Autopilot's deterministic new-candle scheduler has a hard 15-minute floor through `AUTOPILOT_ANALYSIS_INTERVAL_MS`; lower deployed values are ignored. It does not itself imply an xAI call.
 - Compact AI entry confirmation is limited by `AUTOPILOT_AI_MIN_INTERVAL_MS`, shared cache TTL, per-vault/global call caps and per-vault/global USD caps.
 - Access is prepaid per owner-controlled vault: **$1.50 for 24 hours**, **$10.50 for 7 days**, or **$45 for 30 days**. Renewal appends time to an unexpired pass. Each covered day permits up to three compact confirmations, still subject to the stricter runtime budgets above.
-- At two active-runtime hours remaining the web console marks the pass urgent. A Telegram Mini App purchase carries a chat-bound reminder capability and sends one warning plus one expiry notice. Pausing freezes both expiry and reminders. When active paid time ends, PULSE blocks new AI-assisted entries but keeps deterministic protection/exits and every owner control available.
+- At two active-runtime hours remaining the web console marks the pass urgent. A purchase carrying a Telegram chat-bound reminder capability and sends one warning plus one expiry notice. Pausing freezes both expiry and reminders. When active paid time ends, PULSE blocks new AI-assisted entries but keeps deterministic protection/exits and every owner control available.
 - The provider-attempt timestamp is persisted **before** the request. Every attempt therefore observes at least the configured AI interval, including failed requests. Billing/auth/quota failures open a six-hour circuit breaker; generic failures use exponential backoff with a 15-minute floor. This prevents a rejected Grok request from being retried by every one-minute worker tick.
 - The UI exposes lifetime evaluation/Buy/Sell/Hold/failure counters, today’s provider calls and cost, the last signal source, pass state and budget status. Confirmed activity is authoritative for Buy/Sell totals, so an older strategy cannot lose its fills when its detailed decision window changes. Both the API and dashboard independently reconcile the selected vault's confirmed activity; confirmed Buy/Sell counts appear in the main monitor, the collapsed journal label and a dedicated transaction-linked Confirmed trading ledger. The ledger identifies counters repaired from activity. New evaluations are stored in an append-only per-vault journal. The latest 100 are only a recent cache, not a history limit: failed journal writes keep a retryable pending list, and archive reads scan every page independently of current market-data availability. The journal has outcome/search filters, expandable rule/metric evidence, recorded policy and AI context, and pagination without truncating exports. Repeated-candle skips and protection checks have separate monitoring counters, starting when the new telemetry is enabled. The UI and **Export CSV activity** include every available journal and account-matched on-chain activity row; CSV adds rule results, market metrics, decision context, fill prices and explicit history coverage. Incomplete storage reads are labelled, not presented as a complete archive. Strategies created before the complete journal may have an explicitly labelled gap in old Hold/failure detail, but their surviving counters and confirmed fills remain visible. Raw provider text stays behind Technical error details. When xAI returns `usage.cost_in_usd_ticks`, PULSE records that exact provider-billed amount; token-rate calculation is only the fallback for compatible responses without billed-cost ticks.
 - Immediately before an automatic Spot or Autopilot execution, the restricted worker writes the current normalized OKX observation into `OracleRouterV1` with `maxAge = 300` seconds.
@@ -599,41 +601,50 @@ The price path is near-real-time polling, not a continuously streaming Chainlink
 
 When historical data cannot prove a fill basis, the dashboard displays **unavailable**. It does not use zero, a report recommendation, the trigger, or the current mark as a substitute entry.
 
-### Telegram paid delivery
+### PULSE in Telegram
 
-No typed commands are required. Press **Start**, then use the bot's **Open PULSE**, **Global Market**, **Prediction Market**, **Spot Trading**, **Autopilot**, or **My reports** button. Pair/question, network and tier selection happen in the app. My reports opens Portfolio's saved-research section; cross-device recovery uses **Paid report history → Sync with wallet** on Global or Prediction Market.
+**One bot: [@pulsemi_bot](https://t.me/pulsemi_bot).** It combines native chat research, persistent EVM history linking and a TON Connect Mini App. The website introduction is [/telegram](https://www.ai-pulse.tech/telegram). Inside the PULSE app, **Telegram** is a practical user guide: starting the bot, exact service commands and input formats, Stars checkout, persistent history-wallet linking, TON Connect, report recovery and payment help. The Mini App route is [/ton-miniapp](https://www.ai-pulse.tech/ton-miniapp); it has **Explore**, **Reports** and **TON wallet** tabs. The legacy /miniapp entry opens the TON interface too.
 
-To link delivery, open a **bot-sent** app button. The generic profile/menu launch URL alone carries no chat-delivery capability. The bot handles private chats only, and opening any destination neither charges nor trades. See [Telegram deployment and verification](docs/TELEGRAM_BOT_DEPLOYMENT.md).
+| Chat service | Stars per report |
+| --- | ---: |
+| Global Quick → Spot | 10 |
+| Risk Guard | 15 |
+| Prediction Quick | 10 |
+| Global Pro → Spot | 15 |
+| Prediction Pro | 15 |
 
-New **Open full report** buttons use a readable `/shared-report` frontend page with the capability in the URL fragment. The viewer reuses PULSE's Global/Prediction layouts without wallet initialization or trade controls. Anyone with a share link may read it until revoked; report sharing must be explicitly enabled. Existing raw API links remain API links.
+Press **Start**, choose a service in chat and send its requested pair/timeframe, network/token contract or prediction market. Confirm the native Telegram Stars invoice. PULSE delivers a summary and complete text report document to the same private chat. **My reports** recovers purchases from chat and the TON Mini App on another Telegram device without a new payment. The bot also prominently links to **www.ai-pulse.tech** through its menu and **/website** command.
+
+**History wallet** binds one EVM address to the Telegram account. The user proves ownership once in an external browser and confirms the exact address in chat. The account association is stored server-side and survives browser wallet disconnection, Mini App closure, device changes and application restarts. It changes only after explicit replacement or unlinking by that Telegram account. It provides read-only access to retained paid website/mobile-wallet-browser reports; subsequent history reads require neither a transaction nor a chain switch. It does not grant trading or wallet payment authority.
+
+**Open PULSE Mini App** launches the TON workspace from this same bot. It currently offers TON-USDT **Global Quick (10 Stars)** and **Global Pro (15 Stars)**, an optional TON Connect wallet connection and a TON research library. Risk Guard and Prediction purchases remain in chat. TON purchases belong to the same Telegram account and also arrive as complete reports in chat. A TON Connect session does not replace or erase the EVM history association; permanent server-verified TON wallet ownership is not implemented.
+
+Both entry points share **one token and one webhook** at /v1/telegram/webhook. The native chat uses Telegram updates verified with the webhook secret; the TON API at /v1/telegram/ton verifies Mini App initData using this same bot token. The TON report API exposes its own research subset, while the chat library includes all owned Telegram orders plus eligible linked-wallet history.
 
 ```mermaid
 sequenceDiagram
   participant User
-  participant Telegram
+  participant PULSE as One PULSE bot / TON Mini App
+  participant Stars as Telegram Stars
   participant API
-  participant KV
-  participant MiniApp as PULSE Mini App
-  participant Wallet
+  participant Store as Durable storage
   participant Worker as Report worker
-
-  User->>Telegram: Choose Global, Prediction or My reports
-  Telegram->>API: Webhook update plus secret header
-  API->>KV: Deduplicate update ID for seven days
-  API-->>Telegram: Expiring chat-bound Mini App capability
-  User->>MiniApp: Select service and review exact x402 price
-  MiniApp->>Wallet: Connect and sign payment in wallet UI
-  MiniApp->>API: Paid request plus delivery capability
-  API->>KV: Bind payment, job and delivery capability
-  Worker->>KV: Complete the normal durable report job
-  alt Telegram accepts delivery
-    Worker->>Telegram: Send summary and opaque full-report link
-  else Telegram is unavailable
-    Worker->>KV: Queue failed delivery with exponential retry
-  end
+  User->>PULSE: Choose service and provide input
+  PULSE->>API: Create owned order
+  API-->>PULSE: Exact Stars invoice
+  User->>Stars: Confirm purchase
+  Stars->>API: Pre-checkout and successful_payment via one webhook
+  API->>Store: Persist receipt and enqueue one report job
+  Worker->>Store: Save completed private report
+  Worker-->>PULSE: Send summary and complete document to chat
+  User->>PULSE: My reports on another device
+  PULSE->>API: Recover orders for verified Telegram account
+  API-->>PULSE: Existing report; no new payment
 ```
 
-The Telegram bot is a navigation and delivery adapter, not a wallet, model host, or separate analysis service. Its 35-day HMAC capability identifies only the destination chat and cannot pay, trade, retrieve arbitrary wallet history, or authorize Autopilot. The duration covers a 30-day Autopilot pass plus its warning/expiry delivery window. Wallet connection and x402 signing remain in the Mini App. A full-report message uses a revocable opaque report share and therefore requires explicit `REPORT_SHARE_LINK_ENABLED=1`; the bot never receives a direct Blob URL. Duplicate updates are ignored, and failed messages are retried from KV under a per-delivery lock without rerunning or recharging the report.
+Payment and fulfillment are idempotent: repeated webhook updates do not charge again or enqueue a second report. Failed delivery retries from durable KV without regenerating the report. EVM/chat reports can use a revocable browser share when sharing is enabled; TON report notifications link to this bot's Mini App. The signed delivery capability identifies the destination chat only and cannot pay, trade or authorize history access. Published prices are approved; checkout availability follows deployed feature flags and provider readiness.
+
+For exact configuration, including BotFather display name, descriptions, all commands, Main Mini App, menu button and the paused rollout sequence, use the [full BotFather guide](docs/PULSE_BOTFATHER_SETUP.md) and [deployment runbook](docs/PULSE_TELEGRAM_DEPLOYMENT.md). The [rollout playbook](docs/TELEGRAM_ROLLOUT_GUIDE.md), [marketing strategy](docs/PULSE_MARKETING_STRATEGY.md) and [operator kit](docs/launch/README.md) cover launch acceptance, support, economics and campaigns. Local implementation and passing tests do not mean deployment, real Stars acceptance or Telegram platform review have completed.
 
 ## Data architecture: KV and Blob only
 

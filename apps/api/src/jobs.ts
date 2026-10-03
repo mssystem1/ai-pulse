@@ -16,10 +16,10 @@ export type PaymentReceipt = Readonly<{
   id: string; provider: string; network: string; chainId: number; asset: string; amountAtomic: string;
   payer: string; payee: string; authorizationId: string; resourceUrl: string;
   requestHash: string; verificationResult: "accepted_by_middleware"; settlementResult: "settled";
-  settlementMode: "synchronous_onchain" | "gateway_batch" | "mock";
+  settlementMode: "synchronous_onchain" | "gateway_batch" | "mock" | "telegram_stars";
   finality: Readonly<{
-    status: "facilitator_confirmed" | "receipt_verified" | "gateway_batch_accepted" | "simulated";
-    scope: "l1" | "l2" | "gateway" | "mock";
+    status: "facilitator_confirmed" | "receipt_verified" | "gateway_batch_accepted" | "simulated" | "telegram_confirmed";
+    scope: "l1" | "l2" | "gateway" | "mock" | "telegram";
     parentChainStatus?: "unknown";
   }>;
   settlementTx?: string; createdAt: string; verifiedAt: string; settledAt: string;

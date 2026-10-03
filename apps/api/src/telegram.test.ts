@@ -85,7 +85,7 @@ test("webhook ignores groups, verifies its secret, acknowledges callbacks and de
     }
     return realFetch(input, init);
   }) as typeof fetch;
-  const app = express(); app.use(express.json()); app.use(createTelegramRouter({ FEATURE_TELEGRAM: true } as AppConfig));
+  const app = express(); app.use(express.json()); app.use(createTelegramRouter({ FEATURE_TELEGRAM: true,NODE_ENV:"test" } as AppConfig));
   const server = app.listen(0, "127.0.0.1");
   try {
     await new Promise<void>(resolve => server.once("listening", resolve));
@@ -94,10 +94,10 @@ test("webhook ignores groups, verifies its secret, acknowledges callbacks and de
     assert.equal((await post({}, "wrong")).status, 401);
     await post({ update_id: 9001, message: { chat: { id: -1, type: "group" }, text: "/start" } });
     assert.equal(calls.length, 0);
-    const update = { update_id: 9002, callback_query: { id: "callback", data: "/reports", message: { chat: { id: 123, type: "private" } } } };
+    const update = { update_id: 9002, callback_query: { id: "callback", from:{id:123}, data: "/reports", message: { chat: { id: 123, type: "private" } } } };
     assert.equal((await post(update)).status, 200);
     assert.deepEqual(calls.map(call => call.method), ["answerCallbackQuery", "sendMessage"]);
-    assert.match(String(calls[1].payload.text), /Sync with wallet/);
+    assert.match(String(calls[1].payload.text), /No saved reports/);
     const again = await post(update); assert.equal((await again.json() as { duplicate?: boolean }).duplicate, true);
     assert.equal(calls.length, 2);
   } finally {

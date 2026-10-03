@@ -80,7 +80,7 @@ import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
 import { ArcBudgetExceededError, createArcBudgetStore, paymentPayer, type ArcBudgetStore } from "./arcBudget.js";
 import { createV6Router } from "./v6Routes.js";
-import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability, telegramReportUrl } from "./telegram.js";
+import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability, telegramReportUrl, configureTelegramReportReader } from "./telegram.js";
 import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } from "./resilientKv.js";
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
@@ -187,7 +187,8 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(createV6Router(cfg, publicActivity));
   app.use(createTradeAutomationRouter(cfg));
   app.use(createAutopilotAutomationRouter(cfg));
-  app.use(createTelegramRouter(cfg));
+  app.use(createTelegramRouter(cfg, { ...persistence, wakeWorker, validateGlobal: input => AnalysisBodySchema.omit({ chartImageBase64: true, chartImageMime: true }).parse(input) }));
+  configureTelegramReportReader(async id=>{const record=await persistence.reports.get(id);return record?await persistence.reports.read(record):null;});
   app.use(telemetryMiddleware);
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));
   let activityCache: { value: Awaited<ReturnType<typeof publicActivity.snapshot>>; at: number } | undefined;
@@ -1634,9 +1635,10 @@ export function createApp(cfg: AppConfig, dependencies: {
     const delivery = String((job.input as Record<string, unknown>)?._telegramDelivery || "");
     if (!delivery || !cfg.FEATURE_TELEGRAM || !cfg.REPORT_SHARE_LINK_ENABLED) return;
     try {
-      const share = await persistence.reports.createShare(reportId);
+      const tonDelivery=delivery.startsWith("ton:");
+      const reportUrl=tonDelivery?`https://t.me/${(process.env.TELEGRAM_BOT_USERNAME||"pulsemi_bot").replace(/^@/,"")}?startapp`:telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL||"",(await persistence.reports.createShare(reportId)).token);
       const data = report as { analysis?: { headline?: string; summary?: string }; headline?: string; summary?: string; service?: string };
-      await deliverTelegramReportDurably(job.id, delivery, `${data.analysis?.headline || data.headline || data.service || "PULSE report ready"}\n\n${data.analysis?.summary || data.summary || "Your full report is ready."}`, telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL || "", share.token));
+      await deliverTelegramReportDurably(job.id, delivery, `${data.analysis?.headline || data.headline || data.service || "PULSE report ready"}\n\n${data.analysis?.summary || data.summary || "Your full report is ready."}`, reportUrl,reportId);
     } catch (error) { console.error("Telegram report delivery failed", error); }
   };
 

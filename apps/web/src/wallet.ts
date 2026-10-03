@@ -225,20 +225,19 @@ export async function disconnectWallet(): Promise<void> {
   delete target.__pulseAppKitProvider;
 }
 
-async function connectInjectedProvider(provider: InjectedProvider, networkKey: import("./networks").WebNetworkKey): Promise<{ address: string; providerName: string }> {
+async function connectInjectedProvider(provider: InjectedProvider, networkKey: import("./networks").WebNetworkKey, switchNetwork = true): Promise<{ address: string; providerName: string }> {
   const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
   const address = accounts?.[0];
   if (!address) throw new Error("Wallet returned no account");
-  const { switchWalletNetwork } = await import("./networks");
-  await switchWalletNetwork(provider, networkKey);
+  if(switchNetwork){const { switchWalletNetwork } = await import("./networks");await switchWalletNetwork(provider, networkKey);}
   (window as WalletWindow).__pulseDirectProvider = provider;
   return { address, providerName: walletProviderName(provider) };
 }
 
-export async function connectWallet(networkKey: import("./networks").WebNetworkKey = "xlayer", method: WalletConnectionMethod = "auto"): Promise<{ address: string; providerName: string }> {
+export async function connectWallet(networkKey: import("./networks").WebNetworkKey = "xlayer", method: WalletConnectionMethod = "auto", options: { switchNetwork?:boolean } = {}): Promise<{ address: string; providerName: string }> {
   const appkit = await import("./appkit");
   const okxProvider = method === "other" ? null : await discoverOkxProvider();
-  if (okxProvider) return connectInjectedProvider(okxProvider, networkKey);
+  if (okxProvider) return connectInjectedProvider(okxProvider, networkKey,options.switchNetwork!==false);
   if (method === "okx") {
     throw new Error("OKX Wallet was not detected. Install or enable the OKX Wallet extension, or open PULSE in the OKX Wallet DApp browser, then retry.");
   }
@@ -247,7 +246,7 @@ export async function connectWallet(networkKey: import("./networks").WebNetworkK
     const connected = await appkit.connectAppKit();
     const provider = appkit.getAppKitProvider();
     if (provider) (window as WalletWindow).__pulseAppKitProvider = provider;
-    await selectWalletNetwork(networkKey);
+    if(options.switchNetwork!==false)await selectWalletNetwork(networkKey);
     return connected;
   }
   const provider = getInjectedProvider();
@@ -257,7 +256,7 @@ export async function connectWallet(networkKey: import("./networks").WebNetworkK
     );
   }
 
-  return connectInjectedProvider(provider, networkKey);
+  return connectInjectedProvider(provider, networkKey,options.switchNetwork!==false);
 }
 
 export async function selectWalletNetwork(key: import("./networks").WebNetworkKey): Promise<void> {

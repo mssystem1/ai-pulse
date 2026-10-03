@@ -1,0 +1,59 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { createHmac,randomUUID } from "node:crypto";
+import express from "express";
+import { z } from "zod";
+import type { AppConfig } from "@pulse/config";
+import { MemoryJobStore,MemoryReportStore } from "./jobs.js";
+import { createTelegramRouter,telegramDeliveryToken,configureTelegramReportReader,deliverTelegramReportDurably,isTelegramDeliveryCapability } from "./telegram.js";
+import { parseBotResearchInput,formatTelegramResearch } from "./telegramBotChat.js";
+
+function signed(userId:number,token:string){const p=new URLSearchParams({auth_date:String(Math.floor(Date.now()/1000)),user:JSON.stringify({id:userId})});const text=[...p.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([key,value])=>`${key}=${value}`).join("\n");p.set("hash",createHmac("sha256",createHmac("sha256","WebAppData").update(token).digest()).update(text).digest("hex"));return p.toString();}
+test("chat input preserves market/contract identity and rejects malformed requests",()=>{
+  assert.deepEqual(parseBotResearchInput("global-pro","btc-usdt 4h"),{input:{instId:"BTC-USDT",timeframe:"4H",lang:"en"},networkKey:"xlayer"});
+  assert.equal((parseBotResearchInput("prediction-quick","CaseSensitive-Market_ID").input as {primaryMarketId:string}).primaryMarketId,"CaseSensitive-Market_ID");
+  assert.throws(()=>parseBotResearchInput("prediction-quick","https://example.test/market"));
+  assert.throws(()=>parseBotResearchInput("global-quick","BTC-USDT tomorrow"));
+  assert.throws(()=>parseBotResearchInput("risk-guard","base 0x123"));
+  const address="0x"+"aB".repeat(20);assert.equal((parseBotResearchInput("risk-guard",`base ${address}`).input as {address:string}).address,address);
+});
+test("readable research export includes nested reasoning and omits internal delivery data",()=>{const text=formatTelegramResearch({analysis:{headline:"Evidence",scenarios:[{reason:"Alternative view"}]},_telegramDelivery:"secret",chartImageBase64:"encoded-image"});assert.match(text,/Evidence/);assert.match(text,/Alternative view/);assert.ok(!text.includes("secret"));assert.ok(!text.includes("encoded-image"));});
+
+test("one PULSE bot shares identity, payment webhook and report ownership across chat and TON Mini App",async()=>{
+  const values={TELEGRAM_BOT_TOKEN:"fixture-pulse",TELEGRAM_BOT_USERNAME:"pulsemi_bot",TELEGRAM_WEBHOOK_SECRET:"fixture_pulse_secret",TELEGRAM_MINI_APP_URL:"https://pulse.test",TELEGRAM_TON_MINI_APP_ENABLED:"1",TELEGRAM_TON_MINI_APP_URL:"https://pulse.test/ton-miniapp",TELEGRAM_STARS_ENABLED:"1",TELEGRAM_STARS_GLOBAL_QUICK:"10",TELEGRAM_STARS_GLOBAL_PRO:"15",TELEGRAM_STARS_RISK_GUARD:"15",TELEGRAM_STARS_PREDICTION_QUICK:"10",TELEGRAM_STARS_PREDICTION_PRO:"15"};
+  const previous=Object.fromEntries(Object.keys(values).map(key=>[key,process.env[key]]));Object.assign(process.env,values);const realFetch=globalThis.fetch;
+  const calls:Array<{token:string;method:string;payload:Record<string,any>}>=[];
+  globalThis.fetch=(async(input,init)=>{const url=String(input);if(url.startsWith("https://api.telegram.org/")){const [,token,method]=/\/bot([^/]+)\/([^/?]+)/.exec(url)!;const payload=init?.body instanceof FormData?Object.fromEntries(init.body.entries()):JSON.parse(String(init?.body||"{}"));calls.push({token,method,payload});return Response.json({ok:true,result:method==="createInvoiceLink"?"https://t.me/$fixture":true});}return realFetch(input,init);}) as typeof fetch;
+  const jobs=new MemoryJobStore(),reports=new MemoryReportStore();const cfg={FEATURE_TELEGRAM:true,FEATURE_PREDICTION_ANALYSIS:true,REPORT_SHARE_LINK_ENABLED:true,NODE_ENV:"test",PAID_REGENERATION_MAX_ATTEMPTS:2} as AppConfig;
+  const app=express();app.use(express.json());app.use(createTelegramRouter(cfg,{jobs,reports,wakeWorker:()=>{},validateGlobal:(input:unknown)=>z.object({instId:z.string(),timeframe:z.string(),lang:z.literal("en")}).parse(input)}));const server=app.listen(0,"127.0.0.1");
+  try{
+    await new Promise<void>(resolve=>server.once("listening",resolve));const address=server.address();assert.ok(address&&typeof address==="object");const origin=`http://127.0.0.1:${address.port}`;
+    const webhook=(body:unknown,secret=values.TELEGRAM_WEBHOOK_SECRET)=>realFetch(`${origin}/v1/telegram/webhook`,{method:"POST",headers:{"Content-Type":"application/json","x-telegram-bot-api-secret-token":secret},body:JSON.stringify(body)});
+    let sequence=200;const message=(text:string)=>webhook({update_id:sequence++,message:{chat:{id:123,type:"private"},from:{id:123},text}});
+    const callback=(data:string,from=123)=>webhook({update_id:sequence++,callback_query:{id:String(sequence),from:{id:from},message:{chat:{id:123,type:"private"}},data}});
+    const request=(path:string,body?:unknown,token=values.TELEGRAM_BOT_TOKEN,user=123)=>realFetch(`${origin}/v1/telegram/ton/${path}`,{method:body===undefined?"GET":"POST",headers:{"Content-Type":"application/json","PULSE-TELEGRAM-INIT-DATA":signed(user,token)},...(body===undefined?{}:{body:JSON.stringify(body)})});
+    const status=await (await realFetch(`${origin}/v1/telegram/status`)).json();const tonStatus=await (await request("status")).json();assert.equal(status.mode,"pulse");assert.equal(status.botUsername,tonStatus.botUsername);assert.equal(status.webhookPath,tonStatus.webhookPath);assert.equal(status.miniAppUrl,values.TELEGRAM_TON_MINI_APP_URL);
+    assert.equal((await message("/start")).status,200);const welcome=calls.find(call=>call.method==="sendMessage")!.payload;const menu=welcome.reply_markup.inline_keyboard.flat();assert.ok(menu.some((button:any)=>button.callback_data==="svc:risk-guard"));assert.equal(menu.find((button:any)=>button.web_app).web_app.url,values.TELEGRAM_TON_MINI_APP_URL);assert.match(welcome.text,/https:\/\/www\.ai-pulse\.tech/);
+    await message("/website");const websiteReply=calls.filter(call=>call.method==="sendMessage").at(-1)!.payload;assert.match(websiteReply.text,/Official website/);assert.equal(new URL(websiteReply.reply_markup.inline_keyboard[0][0].url).searchParams.get("utm_campaign"),"bot_website");
+    await message("/start x_profile");const xMenu=calls.filter(call=>call.method==="sendMessage").at(-1)!.payload.reply_markup.inline_keyboard.flat();assert.equal(new URL(xMenu.find((button:any)=>button.text==="Open www.ai-pulse.tech").url).searchParams.get("utm_campaign"),"x_profile");
+    await message("/miniapp");assert.equal(calls.filter(call=>call.method==="sendMessage").at(-1)!.payload.reply_markup.inline_keyboard[0][0].web_app.url,values.TELEGRAM_TON_MINI_APP_URL);
+    await message("/globalquick");await message("btc-usdt 4h");const purchase=calls.filter(call=>call.method==="sendMessage").at(-1)!.payload.reply_markup.inline_keyboard[0][0].callback_data;assert.ok(purchase.startsWith("buy:"));
+    await callback(purchase,456);assert.equal(calls.filter(call=>call.method==="createInvoiceLink").length,0);await callback(purchase);await callback(purchase);const invoices=calls.filter(call=>call.method==="createInvoiceLink");assert.equal(invoices[0].payload.payload,invoices[1].payload.payload);assert.equal(invoices[0].payload.prices[0].amount,10);
+    const chatOrder=invoices[0].payload.payload;
+    const paid=(orderId:string,charge:string,amount=10)=>({update_id:sequence++,message:{chat:{id:123,type:"private"},from:{id:123},successful_payment:{currency:"XTR",total_amount:amount,invoice_payload:orderId,telegram_payment_charge_id:charge}}});
+    const chatPayment=paid(chatOrder,"chat-charge");assert.equal((await webhook(chatPayment)).status,200);assert.equal((await webhook(chatPayment)).status,200);
+    assert.equal((await request("session",undefined,"other-bot-token")).status,401);assert.equal((await request("session")).status,200);assert.equal((await request("wallet")).status,404);
+    assert.equal((await request("orders",{serviceId:"risk-guard",input:{address:"0x"+"a".repeat(40)}})).status,400);assert.equal((await request("orders",{serviceId:"global-quick",input:{instId:"BTC-USDT",timeframe:"4H",lang:"en"}})).status,400);
+    const invoice=await request("orders",{serviceId:"global-quick",input:{instId:"TON-USDT",timeframe:"4H",lang:"en"}});assert.equal(invoice.status,201);const tonOrder=(await invoice.json()).orderId;
+    assert.equal((await request(`orders/${chatOrder}`)).status,404);assert.equal((await request(`orders/${tonOrder}`,undefined,values.TELEGRAM_BOT_TOKEN,456)).status,404);assert.equal((await request(`orders/${tonOrder}/handoff`,{})).status,404);
+    assert.equal((await webhook({pre_checkout_query:{id:"ton-precheckout",from:{id:123},currency:"XTR",total_amount:10,invoice_payload:tonOrder}})).status,200);assert.equal(calls.find(call=>call.method==="answerPreCheckoutQuery")!.payload.ok,true);
+    const tonPayment=paid(tonOrder,"ton-charge");assert.equal((await webhook(tonPayment,"wrong-secret")).status,401);assert.equal((await webhook(tonPayment)).status,200);assert.equal((await webhook(tonPayment)).status,200);
+    const accountJobs=await jobs.listByPayer("telegram:123","xlayer");assert.equal(accountJobs.length,2);assert.equal((await jobs.listByPayer("telegram:ton:123","xlayer")).length,0);const tonJob=accountJobs.find(job=>(job.input as any).instId==="TON-USDT")!;
+    const delivery=String((tonJob.input as any)._telegramDelivery);assert.ok(delivery.startsWith("ton:"));assert.equal(isTelegramDeliveryCapability(delivery),true);assert.equal(isTelegramDeliveryCapability(delivery.replace("ton:","")),false);
+    const report=await reports.save("telegram:123",{instId:"TON-USDT",analysis:{headline:"TON evidence",summary:"Research only"}});await jobs.attachReport(tonJob.id,report.id);assert.equal((await (await request(`orders/${tonOrder}`)).json()).report.instId,"TON-USDT");
+    const tonLibrary=(await (await request("orders")).json()).orders;assert.equal(tonLibrary.length,1);assert.equal(tonLibrary[0].id,tonOrder);await message("/reports");const reportButtons=calls.filter(call=>call.method==="sendMessage").at(-1)!.payload.reply_markup.inline_keyboard.flat();assert.ok(reportButtons.some((button:any)=>button.callback_data===`report:${chatOrder}`));assert.ok(reportButtons.some((button:any)=>button.callback_data===`report:${tonOrder}`));
+    configureTelegramReportReader(async id=>{const record=await reports.get(id);return record?await reports.read(record):null;});const deliveryId=randomUUID();await deliverTelegramReportDurably(deliveryId,delivery,"TON evidence","https://t.me/pulsemi_bot?startapp",report.id);await deliverTelegramReportDurably(deliveryId,delivery,"repeat","https://t.me/pulsemi_bot?startapp",report.id);const documents=calls.filter(call=>call.method==="sendDocument");assert.equal(documents.length,1);assert.match(await documents[0].payload.document.text(),/TON evidence/);
+    await message("/wallet");await callback("wallet_link");const walletReply=calls.filter(call=>call.method==="sendMessage").at(-1)!.payload;assert.ok(walletReply.reply_markup.inline_keyboard[0][0].url.includes("/wallet-link#"));assert.ok(walletReply.reply_markup.inline_keyboard[1][0].callback_data.startsWith("wallet_check:"));
+    assert.ok(calls.every(call=>call.token===values.TELEGRAM_BOT_TOKEN));assert.equal((await realFetch(`${origin}/v1/telegram/ton/webhook`,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})).status,404);
+  }finally{await new Promise<void>(resolve=>server.close(()=>resolve()));globalThis.fetch=realFetch;for(const key of Object.keys(values)){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}}
+});

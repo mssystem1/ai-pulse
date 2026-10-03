@@ -36,6 +36,7 @@ import { RouteAvailability } from "./RouteAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import { OverviewWorkspace } from "./OverviewWorkspace";
+import { buildReportBuyIntent } from "./reportTradeHandoff";
 import {
   clearWalletDisconnected,
   connectWallet,
@@ -75,6 +76,11 @@ export function App() {
   });
 
   const [wallet, setWallet] = useState<string | null>(null);
+  const [expectedTelegramWallet] = useState(() => {
+    const value = new URLSearchParams(window.location.search).get("expectedWallet");
+    return value && /^0x[a-fA-F0-9]{40}$/.test(value) ? value.toLowerCase() : null;
+  });
+  const telegramWalletMatches = !expectedTelegramWallet || wallet?.toLowerCase() === expectedTelegramWallet;
   const [walletName, setWalletName] = useState("");
   const [networkKey, setNetworkKey] = useState<WebNetworkKey>(() => readPreferredNetwork(localStorage));
   const network = WEB_NETWORKS[networkKey];
@@ -180,7 +186,24 @@ export function App() {
   const [paymentProgress, setPaymentProgress] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [tradeIntent, setTradeIntent] = useState<ReportTradeIntent | null>(null);
-  const [spotPairDraft, setSpotPairDraft] = useState<string | null>(null);
+  const [spotPairDraft, setSpotPairDraft] = useState<string | null>(() => {
+    const pair = new URLSearchParams(window.location.search).get("pair");
+    return pair && /^[A-Z0-9]+-[A-Z0-9]+$/.test(pair) && pair.length <= 32 ? pair : null;
+  });
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("telegramReport");
+    if (!token || tab !== "spot" || !/^[A-Za-z0-9_-]{24,256}$/.test(token)) return;
+    const controller = new AbortController();
+    void fetch(`${API_BASE}/v1/shared/reports/${encodeURIComponent(token)}`, { signal: controller.signal, cache: "no-store", referrerPolicy: "no-referrer" })
+      .then(async response => { if (!response.ok) throw new Error("Your Telegram report could not be loaded. Reopen the Spot handoff from My reports."); return response.json(); })
+      .then(data => {
+        if (!data.report?.instId) throw new Error("This report has no Spot market context.");
+        setTradeIntent(buildReportBuyIntent(data.report, "limit"));
+        const url = new URL(window.location.href); url.hash = "";
+        window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
+      }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Report handoff unavailable"); });
+    return () => controller.abort();
+  }, [tab]);
   const reportRequestRef = useRef(0);
 
   const [tokenAddr, setTokenAddr] = useState("0x779ded0c9e1022225f8e0630b35a9b54be713736");
@@ -744,7 +767,7 @@ export function App() {
         : tab === "autopilot"
           ? { title: "Guarded autonomous execution", lead: "Allocate capital to an isolated vault and constrain the trading agent with an owner-signed on-chain policy." }
           : tab === "telegram"
-            ? { title: "PULSE in Telegram", lead: "Deliver paid Global and Prediction reports in chat without giving the bot custody." }
+            ? { title: "PULSE in Telegram", lead: "Learn how to start PULSE, buy research with Stars, link your report history and connect a TON wallet." }
             : tab === "docs"
               ? { title: "Product documentation", lead: "Understand every workflow, safety boundary, network and production test." }
               : { title: lang === "zh" ? "风险卫士" : "Risk Guard", lead: lang === "zh" ? `在 ${network.label} 上查看免费原始证据，或生成由多来源证据支持的 Grok 代币风险报告，再决定是否签名。` : `View free raw evidence or generate a multi-source Grok Token Risk report on ${network.label} before deciding whether to sign.` };
@@ -837,6 +860,7 @@ export function App() {
       </nav>
 
       <main id="app-main" tabIndex={-1}>
+      {expectedTelegramWallet && <section className="card" role="status"><strong>Telegram account wallet: {shortAddr(expectedTelegramWallet)}</strong><p>{telegramWalletMatches ? "This browser is using your linked Telegram wallet." : "Connect this exact wallet account to continue. A different browser wallet cannot replace your saved Telegram association."}</p>{!telegramWalletMatches && <button className="btn btn-accent" onClick={() => setWalletOpen(true)}>Connect linked wallet</button>}</section>}
       <div className="tabs desktop-service-tabs" role="tablist" aria-label="PULSE services">
         {navigationTabs.map((item) => (
           <button key={item.id} type="button" role="tab" aria-selected={tab === item.id} className={`tab ${tab === item.id ? "active" : ""}`} onClick={() => navigateTo(item.id)}>
@@ -892,8 +916,8 @@ export function App() {
       </section>}
 
       {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
-        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} initialPair={tradeIntent?.pair || spotPairDraft || instId} initialTrade={tradeIntent} onPairSelected={(pair) => { setTradeIntent(null); setSpotPairDraft(pair); }} onAnalyzeCandidate={selectCandidateForAnalysis} />
-        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={wallet} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={telegramWalletMatches ? wallet : null} lang={lang} initialPair={tradeIntent?.pair || spotPairDraft || instId} initialTrade={tradeIntent} onPairSelected={(pair) => { setTradeIntent(null); setSpotPairDraft(pair); }} onAnalyzeCandidate={selectCandidateForAnalysis} />
+        : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={telegramWalletMatches ? wallet : null} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />
         : tab === "docs" ? <DocsWorkspace lang={lang} />
         : tab === "prediction" ? <div className="grid"><PredictionWorkspace networkKey={networkKey} wallet={wallet} lang={lang} prices={routePrices} onNeedWallet={() => wallet ? setWalletOpen(true) : void onConnect()} onBalancesChanged={() => void refreshBalances()} /></div> : <div className={`grid ${tab === "analyze" ? "analysis-layout" : ""}`}>

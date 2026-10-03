@@ -21,3 +21,4 @@ node
 .env.cloud
 *-report.json
 DB_backup/
+.tmp/telegram-*

@@ -1,3 +1,4 @@
+import { TelegramGuide } from './TelegramGuide';
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -7420,155 +7421,7 @@ function DisabledArc({ feature }: { feature: string }) {
   );
 }
 
-export function TelegramWorkspace() {
-  const [statusError, setStatusError] = useState(false);
-  const [status, setStatus] = useState<{
-    configured?: boolean;
-    botUrl?: string | null;
-    botUsername?: string | null;
-    durableDelivery?: boolean;
-  } | null>(null);
-  useEffect(() => {
-    void apiGet("/v1/telegram/status").then(
-      (response) => { if (response.ok) setStatus(response.data as typeof status); else setStatusError(true); },
-      () => setStatusError(true),
-    );
-  }, []);
-  return (
-    <div className="v6-workspace telegram-user-guide">
-      <section className="v6-heading">
-        <div>
-          <span className="eyebrow">YOUR MOBILE COMPANION</span>
-          <h1>Open the app. Get reports in chat.</h1>
-          <p>
-            Telegram is a shortcut to PULSE and a delivery channel—not a second
-            trading interface. Choose markets, review prices and approve actions
-            in the app. No typed commands required.
-          </p>
-        </div>
-        {status?.configured && status.botUrl ? (
-          <a
-            className="btn btn-accent telegram-launch"
-            href={`${status.botUrl}?start=pulse`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            Open @{status.botUsername} ↗
-          </a>
-        ) : (
-          <span className="telegram-availability">
-            <i className={status?.configured ? "ready" : ""} />
-            {statusError ? "Cannot check Telegram right now. PULSE remains available here." : !status ? "Checking Telegram…" : "Telegram is unavailable. Use PULSE directly while it is restored."}
-          </span>
-        )}
-      </section>
-      <section className="card telegram-flow-card">
-        <div className="dashboard-head">
-          <div>
-            <span className="eyebrow">FIRST REPORT</span>
-            <h3>From one tap to a delivered report</h3>
-          </div>
-          <span
-            className={`status-chip ${status?.durableDelivery ? "confirmed" : "pending"}`}
-          >
-            {status?.durableDelivery ? "Delivery retries enabled" : !status && !statusError ? "Checking delivery" : "Delivery not verified"}
-          </span>
-        </div>
-        <div className="telegram-steps">
-          <article>
-            <span>1</span>
-            <div>
-              <strong>Open and start</strong>
-              <p>
-                Open the official PULSE bot and press Start. Do not send a seed
-                phrase or private key.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>2</span>
-            <div>
-              <strong>Choose a service</strong>
-              <p>
-                Tap Global Market, Prediction Market or Risk Guard in the bot.
-                Choose the pair, question or token and the service options in the app.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>3</span>
-            <div>
-              <strong>Pay securely</strong>
-              <p>
-                In the app, choose your network and connect your wallet. Review
-                the report price before approving payment. Opening a page is free.
-              </p>
-            </div>
-          </article>
-          <article>
-            <span>4</span>
-            <div>
-              <strong>Receive and recover</strong>
-              <p>
-                The bot posts a concise result and a private full-report button.
-                Delivery retries do not create another charge.
-              </p>
-            </div>
-          </article>
-        </div>
-      </section>
-      <div className="telegram-guide-grid">
-        <section className="card command-card">
-          <span className="eyebrow">CHOOSE A DESTINATION</span>
-          <h3>Buttons, not commands</h3>
-          <div className="command-list">
-            <strong>Global / Prediction / Risk Guard</strong><span>Choose and buy research in the app.</span>
-            <strong>Spot Trading</strong><span>Prepare an order; your wallet approves execution.</span>
-            <strong>Autopilot</strong><span>Manage autonomous strategies and their passes.</span>
-            <strong>My reports</strong><span>Open saved reports. For another device, use Paid report history → Sync with wallet on a research page.</span>
-          </div>
-        </section>
-        <section className="card telegram-example">
-          <span className="eyebrow">EXAMPLE</span>
-          <h3>BTC 4H Pro</h3>
-          <div className="chat-demo">
-            <div className="chat-user">Tap Global Market</div>
-            <div className="chat-bot">
-              In the app: <b>BTC-USDT</b> → <b>4H</b> → <b>Pro</b>
-              .
-            </div>
-            <div className="chat-user">Pay & generate</div>
-            <div className="chat-bot report">
-              Report ready ✓
-              <small>
-                Elliott continuation/correction paths, invalidation, chart and
-                private full report.
-              </small>
-            </div>
-          </div>
-        </section>
-      </div>
-      <section className="card telegram-security">
-        <div>
-          <span className="eyebrow">SECURITY</span>
-          <h3>What Telegram can—and cannot—access</h3>
-        </div>
-        <div className="security-columns">
-          <ul>
-            <li>Receives the report selected for that chat</li>
-            <li>Uses an expiring chat-bound delivery capability</li>
-            <li>Retries failed delivery without a second payment</li>
-          </ul>
-          <ul>
-            <li>Never receives private keys or seed phrases</li>
-            <li>Cannot reuse wallet authorization</li>
-            <li>Cannot trade or move funds from chat</li>
-          </ul>
-        </div>
-      </section>
-    </div>
-  );
-}
+export function TelegramWorkspace() { return <TelegramGuide />; }
 
 export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
   const [topic, setTopic] = useState(() => window.location.hash.slice(1) || "docs-workflows");
@@ -8873,16 +8726,18 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             <span className="docs-number">09</span>
             <div className="docs-copy">
               <span className="eyebrow">TELEGRAM</span>
-              <h3>Tap in chat. Choose and authorize in PULSE.</h3>
-              <p>
-                Press Start in the bot, then tap a destination button. Markets,
-                networks, report tiers and payments are selected in the app—not
-                through a chat questionnaire. My reports opens saved research in
-                Portfolio. To recover another device's reports, open Global or
-                Prediction Market and use Paid report history → Sync with wallet.
-                Chat delivery requires opening a bot-sent link; the profile launch
-                button alone does not link notifications. Telegram never signs a trade.
-              </p>
+              <h3>One PULSE bot. Chat research and a TON Mini App.</h3>
+              <p>Open <a href="https://t.me/pulsemi_bot?start=docs" rel="noreferrer">@pulsemi_bot</a> and press Start. Choose a service in the private chat, send the requested pair, token contract or prediction market, then approve its Stars invoice. PULSE sends the summary and complete report document to this chat. Opening a menu or selecting a service does not charge you.</p>
+              <ul>
+                <li><b>Global Quick:</b> 10 Stars. <b>Global Pro:</b> 15 Stars.</li>
+                <li><b>Risk Guard:</b> 15 Stars.</li>
+                <li><b>Prediction Quick:</b> 10 Stars. <b>Prediction Pro:</b> 15 Stars.</li>
+              </ul>
+              <p><b>My reports</b> recovers chat and TON Mini App purchases using your Telegram account, including on another device. If a report is still generating, recover its existing order rather than buying it again. Use <b>/paysupport</b> for a purchase issue and include the order ID.</p>
+              <p><b>History wallet</b> links your existing EVM wallet to this Telegram account. Prove ownership once in your browser, return to PULSE chat and confirm the exact address. Paid history from the website or mobile wallet browser then appears in chat. This association survives browser disconnects, closing Telegram and changing devices; it lasts until you explicitly change or unlink it. Reading history needs no transaction or chain switch.</p>
+              <p><b>Open PULSE Mini App</b> launches the TON workspace from this same bot. It offers TON-USDT Global Quick and Pro, Stars checkout and an optional TON Connect wallet connection. The Mini App shows TON research; all of its purchases are also available in PULSE chat. Connecting a TON wallet does not replace your EVM history association.</p>
+              <div className="docs-callout"><b>Keep your research close</b><span>Use /reports, /wallet and /miniapp, or the matching menu buttons. Stars buy research. Wallet connection does not authorize a trade. The full PULSE platform is at <a href="https://www.ai-pulse.tech" rel="noreferrer">www.ai-pulse.tech</a>.</span></div>
+              <p><a href="/telegram">Explore PULSE in Telegram</a> · <a href="https://t.me/pulsemi_bot?startapp" rel="noreferrer">Open its TON Mini App</a></p>
             </div>
           </section>
         </div>

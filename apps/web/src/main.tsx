@@ -15,6 +15,14 @@ const surface = siteSurface(window.location.href, import.meta.env.VITE_PUBLIC_LA
 applySiteMetadata(surface);
 const LandingPage = lazy(() => import("./LandingPage"));
 const SharedReport = lazy(async () => ({ default: (await import("./SharedReport")).SharedReport }));
+const TelegramLanding = lazy(async () => ({ default: (await import("./TelegramExperience")).TelegramLanding }));
+const TelegramTonMiniApp = lazy(async () => ({ default: (await import("./TelegramTonMiniApp")).TelegramTonMiniApp }));
+const TelegramWalletLinkPage = lazy(async () => {
+  const [{ TelegramWalletLinkPage }, { AppKitProvider }] = await Promise.all([import("./TelegramWalletLinkPage"), import("./appkit")]);
+  return { default: () => <AppKitProvider><TelegramWalletLinkPage /></AppKitProvider> };
+});
+const telegramPath = window.location.pathname.replace(/\/+$/, "");
+const publicTelegramPage = telegramPath === "/telegram" && entryUrl.hostname !== "app.ai-pulse.tech";
 
 // Shared research must not initialize wallet connectors or reconnect a session.
 const NormalApp = lazy(async () => {
@@ -25,7 +33,7 @@ const NormalApp = lazy(async () => {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <Suspense fallback={<p role="status">Opening PULSE…</p>}>
-      {surface === "shared" ? <SharedReport /> : surface === "landing" ? <LandingPage /> : <NormalApp />}
+      {(telegramPath === "/ton-miniapp" || telegramPath === "/miniapp") ? <TelegramTonMiniApp /> : telegramPath === "/wallet-link" ? <TelegramWalletLinkPage /> : publicTelegramPage ? <TelegramLanding /> : surface === "shared" ? <SharedReport /> : surface === "landing" ? <LandingPage /> : <NormalApp />}
     </Suspense>
   </StrictMode>,
 );

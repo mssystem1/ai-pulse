@@ -1,0 +1,78 @@
+import { randomUUID } from "node:crypto";
+import type { AppConfig } from "@pulse/config";
+import { TelegramCommerce, telegramServiceCatalog } from "./telegramCommerce.js";
+import { kvConfigured, runKvCommand } from "./resilientKv.js";
+
+type Api = (method:string,payload:unknown)=>Promise<unknown>;
+type Draft = { id:string; serviceId:string; expiresAt:number; input?:unknown; networkKey?:string };
+function websiteButton(campaign="bot_menu") {
+  const url=new URL("https://www.ai-pulse.tech/");
+  url.search=new URLSearchParams({utm_source:"telegram",utm_medium:"bot",utm_campaign:campaign}).toString();
+  return {text:"Open www.ai-pulse.tech",url:url.href};
+}
+export function parseBotResearchInput(serviceId:string,text:string) {
+  const value=text.trim();
+  if(serviceId.startsWith("global")) {
+    const [pair,timeframe="1H",...extra]=value.split(/\s+/);
+    if(extra.length||!pair||!/^[-A-Za-z0-9_.:]{2,64}$/.test(pair))throw new Error("Send a supported pair and timeframe, for example BTC-USDT 4H.");
+    const periods:Record<string,string>={"1m":"1m","3m":"3m","5m":"5m","15m":"15m","30m":"30m","1h":"1H","2h":"2H","4h":"4H","6h":"6H","12h":"12H","1d":"1D","1w":"1W","1dutc":"1Dutc","1wutc":"1Wutc"};
+    if(!periods[timeframe.toLowerCase()])throw new Error("Supported timeframes: 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W.");
+    return {input:{instId:pair.toUpperCase(),timeframe:periods[timeframe.toLowerCase()],lang:"en"},networkKey:"xlayer"};
+  }
+  if(serviceId.startsWith("prediction")) {
+    if(!/^[A-Za-z0-9_-]{1,256}$/.test(value))throw new Error("Send the exact supported prediction market ID, not a URL or market title.");
+    return {input:{primaryMarketId:value,lang:"en"},networkKey:"xlayer"};
+  }
+  const [network,address,...extra]=value.split(/\s+/);
+  if(extra.length||!["xlayer","base","arbitrum","robinhood"].includes(network?.toLowerCase())||!/^0x[a-fA-F0-9]{40}$/.test(address||""))throw new Error("Send the network and exact token contract: xlayer 0x… . Supported networks: xlayer, base, arbitrum, robinhood.");
+  return {input:{address,lang:"en"},networkKey:network.toLowerCase()};
+}
+
+export function formatTelegramResearch(report:unknown):string {
+  const lines:string[]=["PULSE research report",""];
+  const visit=(value:unknown,path:string,depth:number)=>{
+    if(value===null||value===undefined)return;
+    if(depth>12){lines.push(`${path}: ${JSON.stringify(value)}`);return;}
+    if(Array.isArray(value)){value.forEach((item,index)=>visit(item,`${path} ${index+1}`,depth+1));return;}
+    if(typeof value==="object"){for(const [key,item] of Object.entries(value as Record<string,unknown>)){if(key.startsWith("_")||["chartImageBase64","chartImageMime"].includes(key))continue;visit(item,[path,key.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/_/g," ")].filter(Boolean).join(" / "),depth+1);}return;}
+    lines.push(`${path}: ${String(value)}`,"");
+  };
+  visit(report,"",0);return lines.join("\n");
+}
+
+export class TelegramBotChat {
+  private memory=new Map<number,Draft>();
+  constructor(private cfg:AppConfig,private commerce:TelegramCommerce,private api:Api,private appUrl:string,private tonMiniAppUrl?:string){}
+  private key(userId:number){return `${this.cfg.PERSISTENCE_NAMESPACE||"pulse"}:telegram:chat:draft:${userId}`;}
+  private async draft(userId:number){if(kvConfigured()){const raw=await runKvCommand(["GET",this.key(userId)],"Telegram chat");return typeof raw==="string"?JSON.parse(raw) as Draft:null;}if(this.cfg.NODE_ENV!=="test")throw new Error("Durable chat storage is unavailable. No payment was taken.");return this.memory.get(userId)||null;}
+  private async save(userId:number,draft:Draft){if(kvConfigured())await runKvCommand(["SET",this.key(userId),JSON.stringify(draft),"EX",600],"Telegram chat");else{if(this.cfg.NODE_ENV!=="test")throw new Error("Durable chat storage is unavailable");this.memory.set(userId,draft);}}
+  private async send(userId:number,text:string,buttons?:Array<Array<Record<string,unknown>>>){return this.api("sendMessage",{chat_id:userId,text,disable_web_page_preview:true,...(buttons?{reply_markup:{inline_keyboard:buttons}}:{})});}
+  menu(campaign="bot_menu"){return [...telegramServiceCatalog(this.cfg).map(service=>[{text:`${service.title} · ${service.stars?`★ ${service.stars}`:"paused"}`,callback_data:`svc:${service.id}`}]),...(this.tonMiniAppUrl?[[{text:"Open PULSE Mini App · TON",web_app:{url:this.tonMiniAppUrl}}]]:[]),[websiteButton(campaign)],[{text:"▤ My reports",callback_data:"/reports"},{text:"Wallet history",callback_data:"/wallet"}],[{text:"Payment support",callback_data:"/paysupport"}]];}
+  async handle(userId:number,text:string):Promise<unknown>{
+    const command=text.trim().split(/\s/)[0].split("@")[0].toLowerCase();
+    if(command==="/miniapp")return this.send(userId,this.tonMiniAppUrl?"PULSE Mini App · TON\n\nOpen TON-USDT Quick/Pro research, pay with Stars and optionally connect through TON Connect. Your purchases belong to the same PULSE Telegram account.":"The PULSE TON Mini App is not enabled yet. Chat research and existing report recovery remain available.",this.tonMiniAppUrl?[[{text:"Open PULSE Mini App",web_app:{url:this.tonMiniAppUrl}}]]:this.menu());
+    if(command==="/help")return this.send(userId,"PULSE · How to use it\n\n/globalquick or /globalpro: send a pair and timeframe, for example BTC-USDT 4H.\n/risk: send a supported network and exact token contract.\n/predictionquick or /predictionpro: send the exact supported market ID.\n\nReview the invoice before paying. Reports arrive in this chat.\n/reports: recover paid reports.\n/wallet: link or change your persistent read-only EVM history wallet.\n/miniapp: open TON research and TON Connect.\n/website: open www.ai-pulse.tech.\n/paysupport: payment recovery and human support.",this.menu());
+    if(command==="/settings")return this.handle(userId,"/wallet");
+    const serviceMatch=command.startsWith("svc:")?command.slice(4):({"/global":"global-quick","/globalquick":"global-quick","/globalpro":"global-pro","/prediction":"prediction-quick","/predictionquick":"prediction-quick","/predictionpro":"prediction-pro","/risk":"risk-guard"} as Record<string,string>)[command];
+    if(serviceMatch){const service=telegramServiceCatalog(this.cfg).find(item=>item.id===serviceMatch);if(!service?.enabled)return this.send(userId,"This service is paused. Existing paid reports remain available.",this.menu());await this.save(userId,{id:randomUUID(),serviceId:service.id,expiresAt:Date.now()+600_000});return this.send(userId,`${service.title} · ${service.stars} Stars per report\n\n${service.mode==="spot"?"Send a pair and timeframe, for example BTC-USDT 4H.":service.mode==="prediction"?"Send the exact supported prediction market ID. Preserve letter case; do not send a URL or title.":"Send the network and exact token contract, for example: xlayer 0x…"}\n\nNothing is charged until you review the invoice and confirm Telegram checkout.`);}
+    if(command.startsWith("buy:")){const draft=await this.draft(userId);if(!draft?.input||draft.id!==command.slice(4)||draft.expiresAt<Date.now())return this.send(userId,"This research request expired. Choose the service again.",this.menu());const invoice=await this.commerce.createInvoice(userId,draft.serviceId,draft.input,draft.networkKey,draft.id as ReturnType<typeof randomUUID>);return this.send(userId,`Review ${invoice.stars} Stars for one report. Your result will arrive in this chat. Order: ${invoice.orderId}` ,[[{text:`Pay ★ ${invoice.stars}`,url:invoice.invoiceUrl}],[{text:"My reports",callback_data:"/reports"}]]);}
+    if(command==="/reports"){const orders=await this.commerce.library(userId);if(!orders.length)return this.send(userId,"No saved reports yet. Stars purchases appear here; linked-wallet history appears after you confirm ownership.",this.menu());return this.send(userId,"Your PULSE reports\n\nChoose an order to read or recover it. Wallet history is read-only; no chain switching or transaction is needed.",orders.slice(0,25).map(order=>[{text:`${order.serviceId} · ${order.status}`,callback_data:`report:${order.id}`}]).concat([[{text:"Services",callback_data:"/start"}]]));}
+    if(command.startsWith("report:")){const id=command.slice(7);const result=await this.commerce.readOwned(userId,id);if(result.report){await this.api("sendResearchDocument",{chat_id:userId,report:result.report});const report=formatTelegramResearch(result.report);const chunks=report.match(/[\s\S]{1,3500}/g)||[];for(const chunk of chunks.slice(0,12))await this.send(userId,chunk);if(chunks.length>12)await this.send(userId,"This report is long. Its complete version is in the report document delivered above.");return;}return this.send(userId,`Order ${id}\nStatus: ${result.status}\n\n${result.status==="refunded"?"This purchase was refunded in Stars.":"Do not pay again to recover this order."}`,[[{text:"Refresh order",callback_data:`report:${id}`}],...(!id.startsWith("wallet:")&&["failed_terminal","manual_reconciliation"].includes(result.status)?[[{text:"Refund failed report",callback_data:`refund:${id}`}]]:[])]);}
+    if(command.startsWith("refund:")){await this.commerce.refundOwned(userId,command.slice(7));return this.send(userId,"Your failed-report payment was refunded in Stars.");}
+    const wallets=this.commerce.walletLinks;
+    if(command==="/wallet"){const wallet=await wallets?.association(userId);return this.send(userId,wallet?`Saved history wallet\n${wallet.wallet}\n\nThis association stays until you explicitly change or unlink it. Browser disconnects do not erase it. Reading reports needs no transaction or gas.`:"Link the EVM wallet that paid for your PULSE website reports. One ownership message and confirmation here are required; history reading itself needs no signature or transaction.",[[{text:wallet?"Change history wallet":"Link history wallet",callback_data:wallet?"wallet_change":"wallet_link"}],...(wallet?[[{text:"Unlink history wallet",callback_data:"wallet_unlink"}]]:[]),[{text:"My reports",callback_data:"/reports"}]]);}
+    if(command==="wallet_link"||command==="wallet_change"){if(!wallets)throw new Error("Wallet linking unavailable");const attempt=await wallets.start(userId,command==="wallet_change");const url=new URL("/wallet-link",this.appUrl);url.hash=new URLSearchParams({walletLink:attempt.token}).toString();return this.send(userId,"Open your wallet browser and sign the displayed ownership message. This does not authorize a transaction or change networks. Return here to review and confirm the exact address. The browser link expires in 10 minutes.",[[{text:"Verify wallet ownership",url:url.href}],[{text:"Review signed wallet",callback_data:`wallet_check:${attempt.id}`}]]);}
+    if(command.startsWith("wallet_check:")){const id=command.slice(13);const status=await wallets?.status(userId,id);if(!status||status.status!=="signed")return this.send(userId,"The wallet is not signed yet, or this request expired. Sign in your browser first.",[[{text:"Check again",callback_data:`wallet_check:${id}`}]]);return this.send(userId,`Confirm this exact wallet for your Telegram account:\n\n${status.wallet}\n\nIt grants read-only access to this wallet's paid PULSE history until you change or unlink it.`,[[{text:"Confirm this wallet",callback_data:`wallet_confirm:${id}`}]]);}
+    if(command.startsWith("wallet_confirm:")){const wallet=await wallets?.confirm(userId,command.slice(15));if(!wallet)throw new Error("Wallet confirmation unavailable");return this.send(userId,`History wallet saved permanently:\n${wallet.wallet}\n\nOpen My reports to read your existing paid history.`,[[{text:"My reports",callback_data:"/reports"}]]);}
+    if(command==="wallet_unlink")return this.send(userId,"Remove this Telegram account's access to linked-wallet history? Original wallet reports and your Stars purchases remain.",[[{text:"Confirm unlink",callback_data:"wallet_unlink_confirm"}],[{text:"Keep wallet",callback_data:"/wallet"}]]);
+    if(command==="wallet_unlink_confirm"){await wallets?.unlink(userId);return this.send(userId,"Wallet history access unlinked. Stars reports remain with this Telegram account.");}
+    if(command==="/paysupport")return this.send(userId,`Payment help\n\nUse My reports to recover a pending order or refund a terminal failed report. Do not purchase again. For other issues, include your order ID when contacting ${process.env.TELEGRAM_SUPPORT_CONTACT||"the operator (a staffed contact must be configured before launch)"}. Never send keys, seed phrases or wallet signatures.`,[[{text:"My reports",callback_data:"/reports"}]]);
+    if(command==="/terms")return this.send(userId,"Stars purchase one research report. They are not trading funds and do not authorize wallet transactions. Failed undelivered reports support a Stars refund. Review the exact invoice price before paying.");
+    if(command==="/privacy")return this.send(userId,"PULSE uses your verified Telegram account for Stars reports. Linking an EVM wallet grants read-only report history access after ownership verification and confirmation. The association persists until you explicitly change/unlink it. Keys and seed phrases are never collected.");
+    if(command==="/website")return this.send(userId,"PULSE · Official website\n\nhttps://www.ai-pulse.tech\n\nExplore the full PULSE product and research on the web. Your Stars reports are available in My reports. Link the EVM wallet you used on the website to recover retained web report history here.",[[websiteButton("bot_website")],[{text:"My reports",callback_data:"/reports"},{text:"Wallet history",callback_data:"/wallet"}]]);
+    if(!text.startsWith("/")&&!/^(svc|buy|report|refund|wallet_check|wallet_confirm):/.test(text)){const draft=await this.draft(userId);if(draft&&draft.expiresAt>Date.now()){const parsed=parseBotResearchInput(draft.serviceId,text);await this.save(userId,{...draft,...parsed});const service=telegramServiceCatalog(this.cfg).find(item=>item.id===draft.serviceId)!;return this.send(userId,`${service.title}\nInput: ${text.trim()}\nPrice: ${service.stars} Stars\n\nReview the invoice before payment.`,[[{text:"Review Stars checkout",callback_data:`buy:${draft.id}`}],[{text:"Choose another service",callback_data:"/start"}]]);}}
+    const startService=text.match(/^\/start(?:@\w+)?\s+(global_quick|global_pro|prediction_quick|prediction_pro|risk_guard)$/i)?.[1];if(startService)return this.handle(userId,`svc:${startService.replace(/_/g,"-").toLowerCase()}`);
+    const fromX=/^\/start(?:@\w+)?\s+x_profile$/i.test(text.trim());
+    return this.send(userId,"PULSE · Research in your chat\n\nOur official website: https://www.ai-pulse.tech\nExplore the full PULSE product on the web, or get research delivered here.\n\nFive services, paid with Stars. Choose a service, send its input, review checkout and receive your result here. Link an existing EVM wallet to recover retained paid website history.",this.menu(fromX?"x_profile":"bot_menu"));
+  }
+}

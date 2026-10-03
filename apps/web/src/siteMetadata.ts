@@ -1,6 +1,11 @@
 import { hrefForTab, tabFromHref } from "./navigation";
 
 export function siteMetadata(href: string, surface: "landing" | "app" | "shared") {
+  const pathname = new URL(href).pathname.replace(/\/+$/, "");
+  if (pathname === "/telegram") return { title: "PULSE on Telegram — Intelligence in your pocket", canonical: "https://www.ai-pulse.tech/telegram", robots: "index,follow" };
+  if (pathname === "/miniapp") return { title: "PULSE — Telegram Mini App", canonical: "https://www.ai-pulse.tech/miniapp", robots: "noindex,nofollow" };
+  if (pathname === "/ton-miniapp") return { title: "PULSE — TON Mini App", canonical: "https://www.ai-pulse.tech/ton-miniapp", robots: "noindex,nofollow" };
+  if (pathname === "/wallet-link") return { title: "PULSE — Link wallet to Telegram", canonical: "https://www.ai-pulse.tech/wallet-link", robots: "noindex,nofollow" };
   if (surface === "landing") return { title: "PULSE — Read the market. Trade your way.", canonical: "https://www.ai-pulse.tech/", robots: "index,follow" };
   if (surface === "shared") return { title: "PULSE — Shared research", canonical: "https://www.ai-pulse.tech/shared-report", robots: "noindex,nofollow" };
   const tab = tabFromHref(href);

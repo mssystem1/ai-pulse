@@ -1,0 +1,8 @@
+campaign_code,channel,placement,creative,language,relative_launch_day,planned_budget,approved_budget,accounting_currency,actual_spend,eligible_visits,new_activated_buyers,cohort_maturity_days,net_realized_proceeds,variable_costs,owner,status
+owned_launch_01,owned_telegram,launch_announcement,evidence_and_prices,en,0,,,,,,,,,,,draft
+web_launch_01,owned_web,research_cta,telegram_convenience,en,0,,,,,,,,,,,draft
+x_profile,owned_x,available_profile_link,bot_to_official_website,en,0,,,,,,,,,,,draft
+owned_recovery_01,owned_telegram,educational_post,cross_device_reports,en,6,,,,,,,,,,,draft
+creator_pilot_01,creator,disclosed_walkthrough,actual_report_example,en,10,,,,,,,,,,,draft
+creator_pilot_02,creator,disclosed_walkthrough,actual_report_example,en,18,,,,,,,,,,,draft
+paid_pilot_01,eligible_paid_placement,review_required,structured_research,en,8,,,,,,,,,,,draft

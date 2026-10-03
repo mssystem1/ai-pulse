@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { siteMetadata } from "./siteMetadata.js";
 test("canonical metadata separates public and app contexts without exposing tokens",()=>{
+  assert.equal(siteMetadata("https://www.ai-pulse.tech/telegram?tg=secret", "app").canonical, "https://www.ai-pulse.tech/telegram");
+  assert.equal(siteMetadata("https://www.ai-pulse.tech/miniapp?service=global-pro&tg=secret", "app").robots, "noindex,nofollow");
+  assert.deepEqual(siteMetadata("https://www.ai-pulse.tech/ton-miniapp?tg=secret#private", "app"), { title: "PULSE — TON Mini App", canonical: "https://www.ai-pulse.tech/ton-miniapp", robots: "noindex,nofollow" });
   assert.equal(siteMetadata("http://localhost:5178/landing","landing").canonical,"https://www.ai-pulse.tech/");
   assert.deepEqual(siteMetadata("https://www.ai-pulse.tech/overview?token=private#secret","app"),{title:"Portfolio · PULSE",canonical:"https://app.ai-pulse.tech/portfolio",robots:"noindex,follow"});
   assert.equal(siteMetadata("https://www.ai-pulse.tech/shared-report#share=secret","shared").robots,"noindex,nofollow");
