@@ -99,3 +99,57 @@ test("wallets are isolated; completed delivery allows a different report", async
   await f.client()(url, { ...init, body: JSON.stringify({ instId: "BTC-USDT" }) });
   assert.equal(f.signs(), 3);
 });
+
+const passUrl = "https://pulse.example/robinhood/v1/autopilot/pass/24h";
+const owner = "0x1111111111111111111111111111111111111111";
+const vault1 = "0x2222222222222222222222222222222222222222";
+const vault2 = "0x3333333333333333333333333333333333333333";
+function passFixture() {
+  const f = fixture();
+  const submissions: Array<{ vault: string; signature: string }> = [];
+  let pending = false;
+  f.deps.fetch = (async (input: RequestInfo | URL) => {
+    const req = new Request(input);
+    if (req.method === "GET") return Response.json({ strategies: [{ vault: vault1 }] });
+    const body = await req.json();
+    const signature = req.headers.get("PAYMENT-SIGNATURE");
+    if (!signature) return Response.json({}, { status: 402 });
+    submissions.push({ vault: body.vault, signature });
+    if (pending) return Response.json({ retrySamePayment: true }, { status: 503 });
+    return Response.json({ aiPass: { owner, network: "robinhood", vault: body.vault, purchasedAt: "2026-10-04T08:00:00Z", expiresAt: "2026-10-05T08:00:00Z" } },
+      { status: 201, headers: { "PAYMENT-RESPONSE": "receipt" } });
+  }) as typeof fetch;
+  const buy = (vault: string) => f.client()(passUrl, { method: "POST", body: JSON.stringify({ owner, vault }) });
+  return { ...f, submissions, buy, pending: () => { pending = true; } };
+}
+test("successful passes release the service fence for a second vault while double clicks reuse payment", async () => {
+  const f = passFixture();
+  await f.buy(vault1); await f.buy(vault1);
+  assert.equal(f.signs(), 1);
+  await f.buy(vault2);
+  assert.equal(f.signs(), 2);
+  assert.equal([...f.storage.data.keys()].filter(key => key.includes(":receipt:")).length, 2);
+});
+test("legacy completed pass recovers its original vault before buying for another", async () => {
+  const f = passFixture(); await f.buy(vault1);
+  const key = [...f.storage.data.keys()].find(key => key.startsWith("pulse:pending-payment:") && !key.includes(":receipt:"))!;
+  const legacy = JSON.parse(f.storage.getItem(key)!);
+  delete legacy.recoveredAt; delete legacy.body; delete legacy.delivery;
+  f.storage.setItem(key, JSON.stringify(legacy));
+  await f.buy(vault2);
+  assert.deepEqual(f.submissions, [{ vault: vault1, signature: "fixture-1" }, { vault: vault1, signature: "fixture-1" }, { vault: vault2, signature: "fixture-2" }]);
+});
+test("uncertain original pass replay blocks a different vault without a new signature", async () => {
+  const f = passFixture(); f.pending(); await f.buy(vault1);
+  await assert.rejects(f.buy(vault2), /Restore your original selection/);
+  assert.equal(f.signs(), 1);
+  assert.deepEqual(f.submissions.map(value => value.vault), [vault1, vault1]);
+});
+test("persisting a pass receipt must succeed before releasing its payment fence", async () => {
+  const f = passFixture();
+  const set = f.storage.setItem.bind(f.storage);
+  f.storage.setItem = (key, value) => { if (key.includes(":receipt:")) throw new Error("Storage full"); set(key, value); };
+  await assert.rejects(f.buy(vault1), /Storage full/);
+  await assert.rejects(f.buy(vault2), /Storage full/);
+  assert.equal(f.signs(), 1);
+});

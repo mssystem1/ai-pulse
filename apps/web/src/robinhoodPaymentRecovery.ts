@@ -1,6 +1,6 @@
 import { saveJobRecovery, type JobRecoveryScope } from "./jobRecovery";
 
-type StoredPayment = { version: 1; fingerprint: string; headers: Record<string, string>; recoveredAt?: number };
+type StoredPayment = { version: 1; fingerprint: string; headers: Record<string, string>; recoveredAt?: number; body?: unknown; delivery?: unknown };
 type Dependencies = {
   storage: Storage;
   exclusive: <T>(key: string, run: () => Promise<T>) => Promise<T>;
@@ -27,7 +27,14 @@ export function createRecoverableRobinhoodFetch(wallet: string, deps: Dependenci
     const rawBody = await request.clone().text();
     let body: unknown;
     try { body = JSON.parse(rawBody); } catch { throw new Error("Robinhood paid requests require JSON."); }
-    const fingerprint = await digest(JSON.stringify({ method: request.method, url: `${url.origin}${path}${url.search}`, body: canonical(body) }));
+    const fingerprintFor = (value: unknown) => digest(JSON.stringify({ method: request.method, url: `${url.origin}${path}${url.search}`, body: canonical(value) }));
+    const fingerprint = await fingerprintFor(body);
+    const passRequest = /^\/robinhood\/v1\/autopilot\/pass\/(24h|7d|30d)$/.test(path);
+    const deliveredPass = (value: any, original: any) => passRequest && value?.aiPass
+      && value.aiPass.network === "robinhood"
+      && typeof value.aiPass.owner === "string" && value.aiPass.owner.toLowerCase() === wallet.toLowerCase()
+      && typeof value.aiPass.vault === "string" && value.aiPass.vault.toLowerCase() === String(original?.vault || "").toLowerCase()
+      && Number.isFinite(Date.parse(value.aiPass.purchasedAt)) && Number.isFinite(Date.parse(value.aiPass.expiresAt));
     return deps.exclusive(key, async () => {
       // Storage must work BEFORE requesting a signature. Never silently switch
       // to memory and lose the authorization on refresh.
@@ -46,6 +53,43 @@ export function createRecoverableRobinhoodFetch(wallet: string, deps: Dependenci
         deps.storage.removeItem(key);
         stored = null;
       }
+      if (stored && stored.fingerprint !== fingerprint && passRequest) {
+        // Older clients retained successful passes forever because passes have
+        // no report recovery token. Recover the ORIGINAL purchase, never replay
+        // its authorization against a different vault or request fresh payment.
+        let original = stored.body;
+        if (!original) {
+          const lookup = await deps.fetch(new Request(`${url.origin}/v1/autopilot/strategies?owner=${encodeURIComponent(wallet)}&network=robinhood`));
+          const catalog = lookup.ok ? await lookup.json().catch(() => null) : null;
+          const strategies = Array.isArray(catalog?.strategies) ? catalog.strategies : [];
+          for (const strategy of strategies) {
+            for (const vault of [strategy.vault, String(strategy.vault || "").toLowerCase()]) {
+              for (const owner of [(body as any)?.owner, strategy.owner, wallet, wallet.toLowerCase()]) {
+                const candidate = { ...(body as Record<string, unknown>), owner, vault };
+                if (await fingerprintFor(candidate) === stored.fingerprint) original = candidate;
+                // Telegram context can change between visits. Never guess a
+                // capability: try the ordinary request only if its hash matches.
+                const { telegramDelivery: _delivery, ...plain } = candidate as Record<string, unknown>;
+                if (await fingerprintFor(plain) === stored.fingerprint) original = plain;
+              }
+            }
+          }
+        }
+        if (original && await fingerprintFor(original) === stored.fingerprint) {
+          const headers = new Headers(request.headers);
+          Object.entries(stored.headers).forEach(([name, value]) => headers.set(name, value));
+          const recovered = await deps.fetch(new Request(request, { headers, body: JSON.stringify(original) }));
+          const delivery = recovered.ok && recovered.headers.has("PAYMENT-RESPONSE") ? await recovered.clone().json().catch(() => null) : null;
+          if (deliveredPass(delivery, original)) {
+            // Persist proof before releasing the fence. An uncertain replay or
+            // storage failure must still prevent another charge.
+            deps.storage.setItem(`${key}:receipt:${stored.fingerprint}`, JSON.stringify(delivery.aiPass));
+            deps.storage.setItem(key, JSON.stringify({ ...stored, body: original, delivery: delivery.aiPass, recoveredAt: Date.now() }));
+            deps.storage.removeItem(key);
+            stored = null;
+          }
+        }
+      }
       if (stored && stored.fingerprint !== fingerprint) throw new Error("A Robinhood payment for this service is still pending. Restore your original selection and retry to recover it without paying again.");
       if (!stored) {
         const probe = `${key}:storage-check`;
@@ -57,7 +101,7 @@ export function createRecoverableRobinhoodFetch(wallet: string, deps: Dependenci
         const signed = new Headers(await deps.sign(challenge, request));
         const header = signed.get("PAYMENT-SIGNATURE");
         if (!header) throw new Error("The wallet did not return a payment authorization.");
-        stored = { version: 1, fingerprint, headers: { "PAYMENT-SIGNATURE": header } };
+        stored = { version: 1, fingerprint, headers: { "PAYMENT-SIGNATURE": header }, body };
         const encoded = JSON.stringify(stored);
         deps.storage.setItem(key, encoded);
         if (deps.storage.getItem(key) !== encoded) throw new Error("Payment recovery could not be saved. No payment was submitted.");
@@ -69,7 +113,10 @@ export function createRecoverableRobinhoodFetch(wallet: string, deps: Dependenci
         const delivered = await response.clone().json().catch(() => null);
         const handle = delivered?.history || (delivered?.job?.id && delivered?.recoveryToken
           ? { jobId: delivered.job.id, recoveryToken: delivered.recoveryToken } : null);
-        if (handle) {
+        if (deliveredPass(delivered, body)) {
+          deps.storage.setItem(`${key}:receipt:${fingerprint}`, JSON.stringify(delivered.aiPass));
+          deps.storage.setItem(key, JSON.stringify({ ...stored, delivery: delivered.aiPass, recoveredAt: stored.recoveredAt || Date.now() }));
+        } else if (handle) {
           const scope: JobRecoveryScope = path.includes("/prediction/") ? "prediction" : path.endsWith("/preflight") ? "risk" : "spot";
           // If any write fails, retain the original payment and allow replay.
           saveJobRecovery(deps.storage, "robinhood", handle, scope);
