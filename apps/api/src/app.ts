@@ -1638,7 +1638,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       const tonDelivery=delivery.startsWith("ton:");
       const reportUrl=tonDelivery?`https://t.me/${(process.env.TELEGRAM_BOT_USERNAME||"pulsemi_bot").replace(/^@/,"")}?startapp`:telegramReportUrl(process.env.TELEGRAM_MINI_APP_URL||"",(await persistence.reports.createShare(reportId)).token);
       const data = report as { analysis?: { headline?: string; summary?: string }; headline?: string; summary?: string; service?: string };
-      await deliverTelegramReportDurably(job.id, delivery, `${data.analysis?.headline || data.headline || data.service || "PULSE report ready"}\n\n${data.analysis?.summary || data.summary || "Your full report is ready."}`, reportUrl,reportId);
+      await deliverTelegramReportDurably(job.id, delivery, `${data.analysis?.headline || data.headline || data.service || "PULSE report ready"}\n\n${data.analysis?.summary || data.summary || "Your full report is ready."}`, reportUrl,reportId,{serviceId:job.mode==="risk"?"risk-guard":`${job.mode==="spot"?"global":"prediction"}-${job.tier==="premium"?"pro":"quick"}`,input:Object.fromEntries(Object.entries(job.input as Record<string,unknown>).filter(([key])=>["instId","timeframe","primaryMarketId","address"].includes(key))),networkKey:job.networkKey,createdAt:job.createdAt});
     } catch (error) { console.error("Telegram report delivery failed", error); }
   };
 

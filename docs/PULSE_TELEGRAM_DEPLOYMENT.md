@@ -82,6 +82,8 @@ Retain the other existing frontend variables. Bot tokens, webhook secrets, KV cr
 
 The repo uses Node 22, Railway's checked-in Dockerfile/worker start command, and the existing Vercel static Vite deployment. Keep those hosts and the normal release process. Serve `apps/web/public/tonconnect-manifest.json` as a static JSON file, not through a wildcard HTML fallback.
 
+Report PNG rendering uses the pinned `@resvg/resvg-js` dependency and bundled `assets/fonts/Inter.ttf` with its open-font license. The existing Dockerfile copies `assets`; retain that directory in the runtime image and install optional native dependencies for the host architecture (including Linux musl for Alpine). Frontend `prebuild` compiles `@pulse/schemas` and `@pulse/domain` so Vercel's web-only build can resolve the shared presentation from a fresh checkout. No new environment variables or BotFather settings are required for report formatting or chart attachments.
+
 ## 5. Local verification and review
 
 From `C:\Users\maksim.shishkov\ai-pulse`:
@@ -142,7 +144,7 @@ node --env-file=.env.cloud scripts/telegram-setup.mjs --stage checkout --apply
 ```
 
 4. Run one real purchase of every chat service (65 Stars total) and both TON tiers (25 Stars total). Record order/charge identifiers only in restricted evidence.
-5. Verify each amount, service/tier, one recorded charge, one worker job, complete document delivery and owned recovery.
+5. Verify each amount, service/tier, one recorded charge, one worker job, document delivery and owned recovery. Both the first delivery and `/reports` recovery must show the correct market/pair and Global timeframe. TXT and chat must use readable research sections, retain invalidation/risk/evidence caveats, and exclude raw provider payloads and nested field paths. Pro reports with valid saved chart data must attach their snapshot as a PNG; Quick, Risk Guard and unmapped Prediction Pro reports must not invent a chart. In TON Reports, verify pair/timeframe/date, TXT download and chart enlargement on mobile.
 6. From the same PULSE chat, `/reports` must include purchases made through both interfaces. TON Reports must show TON purchases and reject unrelated EVM/chat orders by direct API request.
 7. Test native invoice cancel/close, delayed provider response, close/reopen recovery and an eligible failed undelivered report refund. Never rebuy an order just to recover it.
 8. Link an existing EVM history wallet, sign the displayed ownership message, return to this bot and confirm the exact address. Disconnect/restart the browser and reload the API; the saved association must remain. Change/unlink must be explicit.

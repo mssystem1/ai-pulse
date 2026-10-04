@@ -1562,6 +1562,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           policyHash: keccak256(toHex(JSON.stringify(s.policy))),
         });
         const priceTx = await walletClient.writeContract({
+          account: walletClient.account,
           address: oracle as `0x${string}`,
           abi: oracleAbi,
           functionName: "setPrice",

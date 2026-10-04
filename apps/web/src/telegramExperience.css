@@ -110,3 +110,26 @@
 }
 @media(max-width:900px){.tg-mode-card{padding:24px}.tg-mode-card h3{font-size:23px}.tg-mode-card p,.tg-mode-card li{font-size:12px}}
 @media(max-width:650px){.tg-mode-grid{grid-template-columns:1fr;gap:14px;margin-top:25px}.tg-mode-card{padding:24px}.tg-card-bottom strong{font-size:11px}.tg-website-link{max-width:30ch}.tg-hero-actions{flex-wrap:wrap}}
+.tg-research-report { color:#dfeaf1; overflow-wrap:anywhere; }
+.tg-research-heading h2 { font-size:23px; line-height:1.35; margin:14px 0 6px; }
+.tg-research-heading h2 span { color:#00dba8; }
+.tg-research-heading h3 { font-size:18px; line-height:1.45; margin:22px 0 10px; }
+.tg-research-heading p,.tg-research-section li,.tg-research-disclaimer p { font-size:14px; line-height:1.7; white-space:pre-wrap; }
+.tg-research-section { padding:18px 0; border-bottom:1px solid #244442; }
+.tg-research-section h3,.tg-research-disclaimer h3 { font-size:13px; color:#00dba8; letter-spacing:.03em; margin:0 0 12px; }
+.tg-research-section ul { padding-left:18px; margin:0; }
+.tg-research-section li+li { margin-top:10px; }
+.tg-research-chart { margin:22px 0; }
+.tg-research-chart img { display:block; width:100%; border-radius:12px; border:1px solid #244442; }
+.tg-research-chart figcaption { color:#8398a7; font-size:11px; line-height:1.6; margin-top:8px; }
+.tg-research-disclaimer { padding:20px 0 0; color:#9bafbd; }
+.tg-report-reference { font-size:11px; color:#8398a7; margin:12px 0; overflow-wrap:anywhere; }
+.tg-report-reference summary { cursor:pointer; }
+.tg-report-reference code { display:block; margin-top:10px; }
+.tg-ton-app .tg-mini-service small { color:#8398a7; font-size:10px; line-height:1.5; }
+.tg-chart-expand { display:block; padding:0; border:0; background:transparent; width:100%; cursor:zoom-in; }
+.tg-chart-dialog { position:fixed; inset:0; z-index:9999; background:#0b111b; padding:24px 16px; overflow:auto; }
+.tg-chart-dialog>.tg-button { width:auto; margin:0 0 24px; }
+.tg-chart-scroll { overflow:auto; border:1px solid #244442; border-radius:12px; }
+.tg-chart-scroll img { display:block; width:1200px; max-width:none; }
+.tg-chart-dialog p { color:#9bafbd; font-size:12px; line-height:1.6; }

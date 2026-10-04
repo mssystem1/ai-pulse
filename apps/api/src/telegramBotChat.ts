@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type { AppConfig } from "@pulse/config";
 import { TelegramCommerce, telegramServiceCatalog } from "./telegramCommerce.js";
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
+import { telegramResearchMessage, telegramHistoryLabel } from "./telegramResearch.js";
+export { formatTelegramResearch } from "./telegramResearch.js";
 
 type Api = (method:string,payload:unknown)=>Promise<unknown>;
 type Draft = { id:string; serviceId:string; expiresAt:number; input?:unknown; networkKey?:string };
@@ -28,18 +30,6 @@ export function parseBotResearchInput(serviceId:string,text:string) {
   return {input:{address,lang:"en"},networkKey:network.toLowerCase()};
 }
 
-export function formatTelegramResearch(report:unknown):string {
-  const lines:string[]=["PULSE research report",""];
-  const visit=(value:unknown,path:string,depth:number)=>{
-    if(value===null||value===undefined)return;
-    if(depth>12){lines.push(`${path}: ${JSON.stringify(value)}`);return;}
-    if(Array.isArray(value)){value.forEach((item,index)=>visit(item,`${path} ${index+1}`,depth+1));return;}
-    if(typeof value==="object"){for(const [key,item] of Object.entries(value as Record<string,unknown>)){if(key.startsWith("_")||["chartImageBase64","chartImageMime"].includes(key))continue;visit(item,[path,key.replace(/([a-z])([A-Z])/g,"$1 $2").replace(/_/g," ")].filter(Boolean).join(" / "),depth+1);}return;}
-    lines.push(`${path}: ${String(value)}`,"");
-  };
-  visit(report,"",0);return lines.join("\n");
-}
-
 export class TelegramBotChat {
   private memory=new Map<number,Draft>();
   constructor(private cfg:AppConfig,private commerce:TelegramCommerce,private api:Api,private appUrl:string,private tonMiniAppUrl?:string){}
@@ -56,8 +46,8 @@ export class TelegramBotChat {
     const serviceMatch=command.startsWith("svc:")?command.slice(4):({"/global":"global-quick","/globalquick":"global-quick","/globalpro":"global-pro","/prediction":"prediction-quick","/predictionquick":"prediction-quick","/predictionpro":"prediction-pro","/risk":"risk-guard"} as Record<string,string>)[command];
     if(serviceMatch){const service=telegramServiceCatalog(this.cfg).find(item=>item.id===serviceMatch);if(!service?.enabled)return this.send(userId,"This service is paused. Existing paid reports remain available.",this.menu());await this.save(userId,{id:randomUUID(),serviceId:service.id,expiresAt:Date.now()+600_000});return this.send(userId,`${service.title} · ${service.stars} Stars per report\n\n${service.mode==="spot"?"Send a pair and timeframe, for example BTC-USDT 4H.":service.mode==="prediction"?"Send the exact supported prediction market ID. Preserve letter case; do not send a URL or title.":"Send the network and exact token contract, for example: xlayer 0x…"}\n\nNothing is charged until you review the invoice and confirm Telegram checkout.`);}
     if(command.startsWith("buy:")){const draft=await this.draft(userId);if(!draft?.input||draft.id!==command.slice(4)||draft.expiresAt<Date.now())return this.send(userId,"This research request expired. Choose the service again.",this.menu());const invoice=await this.commerce.createInvoice(userId,draft.serviceId,draft.input,draft.networkKey,draft.id as ReturnType<typeof randomUUID>);return this.send(userId,`Review ${invoice.stars} Stars for one report. Your result will arrive in this chat. Order: ${invoice.orderId}` ,[[{text:`Pay ★ ${invoice.stars}`,url:invoice.invoiceUrl}],[{text:"My reports",callback_data:"/reports"}]]);}
-    if(command==="/reports"){const orders=await this.commerce.library(userId);if(!orders.length)return this.send(userId,"No saved reports yet. Stars purchases appear here; linked-wallet history appears after you confirm ownership.",this.menu());return this.send(userId,"Your PULSE reports\n\nChoose an order to read or recover it. Wallet history is read-only; no chain switching or transaction is needed.",orders.slice(0,25).map(order=>[{text:`${order.serviceId} · ${order.status}`,callback_data:`report:${order.id}`}]).concat([[{text:"Services",callback_data:"/start"}]]));}
-    if(command.startsWith("report:")){const id=command.slice(7);const result=await this.commerce.readOwned(userId,id);if(result.report){await this.api("sendResearchDocument",{chat_id:userId,report:result.report});const report=formatTelegramResearch(result.report);const chunks=report.match(/[\s\S]{1,3500}/g)||[];for(const chunk of chunks.slice(0,12))await this.send(userId,chunk);if(chunks.length>12)await this.send(userId,"This report is long. Its complete version is in the report document delivered above.");return;}return this.send(userId,`Order ${id}\nStatus: ${result.status}\n\n${result.status==="refunded"?"This purchase was refunded in Stars.":"Do not pay again to recover this order."}`,[[{text:"Refresh order",callback_data:`report:${id}`}],...(!id.startsWith("wallet:")&&["failed_terminal","manual_reconciliation"].includes(result.status)?[[{text:"Refund failed report",callback_data:`refund:${id}`}]]:[])]);}
+    if(command==="/reports"){const orders=await this.commerce.library(userId);if(!orders.length)return this.send(userId,"No saved reports yet. Stars purchases appear here; linked-wallet history appears after you confirm ownership.",this.menu());return this.send(userId,"Your PULSE reports\n\nChoose an order to read or recover it. Wallet history is read-only; no chain switching or transaction is needed.",orders.slice(0,25).map(order=>[{text:telegramHistoryLabel(order),callback_data:`report:${order.id}`}]).concat([[{text:"Services",callback_data:"/start"}]]));}
+    if(command.startsWith("report:")){const id=command.slice(7);const result=await this.commerce.readOwned(userId,id);if(result.report){await this.api("sendResearchDocument",{chat_id:userId,report:result.report,context:result.context});await this.api("sendMessage",{chat_id:userId,text:telegramResearchMessage(result.report,result.context),parse_mode:"HTML",disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"My reports",callback_data:"/reports"}]]}});await this.api("sendResearchChart",{chat_id:userId,report:result.report,context:result.context});return;}return this.send(userId,`Order ${id}\nStatus: ${result.status}\n\n${result.status==="refunded"?"This purchase was refunded in Stars.":"Do not pay again to recover this order."}`,[[{text:"Refresh order",callback_data:`report:${id}`}],...(!id.startsWith("wallet:")&&["failed_terminal","manual_reconciliation"].includes(result.status)?[[{text:"Refund failed report",callback_data:`refund:${id}`}]]:[])]);}
     if(command.startsWith("refund:")){await this.commerce.refundOwned(userId,command.slice(7));return this.send(userId,"Your failed-report payment was refunded in Stars.");}
     const wallets=this.commerce.walletLinks;
     if(command==="/wallet"){const wallet=await wallets?.association(userId);return this.send(userId,wallet?`Saved history wallet\n${wallet.wallet}\n\nThis association stays until you explicitly change or unlink it. Browser disconnects do not erase it. Reading reports needs no transaction or gas.`:"Link the EVM wallet that paid for your PULSE website reports. One ownership message and confirmation here are required; history reading itself needs no signature or transaction.",[[{text:wallet?"Change history wallet":"Link history wallet",callback_data:wallet?"wallet_change":"wallet_link"}],...(wallet?[[{text:"Unlink history wallet",callback_data:"wallet_unlink"}]]:[]),[{text:"My reports",callback_data:"/reports"}]]);}

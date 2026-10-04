@@ -20,18 +20,21 @@ TON Connect manages the Mini App's TON wallet session. A permanent server-verifi
 
 ## Completed local verification
 
+The report-presentation follow-up adds pair/timeframe/service/date labels to report history, readable chat overviews and full curated TXT sections for all five services, saved Pro chart PNG attachments, and the same sections/download/chart enlargement in the TON Mini App. It applies to first delivery and owned report recovery, including retained EVM history. Deploy the API and frontend together; no new BotFather settings are required. Previously sent messages retain their old text/keyboards: send `/reports` again and reopen a report to receive the revised presentation without another purchase.
+
 | Check | Recorded result |
 | --- | --- |
 | API build | Passed |
-| API suite | 270 tests: 269 passed, 1 skipped, 0 failed |
-| Web suite | 112 passed, 0 failed |
+| API suite | 278 tests: 277 passed, 1 skipped, 0 failed; report presentation/delivery follow-up checks also passed |
+| Web suite | 118 passed, 0 failed |
 | Setup/readiness script tests | 15 passed, 0 failed |
 | Production frontend build | Passed, including the dedicated in-app guide |
 | Website browser review | Desktop/mobile layout, five cards, one bot identity and Mini App entry passed |
 | In-app guide browser review | Desktop/mobile layout, five prices, command copying, help disclosures, anchors, direct application-domain entry and reload passed |
 | TON browser review | Explore/Reports/wallet views, disabled unsigned checkout, no EVM connector imports or execution links, and message-permission gate passed |
-| Review isolation | Telegram changes typechecked with the unrelated Autopilot source change excluded |
-| Staged diff | Whitespace check passed; private env files and unrelated Autopilot edit excluded |
+| Report browser review | Mobile/desktop labels, curated content, TXT download, saved chart rendering/enlargement, no horizontal overflow or runtime errors; offline fixtures |
+| Autopilot scope review | Oracle write explicitly uses its configured executor account; unnecessary broad account cast removed; API build and 70 Autopilot tests passed |
+| Staged diff | Whitespace check passed; private env files and unrelated line-ending-only edits excluded |
 
 The browser review used a local server and mock Telegram SDK/invoice responses; its application-domain test emulated the production HTTPS secure context. These results do not establish real Telegram client behavior, a real payment, provider completion or cloud configuration. Existing dependency/chunk-size build warnings remain.
 

@@ -23,6 +23,7 @@
     "@pulse/market": "1.0.0",
     "@pulse/payments": "1.0.0",
     "@pulse/schemas": "1.0.0",
+    "@resvg/resvg-js": "2.6.2",
     "@upstash/redis": "^1.38.1",
     "@vercel/blob": "^2.6.1",
     "cors": "^2.8.5",

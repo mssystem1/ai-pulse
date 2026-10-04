@@ -4,12 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "prebuild": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain",
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@pulse/domain": "1.0.0",
     "@circle-fin/w3s-pw-web-sdk": "1.1.11",
     "@circle-fin/x402-batching": "^3.2.0",
     "@okxweb3/x402-core": "^0.1.0",

@@ -6,3 +6,5 @@ export * from "./walletScan.js";
 export * from "./marketPulse.js";
 export * from "./swapQuote.js";
 export * from "./preflight.js";
+export * from "./researchPresentation.js";
+export * from "./researchChart.js";

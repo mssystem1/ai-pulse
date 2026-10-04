@@ -54,7 +54,7 @@ export function TelegramGuide() {
         <li><span>1</span><h3>Open the bot</h3><p>Open <b>@pulsemi_bot</b> and press <b>Start</b>. Already started? Send <code>/start</code> to show the menu again.</p></li>
         <li><span>2</span><h3>Choose & send input</h3><p>Choose one of the five services. Send the pair and timeframe, token contract, or exact prediction market ID requested by the bot.</p></li>
         <li><span>3</span><h3>Review & pay Stars</h3><p>Select <b>Review Stars checkout</b>, check the service and price, then open <b>Pay</b> and confirm the Telegram invoice.</p></li>
-        <li><span>4</span><h3>Read in chat</h3><p>PULSE sends a summary and the complete report as a text document. Use <b>My reports</b> or <code>/reports</code> to recover it later.</p></li>
+        <li><span>4</span><h3>Read in chat</h3><p>PULSE sends a compact summary and all research sections in a labelled TXT document. Pro reports include a chart when saved chart data is available. <b>My reports</b> or <code>/reports</code> shows the pair, timeframe, service and date so you can reopen the right report.</p></li>
       </ol>
     </section>
 

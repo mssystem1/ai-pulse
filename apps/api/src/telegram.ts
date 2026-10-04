@@ -4,7 +4,9 @@ import type { AppConfig } from "@pulse/config";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { TelegramCommerce, TELEGRAM_SERVICES, type TelegramCommerceDependencies, type StarsUpdate } from "./telegramCommerce.js";
-import { TelegramBotChat, formatTelegramResearch } from "./telegramBotChat.js";
+import { TelegramBotChat } from "./telegramBotChat.js";
+import { presentResearch } from "@pulse/domain";
+import { formatTelegramResearch, telegramResearchMessage, telegramResearchFilename, renderTelegramResearchChart, type ResearchContext } from "./telegramResearch.js";
 
 type TelegramUpdate = StarsUpdate & { update_id?: number; message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; from?: { id?:number }; message?: { chat?: { id?: number; type?: string } } } };
 
@@ -50,7 +52,7 @@ export function telegramMenu(miniAppUrl: string, capability: string, command = "
     return [{ text: item.label, web_app: { url: url.toString() } }];
   }) };
 }
-type DeliveryTask = { id:string;delivery:string;text:string;reportUrl:string;reportId?:string;attempts:number;nextAt:number;createdAt:string;lastError?:string };
+type DeliveryTask = { id:string;delivery:string;text:string;reportUrl:string;reportId?:string;context?:ResearchContext;attempts:number;nextAt:number;createdAt:string;lastError?:string };
 let reportReader:((id:string)=>Promise<unknown>)|undefined;
 export function configureTelegramReportReader(reader:(id:string)=>Promise<unknown>){reportReader=reader;}
 const memoryDocuments=new Set<string>();
@@ -99,9 +101,21 @@ async function kv(command: unknown[]) {
 }
 
 async function telegram(token: string, method: string, payload: unknown) {
-  if(method==="sendResearchDocument"){
-    const request=payload as {chat_id:number;report:unknown};const body=new FormData();body.set("chat_id",String(request.chat_id));body.set("caption","Your complete PULSE research report. No transaction is required to read it.");body.set("document",new Blob([formatTelegramResearch(request.report)],{type:"text/plain;charset=utf-8"}),"PULSE-research-report.txt");
-    const response=await fetch(`https://api.telegram.org/bot${token}/sendDocument`,{method:"POST",body,signal:AbortSignal.timeout(20000)});const data=await response.json() as {ok?:boolean;result?:unknown};if(!response.ok||!data.ok)throw new Error("Telegram research document delivery failed");return data;
+  if(method==="sendResearchDocument"||method==="sendResearchChart"){
+    const request=payload as {chat_id:number|string;report:unknown;context?:ResearchContext};
+    const body=new FormData();body.set("chat_id",String(request.chat_id));
+    const presentation=presentResearch(request.report,request.context);
+    if(method==="sendResearchChart"){
+      const chart=renderTelegramResearchChart(request.report,request.context);
+      if(!chart)return {ok:true,result:null};
+      body.set("caption",`${presentation.label.slice(0,400)}\nOriginal report snapshot · conditional paths, not live prices or guaranteed forecasts.`);
+      body.set("photo",new Blob([Uint8Array.from(chart)],{type:"image/png"}),"PULSE-report-chart.png");
+    }else{
+      body.set("caption",`${presentation.label.slice(0,400)}\nComplete research sections · no transaction required to read.`);
+      body.set("document",new Blob([formatTelegramResearch(request.report,request.context)],{type:"text/plain;charset=utf-8"}),telegramResearchFilename(request.report,request.context));
+    }
+    const endpoint=method==="sendResearchChart"?"sendPhoto":"sendDocument";
+    const response=await fetch(`https://api.telegram.org/bot${token}/${endpoint}`,{method:"POST",body,signal:AbortSignal.timeout(20000)});const data=await response.json() as {ok?:boolean;result?:unknown};if(!response.ok||!data.ok)throw new Error(`Telegram ${endpoint} delivery failed`);return data;
   }
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: AbortSignal.timeout(method === "answerPreCheckoutQuery" ? 3_000 : 10_000) });
   const body = await response.json().catch(() => ({})) as { ok?: boolean; description?: string; result?: unknown };
@@ -124,9 +138,9 @@ async function saveDelivery(task:DeliveryTask){
   else memoryDeliveries.set(task.id,task);
 }
 async function removeDelivery(id:string){if(kvConfigured()){await kv(["DEL",`pulse:v6:telegram:delivery:${id}`]);await kv(["ZREM","pulse:v6:telegram:due",id]);}else memoryDeliveries.delete(id);}
-export async function deliverTelegramReportDurably(id:string,delivery:string,text:string,reportUrl:string,reportId?:string){
+export async function deliverTelegramReportDurably(id:string,delivery:string,text:string,reportUrl:string,reportId?:string,context?:ResearchContext){
   if (await wasDelivered(id)) return { delivered:true };
-  const task:DeliveryTask={id,delivery,text,reportUrl,...(reportId?{reportId}:{}),attempts:0,nextAt:Date.now(),createdAt:new Date().toISOString()};
+  const task:DeliveryTask={id,delivery,text,reportUrl,...(reportId?{reportId}:{}),...(context?{context}:{}),attempts:0,nextAt:Date.now(),createdAt:new Date().toISOString()};
   // Persist before attempting network delivery so a process restart can resume it.
   await saveDelivery(task);
   const delivered = await attemptDelivery(task);
@@ -143,18 +157,21 @@ async function attemptDelivery(task:DeliveryTask){
   try {
     if (!(await wasDelivered(task.id))) {
       if(task.reportId){
-        const documentKey=`pulse:v6:telegram:document:${task.id}`;
-        const sent=kvConfigured()?Boolean(await kv(["GET",documentKey])):memoryDocuments.has(task.id);
-        if(!sent){
-          if(!reportReader)throw new Error("Telegram report reader is unavailable");
-          const report=await reportReader(task.reportId);if(!report)throw new Error("Telegram report is unavailable");
-          const {token,chatId}=deliveryAccount(task.delivery);if(!token||!chatId)throw new Error("Telegram delivery capability is invalid");
-          const body=new FormData();body.set("chat_id",chatId);body.set("caption","Your complete PULSE research report. Research does not authorize transactions.");body.set("document",new Blob([formatTelegramResearch(report)],{type:"text/plain;charset=utf-8"}),"PULSE-research-report.txt");
-          const response=await fetch(`https://api.telegram.org/bot${token}/sendDocument`,{method:"POST",body,signal:AbortSignal.timeout(20000)});const result=await response.json() as {ok?:boolean};if(!response.ok||!result.ok)throw new Error("Telegram report document delivery failed");
-          if(kvConfigured())await kv(["SET",documentKey,"1","EX",604800]);else memoryDocuments.add(task.id);
-        }
-      }
-      await deliverTelegramReport(task.delivery,task.text,task.reportUrl);
+        if(!reportReader)throw new Error("Telegram report reader is unavailable");
+        const report=await reportReader(task.reportId);if(!report)throw new Error("Telegram report is unavailable");
+        const {token,chatId}=deliveryAccount(task.delivery);if(!token||!chatId)throw new Error("Telegram delivery capability is invalid");
+        const part=async(name:string,send:()=>Promise<unknown>)=>{
+          const key=`pulse:v6:telegram:${name}:${task.id}`,memoryKey=`${name}:${task.id}`;
+          const sent=kvConfigured()?Boolean(await kv(["GET",key])):memoryDocuments.has(memoryKey);
+          if(sent)return;
+          await send();
+          if(kvConfigured())await kv(["SET",key,"1","EX",604800]);else {memoryDocuments.add(memoryKey);if(memoryDocuments.size>3000)memoryDocuments.delete(memoryDocuments.values().next().value!);}
+        };
+        const payload={chat_id:chatId,report,context:task.context};
+        await part("document",()=>telegram(token,"sendResearchDocument",payload));
+        await part("overview",()=>telegram(token,"sendMessage",{chat_id:chatId,text:telegramResearchMessage(report,task.context),parse_mode:"HTML",disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"Open full PULSE report",url:task.reportUrl}],[{text:"My reports",callback_data:"/reports"}]]}}));
+        await part("chart",()=>telegram(token,"sendResearchChart",payload));
+      }else await deliverTelegramReport(task.delivery,task.text,task.reportUrl);
       if(kvConfigured())await kv(["SET",`pulse:v6:telegram:sent:${task.id}`,"1","EX",604800]);
       else { memoryDelivered.add(task.id); if(memoryDelivered.size>1000)memoryDelivered.delete(memoryDelivered.values().next().value!); }
     }

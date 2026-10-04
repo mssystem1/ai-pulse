@@ -6,6 +6,14 @@ import { requestHash, type JobStore, type ReportStore, type PaymentReceipt } fro
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { TelegramWalletLink } from "./telegramWalletLink.js";
+import { researchIdentity, researchRecord } from "@pulse/domain";
+
+function researchContext(serviceId:string,input:unknown,networkKey:string,createdAt:number|string) {
+  const source=researchRecord(input);
+  const fields=serviceId.startsWith("global")?["instId","timeframe"]:serviceId.startsWith("prediction")?["primaryMarketId"]:["address"];
+  return {serviceId,networkKey,createdAt,input:Object.fromEntries(fields.filter(key=>typeof source[key]==="string").map(key=>[key,source[key]]))};
+}
+function jobServiceId(job:{mode:string;tier:string|null}) { return job.mode==="risk"?"risk-guard":`${job.mode==="spot"?"global":"prediction"}-${job.tier==="premium"?"pro":"quick"}`; }
 
 export const TELEGRAM_SERVICES = [
   { id: "global-quick", title: "Global Quick → Spot", mode: "spot", tier: "standard", priceEnv: "TELEGRAM_STARS_GLOBAL_QUICK" },
@@ -167,23 +175,23 @@ export class TelegramCommerce {
   }
   async library(userId: number) {
     const ids = kvConfigured() ? await runKvCommand(["ZREVRANGE",this.libraryKey(userId),0,29],"Telegram Stars") : [...this.memory.values()].filter(order=>order.userId===userId&&this.visible(order)).sort((a,b)=>b.createdAt-a.createdAt).slice(0,30).map(order=>order.id);
-    const orders = await Promise.all((Array.isArray(ids)?ids:[]).map(async id=>{const order=await this.get(String(id));if(!order||order.userId!==userId||!this.visible(order))return null;const job=order.jobId?await this.dependencies!.jobs.get(order.jobId):null;return {id:order.id,serviceId:order.serviceId,stars:order.stars,createdAt:order.createdAt,status:order.refunded?"refunded":job?.stage||(order.chargeId?"payment_received":"awaiting_payment"),hasReport:Boolean(job?.reportId)};}));
+    const orders = await Promise.all((Array.isArray(ids)?ids:[]).map(async id=>{const order=await this.get(String(id));if(!order||order.userId!==userId||!this.visible(order))return null;const job=order.jobId?await this.dependencies!.jobs.get(order.jobId):null;return {id:order.id,...researchIdentity(researchContext(order.serviceId,order.input,order.networkKey,order.createdAt)),stars:order.stars,createdAt:order.createdAt,status:order.refunded?"refunded":job?.stage||(order.chargeId?"payment_received":"awaiting_payment"),hasReport:Boolean(job?.reportId)};}));
     const history = await this.walletLinks?.history(userId) || [];
-    return [...orders.filter((order):order is NonNullable<typeof order>=>Boolean(order)), ...history.map(job=>({id:`wallet:${job.id}`,serviceId:job.mode==="risk"?"risk-guard":`${job.mode==="spot"?"global":"prediction"}-${job.tier==="premium"?"pro":"quick"}`,stars:null,source:"wallet",networkKey:job.networkKey,createdAt:Date.parse(job.createdAt),status:job.stage,hasReport:Boolean(job.reportId)}))].sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
+    return [...orders.filter((order):order is NonNullable<typeof order>=>Boolean(order)), ...history.map(job=>({id:`wallet:${job.id}`,...researchIdentity(researchContext(jobServiceId(job),job.input,job.networkKey,job.createdAt)),stars:null,source:"wallet",networkKey:job.networkKey,createdAt:Date.parse(job.createdAt),status:job.stage,hasReport:Boolean(job.reportId)}))].sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
   }
   async readOwned(userId: number, id: string) {
     if (id.startsWith("wallet:")) {
       const job = await this.walletLinks?.ownedJob(userId,id.slice(7));
       if (!job) throw new Error("Wallet report not found");
       const record = job.reportId ? await this.dependencies!.reports.get(job.reportId) : null;
-      return { orderId:id,serviceId:job.mode==="risk"?"risk-guard":`${job.mode==="spot"?"global":"prediction"}-${job.tier==="premium"?"pro":"quick"}`,status:job.stage,source:"wallet",report:record?.ownerWallet===job.payer.toLowerCase()?await this.dependencies!.reports.read(record):null };
+      return { orderId:id,serviceId:jobServiceId(job),context:researchContext(jobServiceId(job),job.input,job.networkKey,job.createdAt),status:job.stage,source:"wallet",report:record?.ownerWallet===job.payer.toLowerCase()?await this.dependencies!.reports.read(record):null };
     }
     const order = await this.get(id);
     if (!order || order.userId !== userId || !this.visible(order)) throw new Error("Order not found");
     if(order.chargeId&&!order.jobId&&!order.refunded) await this.locked(id,async()=>{const current=await this.get(id);if(current?.chargeId&&!current.jobId&&!current.refunded)await this.enqueue(current);order.jobId=current?.jobId;});
     const job=order.jobId?await this.dependencies!.jobs.get(order.jobId):null;
     const record=job?.reportId?await this.dependencies!.reports.get(job.reportId):null;
-    return {orderId:id,serviceId:order.serviceId,stars:order.stars,status:order.refunded?"refunded":job?.stage||(order.chargeId?"payment_received":"awaiting_payment"),report:record?.ownerWallet===this.account(userId)?await this.dependencies!.reports.read(record):null};
+    return {orderId:id,serviceId:order.serviceId,context:researchContext(order.serviceId,order.input,order.networkKey,order.createdAt),stars:order.stars,status:order.refunded?"refunded":job?.stage||(order.chargeId?"payment_received":"awaiting_payment"),report:record?.ownerWallet===this.account(userId)?await this.dependencies!.reports.read(record):null};
   }
   async refundOwned(userId: number, id: string) {
     const order=await this.get(id);if(!order||order.userId!==userId||!this.visible(order))throw new Error("Order not found");if(order.refunded)return {refunded:true};
