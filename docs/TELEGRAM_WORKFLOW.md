@@ -35,7 +35,7 @@ A wallet already bound to another Telegram account cannot be claimed through pro
 
 ## TON Mini App and account separation
 
-Open PULSE's profile/Main Mini App, its Open PULSE menu or /miniapp. The exact URL is https://www.ai-pulse.tech/ton-miniapp. The legacy /miniapp route renders this TON interface.
+Open PULSE's profile/Main Mini App, the separate Launch PULSE Mini App button in the welcome message, the direct https://t.me/pulsemi_bot?startapp link, or the legacy /miniapp shortcut. The bottom-left Menu button lists commands rather than launching the app. /start and /menu show the control centre; Global/Prediction open Quick/Pro submenus, with reports, wallet history, settings, support, help and legal information accessible by buttons. The exact URL is https://www.ai-pulse.tech/ton-miniapp. The legacy /miniapp route renders this TON interface.
 
 Before TON checkout, the Mini App requests Telegram message permission when it is not already present. Declining or an unsupported client stops before invoice creation. The signed TON API verifies PULSE's Telegram initData with the primary bot token. It limits new requests to TON-USDT Global Quick/Pro and rejects EVM wallet linking, EVM execution handoffs and non-TON report reads/refunds. The TON Connect SDK manages its connection session; durable server-verified TON wallet ownership is not implemented. Purchasing with Stars and recovering TON orders uses the verified Telegram account, so report access does not depend on the wallet staying connected.
 

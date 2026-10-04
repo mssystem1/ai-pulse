@@ -91,7 +91,7 @@ export function TelegramGuide() {
       <div className="tg-guide-section-title"><span>04 / THE SAME BOT'S MINI APP</span><h2 id="tg-guide-ton-title">Open TON research. Connect a TON wallet.</h2><p>The TON Mini App lives inside @pulsemi_bot. It offers TON-USDT Global Quick for 10 Stars and Global Pro for 15 Stars.</p></div>
       <div className="tg-guide-two-column">
         <ol className="tg-guide-detail-steps">
-          <li><b>Launch from Telegram.</b><p>Send <code>/miniapp</code> in PULSE chat and select <b>Open PULSE Mini App</b>, or use the bot's Mini App menu button.</p></li>
+          <li><b>Launch from Telegram.</b><p>Select <b>Launch PULSE Mini App</b> in the welcome message, or <b>Open App</b> in the bot profile. The bottom-left Menu button lists bot commands. The <code>/miniapp</code> shortcut remains available.</p></li>
           <li><b>Connect a TON wallet if you want to.</b><p>Open the Mini App's <b>TON wallet</b> tab, select <b>Connect wallet</b>, choose a TON wallet and approve the connection in that wallet. Return to the Mini App to see the connected address.</p></li>
           <li><b>Choose research and review checkout.</b><p>In <b>Explore</b>, choose Global Quick or Pro and a timeframe. Allow PULSE to send messages when prompted, then review and confirm the Stars invoice.</p></li>
           <li><b>Recover the result from either place.</b><p>Read TON purchases in the Mini App's <b>Reports</b> tab or in PULSE chat's <b>My reports</b>. The complete report document is delivered to the chat too.</p></li>

@@ -33,7 +33,7 @@ node --env-file=<OPERATOR_PRODUCTION_ENV> scripts/telegram-setup.mjs --stage pau
 node --env-file=<OPERATOR_PRODUCTION_ENV> scripts/telegram-setup.mjs --status
 ```
 
-6. Finish the manual BotFather settings from the full configuration guide: same existing bot, display name PULSE, avatar, command list, disabled groups/inline mode, enabled privacy, Main Mini App and Open PULSE menu.
+6. Finish the manual BotFather settings from the full configuration guide: same existing bot, display name PULSE, avatar, command list, disabled groups/inline mode, enabled privacy and Main Mini App. The chat menu uses commands; Mini App launch stays in the profile and welcome message. For a navigation-only update after deployment, use `node scripts/telegram-setup.mjs --menu-only --apply` without changing webhook or sales stage.
 7. Run the read-only readiness command for both --view chat and --view ton. It proves only its performed technical checks.
 8. In a staffed acceptance window, enable Stars and use --stage checkout to verify/update availability copy. There is no tester allowlist; do not publicly promote until acceptance passes.
 9. Buy one of each chat service (65 Stars) and both TON tiers (25 Stars), then verify document delivery, shared account recovery, wallet persistence and a failed-report refund. Record real client/provider evidence.

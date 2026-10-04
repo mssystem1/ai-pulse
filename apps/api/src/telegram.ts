@@ -8,7 +8,7 @@ import { TelegramBotChat } from "./telegramBotChat.js";
 import { presentResearch } from "@pulse/domain";
 import { formatTelegramResearch, telegramResearchMessage, telegramResearchFilename, renderTelegramResearchChart, type ResearchContext } from "./telegramResearch.js";
 
-type TelegramUpdate = StarsUpdate & { update_id?: number; message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; from?: { id?:number }; message?: { chat?: { id?: number; type?: string } } } };
+type TelegramUpdate = StarsUpdate & { update_id?: number; message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; from?: { id?:number }; message?: { message_id?: number; chat?: { id?: number; type?: string } } } };
 
 export function telegramServiceMenu(miniAppUrl: string, capability: string, command = "") {
   const urlFor = (service?: string, view?: string) => {
@@ -223,7 +223,7 @@ export function createTelegramRouter(cfg: AppConfig, dependencies?: TelegramComm
     {
       const sender=update.callback_query?.from?.id||update.message?.from?.id;
       if(sender!==chatId)return res.status(200).json({ok:true,ignored:true});
-      try{if(update.callback_query?.id)await telegram(token,"answerCallbackQuery",{callback_query_id:update.callback_query.id});await chatBot.handle(chatId,(update.message?.text||update.callback_query?.data||"").trim());return res.json({ok:true});}
+      try{if(update.callback_query?.id)await telegram(token,"answerCallbackQuery",{callback_query_id:update.callback_query.id});await chatBot.handle(chatId,(update.message?.text||update.callback_query?.data||"").trim(),update.callback_query?.message?.message_id);return res.json({ok:true});}
       catch(error){
         if(isKvUnavailableError(error)){await releaseTelegramUpdate(update.update_id);return res.status(503).json({error:"Persistent bot storage is temporarily unavailable"});}
         try{await telegram(token,"sendMessage",{chat_id:chatId,text:error instanceof Error?error.message.slice(0,1000):"This request could not be completed. Try /reports or choose the service again.",reply_markup:{inline_keyboard:chatBot.menu()}});return res.json({ok:true,requestRejected:true});}
