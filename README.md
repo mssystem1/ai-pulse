@@ -167,7 +167,11 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X reference the same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v8.png`. X can cache the page's card as well as the image, so changing only the image filename does not refresh an existing preview.
 
-The web build also generates a static share page from the compiled homepage. For the current image, use **https://www.ai-pulse.tech/share/v8** in a new X draft. Its `og:url` and `twitter:url` identify the versioned share page, while its search canonical remains the homepage. Browser visitors open the normal homepage with their query and fragment preserved. When replacing the card, increment the image filename and update the homepage's image metadata; the build derives the new share URL automatically. Deploy before sharing the new URL. Existing posts and drafts can retain X's cached preview.
+The web build also generates a static share page from the compiled homepage at **https://www.ai-pulse.tech/share/v8**. Its `og:url` and `twitter:url` identify the versioned share page, while its search canonical remains the homepage. Browser visitors open the normal homepage with their query and fragment preserved.
+
+Both Vercel configurations temporarily redirect Twitterbot's homepage requests on `ai-pulse.tech` and `www.ai-pulse.tech` to `/share/v8`. This lets a new crawl of the main link reach the versioned card; browser visitors and other crawlers receive the normal homepage. The homepage response varies by User-Agent. X controls when its existing cached cards are fetched again, so deploying this route cannot guarantee an immediate change to an already cached preview. The versioned share link remains available when a fresh URL is needed.
+
+When replacing the card, increment the image filename, update the homepage's image metadata and change the Twitterbot redirect destination in both `vercel.json` files to the new share version. The build derives the share page automatically and fails if either redirect targets a different version. Deploy manually before checking the main link again in a fresh X draft.
 
 ## Networks and payments
 

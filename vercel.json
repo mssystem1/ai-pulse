@@ -4,11 +4,26 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build -w @pulse/web",
   "outputDirectory": "apps/web/dist",
+  "redirects": [
+    {
+      "source": "/",
+      "has": [
+        { "type": "host", "value": "(?:www\\.)?ai-pulse\\.tech" },
+        { "type": "header", "key": "user-agent", "value": ".*[Tt]witterbot.*" }
+      ],
+      "destination": "/share/v8",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     { "source": "/share/:version", "destination": "/share/:version.html" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
+    {
+      "source": "/",
+      "headers": [{ "key": "Vary", "value": "User-Agent" }]
+    },
     {
       "source": "/tonconnect-manifest.json",
       "headers": [{ "key": "Content-Type", "value": "application/json; charset=utf-8" }, { "key": "Access-Control-Allow-Origin", "value": "*" }, { "key": "Cache-Control", "value": "public, max-age=300" }]
