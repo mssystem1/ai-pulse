@@ -20,7 +20,7 @@ const writes=calls=>calls.filter(call=>/\/set[A-Z]/.test(call.url));
 test('paused configuration uses one PULSE identity and previews no credentials',()=>{
   const plan=setupPlan(env),preview=publicSetupPlan(plan);assert.equal(preview.name,'PULSE');assert.equal(preview.username,'pulsemi_bot');assert.equal(preview.webhookUrl,'https://api.example/v1/telegram/webhook');assert.ok(preview.description.includes('purchases are paused'));assert.ok(preview.description.length<=512);assert.ok(preview.shortDescription.length<=120);
   for(const secret of [env.TELEGRAM_BOT_TOKEN,env.TELEGRAM_WEBHOOK_SECRET])assert.ok(!JSON.stringify(preview).includes(secret));
-  assert.equal(PULSE_COMMANDS.length,15);assert.ok(PULSE_COMMANDS.some(command=>command.command==='menu'));assert.ok(!PULSE_COMMANDS.some(command=>command.command==='miniapp'));
+  assert.equal(PULSE_COMMANDS.length,16);assert.ok(PULSE_COMMANDS.some(command=>command.command==='menu'));assert.ok(PULSE_COMMANDS.some(command=>command.command==='miniapp'));
 });
 test('paused setup verifies both views before registering payment updates',async()=>{
   const plan=setupPlan(env),mock=fixture();const applied=await applySetup(plan,env,mock.fetcher);assert.equal(applied.length,6);assert.equal(writes(mock.calls).length,6);const webhook=writes(mock.calls).find(call=>call.url.endsWith('/setWebhook'));assert.equal(webhook.payload.drop_pending_updates,false);assert.ok(webhook.payload.allowed_updates.includes('pre_checkout_query'));assert.ok(mock.calls.findIndex(call=>call.url.endsWith('/tonconnect-manifest.json'))<mock.calls.findIndex(call=>/\/set[A-Z]/.test(call.url)));
@@ -42,7 +42,8 @@ test('menu-only changes commands and menu without touching profile, webhook or s
   const mock=fixture();assert.deepEqual(await applyMenu(setupPlan(env),mock.fetcher),['setMyCommands','setChatMenuButton']);
   assert.deepEqual(writes(mock.calls).map(call=>call.url.split('/').at(-1)),['setMyCommands','setChatMenuButton']);
   assert.deepEqual(writes(mock.calls)[1].payload,{menu_button:{type:'commands'}});
-  assert.ok(!writes(mock.calls)[0].payload.commands.some(command=>command.command==='miniapp'));
+  assert.ok(writes(mock.calls)[0].payload.commands.some(command=>command.command==='miniapp'&&command.description==='Launch PULSE Mini App'));
+  assert.deepEqual(writes(mock.calls)[0].payload.commands.slice(0,2).map(command=>command.command),['miniapp','start']);
 });
 test('menu-only identity or missing profile launcher blocks changes',async()=>{
   const wrong=fixture({wrongIdentity:true});await assert.rejects(applyMenu(setupPlan(env),wrong.fetcher));assert.equal(writes(wrong.calls).length,0);
