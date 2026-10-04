@@ -7,6 +7,7 @@
     "prebuild": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain",
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "build": "tsc -p tsconfig.json && vite build",
+    "postbuild": "node ../../scripts/build-social-share.mjs",
     "preview": "vite preview",
     "test": "tsx --test src/**/*.test.ts"
   },

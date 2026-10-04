@@ -165,7 +165,9 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 ### Link previews and search metadata
 
-The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X now reference the exact same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v8.png`; changing the filename prevents one platform from retaining an older image while another uses the current card. Updating these local files does not refresh any remote crawler cache until the next deployment and crawler refresh.
+The web entry point publishes canonical, Open Graph, X card, robots, sitemap, web-manifest, and Schema.org `WebApplication` metadata. Open Graph and X reference the same versioned 1200×630 PULSE social card at `apps/web/public/og-image-v8.png`. X can cache the page's card as well as the image, so changing only the image filename does not refresh an existing preview.
+
+The web build also generates a static share page from the compiled homepage. For the current image, use **https://www.ai-pulse.tech/share/v8** in a new X draft. Its `og:url` and `twitter:url` identify the versioned share page, while its search canonical remains the homepage. Browser visitors open the normal homepage with their query and fragment preserved. When replacing the card, increment the image filename and update the homepage's image metadata; the build derives the new share URL automatically. Deploy before sharing the new URL. Existing posts and drafts can retain X's cached preview.
 
 ## Networks and payments
 

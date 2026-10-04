@@ -5,6 +5,7 @@
   "buildCommand": "npm run build -w @pulse/web",
   "outputDirectory": "apps/web/dist",
   "rewrites": [
+    { "source": "/share/:version", "destination": "/share/:version.html" },
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
   ],
   "headers": [
