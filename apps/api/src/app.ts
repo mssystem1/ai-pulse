@@ -302,7 +302,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       chainId: network.chainId,
       asset: network.paymentAsset.symbol,
       paymentProvider: network.paymentProvider,
-      paymentMode: cfg.paymentMode,
+      paymentMode: cfg.X402_MOCK || cfg.paymentMode === "mock" ? "mock" : network.paymentProvider,
       payTo: selected === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
       grokModel: cfg.GROK_MODEL,
       hasXaiKey: cfg.hasXaiKey,

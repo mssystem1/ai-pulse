@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { createAppKit } from "@reown/appkit/react";
 import { appKitNetworks } from "./appkitNetworks";
+import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 export { appKitNetworks } from "./appkitNetworks";
 import { WagmiAdapter } from "@reown/appkit-adapter-wagmi";
 import { WagmiProvider } from "wagmi";
@@ -18,6 +19,9 @@ export const appKit = createAppKit({
   features: { analytics: false }, enableWallets: appKitEnabled,
 });
 if (appKitEnabled) {
+  appKit.subscribeNetwork((network) => {
+    window.dispatchEvent(new CustomEvent("pulse:wallet-network-changed", { detail: { chainId: network.chainId } }));
+  });
   appKit.subscribeAccount((account) => {
     const target = window as Window & { __pulseAppKitProvider?: InjectedProvider };
     if (account?.isConnected) target.__pulseAppKitProvider = appKit.getWalletProvider() as InjectedProvider;
@@ -34,8 +38,16 @@ export function getAppKitProvider(): InjectedProvider | null {
   return appKitEnabled ? appKit.getWalletProvider() as InjectedProvider | null : null;
 }
 
-export async function connectAppKit(): Promise<{ address: string; providerName: string }> {
+export async function selectAppKitNetwork(key: WebNetworkKey, onlyDisconnected = false): Promise<void> {
+  if (!appKitEnabled || (onlyDisconnected && appKit.getAccount("eip155")?.isConnected)) return;
+  const network = appKitNetworks.find(chain => chain.id === WEB_NETWORKS[key].chainId);
+  if (!network) throw new Error(`${WEB_NETWORKS[key].label} is not enabled in the wallet kit`);
+  if (appKit.getCaipNetwork()?.id !== network.id) await appKit.switchNetwork(network, { throwOnFailure: true });
+}
+
+export async function connectAppKit(preferred?: WebNetworkKey): Promise<{ address: string; providerName: string }> {
   if (!appKitEnabled) throw new Error("Reown AppKit is not configured");
+  if (preferred) await selectAppKitNetwork(preferred);
   const current = appKit.getAccount("eip155");
   if (current?.isConnected && current.address) return { address: current.address, providerName: "Reown AppKit" };
   await appKit.open({ view: "Connect" });

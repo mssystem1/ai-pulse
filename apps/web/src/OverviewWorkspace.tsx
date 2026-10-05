@@ -253,7 +253,7 @@ const COPY: Record<Lang, Copy> = {
     noReportsBody: "在此浏览器购买的报告会显示在这里，无需再次付款即可恢复。",
     globalReport: "全球市场报告",
     predictionReport: "预测市场报告",
-    arcExecution: "Arc 测试网不提供现货交易和 Autopilot；市场分析和风险卫士仍然可用。",
+    arcExecution: "Arc 主网现货交易和 Autopilot 的可用性取决于已验证的合约部署与实时交易路径。",
     statusEyebrow: "状态",
     walletContracts: "钱包与合约",
     ownerControlled: "所有者控制",

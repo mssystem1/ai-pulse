@@ -12,8 +12,12 @@ export const WEB_NETWORKS = {
 export type WebNetworkKey = keyof typeof WEB_NETWORKS;
 
 const viteEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env || {};
-const requested = String(viteEnv.VITE_ENABLED_NETWORKS || "xlayer").split(",").map((value) => value.trim()) as WebNetworkKey[];
-export const ENABLED_WEB_NETWORKS = requested.filter((key): key is WebNetworkKey => key in WEB_NETWORKS);
+export function parseEnabledWebNetworks(value: unknown): WebNetworkKey[] {
+  const requested = String(value || "xlayer").split(",").map(value => value.trim()).map(value => value === "arc-testnet" ? "arc" : value);
+  const enabled = [...new Set(requested.filter((key): key is WebNetworkKey => key in WEB_NETWORKS))];
+  return enabled.length ? enabled : ["xlayer"];
+}
+export const ENABLED_WEB_NETWORKS = parseEnabledWebNetworks(viteEnv.VITE_ENABLED_NETWORKS);
 export const NETWORK_STORAGE_KEY = "pulse:selected-network";
 
 export function readPreferredNetwork(storage: Pick<Storage, "getItem">, enabled: readonly WebNetworkKey[] = ENABLED_WEB_NETWORKS): WebNetworkKey {

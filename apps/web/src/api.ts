@@ -1,4 +1,4 @@
-const env = (import.meta as ImportMeta & { env: Record<string, string> }).env;
+const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env || {};
 
 function isLocalHost(host: string): boolean {
   return (

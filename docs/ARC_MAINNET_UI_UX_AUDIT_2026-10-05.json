@@ -1,0 +1,795 @@
+{
+  "asOf": "2026-10-05T09:32:15.086Z",
+  "scope": "Compiled local UI, disconnected Reown network selection, non-signing wallet fixtures, and public hosted reads; not production Circle or signed trading acceptance",
+  "build": "apps/web/dist",
+  "browser": {
+    "desktopViewport": {
+      "width": 2160,
+      "height": 1500
+    },
+    "mobileViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "isolatedContexts": true,
+    "apiUnavailableFixture": "HTTP 503 from loopback API for unavailable-configuration checks",
+    "workspaceChecks": [
+      {
+        "path": "/portfolio",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Portfolio",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": [],
+        "paidButtons": []
+      },
+      {
+        "path": "/global",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Global Market",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=1H&network=arc&custody=wallet",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=1H&limit=100",
+            "method": "GET"
+          }
+        ],
+        "availability": [
+          "Market data updates automatically",
+          "Spot availability unavailable",
+          "Market data temporarily unavailable. Retrying automatically."
+        ],
+        "paidButtons": [
+          {
+            "text": "Quick report · $0.20",
+            "disabled": true
+          },
+          {
+            "text": "Pro report · $0.30",
+            "disabled": true
+          }
+        ]
+      },
+      {
+        "path": "/prediction",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Prediction market intelligence",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": [],
+        "paidButtons": []
+      },
+      {
+        "path": "/safety",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Risk Guard",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": []
+      },
+      {
+        "path": "/spot",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Spot trading",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=1H&network=arc&custody=wallet",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=1H&limit=100",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/capabilities?network=arc",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=xlayer&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=base&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arbitrum&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=robinhood&pair=BTC-USDT",
+            "method": "GET"
+          }
+        ],
+        "availability": [
+          "Network configuration unavailable. Refresh to retry; trading remains blocked.",
+          "Market data unavailable. You can still configure the ticket.",
+          "No order can be created for this selection\nChoose a pair whose on-chain token, settlement asset and live route are all verified on Arc Mainnet. PULSE will then show the Market or Limit ticket with real symbols and balances."
+        ]
+      },
+      {
+        "path": "/autopilot",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "Autopilot",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=4H&network=arc&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=4H&limit=100",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/capabilities?network=arc",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=xlayer&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=base&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arbitrum&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=robinhood&pair=BTC-USDT",
+            "method": "GET"
+          }
+        ],
+        "availability": [
+          "Network configuration unavailable. Refresh to retry; trading remains blocked.",
+          "Market data unavailable. You can still configure the ticket."
+        ]
+      },
+      {
+        "path": "/docs",
+        "viewport": {
+          "width": 2160,
+          "height": 1500
+        },
+        "network": "arc",
+        "heading": "PULSE guides",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": []
+      },
+      {
+        "path": "/portfolio",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Portfolio",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "paidButtons": []
+      },
+      {
+        "path": "/global",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Global Market",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=1H&network=arc&custody=wallet",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=1H&limit=100",
+            "method": "GET"
+          }
+        ],
+        "paidButtons": [
+          {
+            "text": "Quick report · $0.20",
+            "disabled": true
+          },
+          {
+            "text": "Pro report · $0.30",
+            "disabled": true
+          }
+        ]
+      },
+      {
+        "path": "/prediction",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Prediction market intelligence",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "paidButtons": []
+      },
+      {
+        "path": "/safety",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Risk Guard",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": []
+      },
+      {
+        "path": "/spot",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Spot trading",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=1H&network=arc&custody=wallet",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=1H&limit=100",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/capabilities?network=arc",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=xlayer&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=base&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arbitrum&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=robinhood&pair=BTC-USDT",
+            "method": "GET"
+          }
+        ],
+        "availability": [
+          "Network configuration unavailable. Refresh to retry; trading remains blocked.",
+          "Market data unavailable. You can still configure the ticket.",
+          "No order can be created for this selection\nChoose a pair whose on-chain token, settlement asset and live route are all verified on Arc Mainnet. PULSE will then show the Market or Limit ticket with real symbols and balances."
+        ]
+      },
+      {
+        "path": "/autopilot",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "Autopilot",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/opportunities?timeframe=4H&network=arc&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/ticker?instId=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/market/candles?instId=BTC-USDT&bar=4H&limit=100",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/capabilities?network=arc",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT&custody=erc20",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=xlayer&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=base&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=arbitrum&pair=BTC-USDT",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/trading/resolve-pair?network=robinhood&pair=BTC-USDT",
+            "method": "GET"
+          }
+        ],
+        "availability": [
+          "Network configuration unavailable. Refresh to retry; trading remains blocked.",
+          "Market data unavailable. You can still configure the ticket."
+        ]
+      },
+      {
+        "path": "/docs",
+        "viewport": {
+          "width": 390,
+          "height": 844
+        },
+        "network": "arc",
+        "heading": "PULSE guides",
+        "overflow": 0,
+        "activeTestnetCopy": false,
+        "requests": [
+          {
+            "path": "/v1/trading/pairs?network=arc&limit=1000",
+            "method": "GET"
+          },
+          {
+            "path": "/healthz",
+            "method": "GET"
+          },
+          {
+            "path": "/v1/meta",
+            "method": "GET"
+          }
+        ],
+        "availability": []
+      }
+    ]
+  },
+  "walletKit": {
+    "implementation": "Actual Reown ModalController Networks view and rendered network rows from the production bundle",
+    "networks": [
+      196,
+      8453,
+      42161,
+      5042,
+      4663
+    ],
+    "arc": {
+      "name": "Arc Mainnet",
+      "chainId": 5042,
+      "caip2": "eip155:5042",
+      "rpc": "https://rpc.mainnet.arc.io",
+      "explorer": "https://explorer.arc.io",
+      "nativeCurrency": {
+        "name": "USD Coin",
+        "symbol": "USDC",
+        "decimals": 18
+      },
+      "testnet": false
+    },
+    "appSelectionUpdatesKit": true,
+    "kitSelectionUpdatesAppAndPreference": true,
+    "baseThenArcSelectionPassed": true,
+    "arcPreferenceAndKitRetainedAfterReload": true,
+    "connectedProductionWalletQualified": false
+  },
+  "walletSwitch": {
+    "implementation": "Non-signing EIP-1193 fixture exercised through the compiled React app",
+    "restoredWalletOnBaseReplacesSavedArcPreference": true,
+    "unknownArcAddsCorrectChainThenSwitchesAndVerifies": true,
+    "rejectedSwitchPreservesNetworkAndShowsAlert": true,
+    "ineffectiveSwitchPreservesNetworkAndShowsAlert": true,
+    "legacyTestnetSessionRejectedOnRestore": true,
+    "keyboard": {
+      "arrowOpenFocusesSelectedOption": true,
+      "arrowNavigationAndEnterSelectArc": true,
+      "selectionReturnsFocusToTrigger": true,
+      "escapeClosesAndReturnsFocus": true
+    },
+    "mobilePickerBounds": {
+      "left": 20,
+      "right": 370.4,
+      "top": 80,
+      "bottom": 611.9
+    },
+    "signingOrTransactionRequests": 0
+  },
+  "landing": {
+    "olderApiFixture": "Base global 3; retired Arc Testnet global 19; no Arc mainnet row",
+    "olderApiShowsMainnetCoverageUnknown": true,
+    "olderApiPreservesHistoricalCounts": true,
+    "publicSnapshotAsOf": "2026-10-05T09:17:39.725Z",
+    "publicSnapshotSource": "https://pulse-api-production-7aae.up.railway.app/v1/public/activity",
+    "mainnetRows": 5,
+    "mainnetTotals": {
+      "global": 59,
+      "prediction": 13,
+      "risk": 7
+    },
+    "arcMainnetCoverage": null,
+    "retiredArcCounts": {
+      "global": 16,
+      "prediction": 3,
+      "risk": null
+    },
+    "testnetExcludedFromMainnetChart": true,
+    "historyExpansionShowsOriginalCounts": true,
+    "mainnetIntegrationsDisplayed": "05",
+    "horizontalOverflowPixels": 0
+  },
+  "funding": {
+    "circlePendingVisibleAndLoginDisabled": true,
+    "disconnectedGatewayDepositDisabled": true,
+    "unknownGatewayBalanceShownAsDash": true,
+    "unknownGatewayBalanceNotClassifiedAsEmpty": true,
+    "chineseArcMainnetFundingAndPendingCopyChecked": true
+  },
+  "financialActivity": {
+    "additionalSpendUsdc": "0",
+    "transactionsBroadcast": 0
+  },
+  "deploymentPerformed": false,
+  "pushPerformed": false,
+  "circleEmailWalletConstraint": {
+    "userConfirmedProductionSetupPending": true,
+    "userRequestedEmailWalletsRemainDisabled": true,
+    "featureFlag": "FEATURE_CIRCLE_MAINNET_WALLETS=0"
+  },
+  "remaining": [
+    "Complete the pending production Circle app/subscription/email setup, then qualify live email login/signing",
+    "Manual frontend release and release of the selected-network paymentMode metadata fix",
+    "Hosted and signed wallet acceptance for remaining research, trading, Autopilot and history workflows",
+    "Arc trading activation after execution readiness; current public capabilities remain disabled"
+  ],
+  "hosted": {
+    "asOf": "2026-10-05T09:21:20.033Z",
+    "origin": "https://pulse-api-production-7aae.up.railway.app",
+    "readOnly": true,
+    "metadata": {
+      "network": "eip155:5042",
+      "chainId": 5042,
+      "asset": "USDC",
+      "paymentProvider": "circle-gateway",
+      "paymentModeObserved": "okx",
+      "paymentModeCorrection": "Local source now reports the selected provider; hosted rollout remains manual"
+    },
+    "publicContractBindings": {
+      "registry": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "oracleRouter": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "executionAdapter": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "spotFactory": "0xa4546529b1174765d4d8e256c951365359c853fa",
+      "spotLimitFactory": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "spotBracketFactory": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "autopilotFactory": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07"
+    },
+    "spot": {
+      "visible": true,
+      "enabled": false,
+      "market": false,
+      "limit": false,
+      "bracket": false,
+      "protectedOrders": false
+    },
+    "autopilot": {
+      "visible": true,
+      "enabled": false
+    },
+    "reasons": {
+      "automation": "Arc mainnet execution evidence is temporarily unavailable",
+      "autopilot": "Arc mainnet execution evidence is temporarily unavailable"
+    },
+    "persistence": {
+      "provider": "redis",
+      "configured": true,
+      "state": "online",
+      "retryAfterSeconds": 0,
+      "lastError": null,
+      "lastFailureAt": null,
+      "lastSuccessAt": "2026-10-05T09:21:18.639Z"
+    },
+    "pairs": 2,
+    "circle": {
+      "enabled": false,
+      "network": "arc",
+      "blockchain": "ARC",
+      "reason": "Arc mainnet email login is waiting for the production Circle app and subscription setup"
+    }
+  },
+  "validation": {
+    "frontendTests": {
+      "passed": 149,
+      "failed": 0
+    },
+    "apiApplicationTests": {
+      "passed": 44,
+      "failed": 0
+    },
+    "apiTypeScriptBuild": "passed",
+    "frontendTypeScriptAndViteBuild": "passed; runner config loader used within the workspace sandbox",
+    "browserArtifactSecretScan": {
+      "files": 235,
+      "serverValuesChecked": 28,
+      "leaks": 0
+    },
+    "contractBindings": {
+      "filesChecked": 4,
+      "bindingsPerFile": 9
+    }
+  },
+  "releaseConfiguration": {
+    "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
+    "enabledWebNetworks": "xlayer,base,arbitrum,arc,robinhood",
+    "walletKitEnabled": true,
+    "cloudExport": "214 server settings and 9 public browser settings; ignored local review files, not deployed",
+    "qualificationSignerExcluded": true,
+    "publicReportEncryptionFixtureExcluded": true
+  },
+  "finalReleaseBrowserSmoke": {
+    "servedLocally": true,
+    "responseFixtures": false,
+    "publicApiOrigin": "https://pulse-api-production-7aae.up.railway.app",
+    "landingLoadedActualHostedActivity": true,
+    "arcMainnetShownWithUnavailableCoverage": true,
+    "retiredCountsPreserved": {
+      "global": 16,
+      "prediction": 3,
+      "risk": null
+    },
+    "allFiveNetworksVisible": true,
+    "arcAppAndSavedPreference": "arc",
+    "arcWalletKitChainId": 5042,
+    "selectedArcPairsRequestObserved": true,
+    "horizontalOverflowPixels": 0,
+    "signaturesOrTransactionsRequested": false
+  }
+}

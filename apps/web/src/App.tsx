@@ -49,6 +49,7 @@ import {
   type WalletConnectionMethod,
 } from "./wallet";
 import { connectCircleWallet, isCircleWalletConnected, restoreCircleWallet } from "./circleWallet";
+import { selectAppKitNetwork } from "./appkit";
 import { hasRecoverablePayment } from "./paymentRecovery";
 
 type Tab = PulseTab;
@@ -99,6 +100,7 @@ export function App() {
   useEffect(() => { applyAppearance(appearance); }, [appearance]);
   useEffect(() => {
     if (!networkMenuOpen) return;
+    networkPopoverRef.current?.querySelector<HTMLButtonElement>('[role="option"][aria-selected="true"]')?.focus();
     const dismiss = (event: PointerEvent) => { if (!networkPopoverRef.current?.contains(event.target as Node)) setNetworkMenuOpen(false); };
     const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { setNetworkMenuOpen(false); networkPopoverRef.current?.querySelector("button")?.focus(); } };
     document.addEventListener("pointerdown", dismiss);
@@ -285,13 +287,21 @@ export function App() {
     if (!p) return;
     let active = true;
     p.request({ method: "eth_accounts" })
-      .then((accs) => {
+      .then(async (accs) => {
         if (!active || wasWalletDisconnected()) return;
         const list = accs as string[];
         if (list?.[0]) {
+          const chainId = await p.request({ method: "eth_chainId" });
+          if (!active || wasWalletDisconnected()) return;
+          const selected = networkKeyForChainId(chainId);
+          if (!selected || !ENABLED_WEB_NETWORKS.includes(selected)) {
+            setError("Your connected wallet is on an unsupported network. Select a supported PULSE network in your wallet and reconnect.");
+            return;
+          }
+          setNetworkKey(selected);
           setWallet(list[0]);
           setWalletName(walletProviderName(p));
-          void refreshBalances(list[0]);
+          if (selected === networkKey) void refreshBalances(list[0]);
         } else {
           setWallet(null);
           setWalletName("");
@@ -436,6 +446,25 @@ export function App() {
     setNeedUsdt(false);
     setNeededUsdt(null);
   }
+
+  useEffect(() => {
+    const changed = (event: Event) => {
+      if (wallet || isCircleWalletConnected()) return;
+      const key = networkKeyForChainId((event as CustomEvent<{ chainId?: unknown }>).detail?.chainId);
+      if (key && ENABLED_WEB_NETWORKS.includes(key)) setNetworkKey(key);
+    };
+    window.addEventListener("pulse:wallet-network-changed", changed);
+    return () => window.removeEventListener("pulse:wallet-network-changed", changed);
+  }, [wallet]);
+
+  useEffect(() => {
+    if (wallet || isCircleWalletConnected()) return;
+    let active = true;
+    void selectAppKitNetwork(networkKey, true).catch(error => {
+      if (active) setError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, [networkKey, wallet]);
 
   async function onDisconnect() {
     await disconnectWallet();
@@ -817,14 +846,21 @@ export function App() {
         </div>
         <div className="nav-right">
           <div className="network-popover" ref={networkPopoverRef}>
-            <button type="button" className="network-picker" title={`${lang === "zh" ? "网络与支付" : "Network & payment"} · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)}>
+            <button type="button" className="network-picker" title={`${lang === "zh" ? "网络与支付" : "Network & payment"} · ${network.label} · ${network.payment.symbol}`} aria-haspopup="listbox" aria-expanded={networkMenuOpen} onClick={() => setNetworkMenuOpen((open) => !open)} onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setNetworkMenuOpen(true); } }}>
               <span className={`network-symbol ${networkKey}`}><NetworkLogo network={networkKey} /></span>
               <span className="network-picker-copy"><small>{lang === "zh" ? "网络与支付" : "Network & payment"}</small><b>{network.label}</b></span><span className="network-picker-state"><i />{network.payment.symbol}</span><span className="chevron">⌄</span>
             </button>
-            {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"}>
+            {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"} onKeyDown={event => {
+              if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+              event.preventDefault();
+              const options = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="option"]')];
+              const current = options.indexOf(document.activeElement as HTMLButtonElement);
+              const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + options.length) % options.length;
+              options[next]?.focus();
+            }}>
               <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "设置支付资产、钱包链和链上流动性，不改变外观。" : "Sets payment asset, wallet chain and on-chain liquidity. Appearance stays unchanged."}</p></div>
-              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = true; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
-              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Mainnet") : (lang === "zh" ? "各功能单独检查可用性" : "Availability checked per feature")}</span></div>
+              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc").map((key) => { const item = WEB_NETWORKS[key]; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); networkPopoverRef.current?.querySelector<HTMLButtonElement>(".network-picker")?.focus(); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot"}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
+              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{lang === "zh" ? "各功能单独检查可用性" : "Availability checked per feature"}</span></div>
             </div>}
           </div>
           <AppearancePicker value={appearance} lang={lang} onChange={setAppearance} />
@@ -887,6 +923,8 @@ export function App() {
         </div>}
       </div>
 
+
+      {error && <div className="err" role="alert">{error}{needUsdt && <button type="button" onClick={() => setWalletOpen(true)}>{d.fundWallet}</button>}</div>}
 
       {analysisReady && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
         <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? reportExecution.mapped ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : `${reportExecution.label}. Choose a mapped pair for execution.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
@@ -1034,7 +1072,6 @@ export function App() {
             </>
           )}
 
-          {error && <div className="err">{error}{needUsdt && <button type="button" onClick={() => setWalletOpen(true)}>{d.fundWallet}</button>}</div>}
           {!error && result && (
             <div className="ok">
               OK · {service}

@@ -27,6 +27,18 @@ test("Robinhood is mainnet 4663 with ETH gas, not USDG gas", () => {
   assert.equal(chain.blockExplorers?.default.url, "https://robinhoodchain.blockscout.com");
 });
 
+test("Arc wallet-kit metadata uses mainnet 5042 and 18-decimal USDC gas", () => {
+  const [chain] = buildAppKitNetworks(["arc"]);
+  assert.equal(chain.id, 5042);
+  assert.equal(chain.caipNetworkId, "eip155:5042");
+  assert.equal(chain.name, "Arc Mainnet");
+  assert.deepEqual(chain.nativeCurrency, { name: "USD Coin", symbol: "USDC", decimals: 18 });
+  assert.deepEqual(chain.rpcUrls.default.http, ["https://rpc.mainnet.arc.io"]);
+  assert.equal(chain.blockExplorers?.default.url, "https://explorer.arc.io");
+  assert.notEqual(chain.testnet, true);
+  assert.equal(WEB_NETWORKS.arc.payment.decimals, 6);
+});
+
 test("AppKit respects disabled networks, order, duplicates and empty configuration", () => {
   assert.deepEqual(buildAppKitNetworks(["base", "xlayer", "base"]).map(chain => chain.id), [8453, 196]);
   assert.deepEqual(buildAppKitNetworks([]).map(chain => chain.id), [196]);

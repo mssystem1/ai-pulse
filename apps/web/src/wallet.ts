@@ -245,7 +245,7 @@ export async function connectWallet(networkKey: import("./networks").WebNetworkK
   }
   if (appkit.appKitEnabled) {
     delete (window as WalletWindow).__pulseDirectProvider;
-    const connected = await appkit.connectAppKit();
+    const connected = await appkit.connectAppKit(options.switchNetwork === false ? undefined : networkKey);
     const provider = appkit.getAppKitProvider();
     if (provider) (window as WalletWindow).__pulseAppKitProvider = provider;
     if(options.switchNetwork!==false)await selectWalletNetwork(networkKey);

@@ -8541,7 +8541,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 </div>
                 <div>
                   <b>Arc Mainnet</b>
-                  <span>test USDC · analysis only</span>
+                  <span>USDC · Circle Gateway</span>
                 </div>
                 <div>
                   <b>Robinhood Chain</b>
@@ -8638,12 +8638,12 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <code>/base/... · /arbitrum/...</code>
               </article>
               <article>
-                <span>CIRCLE · ARC TESTNET</span>
+                <span>CIRCLE · ARC MAINNET</span>
                 <h4>Circle Agent Marketplace</h4>
                 <p>
-                  The Arc listing exposes the same five analysis and Risk Guard
-                  services with test USDC. Arc Mainnet never exposes Spot or
-                  Autopilot execution.
+                  The Arc listing settles PULSE research services in USDC through
+                  Circle Gateway. Spot and Autopilot become available after
+                  verified mainnet deployment, route checks and trading activation.
                 </p>
                 <code>/arc/v1/analysis/spot/premium</code>
               </article>

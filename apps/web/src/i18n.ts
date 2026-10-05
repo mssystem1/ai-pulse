@@ -31,7 +31,7 @@ const dict = {
     disconnect: "Disconnect",
     connected: "Connected",
     connectTip:
-      "Connect OKX Wallet (recommended) or MetaMask. You sign x402 payments — your keys never go to our server. The developer test key is only for automated tests, not for users.",
+      "Connect your wallet to approve payments and trades. Arc also supports Circle email wallets when enabled. Your private key stays in your wallet.",
     needWallet: "Connect your wallet first to pay with USDT0 on X Layer.",
     howPay:
       "Web users sign x402 with their wallet. OKX.AI agents pay through Agentic Wallet when calling MCP.",
@@ -96,7 +96,7 @@ const dict = {
     disconnect: "断开",
     connected: "已连接",
     connectTip:
-      "请安装并连接 OKX Wallet（推荐）或 MetaMask。由你在钱包内签名支付 — 私钥不会上传到服务器。开发者测试私钥仅用于自动化测试，不用于真实用户。",
+      "连接钱包后，由你批准支付和交易。Arc 也支持已启用的 Circle 邮箱钱包。私钥始终留在你的钱包中。",
     needWallet: "请先连接钱包，以便在 X Layer 上用 USDT0 支付。",
     howPay:
       "网页用户：连接钱包 → 点击基础/高级/安全按钮 → 钱包弹出 x402 签名。OKX.AI 智能体：调用 MCP 时由 Agentic Wallet 自动支付。",

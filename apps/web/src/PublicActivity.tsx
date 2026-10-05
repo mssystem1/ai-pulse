@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet } from "./api";
+import { WEB_NETWORKS } from "./networks";
 
 export type Service = "global" | "prediction" | "risk";
 type Count = { count: number; partial: number; firstAt: string; lastAt: string };
@@ -12,6 +13,30 @@ export type PublicActivity = {
   execution?: { spot: ExecutionCount | null; autopilot: ExecutionCount | null };
 };
 const services: { key: Service; label: string }[] = [{ key: "global", label: "Global" }, { key: "prediction", label: "Prediction" }, { key: "risk", label: "Risk Guard" }];
+type NetworkActivity = PublicActivity["networks"][number];
+
+/** Missing observations remain unknown; retired chain counts never become mainnet counts. */
+export function publicActivityNetworks(data: PublicActivity) {
+  const observed = new Map(data.networks.filter(network => network.environment === "mainnet").map(network => [network.chain, network]));
+  const mainnets: NetworkActivity[] = Object.values(WEB_NETWORKS).map(network => {
+    const recorded = observed.get(network.caip2);
+    observed.delete(network.caip2);
+    return recorded ? { ...recorded, label: network.label } : {
+      chain: network.caip2, label: network.label, environment: "mainnet", research: { global: null, prediction: null, risk: null },
+    };
+  });
+  return {
+    mainnets: [...mainnets, ...observed.values()],
+    retired: data.networks.filter(network => network.environment === "testnet").map(network => ({
+      ...network, label: network.chain === "eip155:5042002" ? "Arc Testnet" : network.label,
+    })),
+  };
+}
+
+function observedTotal(networks: NetworkActivity[], service: Service): number | null {
+  const counts = networks.flatMap(network => network.research[service] === null ? [] : [network.research[service]!.count]);
+  return counts.length ? counts.reduce((total, count) => total + count, 0) : null;
+}
 function validCounts(value: unknown): value is Counts {
   if (!value || typeof value !== "object") return false;
   return services.every(({ key }) => {
@@ -27,6 +52,10 @@ export function parsePublicActivity(value: unknown): PublicActivity | null {
     || !Array.isArray(data.networks) || data.networks.length > 30 || !data.networks.every(network => network && /^eip155:\d+$/.test(network.chain)
       && typeof network.label === "string" && network.label.length < 80 && ["mainnet", "testnet"].includes(network.environment) && validCounts(network.research))) return null;
   if (new Set(data.networks.map(network => network.chain)).size !== data.networks.length) return null;
+  if (data.networks.some(network => {
+    const knownMainnet = Object.values(WEB_NETWORKS).some(chain => chain.caip2 === network.chain);
+    return (knownMainnet && network.environment !== "mainnet") || (network.chain === "eip155:5042002" && network.environment !== "testnet");
+  })) return null;
   if (!services.every(({key}) => {
     const observed = data.networks.map(network => network.research[key]).filter((count): count is Count => count !== null);
     const total = data.research[key];
@@ -71,13 +100,13 @@ export function ResearchCount({ service, data, loading }: { service: Service; da
   return <div className="landing-research-count"><strong>{value ? value.count.toLocaleString() : "—"}</strong><span>{loading ? "Loading report activity" : value ? "observed reports delivered" : "Report count unavailable"}{value ? <small>{value.partial ? `${value.partial.toLocaleString()} partial · ` : ""}Across networks · <a href="#public-activity-heading">Coverage details</a></small> : null}</span></div>;
 }
 
-function ResearchNetworkChart({ data }: { data: PublicActivity }) {
-  const totals = data.networks.map(network => services.reduce((sum, service) => sum + (network.research[service.key]?.count ?? 0), 0));
+function ResearchNetworkChart({ networks }: { networks: NetworkActivity[] }) {
+  const totals = networks.map(network => services.reduce((sum, service) => sum + (network.research[service.key]?.count ?? 0), 0));
   const maximum = Math.max(1, ...totals);
   return <figure className="landing-network-chart" aria-labelledby="network-chart-title">
-    <figcaption><strong id="network-chart-title">Research across networks</strong><span>Observed report deliveries · shared scale</span></figcaption>
+    <figcaption><strong id="network-chart-title">Research across mainnets</strong><span>Observed report deliveries · shared scale</span></figcaption>
     <div className="landing-chart-legend" aria-label="Report types">{services.map(service => <span key={service.key}><i className={`activity-series-${service.key}`} aria-hidden="true"/>{service.label}</span>)}</div>
-    <ol className="landing-chart-rows">{data.networks.map((network, index) => {
+    <ol className="landing-chart-rows">{networks.map((network, index) => {
       const available = services.some(service => network.research[service.key] !== null);
       const incomplete = services.some(service => network.research[service.key] === null);
       const description = services.map(service => `${service.label}: ${network.research[service.key]?.count.toLocaleString() ?? "unavailable"}`).join("; ");
@@ -97,13 +126,15 @@ function ResearchNetworkChart({ data }: { data: PublicActivity }) {
 }
 
 export function PublicActivityBreakdown({ data, loading, retry }: ReturnType<typeof usePublicActivity>) {
+  const coverage = data ? publicActivityNetworks(data) : null;
   return <section className="landing-width landing-section landing-public-activity" aria-labelledby="public-activity-heading">
     <div className="landing-section-heading"><p className="landing-kicker">PLATFORM-WIDE ACTIVITY</p><h2 id="public-activity-heading">Every network.<br/><span>Clear context.</span></h2><p>Global Market, Prediction Market and Risk Guard analyses across chains. Your selected app network does not filter these totals.</p></div>
     {data ? <>
       <p className="landing-data-status">{data.stale ? "Last available snapshot" : "Updated"} {new Date(data.asOf).toLocaleString()}. Observed deliveries, not a complete lifetime count.</p>
-      <ResearchNetworkChart data={data}/>
-      <div className="landing-table-scroll" role="region" aria-label="Report delivery counts by network" tabIndex={0}><table className="landing-activity-table"><caption>Delivered research by network</caption><thead><tr><th scope="col">Network</th>{services.map(service => <th key={service.key} scope="col">{service.label}</th>)}</tr></thead><tbody>{data.networks.map(network => <tr key={network.chain}><th scope="row">{network.label}<small>{network.environment === "testnet" ? "Testnet analyses" : "Mainnet"}</small></th>{services.map(service => <td key={service.key}>{network.research[service.key]?.count.toLocaleString() ?? "—"}</td>)}</tr>)}</tbody><tfoot><tr><th scope="row">Observed total</th>{services.map(service => <td key={service.key}>{data.research[service.key]?.count.toLocaleString() ?? "—"}</td>)}</tr></tfoot></table></div>
-      <details className="landing-stat-method"><summary>What these numbers include</summary><p>Successfully delivered reports, including genuine developer testing and Arc Testnet analyses. Partially completed reports count once and are identified in each service total. Recovery reads, retries, mock payments and synthetic reports do not add deliveries.</p><ul>{services.map(service => { const count = data.research[service.key]; return <li key={service.key}>{service.label}: {count ? `observed deliveries from ${new Date(count.firstAt).toLocaleDateString()} through ${new Date(count.lastAt).toLocaleDateString()}` : "no verified coverage yet"}.</li>; })}</ul><p>Older records may be missing. A dash means unavailable coverage, not zero activity. These are platform activity figures, not a count of independent customers. Testnet history remains labeled as testnet after a mainnet launch.</p></details>
+      <ResearchNetworkChart networks={coverage!.mainnets}/>
+      <div className="landing-table-scroll" role="region" aria-label="Mainnet report delivery counts" tabIndex={0}><table className="landing-activity-table"><caption>Delivered research by mainnet</caption><thead><tr><th scope="col">Network</th>{services.map(service => <th key={service.key} scope="col">{service.label}</th>)}</tr></thead><tbody>{coverage!.mainnets.map(network => <tr key={network.chain}><th scope="row">{network.label}<small>Mainnet</small></th>{services.map(service => <td key={service.key}>{network.research[service.key]?.count.toLocaleString() ?? "—"}</td>)}</tr>)}</tbody><tfoot><tr><th scope="row">Observed mainnet total</th>{services.map(service => <td key={service.key}>{observedTotal(coverage!.mainnets, service.key)?.toLocaleString() ?? "—"}</td>)}</tr></tfoot></table></div>
+      {coverage!.retired.length > 0 && <details className="landing-stat-method landing-retired-activity"><summary>Retired testnet history</summary><p>These reports retain their original chain identity. They are included in platform totals and excluded from mainnet figures above.</p><div className="landing-table-scroll" role="region" aria-label="Retired testnet report delivery counts" tabIndex={0}><table className="landing-activity-table"><caption>Historical delivered research</caption><thead><tr><th scope="col">Retired network</th>{services.map(service => <th key={service.key} scope="col">{service.label}</th>)}</tr></thead><tbody>{coverage!.retired.map(network => <tr key={network.chain}><th scope="row">{network.label}<small>Retired testnet</small></th>{services.map(service => <td key={service.key}>{network.research[service.key]?.count.toLocaleString() ?? "—"}</td>)}</tr>)}</tbody></table></div></details>}
+      <details className="landing-stat-method"><summary>What these numbers include</summary><p>Successfully delivered reports, including genuine developer testing. Platform totals include the separately labeled retired testnet history; mainnet figures exclude it. Partially completed reports count once and are identified in each service total. Recovery reads, retries, mock payments and synthetic reports do not add deliveries.</p><ul>{services.map(service => { const count = data.research[service.key]; return <li key={service.key}>{service.label}: {count ? `observed deliveries from ${new Date(count.firstAt).toLocaleDateString()} through ${new Date(count.lastAt).toLocaleDateString()}` : "no verified coverage yet"}.</li>; })}</ul><p>Older records may be missing. A dash means unavailable coverage, not zero activity. These are platform activity figures, not a count of independent customers.</p></details>
     </> : <div className="landing-data-unavailable" role="status"><p>{loading ? "Loading cross-chain activity…" : "Activity figures are currently unavailable. No estimated or sample counts are shown."}</p>{!loading && <button className="landing-button small" onClick={retry}>Retry statistics</button>}</div>}
     <div className="landing-execution-stats">{(["spot", "autopilot"] as const).map(service => {
       const execution = data?.execution?.[service];

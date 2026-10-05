@@ -59,6 +59,7 @@ xlayer
 base
 arbitrum
 arc
+robinhood
 ```
 
 Use comma-separated values without spaces:
@@ -76,8 +77,11 @@ A payment route is active only when the network is in the allowlist and its prov
 | Base | `base` plus `FEATURE_BASE_PAYMENTS=1` |
 | Arbitrum | `arbitrum` plus `FEATURE_ARBITRUM_PAYMENTS=1` |
 | Arc Mainnet | `arc` plus `FEATURE_ARC_PAYMENTS=1` and `CIRCLE_GATEWAY_ENABLED=1` |
+| Robinhood Chain | `robinhood` plus `FEATURE_ROBINHOOD_PAYMENTS=1` and its seller/execution configuration |
 
 `DEFAULT_NETWORK` selects the initial network for an unprefixed web visit. Network-specific URLs override it. It does not override the connected wallet chain.
+
+The Arc mainnet release keeps all five existing mainnet integrations visible. Use `ENABLED_NETWORKS=xlayer,base,arbitrum,arc,robinhood` and the same `VITE_ENABLED_NETWORKS` in the release configuration, together with `FEATURE_WALLET_APPKIT=1`, `VITE_FEATURE_WALLET_APPKIT=1` and the public `VITE_REOWN_PROJECT_ID`. The browser network picker and Reown wallet kit share that allowlist. Older browser configurations containing `arc-testnet` are normalized to `arc`; no testnet RPC or wallet chain is enabled. Changing browser variables requires rebuilding the web app; updating Railway alone cannot add a network to an already-built frontend. `.env.production.example` shows this release configuration; the local template's four-network subset remains available for local testing.
 
 For production, set authenticated or otherwise production-grade primary endpoints in `BASE_RPC_URL` and `ARBITRUM_RPC_URL`. Keep the public endpoints in `BASE_RPC_FALLBACK_URL` and `ARBITRUM_RPC_FALLBACK_URL` only as fallbacks. API contract evidence and transaction simulation try configured endpoints in order and verify the returned chain ID. Local development may use the public defaults; production must not depend exclusively on a public Arbitrum RPC.
 

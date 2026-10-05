@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { assertArcUsdcGasReserve, fetchArcGatewayBalance, parseGatewayDepositAmount, readPreferredNetwork } from "./networks";
+import { assertArcUsdcGasReserve, fetchArcGatewayBalance, parseGatewayDepositAmount, parseEnabledWebNetworks, readPreferredNetwork } from "./networks";
 
 test("Gateway deposits retain six-decimal precision and never round extra digits", () => {
   assert.equal(parseGatewayDepositAmount("0.000001"), 1n);
@@ -10,6 +10,12 @@ test("Gateway deposits retain six-decimal precision and never round extra digits
 
 test("retired Arc preference selects mainnet without relabeling recovery storage", () => {
   assert.equal(readPreferredNetwork({ getItem: () => "arc-testnet" }, ["base", "arc"]), "arc");
+});
+
+test("legacy browser rollout settings keep Arc visible as mainnet in the selector and wallet kit", () => {
+  assert.deepEqual(parseEnabledWebNetworks("xlayer,base,arbitrum,arc-testnet,robinhood,arc"), ["xlayer", "base", "arbitrum", "arc", "robinhood"]);
+  assert.deepEqual(parseEnabledWebNetworks("base,base"), ["base"]);
+  assert.deepEqual(parseEnabledWebNetworks("unsupported"), ["xlayer"]);
 });
 
 test("Arc ERC-20 spending reserves native USDC gas using the 6-to-18 decimal conversion", async () => {

@@ -303,7 +303,22 @@ describe("PULSE API", () => {
     assert.equal(json.chainId, 5042);
     assert.equal(json.asset, "USDC");
     assert.equal(json.paymentProvider, "circle-gateway");
+    assert.equal(json.paymentMode, "mock");
     assert.equal((await jfetch("/v1/meta?network=arc-testnet")).res.status, 400);
+  });
+
+  it("live selected-network metadata reports its own payment provider rather than the default OKX mode", async () => {
+    const original = { X402_MOCK: testConfig.X402_MOCK, paymentMode: testConfig.paymentMode };
+    try {
+      testConfig.X402_MOCK = false;
+      testConfig.paymentMode = "okx";
+      for (const [path, mode] of [["/v1/meta?network=arc", "circle-gateway"], ["/arc/v1/meta", "circle-gateway"], ["/v1/meta?network=base", "cdp"], ["/v1/meta?network=xlayer", "okx"]]) {
+        const { res, json } = await jfetch(path);
+        assert.equal(res.status, 200);
+        assert.equal(json.paymentMode, mode);
+        assert.equal(json.paymentProvider, mode);
+      }
+    } finally { Object.assign(testConfig, original); }
   });
 
   it("ownership lookup outages reject REST and MCP before payment without hanging", async () => {

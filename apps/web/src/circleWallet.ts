@@ -6,10 +6,16 @@ import type { InjectedProvider } from "./wallet";
 type CircleWallet = { id: string; address: string; blockchain: "ARC"; accountType?: string };
 type CircleChallengeResult = { type: string; status: string; data?: { signature?: string; txHash?: string; signedTransaction?: string } };
 type CircleSession = { userToken: string; encryptionKey: string; wallets: CircleWallet[]; activeNetwork: "arc" };
+type CircleLoginResult = { userToken: string; encryptionKey: string; refreshToken: string };
+type CircleSdk = Pick<W3SSdk, "getDeviceId" | "updateConfigs" | "verifyOtp" | "execute">;
+export type CircleWalletConnectionOptions = {
+  appId?: string;
+  createSdk?: (appId: string, onLogin: (error: unknown, result?: CircleLoginResult) => void) => CircleSdk;
+};
 const SESSION_KEY = "pulse.circle.session.mainnet";
 const CIRCLE_NETWORK = "arc" as const;
 let session: CircleSession | null = null;
-let sdk: W3SSdk | null = null;
+let sdk: CircleSdk | null = null;
 
 function appId(): string {
   const value = String((import.meta as ImportMeta & { env?: Record<string, unknown> }).env?.VITE_CIRCLE_APP_ID || "").trim();
@@ -17,10 +23,10 @@ function appId(): string {
   return value;
 }
 
-async function circleApi(path: string, init: RequestInit = {}) {
+async function circleApi(path: string, init: RequestInit = {}, userToken = session?.userToken) {
   const headers = new Headers(init.headers);
   headers.set("Content-Type", "application/json");
-  if (session?.userToken) headers.set("Authorization", `Bearer ${session.userToken}`);
+  if (userToken) headers.set("Authorization", `Bearer ${userToken}`);
   const response = await fetch(`${API_BASE}/v1/circle/wallet${path}`, { ...init, headers, cache: "no-store" });
   const body = await response.json().catch(() => ({})) as Record<string, unknown>;
   if (!response.ok) {
@@ -38,20 +44,20 @@ async function circleApi(path: string, init: RequestInit = {}) {
 
 const wait = (milliseconds: number) => new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
 
-async function listArcWallets(options: { waitForCreation?: boolean } = {}): Promise<CircleWallet[]> {
+async function listArcWallets(options: { waitForCreation?: boolean; userToken?: string } = {}): Promise<CircleWallet[]> {
   const attempts = options.waitForCreation ? 12 : 1;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    const listed = await circleApi("/wallets") as { wallets?: CircleWallet[] };
-    const wallets = (listed.wallets || []).filter((wallet) => wallet.blockchain === "ARC" && wallet.accountType !== "SCA");
+    const listed = await circleApi("/wallets", {}, options.userToken) as { wallets?: CircleWallet[] };
+    const wallets = (listed.wallets || []).filter((wallet) => wallet.blockchain === "ARC" && wallet.accountType === "EOA");
     if (wallets.length || attempt === attempts - 1) return wallets;
     await wait(1_000);
   }
   return [];
 }
 
-function execute(challengeId: string): Promise<CircleChallengeResult> {
-  if (!sdk) throw new Error("Circle wallet SDK is not initialized");
-  return new Promise((resolve, reject) => sdk!.execute(challengeId, (error, result) => error ? reject(error) : result ? resolve(result as CircleChallengeResult) : reject(new Error("Circle returned no challenge result"))));
+function execute(challengeId: string, client = sdk): Promise<CircleChallengeResult> {
+  if (!client) throw new Error("Circle wallet SDK is not initialized");
+  return new Promise((resolve, reject) => client.execute(challengeId, (error, result) => error ? reject(error) : result ? resolve(result as CircleChallengeResult) : reject(new Error("Circle returned no challenge result"))));
 }
 
 function persist() {
@@ -59,9 +65,9 @@ function persist() {
   else window.sessionStorage.removeItem(SESSION_KEY);
 }
 
-function walletFor(key: WebNetworkKey): CircleWallet {
+function walletFor(key: WebNetworkKey, candidate = session): CircleWallet {
   if (key !== CIRCLE_NETWORK) throw new Error("Circle email wallet is available only on Arc Mainnet in PULSE");
-  const wallet = session?.wallets.find((item) => item.blockchain === "ARC");
+  const wallet = candidate?.wallets.find((item) => item.blockchain === "ARC" && item.accountType === "EOA");
   if (!wallet) throw new Error(`Circle EOA wallet is unavailable on ${WEB_NETWORKS[key].label}`);
   return wallet;
 }
@@ -99,10 +105,10 @@ async function executeContractTransaction(body: unknown): Promise<string> {
   throw new Error("Circle accepted the transaction, but its blockchain hash is still pending. Refresh balances shortly before retrying.");
 }
 
-export function isCircleWalletConnected() { return Boolean(session); }
+export function isCircleWalletConnected() { return Boolean(session?.wallets.some(wallet => wallet.blockchain === "ARC" && wallet.accountType === "EOA")); }
 
 export function getCircleProvider(): InjectedProvider | null {
-  if (!session) return null;
+  if (!isCircleWalletConnected() || !session) return null;
   return {
     selectedAddress: walletFor(session.activeNetwork).address,
     chainId: WEB_NETWORKS[session.activeNetwork].chainHex,
@@ -153,22 +159,22 @@ export function getCircleProvider(): InjectedProvider | null {
   };
 }
 
-export async function connectCircleWallet(email: string, preferred: WebNetworkKey) {
+export async function connectCircleWallet(email: string, preferred: WebNetworkKey, options: CircleWalletConnectionOptions = {}) {
   preferred = CIRCLE_NETWORK;
   const status = await circleApi("/status");
   if (!status.enabled) throw new Error(String(status.reason || "Arc mainnet email wallet setup is pending"));
-  const id = appId();
-  let loginResolve: ((value: { userToken: string; encryptionKey: string; refreshToken: string }) => void) | null = null;
+  const id = options.appId?.trim() || appId();
+  let loginResolve: ((value: CircleLoginResult) => void) | null = null;
   let loginReject: ((reason: unknown) => void) | null = null;
-  const login = new Promise<{ userToken: string; encryptionKey: string; refreshToken: string }>((resolve, reject) => { loginResolve = resolve; loginReject = reject; });
-  sdk = new W3SSdk({ appSettings: { appId: id } }, (error, result) => error ? loginReject?.(error) : result ? loginResolve?.(result) : loginReject?.(new Error("Circle returned no login session")));
-  const deviceId = await sdk.getDeviceId();
+  const login = new Promise<CircleLoginResult>((resolve, reject) => { loginResolve = resolve; loginReject = reject; });
+  const onLogin = (error: unknown, result?: CircleLoginResult) => error ? loginReject?.(error) : result ? loginResolve?.(result) : loginReject?.(new Error("Circle returned no login session"));
+  const loginSdk = options.createSdk ? options.createSdk(id, onLogin) : new W3SSdk({ appSettings: { appId: id } }, onLogin);
+  const deviceId = await loginSdk.getDeviceId();
   const start = await circleApi("/email/start", { method: "POST", body: JSON.stringify({ email, deviceId }) });
-  sdk.updateConfigs({ appSettings: { appId: id }, loginConfigs: { deviceToken: String(start.deviceToken), deviceEncryptionKey: String(start.deviceEncryptionKey), otpToken: String(start.otpToken) } });
-  sdk.verifyOtp();
+  loginSdk.updateConfigs({ appSettings: { appId: id }, loginConfigs: { deviceToken: String(start.deviceToken), deviceEncryptionKey: String(start.deviceEncryptionKey), otpToken: String(start.otpToken) } });
+  loginSdk.verifyOtp();
   const auth = await login;
-  session = { userToken: auth.userToken, encryptionKey: auth.encryptionKey, wallets: [], activeNetwork: CIRCLE_NETWORK };
-  sdk.updateConfigs({ appSettings: { appId: id }, authentication: { userToken: auth.userToken, encryptionKey: auth.encryptionKey } });
+  loginSdk.updateConfigs({ appSettings: { appId: id }, authentication: { userToken: auth.userToken, encryptionKey: auth.encryptionKey } });
   let wallets: CircleWallet[];
   try {
     // Circle requires first-time email users to be initialized after OTP
@@ -176,30 +182,34 @@ export async function connectCircleWallet(email: string, preferred: WebNetworkKe
     const created = await circleApi("/wallets/initialize", {
       method: "POST",
       body: JSON.stringify({ blockchain: "ARC" }),
-    });
+    }, auth.userToken);
     const challengeId = String(created.challengeId || "");
     if (!challengeId) throw new Error("Circle returned no EOA wallet creation challenge");
-    await execute(challengeId);
-    wallets = await listArcWallets({ waitForCreation: true });
+    await execute(challengeId, loginSdk);
+    wallets = await listArcWallets({ waitForCreation: true, userToken: auth.userToken });
   } catch (error) {
     // 155106 is Circle's documented "user was initialized" response. It is
     // the normal returning-user path. Load the existing wallet or create the
     // missing Arc wallet with Circle's dedicated wallet challenge.
     if ((error as { code?: number })?.code !== 155106) throw error;
-    wallets = await listArcWallets();
+    wallets = await listArcWallets({ userToken: auth.userToken });
     if (!wallets.length) {
-      const created = await circleApi("/wallets/create-arc", { method: "POST", body: "{}" });
+      const created = await circleApi("/wallets/create-arc", { method: "POST", body: "{}" }, auth.userToken);
       const challengeId = String(created.challengeId || "");
       if (!challengeId) throw new Error("Circle returned no Arc Mainnet wallet creation challenge");
-      await execute(challengeId);
-      wallets = await listArcWallets({ waitForCreation: true });
+      await execute(challengeId, loginSdk);
+      wallets = await listArcWallets({ waitForCreation: true, userToken: auth.userToken });
     }
   }
-  session.wallets = wallets;
-  if (!session.wallets.length) {
+  if (!wallets.length) {
     throw new Error("Circle finished login but no Arc Mainnet EOA is available. Check Circle Console → Wallets → User Controlled → Users; if this email was initialized previously without an Arc wallet, create an Arc Mainnet EOA for that user or use a new email for mainnet.");
   }
-  const active = walletFor(session.activeNetwork);
+  // OTP alone is not a usable wallet connection. Commit session and SDK together
+  // only after mainnet EOA creation/listing succeeds, retaining any prior login.
+  const candidate: CircleSession = { userToken: auth.userToken, encryptionKey: auth.encryptionKey, wallets, activeNetwork: CIRCLE_NETWORK };
+  const active = walletFor(candidate.activeNetwork, candidate);
+  session = candidate;
+  sdk = loginSdk;
   persist();
   return { address: active.address, providerName: "Circle Wallet (email)", networkKey: session.activeNetwork, provider: getCircleProvider()! };
 }
@@ -207,7 +217,7 @@ export async function connectCircleWallet(email: string, preferred: WebNetworkKe
 export function restoreCircleWallet() {
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(SESSION_KEY) || "null") as CircleSession | null;
-    if (!stored?.userToken || !stored.wallets?.some((wallet) => wallet.blockchain === "ARC")) return null;
+    if (!stored?.userToken || !stored.encryptionKey || !stored.wallets?.some((wallet) => wallet.blockchain === "ARC" && wallet.accountType === "EOA")) return null;
     stored.activeNetwork = CIRCLE_NETWORK;
     session = stored;
     sdk = new W3SSdk({ appSettings: { appId: appId() }, authentication: { userToken: stored.userToken, encryptionKey: stored.encryptionKey } });

@@ -1,6 +1,6 @@
 {
-  "auditedAt": "2026-10-05T05:59:01.571Z",
-  "browserArtifacts": 237,
+  "auditedAt": "2026-10-05T09:40:39.005Z",
+  "browserArtifacts": 235,
   "serverSecretValuesChecked": 28,
   "leaks": 0,
   "matches": []
