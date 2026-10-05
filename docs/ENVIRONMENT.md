@@ -35,7 +35,7 @@ Browser-build variables are public by design:
 |---|---|
 | `VITE_API_URL` | API origin. Use `http://localhost:4000` locally and the Railway HTTPS origin on Vercel. |
 | `VITE_REOWN_PROJECT_ID` | Create a project at Reown Cloud, add the web origins above, and copy its public project ID. |
-| `CIRCLE_API_KEY` | Secret server key from Circle Console → API Keys for User-Controlled Wallets. Set only on the API process; never prefix with `VITE_`. |
+| `CIRCLE_API_KEY_MAINNET` | Production secret server key (preferred over legacy `CIRCLE_API_KEY`) from Circle Console → API Keys for User-Controlled Wallets. Set only on the API process; never prefix with `VITE_`. |
 | `VITE_CIRCLE_APP_ID` | Public Circle Web3 Services App ID used by the browser SDK for email OTP and challenge approval. Add it to the web environment. |
 | `VITE_ENABLED_NETWORKS` | Must be equal to or narrower than the server allowlist. A change requires rebuilding/redeploying Vercel. |
 | `VITE_PAY_TO_ADDRESS` | Public expected treasury address. It must equal server `PAY_TO_ADDRESS`; production signing fails closed if absent or mismatched. |
@@ -58,14 +58,14 @@ The current Circle Console template editor labels its OTP variables `{{code}}` a
 xlayer
 base
 arbitrum
-arc-testnet
+arc
 ```
 
 Use comma-separated values without spaces:
 
 ```env
-ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+ENABLED_NETWORKS=xlayer,base,arbitrum,arc
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc
 ```
 
 A payment route is active only when the network is in the allowlist and its provider flag is enabled:
@@ -75,7 +75,7 @@ A payment route is active only when the network is in the allowlist and its prov
 | X Layer | `xlayer` in `ENABLED_NETWORKS`; existing OKX configuration remains authoritative |
 | Base | `base` plus `FEATURE_BASE_PAYMENTS=1` |
 | Arbitrum | `arbitrum` plus `FEATURE_ARBITRUM_PAYMENTS=1` |
-| Arc Testnet | `arc-testnet` plus `FEATURE_ARC_PAYMENTS=1` and `CIRCLE_GATEWAY_ENABLED=1` |
+| Arc Mainnet | `arc` plus `FEATURE_ARC_PAYMENTS=1` and `CIRCLE_GATEWAY_ENABLED=1` |
 
 `DEFAULT_NETWORK` selects the initial network for an unprefixed web visit. Network-specific URLs override it. It does not override the connected wallet chain.
 
@@ -90,7 +90,7 @@ For production, set authenticated or otherwise production-grade primary endpoint
 | `VITE_FEATURE_WALLET_APPKIT` | Browser-build mirror; must match `FEATURE_WALLET_APPKIT` |
 | `FEATURE_BASE_PAYMENTS` | Registers Base CDP x402 routes |
 | `FEATURE_ARBITRUM_PAYMENTS` | Registers Arbitrum CDP x402 routes |
-| `FEATURE_ARC_PAYMENTS` | Registers Arc Testnet payment routes |
+| `FEATURE_ARC_PAYMENTS` | Registers Arc Mainnet payment routes |
 | `FEATURE_JOBS` | Enables durable job, recovery, and report delivery paths |
 | `FEATURE_LIVE_SAFETY` | Enables multichain RPC contract/ERC-20 evidence and non-broadcast transaction simulation. Missing observations are returned as `unknown`; this never converts evidence into an audit score. |
 | `FEATURE_PREDICTION_ANALYSIS` | Enables the new prediction-only paid handlers after their prices are configured |
@@ -177,7 +177,7 @@ URLs never receive such a fallback.
 
 ## Pricing: preserve current services, add V5 services
 
-The environment contains several price classes. Eight rows are public on X Layer, Base and Arbitrum: five analysis/risk services plus three Autopilot start services. Circle/Arc publishes only the five analysis/risk rows because Arc Testnet has no Autopilot execution. A configured price does not by itself make a legacy route a public product.
+The environment contains several price classes. Eight rows are public on X Layer, Base and Arbitrum: five analysis/risk services plus three Autopilot start services. Arc publishes five research/risk rows initially; its three Autopilot start services require FEATURE_ARC_TRADING=1 and verified mainnet deployment readiness. A configured price does not by itself make a legacy route a public product.
 
 ### Public marketplace catalog
 
@@ -248,8 +248,8 @@ Network-prefixed X Layer, Base, Arbitrum, and Arc routes reuse these service pri
 Exercise all planned surfaces with real wallet settlement and real Arc analysis:
 
 ```env
-ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+ENABLED_NETWORKS=xlayer,base,arbitrum,arc
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc
 FEATURE_POLYMARKET=1
 FEATURE_WALLET_APPKIT=1
 FEATURE_BASE_PAYMENTS=1
@@ -303,8 +303,8 @@ NODE_ENV=production
 X402_MOCK=0
 ENABLE_SERVER_PAY=0
 
-ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+ENABLED_NETWORKS=xlayer,base,arbitrum,arc
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc
 FEATURE_POLYMARKET=1
 FEATURE_WALLET_APPKIT=1
 FEATURE_BASE_PAYMENTS=1
@@ -318,7 +318,7 @@ FEATURE_DIVERGENCE_ANALYSIS=0
 FEATURE_EVENT_RISK_ANALYSIS=0
 CIRCLE_GATEWAY_ENABLED=1
 BAZAAR_DISCOVERABLE=1
-ARC_AI_MODE=fixture
+ARC_AI_MODE=live
 ```
 
 Use `ARC_AI_MODE=fixture` only for a pre-release plumbing canary that is explicitly labelled as non-analytical. A production surface offering Base/Premium Arc reports must use `ARC_AI_MODE=live`; enabling Arc payments alone does not enable xAI. `FEATURE_LIVE_SAFETY=1` enables factual contract/interface probes and exact transaction simulation; legacy heuristic scores remain X Layer-only and explicitly non-live.
@@ -342,7 +342,7 @@ Recommended staged changes from the canary:
 3. Enable `FEATURE_POLYMARKET=1`; this is data functionality and does not enable a new payment chain. Then enable the four new analysis flags individually after their route tests pass.
 4. Add `base` to both network lists, then set `FEATURE_BASE_PAYMENTS=1`.
 5. Add `arbitrum`, then set `FEATURE_ARBITRUM_PAYMENTS=1`.
-6. Add `arc-testnet`, set `FEATURE_ARC_PAYMENTS=1` and `CIRCLE_GATEWAY_ENABLED=1`, while keeping fixture AI.
+6. Add `arc`, set `FEATURE_ARC_PAYMENTS=1` and `CIRCLE_GATEWAY_ENABLED=1`, with ARC_AI_MODE=live and verified production Gateway support.
 7. Set `BAZAAR_DISCOVERABLE=1` only when Base and Arbitrum metadata validates and controlled CDP settlements are ready to create listings.
 
 ## Provider configuration
@@ -375,12 +375,12 @@ Base and Arbitrum share CDP credentials but use separate CAIP-2 IDs, native USDC
 The initial Arc seller path requires a receiving EVM address and Gateway URL, not Circle developer-controlled-wallet credentials:
 
 ```env
-CIRCLE_GATEWAY_TESTNET_URL=https://gateway-api-testnet.circle.com
-CIRCLE_GATEWAY_ACCEPTED_NETWORKS=eip155:5042002
+CIRCLE_GATEWAY_MAINNET_URL=https://gateway-api.circle.com
+CIRCLE_GATEWAY_ACCEPTED_NETWORKS=eip155:5042
 CIRCLE_GATEWAY_SELLER_ADDRESS=<seller EVM address>
 ```
 
-`CIRCLE_ENTITY_SECRET` and `CIRCLE_WALLET_SET_ID` remain intentionally absent. They belong to Developer-Controlled Wallets. PULSE uses Circle **User-Controlled Wallets**: email OTP plus the Circle browser approval UI, with wallets explicitly created as EOAs. Configure a Circle Testnet `CIRCLE_API_KEY` on the API and its matching `VITE_CIRCLE_APP_ID` on the web. The API key creates short-lived authentication and signing challenges but cannot sign without the user's Circle approval. This Circle email-wallet integration is Arc Testnet-only. X Layer, Base, and Arbitrum remain available through browser wallets and are hidden while a Circle email session is active. A Circle Mainnet key is not required for this rollout.
+`CIRCLE_ENTITY_SECRET` and `CIRCLE_WALLET_SET_ID` remain intentionally absent. They belong to Developer-Controlled Wallets. PULSE uses Circle **User-Controlled Wallets**: email OTP plus the Circle browser approval UI, with wallets explicitly created as EOAs. Configure `CIRCLE_API_KEY_MAINNET` from the Circle mainnet project on the API and its matching `VITE_CIRCLE_APP_ID` from Wallets ? User Controlled ? Configurator on the web. The API key creates short-lived authentication and signing challenges but cannot sign without the user's Circle approval. This Circle email-wallet integration is Arc Mainnet-only. X Layer, Base, and Arbitrum remain available through browser wallets and are hidden while a Circle email session is active. A production Circle key and App ID are required for Arc mainnet email wallets. Configure mainnet email/SMTP, restart the API and rebuild the web app. Testnet sessions and wallets are not reused.
 
 CCTP is also not required for accepting the initial Arc Gateway payment. Add CCTP configuration only when PULSE implements an in-product USDC bridge or withdrawal flow.
 
@@ -444,3 +444,5 @@ Environment settings for the supplied public store:
 | Local `.env` | development copies only; file remains gitignored |
 
 Any credential pasted into chat, logs, screenshots, or tickets must be rotated before production use.
+
+Arc mainnet deployment, execution variables and release acceptance: [Arc migration audit](ARC_MAINNET_MIGRATION.md).

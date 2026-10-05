@@ -1,0 +1,45 @@
+{
+  "chainId": 5042,
+  "transactions": [
+    {
+      "functionName": "setRouter",
+      "address": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "role": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "hash": "0xf4200a089294fcd9e21c44dca9018fd4af3657f076992e6711fa14e0946e40b2",
+      "nonce": 9,
+      "status": "success",
+      "maxGasUSDC": "0.00138192063338",
+      "gasUSDC": "0.000913660502513"
+    },
+    {
+      "functionName": "setSpender",
+      "address": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "role": "0x2B9899bC46Bf0eE094225995f4bD496d42f261Af",
+      "hash": "0x0bb8c4bfb89a068b5261aa8a0ce490e12cb3fc4844bcd094b0792ed4b8b207b6",
+      "nonce": 10,
+      "status": "success",
+      "maxGasUSDC": "0.001380624874855408",
+      "gasUSDC": "0.00091280069409312"
+    },
+    {
+      "functionName": "setSpotKeeper",
+      "address": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "role": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+      "hash": "0x9c9788014f3f52e7e598c3aa5d7fbc4a1ebd647bf7e26bed64ec98c9ed315981",
+      "nonce": 11,
+      "status": "success",
+      "maxGasUSDC": "0.00143216882708107",
+      "gasUSDC": "0.000952216415142435"
+    },
+    {
+      "functionName": "setAutopilotExecutor",
+      "address": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "role": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+      "hash": "0x1191c8651832421ec75040e4ef31f51974dceb64e9a3d336ea8b45e3851f7468",
+      "nonce": 12,
+      "status": "success",
+      "maxGasUSDC": "0.001435445264601416",
+      "gasUSDC": "0.000955150048180635"
+    }
+  ]
+}

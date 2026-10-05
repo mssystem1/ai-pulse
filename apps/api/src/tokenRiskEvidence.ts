@@ -4,6 +4,7 @@ import type { AppConfig, NetworkKey, PulseNetwork } from "@pulse/config";
 import { getXLayerOkxTokens } from "./okxDex.js";
 import { collectGeckoEvidence, optionalNumber } from "./geckoEvidence.js";
 import { collectRobinhoodEvidence } from "./robinhoodEvidence.js";
+import { collectLiveContractEvidence } from "./contractInspect.js";
 
 const BLOCKSCOUT: Partial<Record<NetworkKey, string>> = { base: "https://base.blockscout.com", arbitrum: "https://arbitrum.blockscout.com", robinhood: "https://robinhoodchain.blockscout.com" };
 
@@ -136,6 +137,11 @@ export async function collectTokenRiskEvidence(input: {
   const { cfg, networkKey, network, address } = input;
   const geckoPromise = collectGeckoEvidence(networkKey, address);
   const robinhoodPromise = networkKey === "robinhood" ? collectRobinhoodEvidence(address, cfg.ROBINHOOD_RPC_URL) : Promise.resolve([]);
+  const arcPromise: Promise<SourceResult[]> = networkKey === "arc"
+    ? collectLiveContractEvidence({ address, rpcUrl: [cfg.ARC_RPC_URL, cfg.ARC_RPC_FALLBACK_URL].filter(Boolean), chainId: "5042", expectedChainHex: "0x13b2", network: "Arc Mainnet" })
+      .then(data => [{ source: "Arc mainnet RPC evidence", status: "observed" as const, data }])
+      .catch(() => [{ source: "Arc mainnet RPC evidence", status: "unavailable" as const, error: "Live Arc RPC evidence unavailable; no safety inference made" }])
+    : Promise.resolve([]);
   const blockscoutBase = BLOCKSCOUT[networkKey];
   const blockscoutUrl = (path: string) => {
     // PRO keys belong to the unified gateway, not the explorer's MyAccount API.
@@ -173,8 +179,8 @@ export async function collectTokenRiskEvidence(input: {
   return {
     observedAt: new Date().toISOString(), network: { key: networkKey, label: network.label, chainId: String(network.chainId), environment: network.environment },
     tokenAddress: address.toLowerCase(),
-    sources: [...geckoSources, okxSource, ...blockscoutSources, ...await robinhoodPromise, websiteSource],
-    onchainAuthority: networkKey === "robinhood" ? "Robinhood RPC, Sourcify and indexed Blockscout evidence where available" : networkKey === "xlayer" ? "OKX Onchain OS API" : blockscoutBase ? "Blockscout API" : "No indexed on-chain provider configured",
+    sources: [...geckoSources, okxSource, ...blockscoutSources, ...await robinhoodPromise, ...await arcPromise, websiteSource],
+    onchainAuthority: networkKey === "arc" ? "Arc mainnet RPC; missing indexed evidence remains unknown" : networkKey === "robinhood" ? "Robinhood RPC, Sourcify and indexed Blockscout evidence where available" : networkKey === "xlayer" ? "OKX Onchain OS API" : blockscoutBase ? "Blockscout API" : "No indexed on-chain provider configured",
     sourcePolicy: "GeckoTerminal is the primary token, pool and project-profile source. Only supplied observations may support the score. HTTP failures lower evidence confidence; they are not observed contract vulnerabilities or proof of absent community activity. GeckoTerminal score and metadata verification are attributed provider observations, not PULSE's score or a contract audit. Holder concentration includes pools, exchanges and treasuries unless addresses are classified. Social handles establish links, not posting frequency or engagement; promotion activity is not evaluated by this source set. Website claims are untrusted project statements. Market cap is not safety, FDV is not verified market cap, and pool age is not contract age.",
   };
 }

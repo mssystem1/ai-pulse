@@ -18,6 +18,7 @@ import { buildMarketContext, listSpotInstruments } from "@pulse/market";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, robinhoodAutopilotContext, resolveRobinhoodMarket } from "./robinhoodMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
+import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -37,6 +38,8 @@ import { observeProvider, recordAiUsage } from "./telemetry.js";
 import { deliverTelegramReportDurably } from "./telegram.js";
 import { boundedBuyAmount, valuedPositionBalance } from "./autopilotPolicy.js";
 import { validateRobinhoodSwap } from "./robinhoodFunding.js";
+import { validateArcSwap } from "./arcSwap.js";
+import { arcExecutionFees } from "./arcExecutionFees.js";
 import { robinhoodAutomationReadiness } from "./robinhoodExecutionReadiness.js";
 
 type StrategyEvaluation = {
@@ -128,6 +131,16 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const NATIVE_TOKEN = /^0x[eE]{40}$/;
 const Erc20AddressSchema = z.string().regex(ADDRESS).refine((value) => !NATIVE_TOKEN.test(value), "Autopilot assets must be ERC-20 contracts; use the wrapped native asset");
 const configs = {
+  arc: {
+    id: 5042,
+    rpc: () => process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io",
+    rpcFallback: () => process.env.ARC_RPC_FALLBACK_URL || "https://rpc.quicknode.mainnet.arc.io",
+    oracle: () => executionContractAddress("arc", "oracleRouter"),
+    adapter: () => executionContractAddress("arc", "executionAdapter"),
+    router: () => executionContractAddress("arc", "okxRouter"),
+    spender: () => executionContractAddress("arc", "okxApproval"),
+    factory: () => executionContractAddress("arc", "autopilotFactory"),
+  },
   robinhood: {
     id: 4663,
     rpc: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
@@ -171,7 +184,7 @@ const configs = {
 } as const;
 const StrategySchema = z.object({
   owner: z.string().regex(ADDRESS),
-  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]),
   vault: z.string().regex(ADDRESS),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
@@ -201,7 +214,7 @@ const StrategySchema = z.object({
   }),
 });
 const StrategyPreflightSchema = z.object({
-  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
   pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
@@ -322,7 +335,7 @@ const POTENTIAL_GAINER_PAIRS = ["BTC-USDT", "ETH-USDT", "SOL-USDT", "DOGE-USDT",
 const potentialGainerCache = new Map<string, { expiresAt: number; value: unknown[] }>();
 const potentialGainerInflight = new Map<string, Promise<unknown[]>>();
 
-async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D", cfg: AppConfig, network: "xlayer" | "base" | "arbitrum", erc20: boolean) {
+async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D", cfg: AppConfig, network: "xlayer" | "base" | "arbitrum" | "arc", erc20: boolean) {
   const cacheKey = `${network}:${erc20 ? "erc20" : "wallet"}:${timeframe}`;
   const cached = potentialGainerCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) return cached.value;
@@ -341,7 +354,7 @@ async function scanPotentialGainers(timeframe: "15m" | "1H" | "4H" | "1D", cfg: 
   const pending = potentialGainerInflight.get(cacheKey);
   if (pending) return pending;
   const request = (async () => {
-    const chainId = network === "arbitrum" ? "42161" : network === "base" ? "8453" : "196";
+    const chainId = String(configs[network].id);
     const [tokens, instruments] = await Promise.all([getOkxTradeTokens(cfg, chainId, "", 5000), listSpotInstruments(5000)]);
     const universe = opportunityUniverse({ chainId, erc20, tokens, instruments, researchPairs: POTENTIAL_GAINER_PAIRS });
     const scanPairs = universe.pairs;
@@ -454,7 +467,7 @@ function clients(network: Network, key?: `0x${string}`) {
     name: network,
     nativeCurrency: {
       name: "Native",
-      symbol: network === "xlayer" ? "OKB" : "ETH",
+      symbol: network === "xlayer" ? "OKB" : network === "arc" ? "USDC" : "ETH",
       decimals: 18,
     },
     rpcUrls: { default: { http: urls } },
@@ -727,7 +740,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
     res.json({ ready: true });
   }));
   router.get("/v1/autopilot/configuration", asyncRoute(async (req, res) => {
-    const parsed = z.object({ network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]), vault: z.string().regex(/^0x[a-fA-F0-9]{40}$/), asset: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).safeParse(req.query);
+    const parsed = z.object({ network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]), vault: z.string().regex(/^0x[a-fA-F0-9]{40}$/), asset: z.string().regex(/^0x[a-fA-F0-9]{40}$/) }).safeParse(req.query);
     if (!parsed.success) return res.status(400).json({ error: "Select a valid network, vault and asset" });
     res.setHeader("Cache-Control", "no-store");
     const { network, vault, asset } = parsed.data;
@@ -736,7 +749,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
   const potentialGainersHandler = asyncRoute(async (req, res) => {
     const parsed = z.enum(["15m", "1H", "4H", "1D"]).safeParse(String(req.query.timeframe || "1H"));
     if (!parsed.success) return res.status(400).json({ error: "timeframe must be 15m, 1H, 4H or 1D" });
-    const network = z.enum(["xlayer", "base", "arbitrum"]).safeParse(req.query.network || "xlayer");
+    const network = z.enum(["xlayer", "base", "arbitrum", "arc"]).safeParse(req.query.network || "xlayer");
     if (!network.success) return res.status(400).json({ error: "Select a supported execution network" });
     const candidates = await scanPotentialGainers(parsed.data, cfg, network.data, req.query.custody === "erc20");
     res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=240");
@@ -1022,6 +1035,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
     );
     const activeItems = items.filter((x) => x.status === "active" && Object.hasOwn(configs, x.network)
       && (x.network !== "robinhood" || process.env.FEATURE_ROBINHOOD_TRADING === "1")
+      && (x.network !== "arc" || process.env.FEATURE_ARC_TRADING === "1")
       && (!scope || (x.network === scope.network && x.vault.toLowerCase() === scope.vault.toLowerCase())));
     const scheduled = [
       ...activeItems.map((strategy) => ({ strategy, mode: "risk" as const })),
@@ -1037,6 +1051,10 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
       let executionHash: `0x${string}` | undefined;
       let evaluatedDecision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
       try {
+        if (s.network === "arc") {
+          const readiness = await arcAutomationReadiness(cfg);
+          if (!readiness.ready) throw new Error(readiness.reason);
+        }
         assertExecutionMarketIdentity(s.network, s.pair);
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
@@ -1501,7 +1519,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           action: decision.action, sellAmount: amount, priceE18: price,
           targetDecimals: Number(targetDecimals), settlementDecimals: Number(settlementDecimals), slippageBps: BigInt(slippage),
         });
-        if (decision.action === "sell" && s.network === "robinhood" && BigInt(String(prepared.quote?.toTokenAmount || "0")) < oracleMinimum) {
+        if (decision.action === "sell" && (s.network === "robinhood" || s.network === "arc") && BigInt(String(prepared.quote?.toTokenAmount || "0")) < oracleMinimum) {
           // Gas-optimized default routing can return less than another source.
           // Probe once; unavailable alternatives never relax the vault guard.
           prepared = await betterGenericOkxExitSwap(cfg, { chainId: String(c.id), fromTokenAddress: sellToken,
@@ -1516,6 +1534,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             "Autopilot prepared route failed router/value policy",
           );
         if (s.network === "robinhood") validateRobinhoodSwap(prepared, { from: sellToken, to: buyToken, amount: String(amount), receiver: adapter!, slippageBps: Number(slippage) });
+        const arcExpiresAt = s.network === "arc" ? (await validateArcSwap(prepared, { from: sellToken, to: buyToken, amount: String(amount), receiver: adapter!, slippageBps: Number(slippage) })).expiresAt : undefined;
         const quoted = BigInt(String(prepared.quote?.toTokenAmount || "0"));
         const quoteMinimum = (quoted * (10000n - BigInt(slippage))) / 10000n;
         if (quoted < oracleMinimum) {
@@ -1561,7 +1580,11 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           enforcedMinimum: String(minOut),
           policyHash: keccak256(toHex(JSON.stringify(s.policy))),
         });
+        if (arcExpiresAt && Date.now() + 3000 >= arcExpiresAt) throw new Error("Arc execution quote expired before oracle submission; refresh the route");
+        const priceFees = s.network === "arc" ? await arcExecutionFees(publicClient, { account: walletClient.account!, to: oracle as `0x${string}`,
+          data: encodeFunctionData({ abi: oracleAbi, functionName: "setPrice", args: [s.targetAsset as `0x${string}`, s.settlementAsset as `0x${string}`, price, 300n] }) }) : {};
         const priceTx = await walletClient.writeContract({
+          ...priceFees,
           account: walletClient.account,
           address: oracle as `0x${string}`,
           abi: oracleAbi,
@@ -1629,8 +1652,11 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           s.updatedAt = new Date().toISOString();
           await save([s], "runtime");
         }
+        const executionFees = s.network === "arc" ? await arcExecutionFees(publicClient, { account: walletClient.account!, to: vault,
+          data: encodeFunctionData({ abi: vaultReadAbi, functionName: "execute", args: simulation.request.args }) }) : {};
+        if (arcExpiresAt && Date.now() + 3000 >= arcExpiresAt) throw new Error("Arc execution quote expired before signing; refresh the route");
         executionPhase = "submitted";
-        const txHash = await walletClient.writeContract(simulation.request);
+        const txHash = await walletClient.writeContract({ ...simulation.request, ...executionFees });
         executionHash = txHash;
         s.lastTxHash = txHash;
         const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;

@@ -187,7 +187,7 @@ const COPY: Record<Lang, Copy> = {
     noReportsBody: "Reports purchased in this browser will be recoverable here without paying again.",
     globalReport: "Global report",
     predictionReport: "Prediction report",
-    arcExecution: "Spot and Autopilot are unavailable on Arc Testnet; analysis and Risk Guard remain available.",
+    arcExecution: "Arc mainnet Spot and Autopilot availability depends on verified deployments and live routes.",
     statusEyebrow: "STATUS",
     walletContracts: "WALLET & CONTRACTS",
     ownerControlled: "OWNER CONTROLLED",
@@ -373,7 +373,7 @@ export function OverviewWorkspace({
     request.current?.abort();
     const controller=new AbortController(); request.current=controller;
     setRefreshVersion((value) => value + 1);
-    if (!wallet || networkKey === "arc-testnet") {
+    if (!wallet) {
       setActivity([]);
       setOrders([]);
       setStrategies([]);
@@ -445,7 +445,7 @@ export function OverviewWorkspace({
   const spotPerformance = spotTradePerformance(activity, marks);
   const openSpotPnl = spotPerformance.openPnlPct;
   const realizedSpotPnl = spotPerformance.realizedPct;
-  const executionAvailable = networkKey !== "arc-testnet";
+  const executionAvailable = true;
   const globalReportCount = reports.filter((report) => report.scope === "spot").length;
   const predictionReportCount = reports.filter((report) => report.scope === "prediction").length;
   const allocation = strategies.map(strategy => {
@@ -475,7 +475,6 @@ export function OverviewWorkspace({
         </button>
       </header>
 
-      {networkKey === "arc-testnet" && <div className="overview-network-note">{copy.arcExecution}</div>}
 
       {executionAvailable && <div className="overview-domain-grid">
         <section className="card overview-domain-summary spot">

@@ -21,7 +21,7 @@ export type PaymentChallenge = {
     amount: string;
     payTo: string;
     maxTimeoutSeconds: number;
-    extra: { name: string; version: string };
+    extra: { name: string; version: string; verifyingContract?: string };
   }>;
 };
 
@@ -49,7 +49,7 @@ export function buildChallenge(
         amount: usdToAtomic(priceUsd),
         payTo: cfg.PAY_TO_ADDRESS,
         maxTimeoutSeconds: 300,
-        extra: { name: "USD₮0", version: "1" },
+        extra: cfg.X402_NETWORK === "eip155:5042" ? { name: "GatewayWalletBatched", version: "1", verifyingContract: "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE" } : { name: "USD₮0", version: "1" },
       },
     ],
   };
@@ -86,7 +86,7 @@ export function createX402Middleware(cfg: AppConfig): RequestHandler {
     const effectiveCfg = {
       ...cfg, X402_NETWORK: network.caip2,
       X402_ASSET: network.paymentAsset.address || cfg.X402_ASSET,
-      PAY_TO_ADDRESS: networkKey === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+      PAY_TO_ADDRESS: networkKey === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
     };
     const publicPath = req.originalUrl.split("?")[0] || path;
     const challenge = buildChallenge(effectiveCfg, publicPath, route.priceUsd, route.description, path);
@@ -135,10 +135,10 @@ function normalizePath(path: string): string {
 /**
  * Official OKX x402 middleware when paymentMode=okx, else mock gate.
  */
-export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler } = {}): RequestHandler {
+export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler; circle?: RequestHandler } = {}): RequestHandler {
   const mock = createX402Middleware(cfg);
   const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_SELLER_ADDRESS
-    ? createCircleGatewayPaymentMiddleware(cfg) : null;
+    ? adapters.circle || createCircleGatewayPaymentMiddleware(cfg) : null;
   const cdp = (cfg.FEATURE_BASE_PAYMENTS || cfg.FEATURE_ARBITRUM_PAYMENTS) && cfg.CDP_API_KEY_ID && cfg.CDP_API_KEY_SECRET
     ? createCdpPaymentMiddleware(cfg) : null;
   const xlayer = cfg.paymentMode === "okx" ? (() => {
@@ -154,11 +154,11 @@ export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: Reques
       if (cfg.FEATURE_ROBINHOOD_PAYMENTS && adapters.robinhood) return adapters.robinhood(req, res, next);
       return res.status(503).json({ error: "Robinhood USDG settlement is awaiting readiness verification; no payment requested", code: "robinhood_payments_unavailable" });
     }
-    if (cfg.paymentMode === "mock") return mock(req, res, next);
-    if (networkKey === "arc-testnet") {
+    if (networkKey === "arc") {
       if (!circle) return res.status(503).json({ error: "Circle Gateway payment adapter is disabled" });
       return circle(req, res, next);
     }
+    if (cfg.paymentMode === "mock") return mock(req, res, next);
     if (networkKey === "base" || networkKey === "arbitrum") {
       if (!cdp) return res.status(503).json({ error: "CDP payment adapter is not initialized" });
       return cdp(req, res, next);
@@ -170,6 +170,7 @@ export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: Reques
 export { createMcpPaymentGate } from "./mcpGate.js";
 export { createOkxPaymentMiddleware } from "./okxMiddleware.js";
 export { createCircleGatewayPaymentMiddleware } from "./circleMiddleware.js";
+export type { CirclePaymentAttempt, CirclePaymentJournal } from "./circleMiddleware.js";
 export { createCdpPaymentMiddleware } from "./cdpMiddleware.js";
 export { createCdpJwt } from "./cdpAuth.js";
 export { settleRobinhoodPayment, type RobinhoodAttempt, type RobinhoodJournal, type RobinhoodObserver } from "./robinhoodSettlement.js";

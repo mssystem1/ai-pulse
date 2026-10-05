@@ -13,6 +13,8 @@ import { validateRobinhoodSwap } from "./robinhoodFunding.js";
 import { isRobinhoodMarket, resolveRobinhoodMarket, robinhoodMarketCatalog, robinhoodMarketId, executionSettlementTicker } from "./robinhoodMarkets.js";
 import { ROBINHOOD_USDG, NATIVE_ETH, robinhoodExecutionIdentity } from "./robinhoodExecutionAssets.js";
 import { robinhoodAutomationReadiness } from "./robinhoodExecutionReadiness.js";
+import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
+import { validateArcSwap } from "./arcSwap.js";
 import {
   executionContractAddress,
   executionContracts,
@@ -21,6 +23,7 @@ import {
 const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 const HASH = /^0x[a-fA-F0-9]{64}$/;
 const NETWORKS = {
+  arc: { chainId: "5042", rpc: () => process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io", prefix: "ARC" },
   robinhood: { chainId: "4663", prefix: "ROBINHOOD", rpc: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com" },
   xlayer: { chainId: "196", prefix: "XLAYER", rpc: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech" },
   base: { chainId: "8453", prefix: "BASE", rpc: () => process.env.BASE_RPC_URL || "https://mainnet.base.org" },
@@ -28,7 +31,7 @@ const NETWORKS = {
 } as const;
 
 export const TradeSchema = z.object({
-  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]),
   fromTokenAddress: z.string().regex(ADDRESS),
   toTokenAddress: z.string().regex(ADDRESS),
   amount: z.string().regex(/^\d{1,78}$/).refine((v) => BigInt(v) > 0n),
@@ -45,7 +48,6 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
   router.get("/v1/trading/capabilities", asyncRoute(async (req, res) => {
     res.setHeader("Cache-Control", "no-store");
     const network = String(req.query.network || "xlayer");
-    if (network === "arc-testnet") return res.json({ product: "PULSE", network, analysis: true, spot: { visible: false, enabled: false }, autopilot: { visible: false, enabled: false }, reasons: { spot: "Arc Testnet is analysis/payment only", autopilot: "Arc Testnet is analysis/payment only" } });
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     if (!chain) return res.status(400).json({ error: "Unsupported network" });
     const contracts = executionContracts(network as keyof typeof NETWORKS);
@@ -53,7 +55,8 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
       spot: { visible: cfg.FEATURE_TRADING, enabled: false, market: false, limit: false, bracket: false, protectedOrders: false },
       autopilot: { visible: cfg.FEATURE_AUTOPILOT, enabled: false }, contracts,
       reasons: { spot: "Robinhood execution qualification is not enabled", autopilot: "Robinhood execution qualification is not enabled" } });
-    const onchainReadiness = network === "robinhood" ? await robinhoodAutomationReadiness(cfg) : { ready: true };
+    const onchainReadiness = network === "robinhood" ? await robinhoodAutomationReadiness(cfg) : network === "arc" ? await arcAutomationReadiness(cfg) : { ready: true };
+    const marketReady = cfg.hasOkxCredentials && (network !== "arc" || onchainReadiness.ready);
     const automationReady = onchainReadiness.ready && process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY || "");
     const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(kvConfigured() && process.env.BLOB_READ_WRITE_TOKEN);
     res.json({
@@ -62,7 +65,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
       chainId: Number(chain.chainId),
       analysis: { base: true, premium: true },
       payment: { x402: true },
-      spot: { visible: cfg.FEATURE_TRADING, enabled: cfg.FEATURE_TRADING && cfg.hasOkxCredentials, market: cfg.hasOkxCredentials, limit: automationReady && Boolean(contracts.spotLimitFactory && contracts.oracleRouter && contracts.executionAdapter), bracket: automationReady && Boolean(contracts.spotBracketFactory && contracts.oracleRouter && contracts.executionAdapter), protectedOrders: automationReady && Boolean(contracts.spotFactory && contracts.oracleRouter && contracts.executionAdapter) },
+      spot: { visible: cfg.FEATURE_TRADING, enabled: cfg.FEATURE_TRADING && marketReady, market: marketReady, limit: automationReady && Boolean(contracts.spotLimitFactory && contracts.oracleRouter && contracts.executionAdapter), bracket: automationReady && Boolean(contracts.spotBracketFactory && contracts.oracleRouter && contracts.executionAdapter), protectedOrders: automationReady && Boolean(contracts.spotFactory && contracts.oracleRouter && contracts.executionAdapter) },
       autopilot: { visible: cfg.FEATURE_AUTOPILOT, enabled: cfg.FEATURE_AUTOPILOT && autopilotRuntimeReady && Boolean(contracts.autopilotFactory && contracts.executionAdapter) && !cfg.AUTOPILOT_KILL_SWITCH },
       contracts,
       contractAddressSource: "published_release_with_environment_override",
@@ -110,7 +113,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     const chain = NETWORKS[network as keyof typeof NETWORKS];
     const query = String(req.query.q || "").slice(0, 80);
     const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 100);
-    if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum or Robinhood" });
+    if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum, Robinhood or Arc mainnet" });
     try {
       const tokens = await getOkxTradeTokens(cfg, chain.chainId, query, limit);
       res.json({ network, chainId: chain.chainId, provider: "OKX Onchain OS", tokens });
@@ -125,7 +128,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     const query = String(req.query.q || "").trim().toUpperCase().slice(0, 80);
     const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 1_000);
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
-    if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum or Robinhood" });
+    if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum, Robinhood or Arc mainnet" });
     if (network === "robinhood") {
       try {
         const catalog = await robinhoodMarketCatalog(cfg, erc20Custody);
@@ -264,6 +267,10 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     const parsed = TradeSchema.extend({ userWalletAddress: z.string().regex(ADDRESS) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     if (parsed.data.network === "robinhood" && process.env.FEATURE_ROBINHOOD_TRADING !== "1") return res.status(503).json({ error: "Robinhood execution is not enabled" });
+    if (parsed.data.network === "arc") {
+      const readiness = await arcAutomationReadiness(cfg);
+      if (!readiness.ready) return res.status(503).json({ error: readiness.reason });
+    }
     try {
       const chainId = NETWORKS[parsed.data.network].chainId;
       let effectiveSlippage = parsed.data.slippagePercent;
@@ -285,7 +292,9 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
         maxAutoSlippagePercent: String(parsed.data.maxAutoSlippagePercent),
       });
       const approvedRouter = executionContractAddress(parsed.data.network, "okxRouter");
+      let expiresAt = Date.now() + 30_000;
       if (parsed.data.network === "robinhood") validateRobinhoodSwap(prepared, { from: parsed.data.fromTokenAddress, to: parsed.data.toTokenAddress, amount: parsed.data.amount, receiver: parsed.data.userWalletAddress, slippageBps: Math.ceil(effectiveSlippage * 100) });
+      if (parsed.data.network === "arc") expiresAt = (await validateArcSwap(prepared, { from: parsed.data.fromTokenAddress, to: parsed.data.toTokenAddress, amount: parsed.data.amount, receiver: parsed.data.userWalletAddress, slippageBps: Math.ceil(effectiveSlippage * 100) })).expiresAt;
       const approvalAddress = executionContractAddress(parsed.data.network, "okxApproval");
       const quotedFrom = String(prepared.quote?.fromToken?.address || "").toLowerCase();
       const quotedTo = String(prepared.quote?.toToken?.address || "").toLowerCase();
@@ -299,7 +308,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
       const native = parsed.data.fromTokenAddress.toLowerCase() === "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
       if ((!native && BigInt(prepared.tx.value) !== 0n) || (native && BigInt(prepared.tx.value) !== BigInt(parsed.data.amount)))
         throw new Error("OKX prepared transaction native value does not match the requested sell amount");
-      res.json({ service: "spot_swap_prepared", provider: "OKX Onchain OS", approvalAddress, expiresAt: new Date(Date.now() + 30_000).toISOString(), ...prepared });
+      res.json({ service: "spot_swap_prepared", provider: "OKX Onchain OS", approvalAddress, expiresAt: new Date(expiresAt).toISOString(), ...prepared });
     } catch (error) { res.status(502).json({ error: error instanceof Error ? error.message : String(error) }); }
   }));
 
@@ -315,7 +324,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
   router.post("/v1/trading/activity", asyncRoute(async (req, res) => {
     // Browser activity is only an announcement. Confirmation is derived from the
     // chain receipt by reconcileV6Activity; clients cannot assert settlement.
-    const schema = z.object({ owner: z.string().regex(ADDRESS), network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]), source: z.enum(["wallet", "spot", "autopilot", "limit"]), kind: z.string().min(1).max(64), status: z.literal("pending"), txHash: z.string().regex(HASH), account: z.string().regex(ADDRESS).optional(), pair: z.string().max(64).optional(), executionPair: z.string().max(64).optional(), amount: z.string().regex(/^\d{1,78}$/).optional() });
+    const schema = z.object({ owner: z.string().regex(ADDRESS), network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]), source: z.enum(["wallet", "spot", "autopilot", "limit"]), kind: z.string().min(1).max(64), status: z.literal("pending"), txHash: z.string().regex(HASH), account: z.string().regex(ADDRESS).optional(), pair: z.string().max(64).optional(), executionPair: z.string().max(64).optional(), amount: z.string().regex(/^\d{1,78}$/).optional() });
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     const activity = await recordV6Activity(parsed.data);

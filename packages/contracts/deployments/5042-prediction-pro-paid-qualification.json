@@ -1,0 +1,14 @@
+{
+  "service": "prediction-pro",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "paidUSDC": 0.3,
+  "reportJobId": "f41ca207-80a2-4adf-a74a-f7fa31983942",
+  "stage": "completed",
+  "liveReport": true,
+  "sdkRecovery": true,
+  "unauthorizedStatus": 403,
+  "sameJobOnReplay": true,
+  "observedGatewayChangeUSDC": 0.3,
+  "finality": "gateway_batch_accepted",
+  "qualifiedAt": "2026-10-04T20:59:59.053Z"
+}

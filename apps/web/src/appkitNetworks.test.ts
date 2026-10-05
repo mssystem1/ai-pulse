@@ -30,5 +30,5 @@ test("Robinhood is mainnet 4663 with ETH gas, not USDG gas", () => {
 test("AppKit respects disabled networks, order, duplicates and empty configuration", () => {
   assert.deepEqual(buildAppKitNetworks(["base", "xlayer", "base"]).map(chain => chain.id), [8453, 196]);
   assert.deepEqual(buildAppKitNetworks([]).map(chain => chain.id), [196]);
-  assert.equal(buildAppKitNetworks(["arc-testnet"])[0].testnet, true);
+  assert.notEqual(buildAppKitNetworks(["arc"])[0].testnet, true);
 });

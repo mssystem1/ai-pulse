@@ -5,6 +5,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 import { createCircleWalletRouter } from "./circleWallet.js";
+import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { createTradeAutomationRouter } from "./tradeAutomation.js";
 import { normalizeExecutionRpcUrls } from "./onchainDiscovery.js";
 import { autopilotPassTargetExists, createAutopilotAutomationRouter, grantAutopilotPass } from "./autopilotAutomation.js";
@@ -89,6 +90,7 @@ import { reportDelivery, fullReportDelivery } from "./reportDelivery.js";
 import { optionalNumber } from "./geckoEvidence.js";
 import { createPublicActivityStore, jobResearchDelivery, researchDelivery } from "./publicActivity.js";
 import { createRobinhoodPaymentRuntime } from "./robinhoodPaymentRuntime.js";
+import { createCirclePaymentRuntime } from "./circlePaymentRuntime.js";
 import { paidReplayRecoveryToken, verifyPaidReplayRecoveryToken } from "./paidJobRecovery.js";
 import { prepareRobinhoodFunding, robinhoodFundingFailureCode } from "./robinhoodFunding.js";
 
@@ -180,7 +182,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     walletDaily: cfg.ARC_LIVE_WALLET_DAILY_LIMIT, dailyCostMicrousd: Math.floor(cfg.ARC_LIVE_DAILY_COST_LIMIT_USD * 1_000_000),
   });
   app.set("trust proxy", true);
-    
+
   app.use(cors({ exposedHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE"] }));
   app.use(express.json({ limit: "12mb" }));
   app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
@@ -224,7 +226,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     }
   });
 
-  const networkAliases = { xlayer: "xlayer", base: "base", arbitrum: "arbitrum", arc: "arc-testnet", robinhood: "robinhood" } as const;
+  const networkAliases = { xlayer: "xlayer", base: "base", arbitrum: "arbitrum", arc: "arc", robinhood: "robinhood" } as const;
   app.use((req, res, next) => {
     const match = req.url.match(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/);
     const alias = match?.[1] as keyof typeof networkAliases | undefined;
@@ -233,7 +235,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const enabled = networkKey === "xlayer" || networkKey === "robinhood"
       || (networkKey === "base" && cfg.FEATURE_BASE_PAYMENTS)
       || (networkKey === "arbitrum" && cfg.FEATURE_ARBITRUM_PAYMENTS)
-      || (networkKey === "arc-testnet" && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_ENABLED);
+      || (networkKey === "arc" && cfg.FEATURE_ARC_MAINNET && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_ENABLED);
     if (!enabled) return res.status(404).json({ error: `Network payment route disabled: ${networkKey}` });
     const network = cfg.enabledNetworks.includes(networkKey) ? networkKey : "xlayer";
     Object.assign(req, { pulseNetworkKey: network });
@@ -283,7 +285,11 @@ export function createApp(cfg: AppConfig, dependencies: {
     });
   });
 
-  app.get("/v1/meta", (_req, res) => {
+  app.get("/v1/meta", (req, res) => {
+    const selected = req.query.network === undefined ? (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer"
+      : cfg.enabledNetworks.find(key => key === req.query.network);
+    if (!selected) return res.status(400).json({ error: "Select an enabled PULSE network" });
+    const network = getNetwork(selected);
     res.json({
       name: cfg.productName,
       tagline: cfg.productTagline,
@@ -291,10 +297,13 @@ export function createApp(cfg: AppConfig, dependencies: {
       description: cfg.productShortDescription,
       logo: cfg.logoUrl,
       methodology_version: cfg.methodologyVersion,
-      network: cfg.X402_NETWORK,
-      asset: cfg.X402_ASSET,
+      network: network.caip2,
+      networkKey: selected,
+      chainId: network.chainId,
+      asset: network.paymentAsset.symbol,
+      paymentProvider: network.paymentProvider,
       paymentMode: cfg.paymentMode,
-      payTo: cfg.PAY_TO_ADDRESS,
+      payTo: selected === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
       grokModel: cfg.GROK_MODEL,
       hasXaiKey: cfg.hasXaiKey,
       languages: ["en", "zh"],
@@ -798,6 +807,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     return verifyRecoveryToken(job, token) || verifyPaidReplayRecoveryToken(job, token, cfg.REPORT_ENCRYPTION_KEY) ? job : false;
   };
   const retrySettledReportJob = async (job: AnalysisJob) => {
+    if (job.networkKey === "arc-testnet") return { status: 410, body: { error: "Arc testnet is retired. Saved reports remain recoverable; testnet receipts cannot authorize mainnet regeneration." } } as const;
     if (job.reportId || job.stage === "completed" || job.stage === "completed_partial") {
       return { status: 200, body: { job: publicJobView(job), reportReady: true } } as const;
     }
@@ -821,7 +831,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const HistoryIdentitySchema = z.object({
     wallet: z.string().regex(/^0x[a-fA-F0-9]{40}$/),
-    networkKey: z.enum(["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"]),
+    networkKey: z.enum(["xlayer", "base", "arbitrum", "arc", "robinhood", "arc-testnet"]),
   });
 
   app.post("/v1/dex/robinhood/native-usdg", async (req, res) => {
@@ -854,9 +864,9 @@ export function createApp(cfg: AppConfig, dependencies: {
         address: network.paymentAsset.address,
         decimals: network.paymentAsset.decimals,
         logoUrl: null,
-        provider: key === "arc-testnet" ? "Arc Testnet configuration" : "PULSE network registry",
+        provider: "PULSE network registry",
       }] : [];
-      const routed = key === "arc-testnet" ? [] : await observeProvider("okx_dex", "token_catalog", () => getOkxTradeTokens(cfg, String(network.chainId), q, limit)).catch(() => []);
+      const routed = await observeProvider("okx_dex", "token_catalog", () => getOkxTradeTokens(cfg, String(network.chainId), q, limit)).catch(() => []);
       const normalizedQuery = q.toLowerCase();
       const relevance = (item: { symbol: string; name: string }) => {
         const symbol = item.symbol.toLowerCase();
@@ -888,7 +898,7 @@ export function createApp(cfg: AppConfig, dependencies: {
           dexUrl: null,
           sources: [item.provider || "OKX Onchain OS"],
         }));
-      return res.json({ service: "network_token_catalog", network: key, chainId: String(network.chainId), query: q, count: tokens.length, sources: key === "arc-testnet" ? ["Arc Testnet network registry"] : ["OKX Onchain OS"], tokens, manualAddressSupported: true });
+      return res.json({ service: "network_token_catalog", network: key, chainId: String(network.chainId), query: q, count: tokens.length, sources: ["PULSE network registry", "OKX Onchain OS"], tokens, manualAddressSupported: true });
     } catch (e) {
       return res.status(502).json({ error: e instanceof Error ? e.message : String(e) });
     }
@@ -1049,7 +1059,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   ]) {
     app.get(path, (req, res) => {
       const key = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
-      res.status(400).json(buildX402InputRequired(`/${key === "arc-testnet" ? "arc" : key}${path}`));
+      res.status(400).json(buildX402InputRequired(`/${key === "arc" ? "arc" : key}${path}`));
     });
   }
 
@@ -1164,7 +1174,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   // carried by the signed authorization.
   app.use(async (req, res, next) => {
     const network = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey;
-    if (network !== "arc-testnet" || cfg.ARC_AI_MODE !== "live" || !req.path.match(/^\/v1\/analysis\/(?:base$|premium$|spot\/|prediction\/|fused\/)/)) return next();
+    if (network !== "arc" || cfg.ARC_AI_MODE !== "live" || !req.path.match(/^\/v1\/analysis\/(?:base$|premium$|spot\/|prediction\/|fused\/)/)) return next();
     try { await arcBudget.checkIp(req.ip || req.socket.remoteAddress || "unknown"); return next(); }
     catch (error) {
       if (error instanceof ArcBudgetExceededError) {
@@ -1193,7 +1203,11 @@ export function createApp(cfg: AppConfig, dependencies: {
     const parsed = AutopilotPassBodySchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(buildX402InputRequired(req.path, parsed.error.issues));
     const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
-    if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+    if (network === "arc") {
+      const readiness = await arcAutomationReadiness(cfg);
+      if (!readiness.ready) return res.status(503).json({ error: `${readiness.reason}; no payment requested`, code: "arc_execution_unavailable" });
+    }
+
     if (network === "robinhood" && process.env.FEATURE_ROBINHOOD_TRADING !== "1") return res.status(422).json({ error: "Robinhood Autopilot is awaiting execution readiness checks; no payment requested" });
     try {
       if (!(await passTargetExists({ owner: parsed.data.owner, vault: parsed.data.vault, network }))) {
@@ -1207,7 +1221,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   // Payment gate for paid routes, measured only until challenge rejection or
   // verified/settled continuation (never including downstream provider work).
-  const paymentGate = createPaymentGate(cfg, { robinhood: dependencies.robinhoodPayment || createRobinhoodPaymentRuntime(cfg) });
+  const paymentGate = createPaymentGate(cfg, { robinhood: dependencies.robinhoodPayment || createRobinhoodPaymentRuntime(cfg), circle: createCirclePaymentRuntime(cfg) });
   app.use((req, res, next) => {
     const route = cfg.routes[`${req.method.toUpperCase()} ${req.path}`];
     if (!route || route.free || route.priceUsd <= 0) return paymentGate(req, res, next);
@@ -1229,7 +1243,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         const parsed = AutopilotPassBodySchema.safeParse(req.body);
         if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
         const network = ((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
-        if (network === "arc-testnet") return res.status(422).json({ error: "Autopilot is not available on Arc Testnet" });
+
         if (network === "robinhood" && process.env.FEATURE_ROBINHOOD_TRADING !== "1") return res.status(422).json({ error: "Robinhood Autopilot is awaiting execution readiness checks" });
         const payer = paymentPayer(req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT"));
         if (!cfg.X402_MOCK && (!payer || payer !== parsed.data.owner.toLowerCase())) return res.status(403).json({ error: "The paying wallet must own the selected Autopilot" });
@@ -1247,7 +1261,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     baseUrl: cfg.XAI_BASE_URL,
     model: cfg.GROK_MODEL,
   };
-  const isArc = (req: express.Request) => (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey === "arc-testnet";
+  const isArc = (req: express.Request) => (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey === "arc";
   const modelLimits = (tier: "standard" | "premium") => ({
     maxInputTokens: tier === "premium" ? cfg.GROK_MAX_INPUT_PREMIUM : cfg.GROK_MAX_INPUT_STANDARD,
     maxOutputTokens: spotOutputTokenLimit(tier === "premium" ? "premium" : "base", tier === "premium" ? cfg.GROK_MAX_OUTPUT_PREMIUM : cfg.GROK_MAX_OUTPUT_STANDARD),
@@ -1298,7 +1312,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         recordAiUsage(result.usage.promptTokens, result.usage.completionTokens, cost, result.usage.cachedTokens, result.usage.reasoningTokens);
       }
       const selectedNetwork = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
-      const defiChainId = selectedNetwork === "xlayer" ? "196" : selectedNetwork === "base" ? "8453" : selectedNetwork === "arbitrum" ? "42161" : null;
+      const defiChainId = selectedNetwork === "xlayer" ? "196" : selectedNetwork === "base" ? "8453" : selectedNetwork === "arbitrum" ? "42161" : selectedNetwork === "arc" ? "5042" : null;
       const assetSymbol = body.instId.split("-")[0]?.trim().toUpperCase() || "";
       // Reuse the same identity-preserving chain aliases as Spot and
       // Autopilot. This makes BTC -> cbBTC and DOGE -> cbDOGE on Base visible
@@ -1375,7 +1389,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const payer = paymentPayer(authorization) || `payment:${authorizationId}`;
     const bodyHash = requestHash(req.body);
     const network = getNetwork((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
-    const payee = network.key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
+    const payee = network.key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
     // Canonical V5 analysis uses server-fetched evidence only. Never persist a
     // deprecated browser screenshot in Redis merely because an old client sent it.
     const { chartImageBase64: _chart, chartImageMime: _chartMime, ...durableBody } =
@@ -1419,10 +1433,10 @@ export function createApp(cfg: AppConfig, dependencies: {
     const settlementTx = typeof inline?.result.transaction === "string"
       ? inline.result.transaction
       : settlementTransaction(settlement);
-    const settlementMode = cfg.X402_MOCK ? "mock" : network.key === "arc-testnet" ? "gateway_batch" : "synchronous_onchain";
+    const settlementMode = cfg.X402_MOCK ? "mock" : network.key === "arc" ? "gateway_batch" : "synchronous_onchain";
     const finality = cfg.X402_MOCK
       ? { status: "simulated" as const, scope: "mock" as const }
-      : network.key === "arc-testnet"
+      : network.key === "arc"
         ? { status: "gateway_batch_accepted" as const, scope: "gateway" as const }
         : network.key === "robinhood"
           ? { status: "receipt_verified" as const, scope: "l2" as const, parentChainStatus: "unknown" as const }
@@ -1433,7 +1447,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     return Object.freeze({
       id: requestHash(settlement), provider: cfg.X402_MOCK ? "mock" : inline?.provider || network.paymentProvider,
       network: network.caip2, chainId: network.chainId, asset: network.paymentAsset.address || cfg.X402_ASSET, amountAtomic,
-      payer, payee: network.key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+      payer, payee: network.key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
       authorizationId, resourceUrl: req.originalUrl.split("?")[0], requestHash: requestHash(req.body),
       verificationResult: "accepted_by_middleware", settlementResult: "settled",
       settlementMode, finality,
@@ -1650,6 +1664,10 @@ export function createApp(cfg: AppConfig, dependencies: {
       throw new Error("Durable worker requires a settled receipt");
     }
     const req = jobRequest(current);
+    if (current.networkKey === "arc-testnet") {
+      await persistence.jobs.transition(current.id, "manual_reconciliation", "Arc testnet retired; receipt cannot be migrated to mainnet");
+      return;
+    }
     const tier = current.tier || "standard";
     try {
       await persistence.jobs.transition(current.id, "fetching_context", "claimed by durable worker");
@@ -1835,7 +1853,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const holders = optionalNumber(blockToken.holders ?? (geckoProfile.holders as { count?: unknown } | undefined)?.count ?? okxToken.holders);
     const pairCreatedAt = Date.parse(String(pool.createdAt || ""));
     const ageDays = Number.isFinite(pairCreatedAt) && pairCreatedAt > 0 ? Math.max(0, Math.floor((Date.now() - pairCreatedAt) / 86_400_000)) : null;
-    const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "8453" | "42161" | "5042002" | "4663", lang }, mv);
+    const legacy = runPreflight({ intent: "generic", tokenAddress: address, chainId: String(network.chainId) as "196" | "8453" | "42161" | "5042" | "4663", lang }, mv);
     const token = {
       service: "token_scan", methodology_version: mv, chainId: String(network.chainId), address: address.toLowerCase(),
       symbol: String(blockToken.symbol || okxToken.symbol || geckoToken.symbol || fixtureScan?.symbol || "Unknown"),
@@ -1949,7 +1967,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const mcp = createMcpHandler(cfg, (req, res, route, args, id, tool, method = "POST") => {
     const network = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
-    const prefix = network === "xlayer" ? "" : network === "arc-testnet" ? "/arc" : `/${network}`;
+    const prefix = network === "xlayer" ? "" : network === "arc" ? "/arc" : `/${network}`;
     const json = res.json.bind(res);
     res.json = (payload: unknown) => {
       // Restore before Express serializes; preserve HTTP status and settlement headers.

@@ -1,0 +1,167 @@
+{
+  "auditedAt": "2026-10-05T06:03:26.087Z",
+  "mode": "Public read-only probes; no credentials, deployment or payments",
+  "checks": [
+    {
+      "origin": "https://www.ai-pulse.tech",
+      "endpoints": [
+        {
+          "path": "/healthz",
+          "status": 200,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        },
+        {
+          "path": "/v1/meta?network=arc",
+          "status": 200,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        },
+        {
+          "path": "/arc/v1/meta",
+          "status": 200,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        },
+        {
+          "path": "/v1/circle/wallet/status",
+          "status": 200,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        }
+      ]
+    },
+    {
+      "origin": "https://pulse-api-production-8d1f.up.railway.app",
+      "endpoints": [
+        {
+          "path": "/healthz",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": "eip155:196",
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": [
+            {
+              "key": "network",
+              "value": "eip155:196"
+            }
+          ]
+        },
+        {
+          "path": "/v1/meta?network=arc",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": "eip155:196",
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": [
+            {
+              "key": "network",
+              "value": "eip155:196"
+            }
+          ]
+        },
+        {
+          "path": "/arc/v1/meta",
+          "status": 404,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        },
+        {
+          "path": "/v1/circle/wallet/status",
+          "status": 404,
+          "json": false,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": []
+        }
+      ]
+    },
+    {
+      "origin": "https://pulse-api-production-7aae.up.railway.app",
+      "endpoints": [
+        {
+          "path": "/healthz",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": "eip155:196",
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": [
+            {
+              "key": "network",
+              "value": "eip155:196"
+            }
+          ]
+        },
+        {
+          "path": "/v1/meta?network=arc",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": "eip155:196",
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": [
+            {
+              "key": "network",
+              "value": "eip155:196"
+            }
+          ]
+        },
+        {
+          "path": "/arc/v1/meta",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": "eip155:196",
+          "paymentProvider": null,
+          "circleEnabled": null,
+          "identities": [
+            {
+              "key": "network",
+              "value": "eip155:196"
+            }
+          ]
+        },
+        {
+          "path": "/v1/circle/wallet/status",
+          "status": 200,
+          "json": true,
+          "chainId": null,
+          "network": null,
+          "paymentProvider": null,
+          "circleEnabled": true,
+          "identities": []
+        }
+      ]
+    }
+  ],
+  "webCompiledApiOrigins": []
+}

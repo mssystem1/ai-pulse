@@ -49,6 +49,7 @@ import {
   type WalletConnectionMethod,
 } from "./wallet";
 import { connectCircleWallet, isCircleWalletConnected, restoreCircleWallet } from "./circleWallet";
+import { hasRecoverablePayment } from "./paymentRecovery";
 
 type Tab = PulseTab;
 type Candle = { ts: number; open: number; high: number; low: number; close: number; volume: number };
@@ -113,7 +114,7 @@ export function App() {
   useEffect(() => {
     const onPopState = () => {
       const requested = tabFromHref(window.location.href);
-      const next = networkKey === "arc-testnet" && (requested === "spot" || requested === "autopilot") ? "analyze" : requested;
+      const next = requested;
       setTab(next);
       setMobileNavOpen(false);
       if (next !== requested) window.history.replaceState(window.history.state, "", hrefForTab(window.location.href, next));
@@ -224,12 +225,12 @@ export function App() {
     try {
       const [b, gateway] = await Promise.all([
         fetchNetworkBalances(a, networkKey),
-        networkKey === "arc-testnet" ? fetchArcGatewayBalance(a) : Promise.resolve(null),
+        networkKey === "arc" ? fetchArcGatewayBalance(a).catch(() => null) : Promise.resolve(null),
       ]);
       if (requestId !== balanceRequestRef.current || balanceContextRef.current.networkKey !== networkKey || balanceContextRef.current.wallet?.toLowerCase() !== a.toLowerCase()) return;
       setBalances(b);
       setGatewayBalance(gateway);
-      const spendable = networkKey === "arc-testnet" ? gateway || 0 : b.payment;
+      const spendable = networkKey === "arc" ? gateway || 0 : b.payment;
       if (neededUsdt !== null && spendable >= neededUsdt) {
         setNeedUsdt(false);
         setNeededUsdt(null);
@@ -364,10 +365,6 @@ export function App() {
   useEffect(() => {
     document.documentElement.dataset.pulseNetwork = networkKey;
     savePreferredNetwork(localStorage, networkKey);
-    if (networkKey === "arc-testnet" && (tab === "spot" || tab === "autopilot")) {
-      setTab("analyze");
-      window.history.replaceState(window.history.state, "", hrefForTab(window.location.href, "analyze"));
-    }
   }, [networkKey]);
 
   // A report belongs to the exact market selection that produced it. Never
@@ -410,17 +407,17 @@ export function App() {
 
   async function onCircleConnect(email: string) {
     setError(null);
-    if (!ENABLED_WEB_NETWORKS.includes("arc-testnet")) throw new Error("Enable Arc Testnet before connecting Circle Wallet");
-    const connected = await connectCircleWallet(email, "arc-testnet");
+    if (!ENABLED_WEB_NETWORKS.includes("arc")) throw new Error("Enable Arc Mainnet before connecting Circle Wallet");
+    const connected = await connectCircleWallet(email, "arc");
     (window as Window & { __pulseCircleProvider?: typeof connected.provider }).__pulseCircleProvider = connected.provider;
     clearWalletDisconnected();
-    setNetworkKey("arc-testnet");
+    setNetworkKey("arc");
     setWallet(connected.address);
     setWalletName(connected.providerName);
   }
 
   async function onNetworkChange(next: WebNetworkKey) {
-    if (isCircleWalletConnected() && next !== "arc-testnet") return;
+    if (isCircleWalletConnected() && next !== "arc") return;
     setError(null);
     const provider = getInjectedProvider();
     if (wallet && provider) {
@@ -603,16 +600,17 @@ export function App() {
       const canonicalPath = path.replace(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/, "");
       const required = routePrices[canonicalPath];
       if (!Number.isFinite(required)) throw new Error("This service has no published price and cannot be purchased.");
+      const recovering = await hasRecoverablePayment(networkKey, wallet, `${API_BASE}${path}`, { method: "POST", body: JSON.stringify(body) }, localStorage);
       // Always refresh balances right before pay
       const [bal, gateway] = await Promise.all([
-        fetchNetworkBalances(wallet, networkKey, true),
-        networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null),
+        fetchNetworkBalances(wallet, networkKey, true).catch(error => { if (!recovering) throw error; return balances; }),
+        networkKey === "arc" ? fetchArcGatewayBalance(wallet).catch(error => { if (!recovering) throw error; return null; }) : Promise.resolve(null),
       ]);
       setBalances(bal);
       setGatewayBalance(gateway);
-      const spendable = networkKey === "arc-testnet" ? gateway || 0 : bal.payment;
+      const spendable = networkKey === "arc" ? gateway || 0 : bal?.payment;
       try {
-        assertPaymentBalance(spendable, required, network.payment.symbol, network.label);
+        if (!recovering) assertPaymentBalance(spendable, required, network.payment.symbol, network.label);
       } catch (balanceError) {
         setNeedUsdt(true);
         setNeededUsdt(required);
@@ -620,7 +618,7 @@ export function App() {
         throw balanceError;
       }
 
-      setPaymentProgress("Open your wallet and sign the x402 payment. A report job exists only after the signature is accepted.");
+      setPaymentProgress(recovering ? "Recovering your saved payment. No new payment signature is requested." : "Open your wallet and sign the x402 payment. A report job exists only after the signature is accepted.");
       const paidFetch = await createWalletPaidFetch(wallet, networkKey);
       const telegramDelivery = new URLSearchParams(window.location.search).get("tg");
       const res = await paidFetch(`${API_BASE}${path}`, {
@@ -776,7 +774,7 @@ export function App() {
     { id: "analyze", label: lang === "zh" ? "全球市场" : "Global Market", hint: lang === "zh" ? "研究和报告" : "Research and reports" },
     { id: "prediction", label: lang === "zh" ? "预测市场" : "Prediction Market", hint: lang === "zh" ? "证据和概率" : "Evidence and probabilities" },
     { id: "safety", label: lang === "zh" ? "风险卫士" : "Risk Guard", hint: lang === "zh" ? "签名前检查" : "Inspect before signing" },
-    ...(networkKey === "arc-testnet" ? [] : [
+    ...([
       { id: "spot" as Tab, label: lang === "zh" ? "现货交易" : "Spot Trading", hint: lang === "zh" ? "市价单和限价单" : "Market and Limit orders" },
       { id: "autopilot" as Tab, label: "Autopilot", hint: lang === "zh" ? "在限制内自动运行" : "Automate with guardrails" },
     ]),
@@ -787,7 +785,7 @@ export function App() {
   useEffect(() => { applySiteMetadata("app"); }, [tab]);
 
   function navigateTo(nextTab: Tab) {
-    const safeTab = networkKey === "arc-testnet" && (nextTab === "spot" || nextTab === "autopilot") ? "analyze" : nextTab;
+    const safeTab = nextTab;
     setTab(safeTab);
     setMobileNavOpen(false);
     const nextHref = hrefForTab(window.location.href, safeTab);
@@ -825,8 +823,8 @@ export function App() {
             </button>
             {networkMenuOpen && <div className="network-menu" role="listbox" aria-label={lang === "zh" ? "选择支付网络" : "Choose payment network"}>
               <div className="network-menu-head"><span className="eyebrow">{lang === "zh" ? "执行环境" : "EXECUTION CONTEXT"}</span><strong>{lang === "zh" ? "选择网络" : "Choose network"}</strong><p>{lang === "zh" ? "设置支付资产、钱包链和链上流动性，不改变外观。" : "Sets payment asset, wallet chain and on-chain liquidity. Appearance stays unchanged."}</p></div>
-              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc-testnet").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = key !== "arc-testnet"; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
-              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc-testnet" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Testnet") : (lang === "zh" ? "各功能单独检查可用性" : "Availability checked per feature")}</span></div>
+              <div className="network-options">{ENABLED_WEB_NETWORKS.filter((key) => !isCircleWalletConnected() || key === "arc").map((key) => { const item = WEB_NETWORKS[key]; const mainnet = true; return <button key={key} type="button" role="option" aria-selected={key === networkKey} className={key === networkKey ? "selected" : ""} onClick={() => { setNetworkMenuOpen(false); void onNetworkChange(key); }}><span className={`network-option-symbol ${key}`}><NetworkLogo network={key} /></span><span className="network-option-copy"><strong>{item.label}</strong><small>{item.payment.symbol} {lang === "zh" ? "通过" : "via"} {item.provider}</small><em>{mainnet ? (lang === "zh" ? "分析 · 现货 · Autopilot" : "Analysis · Spot · Autopilot") : (lang === "zh" ? "分析 · 支付测试" : "Analysis · payment test")}</em></span><span className="network-option-check">{key === networkKey ? "✓" : ""}</span></button>; })}</div>
+              <div className="network-menu-foot"><span><i /> {lang === "zh" ? "外观单独设置" : "Appearance is independent"}</span><span>{networkKey === "arc" ? (lang === "zh" ? "Arc 测试网不显示交易" : "Trading hidden on Arc Mainnet") : (lang === "zh" ? "各功能单独检查可用性" : "Availability checked per feature")}</span></div>
             </div>}
           </div>
           <AppearancePicker value={appearance} lang={lang} onChange={setAppearance} />
@@ -848,7 +846,7 @@ export function App() {
             >
               <span className="wallet-glyph" aria-hidden>↗</span>
               <span className="wallet-action-copy"><strong>{d.walletFunding}</strong><small>{shortAddr(wallet)}</small></span>
-              <span className="wallet-balance">{balances ? `${formatTokenBalance(networkKey === "arc-testnet" ? gatewayBalance ?? NaN : balances.payment, lang)} ${network.payment.symbol}` : "…"}</span>
+              <span className="wallet-balance">{balances ? `${formatTokenBalance(networkKey === "arc" ? gatewayBalance ?? NaN : balances.payment, lang)} ${network.payment.symbol}` : "…"}</span>
               <span className="chevron">›</span>
             </button>
           ) : (
@@ -890,7 +888,7 @@ export function App() {
       </div>
 
 
-      {networkKey !== "arc-testnet" && analysisReady && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
+      {analysisReady && (["analyze", "spot"] as Tab[]).includes(tab) && <section className="product-journey spot-journey" aria-label="Global intelligence and Spot trading workflow">
         <div className="journey-copy"><span className="eyebrow">GLOBAL → SPOT PATH</span><strong>{analysisReady ? "Report ready" : "Turn Global intelligence into a Spot action"}</strong><small>{analysisReady ? reportExecution.mapped ? `${instId} · ${timeframe} can prefill a Market or Limit ticket.` : `${reportExecution.label}. Choose a mapped pair for execution.` : "Global Quick/Pro can prefill entry, TP and SL; direct pair configuration also remains available."}</small></div>
         <button type="button" className={`${tab === "analyze" ? "active" : ""} ${analysisReady ? "complete" : ""}`} onClick={() => navigateTo("analyze")}><i>1</i><span><b>Global intelligence</b><small>{analysisReady ? "Report ready" : "Quick or Pro"}</small></span></button>
         <span className="journey-arrow">→</span>

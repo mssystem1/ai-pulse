@@ -5,6 +5,7 @@ export type { ExecutionNetwork } from "./executionContracts.js";
 import type { ExecutionNetwork } from "./executionContracts.js";
 
 const NETWORKS = {
+  arc: { id: 5042, primary: () => process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io", fallback: () => process.env.ARC_RPC_FALLBACK_URL || "https://rpc.quicknode.mainnet.arc.io", prefix: "ARC" },
   robinhood: { id: 4663, primary: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com", fallback: () => process.env.ROBINHOOD_RPC_FALLBACK_URL || "https://rpc.mainnet.chain.robinhood.com", prefix: "ROBINHOOD" },
   xlayer: { id: 196, primary: () => process.env.X_LAYER_RPC || "https://rpc.xlayer.tech", fallback: () => process.env.X_LAYER_RPC_FALLBACK || "https://xlayerrpc.okx.com", prefix: "XLAYER" },
   base: { id: 8453, primary: () => process.env.BASE_RPC_URL || "https://mainnet.base.org", fallback: () => process.env.BASE_RPC_FALLBACK_URL || "https://base-rpc.publicnode.com", prefix: "BASE" },
@@ -41,7 +42,7 @@ export function executionRpcUrls(network: ExecutionNetwork) {
 export function executionPublicClient(network: ExecutionNetwork): PublicClient {
   const cfg = NETWORKS[network];
   const urls = executionRpcUrls(network);
-  const chain = { id: cfg.id, name: network, nativeCurrency: { name: "Native", symbol: network === "xlayer" ? "OKB" : "ETH", decimals: 18 }, rpcUrls: { default: { http: urls } }, contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" as const, blockCreated: 0 } } } as const;
+  const chain = { id: cfg.id, name: network, nativeCurrency: { name: "Native", symbol: network === "xlayer" ? "OKB" : network === "arc" ? "USDC" : "ETH", decimals: 18 }, rpcUrls: { default: { http: urls } }, contracts: { multicall3: { address: "0xcA11bde05977b3631167028862bE2a173976CA11" as const, blockCreated: 0 } } } as const;
   return createPublicClient({ chain, transport: fallback(urls.map((url) => http(url, { retryCount: 2, retryDelay: 450 })), { retryCount: 1 }) });
 }
 

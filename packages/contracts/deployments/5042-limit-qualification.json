@@ -1,0 +1,110 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "approve-order",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 26,
+      "hash": "0xafe832818006987b8037a19df8ae2af228d75df3cd0eb6970d818c22f409acad",
+      "status": "success",
+      "maxGasUSDC": "0.00168722470301",
+      "gasUSDC": "0.00110876055438"
+    },
+    {
+      "step": "create-order",
+      "to": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "nonce": 27,
+      "hash": "0xeaf756c9eb792582f27a2ec8892603fde266095da3aae7b2670de3e1a7f835a8",
+      "status": "success",
+      "maxGasUSDC": "0.0069072753097345",
+      "gasUSDC": "0.0044016225309315"
+    },
+    {
+      "step": "registry-resume",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 28,
+      "hash": "0xf5ea61fbd7872c7ee65934dcbe4346115101fb77a8f453653c29af3458e4120e",
+      "status": "success",
+      "maxGasUSDC": "0.00083928036281375",
+      "gasUSDC": "0.00055260028666125"
+    },
+    {
+      "step": "oracle-price",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 29,
+      "hash": "0xd0a71aec5af2bfdd43ecdc322bcb415b2a12378fa8414aa08c5ba4b3756f4ad2",
+      "status": "success",
+      "maxGasUSDC": "0.00218304094371",
+      "gasUSDC": "0.0014380007459625"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 30,
+      "hash": "0xc07480221da3dac40bddee0699434cc88352fd37eecb1ae776d87249a3e48498",
+      "status": "success",
+      "maxGasUSDC": "0.00083964034985",
+      "gasUSDC": "0.00055284027642"
+    },
+    {
+      "step": "registry-resume-2",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 31,
+      "hash": "0x80a28c75f7e11156e4c1cf59c03d6282aeedb5ebf807988cdd7c5b535c6fe959",
+      "status": "success",
+      "maxGasUSDC": "0.00083928080878616",
+      "gasUSDC": "0.00055260063902664"
+    },
+    {
+      "step": "oracle-price-2",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 32,
+      "hash": "0xb4ca51928cd3038cb215a0eecd7a30ac6af9f9a7e870591b3e655232f9d0e114",
+      "status": "success",
+      "maxGasUSDC": "0.0010578010193666",
+      "gasUSDC": "0.0006980008071672"
+    },
+    {
+      "step": "execute-order",
+      "to": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "nonce": 33,
+      "hash": "0x3ba5692f3d7bd8696ca925cbdec4b57d2cdc6ca83d3161cb6ea538660eede468",
+      "status": "success",
+      "maxGasUSDC": "0.014219917703247488",
+      "gasUSDC": "0.007646188842042552"
+    },
+    {
+      "step": "approve-output",
+      "to": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+      "nonce": 34,
+      "hash": "0xa75e593d980ba3a71dbdaf8b591584630b9785fcc3bca89573cedcf922117982",
+      "status": "success",
+      "maxGasUSDC": "0.001948010158798699",
+      "gasUSDC": "0.001281941704787909"
+    },
+    {
+      "step": "sell-test-output",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 35,
+      "hash": "0x0041114b2a999891ff22519cd0a5ca1b881f1faca9bae8280d17a0ad32ff6a05",
+      "status": "success",
+      "maxGasUSDC": "0.006963751717279132",
+      "gasUSDC": "0.004321185746521223"
+    },
+    {
+      "step": "registry-pause-2",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 36,
+      "hash": "0xf45f3876d65b08d081a8060982c2e928e017522574e807c826bc315327f233e7",
+      "status": "success",
+      "maxGasUSDC": "0.00083964073321563",
+      "gasUSDC": "0.000552840579321036"
+    }
+  ],
+  "data": {
+    "orderId": "1",
+    "ownerReceivedWETH": "0.000036944297538575",
+    "completed": true
+  }
+}

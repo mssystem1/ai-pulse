@@ -1,0 +1,98 @@
+{
+  "chainId": 5042,
+  "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+  "auditedAt": "2026-10-05T05:29:07.811Z",
+  "blockNumber": "24340757",
+  "balances": [
+    {
+      "kind": "autopilot",
+      "account": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "usdcAtomic": "0",
+      "wethAtomic": "0"
+    },
+    {
+      "kind": "spot-limit",
+      "account": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "usdcAtomic": "0",
+      "wethAtomic": "0"
+    },
+    {
+      "kind": "spot-protection",
+      "account": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "usdcAtomic": "0",
+      "wethAtomic": "0"
+    },
+    {
+      "kind": "spot-bracket",
+      "account": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "usdcAtomic": "0",
+      "wethAtomic": "0"
+    }
+  ],
+  "allowances": [
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x2B9899bC46Bf0eE094225995f4bD496d42f261Af",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x2B9899bC46Bf0eE094225995f4bD496d42f261Af",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x3600000000000000000000000000000000000000",
+      "spender": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "amountAtomic": "0"
+    },
+    {
+      "token": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "spender": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "amountAtomic": "0"
+    }
+  ],
+  "qualificationCapitalRecovered": true,
+  "qualificationApprovalsCleared": true,
+  "registryPaused": true,
+  "vaultPaused": true
+}

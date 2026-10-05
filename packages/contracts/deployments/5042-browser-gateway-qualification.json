@@ -1,0 +1,31 @@
+{
+    "chainId":  5042,
+    "owner":  "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+    "entries":  [
+                    {
+                        "step":  "browser-gateway-approve",
+                        "to":  "0x3600000000000000000000000000000000000000",
+                        "nonce":  90,
+                        "hash":  "0xb73e1130f1f05dc7ededabc2fc1a137732dd07b3e67b64f41613a7503dc8e3a8",
+                        "status":  "success",
+                        "maxGasUSDC":  "0.00168686470286",
+                        "gasUSDC":  "0.00110852055426"
+                    },
+                    {
+                        "step":  "browser-gateway-deposit",
+                        "to":  "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE",
+                        "nonce":  91,
+                        "hash":  "0xa8ef9ec0fb2547c78ea7a47207d05aaf396c28a5d7de7232549d0ec4389e6e45",
+                        "status":  "success",
+                        "maxGasUSDC":  "0.00281968917487",
+                        "gasUSDC":  "0.00175078087539"
+                    }
+                ],
+    "data":  {
+                 "signedFingerprint":  "0xa8c096560e1b1e1cf7270762fe1a52e2821f4652235f169376e15ff3539417d1",
+                 "historySigned":  true,
+                 "completed":  true,
+                 "reportJobId":  "0fec1b01-1483-47f1-9596-00e6dd81e84b",
+                 "paidReportDelivered":  true
+             }
+}

@@ -1,0 +1,708 @@
+{
+  "chainId": 5042,
+  "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+  "auditedAt": "2026-10-05T05:23:55.359Z",
+  "blockNumber": "24340141",
+  "maximumTotalSpendUSDC": "5",
+  "walletUSDC": "1.831394181087316151",
+  "gatewayUSDC": "0",
+  "vaultUSDC": "0",
+  "vaultWETH": "0",
+  "confirmedTransactionGasUSDC": "0.431935778921677042",
+  "confirmedPaidChargesUSDC": "3.1",
+  "conservativeSpentUSDC": "3.534676818912683849",
+  "remainingAuthorizedSpendUSDC": "1.465323181087316151",
+  "unvaluedTestCapital": false,
+  "transactionCount": 92,
+  "latestNonce": 92,
+  "missingNonces": [],
+  "receiptAccountingComplete": true,
+  "paidEvidence": [
+    {
+      "proof": "5042-agent-paid-qualification.json",
+      "service": "agent-mcp-risk",
+      "chargeUSDC": ".20"
+    },
+    {
+      "proof": "5042-browser-paid-qualification.json",
+      "service": "browser-risk",
+      "chargeUSDC": "0.20"
+    },
+    {
+      "proof": "5042-global-pro-paid-qualification.json",
+      "service": "global-pro",
+      "chargeUSDC": "0.3"
+    },
+    {
+      "proof": "5042-global-quick-paid-qualification.json",
+      "service": "global-quick",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-prediction-pro-paid-qualification.json",
+      "service": "prediction-pro",
+      "chargeUSDC": "0.3"
+    },
+    {
+      "proof": "5042-prediction-quick-paid-qualification.json",
+      "service": "prediction-quick",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-risk-paid-qualification.json",
+      "service": "risk",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-autopilot-pass-qualification.json",
+      "service": "autopilot-24h",
+      "chargeUSDC": "1.50"
+    }
+  ],
+  "transactions": [
+    {
+      "hash": "0xa6e7895693b7854c0bba90538746f70e5b68d23d608fbb1de6e17ea157de4fe8",
+      "nonce": 0,
+      "proof": "5042.json",
+      "gasUSDC": "0.00829732414866",
+      "status": "success"
+    },
+    {
+      "hash": "0x8d7e7cd09699ff41dc482c795c872a53cc07329a2713c3e81a705adc0a422e77",
+      "nonce": 1,
+      "proof": "5042.json",
+      "gasUSDC": "0.00801872400936",
+      "status": "success"
+    },
+    {
+      "hash": "0x3cfe66868bc07ce569297913014ec3f2ade0dd7598a491ce574032a52ebfafc0",
+      "nonce": 2,
+      "proof": "5042.json",
+      "gasUSDC": "0.01461958730979",
+      "status": "success"
+    },
+    {
+      "hash": "0xa3cbad369684b9033059d228eac958ce4ca1c51bcd26360c136707b51ed548b7",
+      "nonce": 3,
+      "proof": "5042.json",
+      "gasUSDC": "0.02989703494851",
+      "status": "success"
+    },
+    {
+      "hash": "0x89ddd4773824f2d9317b0a16df8f5e5e0392d16e9fe30ae8dee5c6a18544e353",
+      "nonce": 4,
+      "proof": "5042.json",
+      "gasUSDC": "0.03941391970695",
+      "status": "success"
+    },
+    {
+      "hash": "0xdc88c9c7c0ccb29c7a24546d989d628f37a5fb5e834976bef7c764a2cdc14ae6",
+      "nonce": 5,
+      "proof": "5042.json",
+      "gasUSDC": "0.03731383865691",
+      "status": "success"
+    },
+    {
+      "hash": "0x7f1b4404ab69f4279fce4896576964fe885353901966075149db891f27237352",
+      "nonce": 6,
+      "proof": "5042.json",
+      "gasUSDC": "0.02579785289892",
+      "status": "success"
+    },
+    {
+      "hash": "0xf0b73f292014332d9a6a20fd8560e9ea654f8070490a035272fa940a0fe1ea00",
+      "nonce": 7,
+      "proof": "5042.json",
+      "gasUSDC": "0.00055284027642",
+      "status": "success"
+    },
+    {
+      "hash": "0x6a72fcbf5efffe2d384665edaf2864755429c8a3b3fba1ecfa70b32aec943d8b",
+      "nonce": 8,
+      "proof": "5042.json",
+      "gasUSDC": "0.00091168045584",
+      "status": "success"
+    },
+    {
+      "hash": "0xf4200a089294fcd9e21c44dca9018fd4af3657f076992e6711fa14e0946e40b2",
+      "nonce": 9,
+      "proof": "5042-execution-configuration.json",
+      "gasUSDC": "0.000913660502513",
+      "status": "success"
+    },
+    {
+      "hash": "0x0bb8c4bfb89a068b5261aa8a0ce490e12cb3fc4844bcd094b0792ed4b8b207b6",
+      "nonce": 10,
+      "proof": "5042-execution-configuration.json",
+      "gasUSDC": "0.00091280069409312",
+      "status": "success"
+    },
+    {
+      "hash": "0x9c9788014f3f52e7e598c3aa5d7fbc4a1ebd647bf7e26bed64ec98c9ed315981",
+      "nonce": 11,
+      "proof": "5042-execution-configuration.json",
+      "gasUSDC": "0.000952216415142435",
+      "status": "success"
+    },
+    {
+      "hash": "0x1191c8651832421ec75040e4ef31f51974dceb64e9a3d336ea8b45e3851f7468",
+      "nonce": 12,
+      "proof": "5042-execution-configuration.json",
+      "gasUSDC": "0.000955150048180635",
+      "status": "success"
+    },
+    {
+      "hash": "0xfc3e22d1571d33cdf9f7d92684119537a3b36874dd4f47e803161b442f713a09",
+      "nonce": 13,
+      "proof": "5042-instance-verification.json",
+      "gasUSDC": "0.033894860001694743",
+      "status": "success"
+    },
+    {
+      "hash": "0x468153b8d048d7b12642b447e6af80d9f9ccd63f4fa928712d181940e93e3c9f",
+      "nonce": 14,
+      "proof": "5042-instance-verification.json",
+      "gasUSDC": "0.024970940002497094",
+      "status": "success"
+    },
+    {
+      "hash": "0x5f529e9ee585f8ddefd9a1fbf78231f6ff7bd2be694342caabf23d3c4bdcefb9",
+      "nonce": 15,
+      "proof": "5042-instance-verification.json",
+      "gasUSDC": "0.021189560002118956",
+      "status": "success"
+    },
+    {
+      "hash": "0x13931f854ddfb65d8220f3506d7a5dea211f69725e4b9ec5eaa4c1b49b691bf2",
+      "nonce": 16,
+      "proof": "5042-instance-verification.json",
+      "gasUSDC": "0.031820360003182036",
+      "status": "success"
+    },
+    {
+      "hash": "0x669092b33cd56c70251017a61b355b03efc92f148a13de85176aae7475e26bdc",
+      "nonce": 17,
+      "proof": "5042-spot-qualification.json",
+      "gasUSDC": "0.001108760000110876",
+      "status": "success"
+    },
+    {
+      "hash": "0xb27961323bf18e31a40eb809e0755f30d9cd8672da640255548e65ad1c4d53a6",
+      "nonce": 18,
+      "proof": "5042-spot-qualification.json",
+      "gasUSDC": "0.004837040000483704",
+      "status": "success"
+    },
+    {
+      "hash": "0xdf835f653a1449a61906154b63b092e1a4c06a585e6e327e29be6a422163b848",
+      "nonce": 19,
+      "proof": "5042-spot-qualification.json",
+      "gasUSDC": "0.001281940000128194",
+      "status": "success"
+    },
+    {
+      "hash": "0x59de575b37b62936ede280a51a2ab465830cfc22d3b45e73c33457277654900e",
+      "nonce": 20,
+      "proof": "5042-spot-qualification.json",
+      "gasUSDC": "0.004321180000432118",
+      "status": "success"
+    },
+    {
+      "hash": "0x3cd6cca87fdc23b5b85b12bdee3ba6d63ca3ccb1c6363fcbc1d5a9be2fb1477a",
+      "nonce": 21,
+      "proof": "5042-gateway-qualification.json",
+      "gasUSDC": "0.00138565",
+      "status": "success"
+    },
+    {
+      "hash": "0x8669b3c272ccca41fe75c21473afe890d5cf880caa72d228e8c67f22d022eff4",
+      "nonce": 22,
+      "proof": "5042-gateway-qualification.json",
+      "gasUSDC": "0.002188475",
+      "status": "success"
+    },
+    {
+      "hash": "0xfc5d65ff0f5b22a455ff6edc863c767dc698b370d46f72d1cc006b6b6c881d83",
+      "nonce": 23,
+      "proof": "5042-autopilot-setup-qualification.json",
+      "gasUSDC": "0.0020430010215",
+      "status": "success"
+    },
+    {
+      "hash": "0x78355a652ee0bef1d070d96f5cd7c9c7d7e6fa60ce1e3cc434ac9d350b77ba35",
+      "nonce": 24,
+      "proof": "5042-autopilot-setup-qualification.json",
+      "gasUSDC": "0.00152090076045",
+      "status": "success"
+    },
+    {
+      "hash": "0x3efa58864e5f8786e4a1a1cb8356fe5241e00452540c84334b4407de50cbba71",
+      "nonce": 25,
+      "proof": "5042-autopilot-setup-qualification.json",
+      "gasUSDC": "0.00097900053845",
+      "status": "success"
+    },
+    {
+      "hash": "0xafe832818006987b8037a19df8ae2af228d75df3cd0eb6970d818c22f409acad",
+      "nonce": 26,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.00110876055438",
+      "status": "success"
+    },
+    {
+      "hash": "0xeaf756c9eb792582f27a2ec8892603fde266095da3aae7b2670de3e1a7f835a8",
+      "nonce": 27,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.0044016225309315",
+      "status": "success"
+    },
+    {
+      "hash": "0xf5ea61fbd7872c7ee65934dcbe4346115101fb77a8f453653c29af3458e4120e",
+      "nonce": 28,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.00055260028666125",
+      "status": "success"
+    },
+    {
+      "hash": "0xd0a71aec5af2bfdd43ecdc322bcb415b2a12378fa8414aa08c5ba4b3756f4ad2",
+      "nonce": 29,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.0014380007459625",
+      "status": "success"
+    },
+    {
+      "hash": "0xc07480221da3dac40bddee0699434cc88352fd37eecb1ae776d87249a3e48498",
+      "nonce": 30,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.00055284027642",
+      "status": "success"
+    },
+    {
+      "hash": "0x80a28c75f7e11156e4c1cf59c03d6282aeedb5ebf807988cdd7c5b535c6fe959",
+      "nonce": 31,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.00055260063902664",
+      "status": "success"
+    },
+    {
+      "hash": "0xb4ca51928cd3038cb215a0eecd7a30ac6af9f9a7e870591b3e655232f9d0e114",
+      "nonce": 32,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.0006980008071672",
+      "status": "success"
+    },
+    {
+      "hash": "0x3ba5692f3d7bd8696ca925cbdec4b57d2cdc6ca83d3161cb6ea538660eede468",
+      "nonce": 33,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.007646188842042552",
+      "status": "success"
+    },
+    {
+      "hash": "0xa75e593d980ba3a71dbdaf8b591584630b9785fcc3bca89573cedcf922117982",
+      "nonce": 34,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.001281941704787909",
+      "status": "success"
+    },
+    {
+      "hash": "0x0041114b2a999891ff22519cd0a5ca1b881f1faca9bae8280d17a0ad32ff6a05",
+      "nonce": 35,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.004321185746521223",
+      "status": "success"
+    },
+    {
+      "hash": "0xf45f3876d65b08d081a8060982c2e928e017522574e807c826bc315327f233e7",
+      "nonce": 36,
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.000552840579321036",
+      "status": "success"
+    },
+    {
+      "hash": "0x60b03ddfd9b14e9d9184a7f5b2d7422a51b8cadf51e5b2f34f9df1904eb8c8fe",
+      "nonce": 37,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00055260042019704",
+      "status": "success"
+    },
+    {
+      "hash": "0x1c61390d69c8c5ec0eef2f193c5830ee3b751fdd273e35ee978dc1378253b6c4",
+      "nonce": 38,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00069800040135",
+      "status": "success"
+    },
+    {
+      "hash": "0x23c659c5c59aab5d564b0ff4d9208552e18d0cc0bad0c74beac24f650cef1f16",
+      "nonce": 39,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00110876055438",
+      "status": "success"
+    },
+    {
+      "hash": "0x3a29a4b58defcdcdc2f0f8ac35322c60ebe753142cf868491a8d6ff61ba934da",
+      "nonce": 40,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00489574244787",
+      "status": "success"
+    },
+    {
+      "hash": "0xf7b8dcab8bd04b06c8eb68e7468ed1d393c066e3a294d43d0a92b465a5512748",
+      "nonce": 41,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00069800040135",
+      "status": "success"
+    },
+    {
+      "hash": "0x46cb9d5cce1ed52d33439cb2ee748ca5d98fb330cb64214a0611f667402c81a1",
+      "nonce": 42,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.007480644301368",
+      "status": "success"
+    },
+    {
+      "hash": "0xc5747412c791d7f0d2098c056da34b523751cc915e1d18db48e99027e4038414",
+      "nonce": 43,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0005841603862758",
+      "status": "success"
+    },
+    {
+      "hash": "0xbbcf4ed6406bba41b18ac26f7895184d846ecac580a7bb4db1f3cb0f38a3dde1",
+      "nonce": 44,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00058468038661965",
+      "status": "success"
+    },
+    {
+      "hash": "0xfb9effd31f50eda0da2ad3a056ba134c2559ea5bb0985224b0cffbb246ad9bee",
+      "nonce": 45,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0006980005307592",
+      "status": "success"
+    },
+    {
+      "hash": "0xefac3a7a22552921cb242018c6ca9cf127c2aa74a812532ecd1f3d5f63505c60",
+      "nonce": 46,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0008040006113616",
+      "status": "success"
+    },
+    {
+      "hash": "0xef10023eced3369e81d2b17b34f4cb6306b0c20c5a4651d3576f7f5bf549612b",
+      "nonce": 47,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00704110352055",
+      "status": "success"
+    },
+    {
+      "hash": "0xd50d01ce95e419bc0b9cc4f46b63606b5f1446e1361a6ea793baf367147e52b2",
+      "nonce": 48,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00110876055438",
+      "status": "success"
+    },
+    {
+      "hash": "0x66eccf61211eab215f73a3d8a14d0887ed6aa22f56181923392e104bd1901176",
+      "nonce": 49,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00483704241852",
+      "status": "success"
+    },
+    {
+      "hash": "0xac0a1f605c5f1559ea18b78e5b3d7e5f392276fed7a0267eacb16d871898b866",
+      "nonce": 50,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00128170064085",
+      "status": "success"
+    },
+    {
+      "hash": "0x34d020621388fb17bcb7ea14a55718a1b6e0df741d7f7607c5cd9ce1523d7a73",
+      "nonce": 51,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0043042021521",
+      "status": "success"
+    },
+    {
+      "hash": "0xbeb0c8d15020e08e1349ae024f49bf1c94b7794c9fb8593ceaf99fdc6a71973d",
+      "nonce": 52,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00057144028572",
+      "status": "success"
+    },
+    {
+      "hash": "0xf824ab8d906a43fca38577903961bcefb241f668d6b5b765a3c11271e4d9516b",
+      "nonce": 53,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00057172028586",
+      "status": "success"
+    },
+    {
+      "hash": "0x07fc0bef84a8f654fd73e0dc1aa94b956556f22c669659594ef051766865a866",
+      "nonce": 54,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00069105",
+      "status": "success"
+    },
+    {
+      "hash": "0xd9200cf98ee659c5c55b4dace53111b4eb821c09ccd95daedec643ff73cb63da",
+      "nonce": 55,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.00055260317745",
+      "status": "success"
+    },
+    {
+      "hash": "0x8a2a8e5248b6dd8503fd152faa07ac359f2fa7b871148535efea788e0d9a8c5a",
+      "nonce": 56,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0006980024822625",
+      "status": "success"
+    },
+    {
+      "hash": "0xbeb3969dbfed94ae23a0da719df04d946438ffa7f1fffd713ef50abc15966c79",
+      "nonce": 57,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.000745062649619625",
+      "status": "success"
+    },
+    {
+      "hash": "0x860c960dbdb0160bd760f167e40a7b14e23e51b661131cef17f5c8272a57e80a",
+      "nonce": 58,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.006858268047801216",
+      "status": "success"
+    },
+    {
+      "hash": "0x13555d760060d01f7428ec7960f602aa9765b0746e0267c5aacf5413ee722ba0",
+      "nonce": 59,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.001108520637399",
+      "status": "success"
+    },
+    {
+      "hash": "0xe260ea08b89bafa17d76a441ccf70ed2bf02aaf4a4f860d2dfc2c71c31b2765e",
+      "nonce": 60,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.0048945428143605",
+      "status": "success"
+    },
+    {
+      "hash": "0xfeeee40c95a345df6d7874a50529a4df5624093f7968512a041e17f49dd116e3",
+      "nonce": 61,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.001264320726984",
+      "status": "success"
+    },
+    {
+      "hash": "0xc7a075b642427c5d5a4e26204d20299af9c7d2e39cb4e58661d88a75ca717683",
+      "nonce": 62,
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.000552840317883",
+      "status": "success"
+    },
+    {
+      "hash": "0xc9b4b37bc4ca86002a8307a9183041dc30e79470ac1ff4625a81e3c9d448fcc4",
+      "nonce": 63,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.001108761114969056",
+      "status": "success"
+    },
+    {
+      "hash": "0x655f6acb26528e384d7c6776aadd0b0ef7b4f30cf31fc1855fbc3bc71d4925cc",
+      "nonce": 64,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.004401624426269072",
+      "status": "success"
+    },
+    {
+      "hash": "0x4e55c3948a10144e2ae8e607ca32e1e70f20aaca8ae5ba2f923d0eb32d1b80ac",
+      "nonce": 65,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.00055260055569456",
+      "status": "success"
+    },
+    {
+      "hash": "0x399178334ae49f357a407701ae164a522cb50891e750663793a808e27f682a44",
+      "nonce": 66,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.0006980007019088",
+      "status": "success"
+    },
+    {
+      "hash": "0xc01027ede724b917a28a700a9ea2e3982270b882b7356210b67297cd2f85c516",
+      "nonce": 67,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.007473788642679192",
+      "status": "success"
+    },
+    {
+      "hash": "0xb9dd08c99fe1fd734112bea6a467e1390b61a9fe37e24e15a1646645f3748e36",
+      "nonce": 68,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.001281941704787909",
+      "status": "success"
+    },
+    {
+      "hash": "0x533ca7fa6d97c410ca4b9c11d68059ef065241e4f5e2942b66200ea959465ce0",
+      "nonce": 69,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.004148065516297591",
+      "status": "success"
+    },
+    {
+      "hash": "0xf9498f96c50dd4e8e95293e8b6d17e3333124dc8075488506fc72766ac843cb9",
+      "nonce": 70,
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.000552840735194274",
+      "status": "success"
+    },
+    {
+      "hash": "0x0ff68e98c2bf6232f9644a25e331d6d03badcb55f5474ba20dc19ccc8df15abd",
+      "nonce": 71,
+      "proof": "5042-autopilot-pass-gate-qualification.json",
+      "gasUSDC": "0.00055260224778339",
+      "status": "success"
+    },
+    {
+      "hash": "0xfaded05e931eb4e404d3fba40634aa9cf9cf61689dbc6e045f9c5e66656b9b18",
+      "nonce": 72,
+      "proof": "5042-autopilot-pass-gate-qualification.json",
+      "gasUSDC": "0.000552842248759626",
+      "status": "success"
+    },
+    {
+      "hash": "0x7f2465887bd6d774119ab9e48483122c8bfc11040cdc1091d07267dbd323ae17",
+      "nonce": 73,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.00055260224778339",
+      "status": "success"
+    },
+    {
+      "hash": "0x4caa9ce5e9ad7e7cf1f420080b42cb7787c6d5a784b0c2e0583420c21be72dfc",
+      "nonce": 74,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.000595362421716104",
+      "status": "success"
+    },
+    {
+      "hash": "0x482464d3784a9f86160371f1e2dd5eacbb7d25bb38a0d610b9b44b166f434fd9",
+      "nonce": 75,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.0006980028392197",
+      "status": "success"
+    },
+    {
+      "hash": "0x4cbeedb402a36a46ac84715501b7bcfb268c4f5e41661d71b7f9b528338799f5",
+      "nonce": 76,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.009426398343133254",
+      "status": "success"
+    },
+    {
+      "hash": "0x6bf9ec89d200d321b94ed065e84df32df83d5487b20812674bee45d92fe1c526",
+      "nonce": 77,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.000551642243878446",
+      "status": "success"
+    },
+    {
+      "hash": "0x2b349d38baf8e09d4367e0121b7476c3199b85f9bb5cd5008747a351f03e20d9",
+      "nonce": 78,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.001078844388343526",
+      "status": "success"
+    },
+    {
+      "hash": "0x478e0f081ed6d83512514f7eaad3a418b361dbad0580da7d8ed4706f15350af0",
+      "nonce": 79,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.000978763981253114",
+      "status": "success"
+    },
+    {
+      "hash": "0xc98e86e65117e97a4823676587521c4b0e00ec7f69082ab4251ba9790868868c",
+      "nonce": 80,
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.000552842248759626",
+      "status": "success"
+    },
+    {
+      "hash": "0x13c86234c042a87d26c903fe0e868b9fa714b6b45e49172092d9bf0e1ca43aea",
+      "nonce": 81,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.00056335065249321",
+      "status": "success"
+    },
+    {
+      "hash": "0x85762e5b217007fb5ec09f65155ca054a79fed75f2e184829254c1212782c099",
+      "nonce": 82,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.000602938176722568",
+      "status": "success"
+    },
+    {
+      "hash": "0x4fc8ba0dd706dccf653c1767d05ded7cb8576711b07cf3b9a8223ec436d9a98e",
+      "nonce": 83,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.0007098805695634",
+      "status": "success"
+    },
+    {
+      "hash": "0xb7e91e7a08eb6e218b4a48456dd50c2755cd36080f58aa0546af94f26e311888",
+      "nonce": 84,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.008001249375869328",
+      "status": "success"
+    },
+    {
+      "hash": "0x642d255a496e61cc48fe4c0ec5a7e803e49e1d283dc6ea1dfb11502c5ad7d423",
+      "nonce": 85,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.000557986984295496",
+      "status": "success"
+    },
+    {
+      "hash": "0xa5da60a01ad31be62f7531c921ce4ac48a0a5c128c5c2d98dbd46376d38a7166",
+      "nonce": 86,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.000554511886632558",
+      "status": "success"
+    },
+    {
+      "hash": "0x64e958b9f9718ab878680a5b901e645b29933956e99198020238a525ab783672",
+      "nonce": 87,
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.00107908053954",
+      "status": "success"
+    },
+    {
+      "hash": "0xde8f9c67f78a5abdb9d5bd9c18c99feca1beb3c0fd77a4c17739d84d5e2819aa",
+      "nonce": 88,
+      "proof": "5042-agent-gateway-qualification.json",
+      "gasUSDC": "0.00110852055426",
+      "status": "success"
+    },
+    {
+      "hash": "0xb7418d2a7a34a6a7bf16de3730773c8dfe3a7594abcf7ba2221ed2fb4f63ff17",
+      "nonce": 89,
+      "proof": "5042-agent-gateway-qualification.json",
+      "gasUSDC": "0.00175078087539",
+      "status": "success"
+    },
+    {
+      "hash": "0xb73e1130f1f05dc7ededabc2fc1a137732dd07b3e67b64f41613a7503dc8e3a8",
+      "nonce": 90,
+      "proof": "5042-browser-gateway-qualification.json",
+      "gasUSDC": "0.00110852055426",
+      "status": "success"
+    },
+    {
+      "hash": "0xa8ef9ec0fb2547c78ea7a47207d05aaf396c28a5d7de7232549d0ec4389e6e45",
+      "nonce": 91,
+      "proof": "5042-browser-gateway-qualification.json",
+      "gasUSDC": "0.00175078087539",
+      "status": "success"
+    }
+  ]
+}

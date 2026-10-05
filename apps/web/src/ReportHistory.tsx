@@ -35,7 +35,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
     if (!provider) return setMessage("Open PULSE inside your wallet browser or connect a wallet that supports message signing.");
     setBusy("sync"); setMessage("");
     try {
-      if (networkKey !== "arc-testnet") await switchWalletNetwork(provider, networkKey);
+      if (networkKey !== "arc") await switchWalletNetwork(provider, networkKey);
       if (!current.current) return;
       const challengeResponse = await fetch(`${API_BASE}/v1/report-history/challenge`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ wallet, networkKey }) });
       if (!challengeResponse.ok) throw new Error(`Could not create wallet history challenge (${challengeResponse.status})`);

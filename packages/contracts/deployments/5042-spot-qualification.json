@@ -1,0 +1,54 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "inputUSDC": "0.1",
+  "entries": [
+    {
+      "step": "buy-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 17,
+      "hash": "0x669092b33cd56c70251017a61b355b03efc92f148a13de85176aae7475e26bdc",
+      "status": "success",
+      "maxGasUSDC": "0.001687224000140602",
+      "gasUSDC": "0.001108760000110876"
+    },
+    {
+      "inputToken": "0x3600000000000000000000000000000000000000",
+      "outputToken": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "inputAmount": "100000",
+      "minimumOutput": "36759576696729",
+      "step": "buy",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 18,
+      "hash": "0xb27961323bf18e31a40eb809e0755f30d9cd8672da640255548e65ad1c4d53a6",
+      "status": "success",
+      "maxGasUSDC": "0.008214912000684576",
+      "gasUSDC": "0.004837040000483704",
+      "outputAmount": "36944298187668"
+    },
+    {
+      "step": "sell-approve",
+      "to": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "nonce": 19,
+      "hash": "0xdf835f653a1449a61906154b63b092e1a4c06a585e6e327e29be6a422163b848",
+      "status": "success",
+      "maxGasUSDC": "0.001948008000162334",
+      "gasUSDC": "0.001281940000128194"
+    },
+    {
+      "inputToken": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+      "outputToken": "0x3600000000000000000000000000000000000000",
+      "inputAmount": "36944298187668",
+      "minimumOutput": "98903",
+      "step": "sell",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 20,
+      "hash": "0x59de575b37b62936ede280a51a2ab465830cfc22d3b45e73c33457277654900e",
+      "status": "success",
+      "maxGasUSDC": "0.006963744000580312",
+      "gasUSDC": "0.004321180000432118",
+      "outputAmount": "99400"
+    }
+  ],
+  "completed": true
+}

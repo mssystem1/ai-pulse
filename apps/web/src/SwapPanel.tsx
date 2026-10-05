@@ -65,9 +65,22 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
   const [email, setEmail] = useState("");
   const [circleBusy, setCircleBusy] = useState(false);
   const [circleError, setCircleError] = useState<string | null>(null);
+  const [circleAvailable, setCircleAvailable] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const network = WEB_NETWORKS[networkKey];
   const legacyBalances = balances ? { okb: balances.native, usdt0: balances.payment } : null;
+
+  useEffect(() => {
+    if (!open || address || networkKey !== "arc") return;
+    let active = true;
+    setCircleAvailable(null);
+    void apiGet("/v1/circle/wallet/status").then(response => {
+      const status = response.data as { enabled?: boolean };
+      const appConfigured = Boolean(String(import.meta.env.VITE_CIRCLE_APP_ID || "").trim());
+      if (active) setCircleAvailable(response.ok && status.enabled === true && appConfigured);
+    }).catch(() => { if (active) setCircleAvailable(false); });
+    return () => { active = false; };
+  }, [open, address, networkKey]);
   const copy = {
     en: { eyebrow: "X Layer wallet", title: "Wallet & funding", subtitle: "Balances, payment readiness, and swapping in one place.", disconnected: "Connect once from the header to view balances and swap on X Layer.", okb: "OKB", okbRole: "Network gas", usdt: "USDT0", usdtRole: "x402 payments", ready: "Ready to pay", low: "Top up USDT0", refresh: "Refresh", disconnect: "Disconnect", swapTitle: "Swap OKB → USDT0", swapHelp: "A native PULSE swap flow powered by the official OKX Exchange OS DEX API. The connected header wallet signs directly—there is no second wallet session.", connected: "Connected wallet", amount: "You pay", balance: "Balance", getQuote: "Get live quote", quoting: "Finding best route…", receive: "You receive", route: "Route", impact: "Price impact", swap: "Review & swap in wallet", swapping: "Preparing transaction…", success: "Transaction submitted", openDex: "Open OKX DEX", close: "Close wallet panel", reserve: "Leave a small OKB reserve for network gas.", noCredentials: "Live OKX DEX funding is unavailable on this deployment." },
     zh: { eyebrow: "X Layer 钱包", title: "钱包与充值", subtitle: "余额、支付状态和兑换集中在一个面板。", disconnected: "请从页眉连接一次钱包，以查看余额并在 X Layer 上兑换。", okb: "OKB", okbRole: "网络 Gas", usdt: "USDT0", usdtRole: "x402 支付", ready: "可以支付", low: "充值 USDT0", refresh: "刷新", disconnect: "断开", swapTitle: "兑换 OKB → USDT0", swapHelp: "PULSE 原生兑换流程，由 OKX Exchange OS 官方 DEX API 提供。页眉中已连接的钱包直接签名，无需第二次连接。", connected: "已连接钱包", amount: "支付", balance: "余额", getQuote: "获取实时报价", quoting: "正在寻找最佳路由…", receive: "预计收到", route: "路由", impact: "价格影响", swap: "在钱包中确认兑换", swapping: "正在准备交易…", success: "交易已提交", openDex: "打开 OKX DEX", close: "关闭钱包面板", reserve: "请保留少量 OKB 用于网络 Gas。", noCredentials: "此部署暂未启用 OKX DEX 实时充值。" },
@@ -238,11 +251,11 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
   }
 
   if (!open) return null;
-  const spendable = networkKey === "arc-testnet" ? gatewayBalance || 0 : balances?.payment || 0;
+  const spendable = networkKey === "arc" ? gatewayBalance || 0 : balances?.payment || 0;
   const paymentReady = spendable >= 0.01;
   const fundingStatus = networkKey === "xlayer"
     ? (lang === "zh" ? "充值 USDT0" : "Top up USDT0")
-    : networkKey === "arc-testnet"
+    : networkKey === "arc"
       ? (lang === "zh" ? "将 USDC 存入 Gateway" : "Deposit USDC into Gateway")
       : `${lang === "zh" ? "充值" : "Top up"} ${network.payment.symbol}`;
   const dexUrl = `https://web3.okx.com/dex-swap#srcChain=196&dstChain=196&toTokenAddress=${USDT0_ADDRESS}`;
@@ -264,11 +277,12 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
               <span><strong>Other wallets</strong><small>WalletConnect, MetaMask, Trust Wallet and Base-compatible wallets</small></span>
               <b aria-hidden>→</b>
             </button>
-            {networkKey === "arc-testnet" && <>
+            {networkKey === "arc" && <>
               <div className="connect-divider"><span>or</span></div>
-              <div className="circle-network-notice"><strong>Circle email wallet · Arc Testnet only</strong><span>This test wallet automatically switches PULSE to Arc Testnet. Base, Arbitrum, and X Layer are hidden until you disconnect it.</span></div>
-              <label className="circle-email"><span>Email for your Arc Testnet wallet</span><input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => { setEmail(event.target.value); setCircleError(null); }} /></label>
-              <button type="button" className="btn btn-primary full" disabled={circleBusy || !email.trim()} onClick={() => { setCircleBusy(true); setCircleError(null); void onCircleConnect(email.trim()).catch((error) => setCircleError(error instanceof Error ? error.message : String(error))).finally(() => setCircleBusy(false)); }}>{circleBusy ? "Check your email…" : "Continue on Arc Testnet with Circle"}</button>
+              <div className="circle-network-notice"><strong>Circle email wallet · Arc Mainnet only</strong><span>Connecting switches PULSE to Arc Mainnet. Other networks become available after you disconnect.</span></div>
+              {circleAvailable !== true && <p className="hint">{circleAvailable === null ? "Checking email wallet availability…" : "Email wallet setup is pending on this deployment."}</p>}
+              <label className="circle-email"><span>Email for your Arc Mainnet wallet</span><input type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(event) => { setEmail(event.target.value); setCircleError(null); }} /></label>
+              <button type="button" className="btn btn-primary full" disabled={circleBusy || !email.trim() || circleAvailable !== true} onClick={() => { setCircleBusy(true); setCircleError(null); void onCircleConnect(email.trim()).catch((error) => setCircleError(error instanceof Error ? error.message : String(error))).finally(() => setCircleBusy(false)); }}>{circleBusy ? "Check your email…" : "Continue on Arc Mainnet with Circle"}</button>
               <small className="circle-note">User-controlled Circle EOA. PULSE never receives your private key.</small>
               {circleError && <div className="swap-message error circle-error"><strong>Circle login needs attention</strong><span>{circleError}</span>{/SMTP|email OTP is not configured/i.test(circleError) && <a href="https://console.circle.com" target="_blank" rel="noreferrer">Open Circle Console ↗</a>}</div>}
             </>}
@@ -276,7 +290,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
         ) : (
           <>
             <div className="account-row"><div className="account-avatar">{address.slice(2, 4).toUpperCase()}</div><div className="account-identity" title={address}><strong>{shortAddr(address)}</strong><span>{walletName} · {network.label}</span></div><button type="button" className={`copy-address-button ${copied ? "copied" : ""}`} title={`Copy ${address}`} aria-label={`Copy wallet address ${address}`} onClick={() => void copyAddress()}><span aria-hidden>{copied ? "✓" : "⧉"}</span>{copied ? "Copied" : "Copy address"}</button><button type="button" className="text-button" onClick={onDisconnect}>{copy.disconnect}</button></div>
-            {networkKey === "arc-testnet" ? <div className="arc-balance-panel"><div className="arc-balance-tabs"><button type="button" className={arcBalanceView === "wallet" ? "active" : ""} onClick={() => setArcBalanceView("wallet")}>Wallet USDC</button><button type="button" className={arcBalanceView === "gateway" ? "active" : ""} onClick={() => setArcBalanceView("gateway")}>Gateway USDC</button></div>{arcBalanceView === "wallet" ? <div className="balance-card payment"><div><span>Wallet USDC</span><small>Onchain wallet balance · gas balance {balances ? fmtBal(balances.native, 6) : "—"} USDC</small></div><strong>{balances ? fmtBal(balances.payment, 6) : "—"}</strong></div> : <div className={`balance-card payment ${emphasize ? "low" : ""}`}><div><span>Gateway USDC</span><small>Available for Circle Gateway x402</small></div><strong>{fmtBal(gatewayBalance || 0, 6)}</strong></div>}</div> : <div className="balance-grid"><div className="balance-card"><div><span>{network.native.symbol}</span><small>Network gas</small></div><strong>{balances ? fmtBal(balances.native, 6) : "—"}</strong></div><div className={`balance-card payment ${emphasize ? "low" : ""}`}><div><span>{network.payment.symbol}</span><small>x402 payments</small></div><strong>{balances ? fmtBal(balances.payment, 6) : "—"}</strong></div></div>}
+            {networkKey === "arc" ? <div className="arc-balance-panel"><div className="arc-balance-tabs"><button type="button" className={arcBalanceView === "wallet" ? "active" : ""} onClick={() => setArcBalanceView("wallet")}>Wallet USDC</button><button type="button" className={arcBalanceView === "gateway" ? "active" : ""} onClick={() => setArcBalanceView("gateway")}>Gateway USDC</button></div>{arcBalanceView === "wallet" ? <div className="balance-card payment"><div><span>Wallet USDC</span><small>Onchain wallet balance · gas balance {balances ? fmtBal(balances.native, 6) : "—"} USDC</small></div><strong>{balances ? fmtBal(balances.payment, 6) : "—"}</strong></div> : <div className={`balance-card payment ${emphasize ? "low" : ""}`}><div><span>Gateway USDC</span><small>Available for Circle Gateway x402</small></div><strong>{fmtBal(gatewayBalance || 0, 6)}</strong></div>}</div> : <div className="balance-grid"><div className="balance-card"><div><span>{network.native.symbol}</span><small>Network gas</small></div><strong>{balances ? fmtBal(balances.native, 6) : "—"}</strong></div><div className={`balance-card payment ${emphasize ? "low" : ""}`}><div><span>{network.payment.symbol}</span><small>x402 payments</small></div><strong>{balances ? fmtBal(balances.payment, 6) : "—"}</strong></div></div>}
             <div className={`readiness ${paymentReady && !emphasize ? "ready" : "needs-funds"}`}><span className="status-dot" /><span>{paymentReady && !emphasize ? copy.ready : fundingStatus}</span><button type="button" onClick={onRefresh} disabled={loadingBal}>{loadingBal ? "…" : copy.refresh}</button></div>
           </>
         )}
@@ -303,7 +317,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
         </section> : <section className="swap-section funding-section">
           <div className="swap-title-row"><div><span className="eyebrow">{network.provider}</span><h3>Fund {network.payment.symbol} on {network.label}</h3></div><a href={network.fundingUrl} target="_blank" rel="noreferrer">{network.fundingLabel} ↗</a></div>
           <p>{network.fundingNote}</p>
-          {networkKey === "robinhood" ? <RobinhoodFunding key={address || "disconnected"} address={address} balance={balances?.native ?? null} onRefresh={onRefresh} /> : networkKey === "arc-testnet" ? (
+          {networkKey === "robinhood" ? <RobinhoodFunding key={address || "disconnected"} address={address} balance={balances?.native ?? null} onRefresh={onRefresh} /> : networkKey === "arc" ? (
             <div className="native-swap">
               <div className="swap-asset-card"><div><span>Gateway deposit</span><small>Wallet balance: {balances ? fmtBal(balances.payment, 6) : "—"} USDC</small></div><div className="swap-input-row"><input inputMode="decimal" value={gatewayAmount} onChange={(event) => setGatewayAmount(event.target.value)} aria-label="Gateway deposit amount" /><strong>USDC</strong></div></div>
               <button type="button" className="btn btn-primary full" disabled={!address || fundingBusy} onClick={() => void fundGateway()}>{fundingBusy ? "Approving and depositing…" : "Deposit into Circle Gateway"}</button>

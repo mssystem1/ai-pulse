@@ -114,3 +114,7 @@ Use the approved test wallet and smallest practical amounts:
 9. Confirm all events reconcile into KV and the correct independent dashboard.
 
 Record every transaction hash, receipt, event, balance delta, and explorer link. A network stays disabled if any expected invariant fails.
+
+## Arc mainnet
+
+Arc uses chain 5042 and native USDC gas with 18 decimals; payment/trading approvals use USDC ERC-20 units with 6 decimals. Use the dedicated read-only `npm run plan:arc` and budgeted `packages/contracts/scripts/deploy-arc.mjs`. Deployment leaves automation paused. Configure verified router/spender and execution roles, complete live qualification, then enable trading. See [Arc migration audit](ARC_MAINNET_MIGRATION.md).

@@ -19,6 +19,9 @@ data/cache/
 .codex-ui-review/
 node
 .env.cloud
+.env.railway.cloud
+.env.vercel.cloud
 *-report.json
 DB_backup/
 .tmp/telegram-*
+.tmp/

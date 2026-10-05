@@ -202,20 +202,21 @@ function genericQuoteSummary(raw: Record<string, unknown>, chainId: string) {
   };
 }
 
-/** Fail closed before advertising a Robinhood route, not only at execution. */
+/** Bind Arc and Robinhood mainnet routes to the requested tokens and amount. */
 export function assertRobinhoodQuoteIdentity(raw: Record<string, unknown>, input: GenericDexRequest) {
-  if (input.chainId !== "4663") return;
+  if (input.chainId !== "4663" && input.chainId !== "5042") return;
+  const label = input.chainId === "5042" ? "Arc mainnet" : "Robinhood";
   const from = raw.fromToken as Record<string, unknown> | undefined;
   const to = raw.toToken as Record<string, unknown> | undefined;
   if ((raw.chainIndex != null && String(raw.chainIndex) !== input.chainId)
     || String(from?.tokenContractAddress || "").toLowerCase() !== input.fromTokenAddress.toLowerCase()
     || String(to?.tokenContractAddress || "").toLowerCase() !== input.toTokenAddress.toLowerCase())
-    throw new Error("Robinhood quote assets or chain do not match the request");
+    throw new Error(`${label} quote assets or chain do not match the request`);
   const amount = String(raw.fromTokenAmount ?? "");
   const received = String(raw.toTokenAmount ?? "");
   if (!/^\d+$/.test(amount) || !/^\d+$/.test(received) || !/^\d+$/.test(input.amount)
     || BigInt(amount) !== BigInt(input.amount) || BigInt(amount) <= 0n || BigInt(received) <= 0n)
-    throw new Error("Robinhood quote must match the exact input and have positive output");
+    throw new Error(`${label} quote must match the exact input and have positive output`);
 }
 
 /** Live Onchain OS quote for any exact token pair supported by its chain router. */
@@ -247,7 +248,7 @@ export async function getGenericOkxSwap(cfg: AppConfig, input: GenericDexRequest
   });
   const tx = raw.tx as Record<string, unknown> | undefined;
   const router = raw.routerResult as Record<string, unknown> | undefined;
-  if (input.chainId === "4663") assertRobinhoodQuoteIdentity(router || {}, input);
+  if (input.chainId === "4663" || input.chainId === "5042") assertRobinhoodQuoteIdentity(router || {}, input);
   if (!tx || typeof tx.to !== "string" || typeof tx.data !== "string") {
     throw new Error("OKX Onchain OS returned no executable transaction");
   }
@@ -401,6 +402,12 @@ const tradeTokenRequests = new Map<string, Promise<Record<string, unknown>[]>>()
 // OKX's discovery catalog. These addresses are additive; a live quote is still
 // required before the UI enables a wallet transaction.
 const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
+  "5042": [
+    { tokenSymbol: "USDC", tokenName: "USD Coin", tokenContractAddress: "0x3600000000000000000000000000000000000000", decimals: 6, tokenSource: "Arc official mainnet deployment" },
+    { tokenSymbol: "WETH", tokenName: "Wrapped Ether", tokenContractAddress: "0x128cC466B61f542da60c70e3aA11c10e19B84EDB", decimals: 18, tokenSource: "Arc official mainnet deployment" },
+    { tokenSymbol: "cirBTC", tokenName: "Circle Wrapped Bitcoin", tokenContractAddress: "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0", decimals: 8, tokenSource: "Arc official mainnet deployment" },
+    { tokenSymbol: "EURC", tokenName: "Euro Coin", tokenContractAddress: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", decimals: 6, tokenSource: "Arc official mainnet deployment" },
+  ],
   "196": [
     { tokenSymbol: "LINK", tokenName: "Chainlink", tokenContractAddress: "0x8af9711b44695a5a081f25ab9903ddb73acf8fa9", decimals: 18, tokenSource: "Chainlink official deployment" },
     { tokenSymbol: "USDT0", tokenName: "Tether USD0", tokenContractAddress: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, tokenSource: "X Layer official token list" },
@@ -440,6 +447,7 @@ const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
  * substitute for its underlying asset, even when its ticker contains it.
  */
 const EXECUTION_ASSET_ALIASES: Record<string, Record<string, string[]>> = {
+  "5042": { BTC: ["CIRBTC"], ETH: ["WETH"] },
   "196": {
     // xBTC is OKX's wrapped BTC on X Layer and currently has the safe liquid
     // USDT0 route. The similarly named WBTC catalog entry is retained only as

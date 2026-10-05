@@ -12,6 +12,7 @@ import {
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { AppConfig } from "@pulse/config";
+import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, robinhoodOrderMarket } from "./robinhoodMarkets.js";
@@ -20,6 +21,8 @@ import { recordV6Activity } from "./v6Store.js";
 import { executionPublicClient, executionRpcUrls, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
 import { executionContractAddress } from "./executionContracts.js";
 import { validateRobinhoodSwap } from "./robinhoodFunding.js";
+import { validateArcSwap } from "./arcSwap.js";
+import { arcExecutionFees } from "./arcExecutionFees.js";
 
 type Network = import("./executionContracts.js").ExecutionNetwork;
 type RegisteredOrder = {
@@ -60,6 +63,18 @@ type RegisteredOrder = {
 const address = /^0x[a-fA-F0-9]{40}$/;
 const hash = /^0x[a-fA-F0-9]{64}$/;
 const networks = {
+  arc: {
+    id: 5042,
+    rpc: () => process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io",
+    rpcFallback: () => process.env.ARC_RPC_FALLBACK_URL || "https://rpc.quicknode.mainnet.arc.io",
+    oracle: () => executionContractAddress("arc", "oracleRouter"),
+    adapter: () => executionContractAddress("arc", "executionAdapter"),
+    router: () => executionContractAddress("arc", "okxRouter"),
+    spender: () => executionContractAddress("arc", "okxApproval"),
+    ocoFactory: () => executionContractAddress("arc", "spotFactory"),
+    limitFactory: () => executionContractAddress("arc", "spotLimitFactory"),
+    bracketFactory: () => executionContractAddress("arc", "spotBracketFactory"),
+  },
   robinhood: {
     id: 4663,
     rpc: () => process.env.ROBINHOOD_RPC_URL || "https://rpc.mainnet.chain.robinhood.com",
@@ -111,7 +126,7 @@ const networks = {
 } as const;
 const schema = z.object({
   owner: z.string().regex(address),
-  network: z.enum(["xlayer", "base", "arbitrum", "robinhood"]),
+  network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]),
   account: z.string().regex(address),
   orderId: z.string().regex(/^\d+$/),
   version: z.enum(["oco-v1", "limit-v2", "bracket-v1"]),
@@ -288,7 +303,7 @@ function clients(network: Network, key?: `0x${string}`) {
     name: network,
     nativeCurrency: {
       name: "Native",
-      symbol: network === "xlayer" ? "OKB" : "ETH",
+      symbol: network === "xlayer" ? "OKB" : network === "arc" ? "USDC" : "ETH",
       decimals: 18,
     },
     rpcUrls: { default: { http: urls } },
@@ -810,9 +825,14 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
     for (const item of items
       .filter((o) => Object.hasOwn(networks, o.network) && (o.status === "active" || o.status === "paused"))
       .filter((o) => (o.network !== "robinhood" || process.env.FEATURE_ROBINHOOD_TRADING === "1")
+        && (o.network !== "arc" || process.env.FEATURE_ARC_TRADING === "1")
         && (!scope || (o.network === scope.network && o.account.toLowerCase() === scope.account.toLowerCase() && o.orderId === scope.orderId)))
       .slice(0, 100)) {
       try {
+        if (item.network === "arc") {
+          const readiness = await arcAutomationReadiness(cfg);
+          if (!readiness.ready) throw new Error(readiness.reason);
+        }
         assertExecutionMarketIdentity(item.network, item.instId);
         const net = networks[item.network];
         const oracle = net.oracle();
@@ -876,13 +896,19 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
         if (!triggered) continue;
         const base = (item.version === "oco-v1" ? item.sellToken : bracketProtected ? record[1] : record[2]) as `0x${string}`;
         const quote = (item.version === "oco-v1" ? item.buyToken : bracketProtected ? record[0] : record[3]) as `0x${string}`;
+        const priceFees = item.network === "arc" ? await arcExecutionFees(publicClient, {
+          account: walletClient.account!, to: oracle as `0x${string}`,
+          data: encodeFunctionData({ abi: oracleAbi, functionName: "setPrice", args: [base, quote, price, 300n] }),
+        }) : {};
         const priceHash = await walletClient.writeContract({
+          ...priceFees,
           address: oracle as `0x${string}`,
           abi: oracleAbi,
           functionName: "setPrice",
           args: [base, quote, price, 300n],
         });
-        await publicClient.waitForTransactionReceipt({ hash: priceHash });
+        const priceReceipt = await publicClient.waitForTransactionReceipt({ hash: priceHash });
+        if (priceReceipt.status !== "success") throw new Error("Automation oracle price update reverted");
         const amount = (item.version === "oco-v1" ? record[2] : bracketProtected ? record[5] : record[4]) as bigint;
         const swapFrom = (bracketProtected ? record[1] : item.sellToken) as string;
         const swapTo = (bracketProtected ? record[0] : item.buyToken) as string;
@@ -895,6 +921,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
           slippagePercent: "0.5",
         });
         if (item.network === "robinhood") validateRobinhoodSwap(prepared, { from: swapFrom, to: swapTo, amount: String(amount), receiver: adapter!, slippageBps: 50 });
+        const arcExpiresAt = item.network === "arc" ? (await validateArcSwap(prepared, { from: swapFrom, to: swapTo, amount: String(amount), receiver: adapter!, slippageBps: 50 })).expiresAt : undefined;
         if (
           prepared.tx.to.toLowerCase() !== approvedRouter!.toLowerCase() ||
           BigInt(prepared.tx.value) !== 0n
@@ -921,6 +948,12 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
           ],
         });
         let executionHash: `0x${string}`;
+        const submit = async (request: Parameters<typeof walletClient.writeContract>[0]) => {
+          const fees = item.network === "arc" ? await arcExecutionFees(publicClient, { account: walletClient.account!, to: request.address,
+            data: encodeFunctionData({ abi: request.abi, functionName: request.functionName, args: request.args }) }) : {};
+          if (arcExpiresAt && Date.now() + 3000 >= arcExpiresAt) throw new Error("Arc execution quote expired before signing; refresh the route");
+          return walletClient.writeContract({ ...request, ...fees });
+        };
         if (item.version === "oco-v1") {
           const simulation = await publicClient.simulateContract({
             address: item.account as `0x${string}`,
@@ -934,7 +967,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
             ],
             account: walletClient.account,
           });
-          executionHash = await walletClient.writeContract(simulation.request);
+          executionHash = await submit(simulation.request);
         } else if (item.version === "limit-v2") {
           const simulation = await publicClient.simulateContract({
             address: item.account as `0x${string}`,
@@ -943,14 +976,14 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
             args: [BigInt(item.orderId), adapter as `0x${string}`, adapterData],
             account: walletClient.account,
           });
-          executionHash = await walletClient.writeContract(simulation.request);
+          executionHash = await submit(simulation.request);
         } else {
           if (bracketProtected) {
             const simulation = await publicClient.simulateContract({ address: item.account as `0x${string}`, abi: bracketAbi, functionName: "executeExit", args: [BigInt(item.orderId), adapter as `0x${string}`, adapterData, minOut], account: walletClient.account });
-            executionHash = await walletClient.writeContract(simulation.request);
+            executionHash = await submit(simulation.request);
           } else {
             const simulation = await publicClient.simulateContract({ address: item.account as `0x${string}`, abi: bracketAbi, functionName: "executeEntry", args: [BigInt(item.orderId), adapter as `0x${string}`, adapterData], account: walletClient.account });
-            executionHash = await walletClient.writeContract(simulation.request);
+            executionHash = await submit(simulation.request);
           }
         }
         const receipt = await publicClient.waitForTransactionReceipt({

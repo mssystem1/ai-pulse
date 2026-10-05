@@ -71,7 +71,7 @@ test("adds a missing chain after EIP-4902", async () => {
 
 test("does not hide wallet rejection or provider-specific failures", async () => {
   const provider = { request: async () => { throw Object.assign(new Error("rejected"), { code: 4001 }); } };
-  await assert.rejects(() => switchWalletNetwork(provider, "arc-testnet"), /rejected/);
+  await assert.rejects(() => switchWalletNetwork(provider, "arc"), /rejected/);
   assert.equal(walletProviderName({ isOkxWallet: true } as InjectedProvider), "OKX Wallet");
   assert.equal(walletProviderName({ isMetaMask: true } as InjectedProvider), "MetaMask");
   assert.equal(walletProviderName({ isRabby: true } as InjectedProvider), "Rabby");
@@ -98,7 +98,8 @@ test("reconciles wallet chain events with every supported PULSE network", () => 
   assert.equal(networkKeyForChainId("0xc4"), "xlayer");
   assert.equal(networkKeyForChainId("0x2105"), "base");
   assert.equal(networkKeyForChainId("0xa4b1"), "arbitrum");
-  assert.equal(networkKeyForChainId("0x4cef52"), "arc-testnet");
+  assert.equal(networkKeyForChainId("0x13b2"), "arc");
+  assert.equal(networkKeyForChainId("0x4cef52"), null);
   assert.equal(networkKeyForChainId("0x1"), null);
 });
 

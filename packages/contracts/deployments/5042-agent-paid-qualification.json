@@ -1,0 +1,16 @@
+{
+  "chainId": 5042,
+  "service": "agent-mcp-risk",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "paidUSDC": ".20",
+  "reportJobId": "d63eb301-b54c-4c9e-a74b-c316ab68a7ef",
+  "actualBuyer": true,
+  "actualMcp": true,
+  "liveReport": true,
+  "sdkRecovery": true,
+  "freeMcpRecovery": true,
+  "lostResponseRecovery": true,
+  "sameJobOnReplay": true,
+  "gatewayRemainingUSDC": "0",
+  "qualifiedAt": "2026-10-05T04:46:13.676Z"
+}

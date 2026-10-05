@@ -50,7 +50,7 @@ export function telegramServiceCatalog(cfg: AppConfig) {
     return { ...service, stars: enabled ? stars : null, enabled };
   });
 }
-type Order = { id: string; userId: number; serviceId: string; stars: number; input: unknown; networkKey: "xlayer" | "base" | "arbitrum" | "robinhood"; surface?: "ton"; createdAt: number; chargeId?: string; paidAt?: string; jobId?: string; refunded?: boolean };
+type Order = { id: string; userId: number; serviceId: string; stars: number; input: unknown; networkKey: "xlayer" | "base" | "arbitrum" | "robinhood" | "arc"; surface?: "ton"; createdAt: number; chargeId?: string; paidAt?: string; jobId?: string; refunded?: boolean };
 export type TelegramCommerceProfile = { apiPrefix?: string; webhookSecret?: string; appUrl?: string; allowEvm?: boolean; botOnly?: boolean };
 export type StarsUpdate = { pre_checkout_query?: { id: string; from: { id: number }; currency: string; total_amount: number; invoice_payload: string }; message?: { chat?: { id?: number; type?: string }; from?: { id?: number }; successful_payment?: { currency: string; total_amount: number; invoice_payload: string; telegram_payment_charge_id: string } } };
 export class TelegramCommerce {
@@ -155,7 +155,7 @@ export class TelegramCommerce {
     if (!service?.enabled || !service.stars) throw new Error("Service unavailable");
     if(this.profile.allowEvm===false&&((rawInput as {instId?:string})?.instId!=="TON-USDT"||networkKey!=="xlayer"))throw new Error("This Mini App supports TON-USDT research only. EVM token inputs and execution are unavailable.");
     let input = service.mode === "spot" ? this.dependencies!.validateGlobal(rawInput) : service.mode === "prediction" ? PredictionAnalysisRequestSchema.parse(rawInput) : TokenScanRequestSchema.parse(rawInput);
-    if (!["xlayer", "base", "arbitrum", "robinhood"].includes(networkKey)) throw new Error("Unsupported network");
+    if (!["xlayer", "base", "arbitrum", "robinhood", "arc"].includes(networkKey)) throw new Error("Unsupported network");
     if (service.mode === "risk") input = { ...(input as object), chainId: ({ xlayer: "196", base: "8453", arbitrum: "42161", robinhood: "4663" } as Record<string,string>)[networkKey] };
     const existing = await this.get(orderId);
     if (existing && (existing.userId !== userId || existing.serviceId !== serviceId || requestHash(existing.input) !== requestHash(input) || existing.networkKey !== networkKey)) throw new Error("Order does not match this purchase");

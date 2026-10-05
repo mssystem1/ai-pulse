@@ -6,7 +6,7 @@
 
 <p align="center"><strong>Market intelligence. Wallet-approved Spot orders. Autonomous Autopilot trading.</strong></p>
 
-PULSE combines live OKX Global Market evidence—including crypto, xStocks, and RWA instruments—with explicitly selected Polymarket data. A valid Global report can prefill an Agentic-Wallet-signed Market or Limit Spot ticket, including optional TP/SL. Guarded Autopilot starts separately through its own pair, strategy, capital/risk, owner-vault and duration workflow; it never requires or reuses a paid report as its live signal. Reports are private, recoverable across devices through wallet proof, and paid per request through network-aware x402 settlement on X Layer, Base, Arbitrum One, and Arc Testnet.
+PULSE combines live OKX Global Market evidence—including crypto, xStocks, and RWA instruments—with explicitly selected Polymarket data. A valid Global report can prefill an Agentic-Wallet-signed Market or Limit Spot ticket, including optional TP/SL. Guarded Autopilot starts separately through its own pair, strategy, capital/risk, owner-vault and duration workflow; it never requires or reuses a paid report as its live signal. Reports are private, recoverable across devices through wallet proof, and paid per request through network-aware x402 settlement on X Layer, Base, Arbitrum One, and Arc Mainnet.
 
 PULSE is an independent intelligence product. Polymarket is a public read-only evidence source; PULSE does not place Polymarket orders or bypass Polymarket trading restrictions.
 
@@ -39,7 +39,7 @@ PULSE uses one Telegram bot, `@pulsemi_bot`: all five chat research services, pe
 
 Telegram report history identifies Global reports by pair and timeframe, followed by service, status and date. Prediction entries identify the market; Risk Guard identifies the token and network. First delivery and recovery use the same curated research sections: a compact formatted chat overview, a labelled TXT download, and a PNG chart for Pro reports with valid saved chart data. Provider payloads, raw candle arrays, internal field paths and payment metadata are excluded. The TON Mini App uses the same report presentation, supports TXT downloads and expands saved charts for reading on mobile.
 
-Public activity combines chains independently of the selected RPC. Research counts include Arc Testnet with explicit labeling; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
+Public activity combines chains independently of the selected RPC. Research counts include Arc mainnet and the separately labelled retired Arc testnet archive; Spot/Autopilot fills and settlement-asset volume remain mainnet-only. Counts are evidence-backed observed activity, include genuine developer testing, and disclose incomplete historical coverage. Missing figures are not replaced with sample or zero lifetime counts.
 
 The landing page compares research deliveries with a shared-scale stacked bar chart, split into Global, Prediction and Risk Guard. Patterns and labels distinguish services across all five appearances; the table retains exact counts. Missing coverage is shown explicitly, and testnet research is not presented as mainnet trading volume.
 
@@ -55,7 +55,7 @@ Markets move continuously, but most analysis products still require an account, 
 - Move a valid Global plan into connected-wallet Market or Limit Spot execution with route, balance, slippage, entry, TP, and SL carried forward.
 - Run a policy-bounded Autopilot that can Buy, Hold, partially Sell, fully Sell, and later Buy again only inside owner-signed limits.
 - Run network-scoped Risk Guard evidence and pre-trade checks, with source coverage disclosed for each chain, including Robinhood.
-- Settle through USD₮0 on X Layer, native USDC on Base and Arbitrum, USDG on Robinhood, or test USDC on Arc Testnet.
+- Settle through USD₮0 on X Layer, native USDC on Base and Arbitrum, USDG on Robinhood, or USDC on Arc Mainnet.
 - Recover an idempotent paid job without paying twice and reopen wallet-owned report history on another device.
 - Use the same product through the responsive web console, REST, MCP, or TypeScript SDK.
 
@@ -144,11 +144,11 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 
 ### Wallet and funding
 
-- One wallet drawer supports OKX Wallet, EIP-6963 injected wallets, WalletConnect, Base-compatible AppKit connectors, and Circle User-Controlled EOA wallets authenticated by email OTP. With the configured Circle Testnet application, Circle email sessions are Arc Testnet-only; PULSE hides X Layer, Base, and Arbitrum until the Circle wallet is disconnected.
+- One wallet drawer supports OKX Wallet, EIP-6963 injected wallets, WalletConnect, Base-compatible AppKit connectors, and Circle User-Controlled EOA wallets authenticated by email OTP. With a production Circle application, Circle email sessions are Arc Mainnet-only; PULSE hides X Layer, Base, and Arbitrum until the Circle wallet is disconnected.
 - The selected PULSE network, connected provider, wallet chain, address, native balance, and exact payment-asset balance remain distinct.
 - X Layer prepares OKB → USD₮0 through OKX Exchange OS.
 - Base and Arbitrum prepare native ETH → native USDC inside PULSE; Arbitrum explicitly rejects USDC.e as the payment asset.
-- Arc Testnet exposes faucet guidance, test-USDC balance, Circle Gateway balance, and Gateway deposit.
+- Arc Mainnet exposes wallet USDC, Circle Gateway balance and Gateway deposit; native gas uses the same USDC balance through its 18-decimal interface.
 - Arc displays wallet USDC and Circle Gateway USDC in separate tabs so onchain funds are not confused with spendable Gateway funds.
 - When Robinhood is enabled, its funding drawer prepares ETH → canonical USDG through OKX DEX. PULSE validates the deployed router's calldata, recipient, minimum received and expiry, checks gas reserves and simulates before the connected wallet signs. Funding never requires the facilitator key or an ERC-20 approval.
 - Before browser signing, PULSE switches to the selected chain and refreshes the exact payment-asset balance.
@@ -177,14 +177,14 @@ When replacing the card, increment the image filename, update the homepage's ima
 
 Network support is feature-specific. Selecting a chain does not enable every order type or start a strategy. Wallet Spot, contract Limit/protection and Autopilot each check live capabilities, deployed contracts, routes and runtime readiness. Robinhood uses canonical USDG for service payments and trading capital, with ETH reserved for gas; see its release limitations below.
 
-For a deployment, keep `ENABLED_NETWORKS` (API) and `VITE_ENABLED_NETWORKS` (web) aligned. The five-network list is `xlayer,base,arbitrum,arc-testnet,robinhood`. Rebuild the frontend after changing browser variables: the PULSE selector and wallet connection modal must advertise the same chains. Never put facilitator, admin or buyer private keys in `VITE_*` variables.
+For a deployment, keep `ENABLED_NETWORKS` (API) and `VITE_ENABLED_NETWORKS` (web) aligned. The five-network list is `xlayer,base,arbitrum,arc,robinhood`. Rebuild the frontend after changing browser variables: the PULSE selector and wallet connection modal must advertise the same chains. Never put facilitator, admin or buyer private keys in `VITE_*` variables.
 
 | Network | Public prefix | Payment asset | Provider | Funding inside PULSE |
 | --- | --- | --- | --- | --- |
 | X Layer (`eip155:196`) | `/xlayer` | USD₮0 | OKX x402 | Native OKB to USD₮0 through OKX Exchange OS |
 | Base (`eip155:8453`) | `/base` | Native USDC | CDP x402 | Native ETH to native USDC swap |
 | Arbitrum One (`eip155:42161`) | `/arbitrum` | Native USDC | CDP x402 | Native ETH to native USDC swap; USDC.e is not accepted |
-| Arc Testnet (`eip155:5042002`) | `/arc` | Test USDC | Circle Gateway | Faucet guidance and in-app Gateway deposit |
+| Arc Mainnet (`eip155:5042`) | `/arc` | USDC | Circle Gateway | Mainnet USDC funding and in-app Gateway deposit |
 | Robinhood mainnet (`eip155:4663`, opt-in) | `/robinhood` | USDG | PULSE self-hosted x402 SDK facilitator | ETH to USDG; confirmed mainnet funding swap |
 
 Robinhood qualification covers paid research, funding, wallet Spot, contract Limit roundtrips, Autopilot setup and paid Entry Pass activation. A genuine AI-approved AMAT Autopilot buy and complete autonomous take-profit exit are confirmed on mainnet. The exit required a better liquidity source and a bounded temporary 10% test tolerance; the same market did not qualify at the original 1%. Production limits are not enlarged automatically. Global automation is unpaused; the qualification account is individually paused, its original limits restored, and its position fully closed. This is not certification of every pair or production scheduling. See the [October 3 workflow verification](docs/ROBINHOOD_AUTOPILOT_VERIFICATION_2026-10-03.md), [integration plan](docs/ROBINHOOD_MAINNET_PLAN.md) and [payment operator guide](docs/ROBINHOOD_SELF_HOSTED_FACILITATOR.md). The normal facilitator runtime requires a dedicated gas signer separate from admin and buyer wallets.
@@ -210,7 +210,7 @@ The web UI uses the familiar **Base** and **Premium** tier labels. Public agent 
 
 ### Public Autopilot start services
 
-These three services guide the same six-step setup as the web product. The caller's Agentic Wallet creates/selects the owner vault, configures policy, deposits capital, registers the strategy and confirms start; the duration-specific x402 endpoint is the final AI-runtime activation step. They are published on X Layer, Base and Arbitrum, but excluded from Circle/Arc because Arc Testnet has no Autopilot execution.
+These three services guide the same six-step setup as the web product. The caller's Agentic Wallet creates/selects the owner vault, configures policy, deposits capital, registers the strategy and confirms start; the duration-specific x402 endpoint is the final AI-runtime activation step. They are published on X Layer, Base and Arbitrum, and on Arc after its own contract deployment and execution qualification. Arc passes stay unpublished until FEATURE_ARC_TRADING=1.
 
 | AI Entry Pass | Price |
 | --- | ---: |
@@ -218,7 +218,7 @@ These three services guide the same six-step setup as the web product. The calle
 | Start Autopilot · 7d | $10.50 |
 | Start Autopilot · 30d | $45.00 |
 
-Prices are configured by environment variables and published through `/v1/metadata`. The overall execution-mainnet catalog has eight services; the Arc Testnet subset has five. Legacy compatibility prices remain configurable without becoming discoverable products. A paid request is rejected before the payment challenge when its schema or required preconditions are invalid.
+Prices are configured by environment variables and published through `/v1/metadata`. The overall execution-mainnet catalog has eight services; the Arc mainnet research subset has five until its three Autopilot services are activated. Legacy compatibility prices remain configurable without becoming discoverable products. A paid request is rejected before the payment challenge when its schema or required preconditions are invalid.
 
 Both Global tiers expose the same two execution choices after delivery: a prefilled wallet-signed Spot Market order or Spot Limit order. Base/Quick is the concise report; Premium/Pro adds the deeper chart, Elliott paths and broader execution context. Autopilot starts independently and does not buy or reuse either report: its own deterministic gates decide when a compact prepaid AI entry confirmation is eligible.
 
@@ -259,7 +259,7 @@ The selected network is stored locally and restored on reload or the next start.
 - **X Layer:** OKB and USD₮0 balances; in-app OKB → USD₮0 swap.
 - **Base:** ETH and native USDC balances; in-app ETH → USDC swap.
 - **Arbitrum:** ETH and native USDC balances; in-app ETH → USDC swap with explicit USDC.e warning.
-- **Arc Testnet:** separate Wallet USDC and Gateway USDC tabs, faucet entry, and Gateway deposit. `ARC_AI_MODE=live` is required for real Quick/Pro reports; `fixture` is only a deterministic payment/job plumbing check and makes no market inference.
+- **Arc Mainnet:** separate wallet and Gateway USDC balances, mainnet funding guidance and Gateway deposit. `ARC_AI_MODE=live` is required for real Quick/Pro reports; `fixture` is only a deterministic payment/job plumbing check and makes no market inference.
 
 Supported connection paths include OKX Wallet, EIP-6963 injected wallets such as MetaMask and Rabby, WalletConnect mobile sessions, Base-compatible connectors exposed through AppKit, and Circle User-Controlled EOA wallets via email OTP. The connected address in the funding drawer is copyable. Circle wallet keys remain controlled by the user through Circle's MPC signing UI; `CIRCLE_API_KEY` is server-only.
 
@@ -761,7 +761,7 @@ The browser also maintains a latest-request epoch. Starting Premium supersedes a
 
 ## On-chain execution architecture
 
-One separately configured contract suite exists on each supported execution mainnet. The UI reads factory state before suggesting account creation. Arc Testnet exposes analysis/payment and Risk Guard only; Spot and Autopilot remain hidden.
+One separately configured contract suite exists on each supported execution mainnet. The UI reads factory state before suggesting account creation. Arc mainnet supports research, Risk Guard, Spot and Autopilot in code. Spot orders and Autopilot activation require a verified chain-5042 deployment; see docs/ARC_MAINNET_MIGRATION.md for release readiness.
 
 ```mermaid
 flowchart LR
@@ -906,8 +906,8 @@ Start with [`.env.local.example`](.env.local.example) for local integration and 
 Key controls:
 
 ```dotenv
-ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet,robinhood
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet,robinhood
+ENABLED_NETWORKS=xlayer,base,arbitrum,arc,robinhood
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc,robinhood
 
 FEATURE_PREDICTION_ANALYSIS=1
 FEATURE_FUSED_ANALYSIS=0
@@ -966,14 +966,14 @@ Production deployment is an operator action. Local readiness never authorizes a 
 - The existing X Layer identity is [PULSE agent #8355](https://www.okx.ai/agents/8355). PULSE updates this identity rather than creating duplicate Base or Arbitrum ERC-8004 agents.
 - X Layer challenges declare USD₮0 address, six decimals, symbol, EIP-712 name/version, amount, payee, and `eip155:196`.
 - Base and Arbitrum publish CDP Bazaar discovery extensions only after their deployed paid routes are enabled and verified.
-- Arc Testnet listing material must remain explicitly testnet and must not imply production-value USDC or Arc-native AI inference.
+- Arc listings use mainnet chain 5042 and production Circle Gateway. Execution claims require deployed and qualified PULSE contracts; AI inference remains off-chain.
 - The Base dashboard verification tag is emitted by `apps/web/index.html` as `base:app_id=6a71cfab2c28265d676172e4`.
 
 | Discovery surface | Network and settlement | Public catalog |
 | --- | --- | --- |
 | OKX.AI agent #8355 | X Layer · USDT0 | Eight services under `/xlayer`: five analysis/risk plus three Agentic-Wallet Autopilot starts |
 | CDP Bazaar | Base and Arbitrum · native USDC | The same eight services under `/base` and `/arbitrum`, with Agentic Wallet execution and Bazaar schemas |
-| Circle Agent Marketplace material | Arc Testnet · test USDC | The same five analysis/Risk Guard endpoints under `/arc`; no Spot or Autopilot execution |
+| Circle Agent Marketplace material | Arc Mainnet · USDC | Five research/Risk Guard endpoints under `/arc`; three Autopilot passes follow qualified execution activation |
 
 The three Autopilot rows are complete guided start/extension services, not ordinary analysis reports. Their paid endpoints activate 24h, 7d or 30d of compact AI entry runtime only after an owner-controlled vault exists. Pause freezes unused time. Global Market/Limit execution remains part of the two Global workflows rather than extra SKUs.
 
@@ -1057,7 +1057,7 @@ The exact Autopilot strategies, entry/exit rules, risk profiles, contract author
 | --- | --- |
 | Original X Layer web, REST, MCP, safety, wallet and funding | Preserved and extended |
 | Base / Arbitrum native-USDC payment and in-app funding | Implemented; production certification remains an operator gate |
-| Arc Testnet Circle payment and funding | Implemented; explicitly testnet |
+| Arc mainnet | Migration implemented; deployment and live wallet/payment/execution acceptance pending |
 | Polymarket discovery and read-only analysis | Implemented |
 | Prediction Market Quick and Pro services | Implemented |
 | Receipt-bound durable jobs and private recovery | Implemented |

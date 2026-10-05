@@ -1,0 +1,78 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "registry-resume",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 81,
+      "hash": "0x13c86234c042a87d26c903fe0e868b9fa714b6b45e49172092d9bf0e1ca43aea",
+      "status": "success",
+      "maxGasUSDC": "0.00085288659854099",
+      "gasUSDC": "0.00056335065249321"
+    },
+    {
+      "step": "vault-resume",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 82,
+      "hash": "0x85762e5b217007fb5ec09f65155ca054a79fed75f2e184829254c1212782c099",
+      "status": "success",
+      "maxGasUSDC": "0.000913111970003847",
+      "gasUSDC": "0.000602938176722568"
+    },
+    {
+      "step": "oracle-price",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 83,
+      "hash": "0x4fc8ba0dd706dccf653c1767d05ded7cb8576711b07cf3b9a8223ec436d9a98e",
+      "status": "success",
+      "maxGasUSDC": "0.00107280389981395",
+      "gasUSDC": "0.0007098805695634"
+    },
+    {
+      "step": "execute-exit",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 84,
+      "hash": "0xb7e91e7a08eb6e218b4a48456dd50c2755cd36080f58aa0546af94f26e311888",
+      "status": "success",
+      "maxGasUSDC": "0.013748030035521232",
+      "gasUSDC": "0.008001249375869328"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 85,
+      "hash": "0x642d255a496e61cc48fe4c0ec5a7e803e49e1d283dc6ea1dfb11502c5ad7d423",
+      "status": "success",
+      "maxGasUSDC": "0.00084615426255618",
+      "gasUSDC": "0.000557986984295496"
+    },
+    {
+      "step": "vault-pause",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 86,
+      "hash": "0xa5da60a01ad31be62f7531c921ce4ac48a0a5c128c5c2d98dbd46376d38a7166",
+      "status": "success",
+      "maxGasUSDC": "0.000841426682712252",
+      "gasUSDC": "0.000554511886632558"
+    },
+    {
+      "step": "recover-cash",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 87,
+      "hash": "0x64e958b9f9718ab878680a5b901e645b29933956e99198020238a525ab783672",
+      "status": "success",
+      "maxGasUSDC": "0.00177708074045",
+      "gasUSDC": "0.00107908053954"
+    }
+  ],
+  "data": {
+    "workerPositionClosed": true,
+    "returnedAtomic": "99294",
+    "recoveredCashAtomic": "199294",
+    "sdkBalancesVerified": true,
+    "enrichedActivityVerified": true,
+    "workflowCompleted": true,
+    "completed": true
+  }
+}

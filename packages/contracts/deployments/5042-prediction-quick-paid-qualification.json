@@ -1,0 +1,14 @@
+{
+  "service": "prediction-quick",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "paidUSDC": 0.2,
+  "reportJobId": "f7b0dcdb-62fa-46f5-95e1-421d2c1b1213",
+  "stage": "completed",
+  "liveReport": true,
+  "sdkRecovery": true,
+  "unauthorizedStatus": 403,
+  "sameJobOnReplay": true,
+  "observedGatewayChangeUSDC": 0.2,
+  "finality": "gateway_batch_accepted",
+  "qualifiedAt": "2026-10-04T20:53:29.150Z"
+}

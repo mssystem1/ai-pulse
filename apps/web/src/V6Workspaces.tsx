@@ -17,8 +17,10 @@ import { RouteAvailability, useRouteResults } from "./RouteAvailability";
 import { routeSortRank } from "./routeChecks";
 import { ASSESSMENT_EVENT, currentOpportunityAssessment, isConfirmedSpotSetup, readOpportunityAssessments } from "./opportunityAssessment";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
+import { hasRecoverablePayment } from "./paymentRecovery";
 import {
   switchWalletNetwork,
+  assertArcUsdcGasReserve,
   fetchTokenBalance,
   WEB_NETWORKS,
   type WebNetworkKey,
@@ -69,7 +71,7 @@ type Activity = {
   createdAt: string;
 };
 
-const EXECUTION_NETWORKS: WebNetworkKey[] = ["xlayer", "base", "arbitrum", "robinhood"];
+const EXECUTION_NETWORKS: WebNetworkKey[] = ["xlayer", "base", "arbitrum", "robinhood", "arc"];
 
 async function probePairRoute(
   pair: string,
@@ -142,7 +144,7 @@ type AutomationOrder = {
 };
 type AutopilotStrategyView = {
   id: string;
-  network?: "xlayer" | "base" | "arbitrum" | "robinhood";
+  network?: "xlayer" | "base" | "arbitrum" | "robinhood" | "arc";
   vault: string;
   settlementAsset?: string;
   targetAsset?: string;
@@ -434,7 +436,7 @@ export function OpportunityRadar({
       setStatus("Scanning live market structure…");
     }
     void apiGet(
-      `/v1/opportunities?timeframe=${encodeURIComponent(radarTimeframe)}&network=${networkKey === "arc-testnet" || networkKey === "robinhood" ? "xlayer" : networkKey}&custody=${context === "autopilot" ? "erc20" : "wallet"}`,
+      `/v1/opportunities?timeframe=${encodeURIComponent(radarTimeframe)}&network=${networkKey === "robinhood" ? "xlayer" : networkKey}&custody=${context === "autopilot" ? "erc20" : "wallet"}`,
     ).then((response) => {
       if (!current) return;
       // A background request already in flight must not replace expanded cards.
@@ -612,6 +614,8 @@ async function sendPrepared(
     value?: string;
     gas?: string;
     gasPrice?: string;
+    spendToken?: string;
+    spendAmount?: string;
   },
 ) {
   const provider = getInjectedProvider();
@@ -629,6 +633,12 @@ async function sendPrepared(
   };
   // Let the connected wallet estimate gas against current state. The OKX gas
   // fields are useful quote hints but can become stale while approval confirms.
+  if (networkKey === "arc") {
+    let spend = tx.spendToken?.toLowerCase() === WEB_NETWORKS.arc.payment.address.toLowerCase() ? BigInt(tx.spendAmount || "0") : 0n;
+    if (tx.to.toLowerCase() === WEB_NETWORKS.arc.payment.address.toLowerCase() && /^0xa9059cbb[\da-f]{128}$/i.test(tx.data)) spend = BigInt(`0x${tx.data.slice(-64)}`);
+    const gas = BigInt(String(await provider.request({ method: "eth_estimateGas", params: [request] })));
+    await assertArcUsdcGasReserve(provider, wallet, spend, gas, BigInt(tx.value || "0"));
+  }
   const hash = await provider.request({
     method: "eth_sendTransaction",
     params: [request],
@@ -727,6 +737,7 @@ async function ensureSwapAllowance(
   const provider = getInjectedProvider();
   if (!provider) throw new Error("Connect an injected wallet first");
   await switchWalletNetwork(provider, networkKey);
+  if (networkKey === "arc" && token.toLowerCase() === WEB_NETWORKS.arc.payment.address.toLowerCase()) await assertArcUsdcGasReserve(provider, wallet, BigInt(amount), 500_000n);
   const allowanceData = encodeFunctionData({
     abi: erc20ExecutionAbi,
     functionName: "allowance",
@@ -1297,7 +1308,6 @@ export function SpotWorkspace({
   }
 
   useEffect(() => {
-    if (networkKey === "arc-testnet") return;
     let cancelled = false;
     setBaseToken(null);
     setQuoteToken(null);
@@ -1378,10 +1388,6 @@ export function SpotWorkspace({
   }, [pair, networkKey, mappingAttempt, incomingTrade]);
 
   useEffect(() => {
-    if (networkKey === "arc-testnet") {
-      setRouteAvailable(false);
-      return;
-    }
     if (mappingScope !== expectedMappingScope) {
       setRouteAvailable(false);
       setRouteStatus("Mapping the selected pair on this network…");
@@ -1444,7 +1450,7 @@ export function SpotWorkspace({
   }, [baseToken, quoteToken, mappingScope, expectedMappingScope, networkKey, pair]);
 
   useEffect(() => {
-    if (!wallet || mappingScope !== expectedMappingScope || !baseToken || !quoteToken || networkKey === "arc-testnet") {
+    if (!wallet || mappingScope !== expectedMappingScope || !baseToken || !quoteToken) {
       setTokenBalances({ base: null, quote: null });
       return;
     }
@@ -1573,7 +1579,7 @@ export function SpotWorkspace({
     if (nextCapability) setCapability(nextCapability);
     else {
       setCapability(null);
-      if (wallet && networkKey !== "arc-testnet") {
+      if (wallet) {
         setSpotAccountStatus("error");
         setLimitAccountStatus("error");
         setBracketAccountStatus("error");
@@ -1582,7 +1588,7 @@ export function SpotWorkspace({
         );
       }
     }
-    if (wallet && networkKey !== "arc-testnet") {
+    if (wallet) {
       let syncNotice = "";
       const history = await apiGet(
         `/v1/trading/activity?network=${networkKey}&address=${wallet}`,
@@ -1742,7 +1748,7 @@ export function SpotWorkspace({
       (order) => order.status === "active" || order.status === "paused",
     );
   useEffect(() => {
-    if (!wallet || !needsLiveReconciliation || networkKey === "arc-testnet")
+    if (!wallet || !needsLiveReconciliation)
       return;
     const timer = window.setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
@@ -1772,10 +1778,6 @@ export function SpotWorkspace({
     setMessage("");
     setQuote(null);
     try {
-      if (networkKey === "arc-testnet")
-        throw new Error(
-          "Spot Trading is intentionally unavailable on Arc Testnet",
-        );
       const response = await apiPost("/v1/trading/quote", {
         network: networkKey,
         fromTokenAddress: fromToken,
@@ -1815,8 +1817,6 @@ export function SpotWorkspace({
     setBusy("swap");
     setMessage("");
     try {
-      if (networkKey === "arc-testnet")
-        throw new Error("Spot Trading is unavailable on Arc Testnet");
       const protectionAccount = protectAfterFill
         ? await ensureProtectionAccount()
         : null;
@@ -1857,7 +1857,7 @@ export function SpotWorkspace({
         prepared.approvalAddress,
         amount,
       );
-      const hash = await sendPrepared(networkKey, wallet, tx);
+      const hash = await sendPrepared(networkKey, wallet, { ...tx, spendToken: fromToken, spendAmount: amount });
       if (approvalHash)
         await apiPost("/v1/trading/activity", {
           owner: wallet,
@@ -2702,8 +2702,6 @@ export function SpotWorkspace({
     }
   }
 
-  if (networkKey === "arc-testnet")
-    return <DisabledArc feature="Spot Trading" />;
   const quoteData = quote?.quote as Record<string, unknown> | undefined;
   const sellAsset = side === "buy" ? quoteToken : baseToken;
   const buyAsset = side === "buy" ? baseToken : quoteToken;
@@ -4476,7 +4474,7 @@ export function AutopilotWorkspace({
     setBalanceRefreshTick((tick) => tick + 1);
     setCapabilityUnavailable(false);
     const isCurrentScope = () => vaultLookupRef.current === refreshScope;
-    if (wallet && networkKey !== "arc-testnet") {
+    if (wallet) {
       setVaultStatus("checking");
       setVaultLookupError("");
     }
@@ -4487,14 +4485,14 @@ export function AutopilotWorkspace({
     if (nextCapability) setCapability(nextCapability);
     else {
       setCapability(null);
-      if (wallet && networkKey !== "arc-testnet") {
+      if (wallet) {
         setVaultStatus("error");
         setVaultLookupError(
           `Could not load ${WEB_NETWORKS[networkKey].label} Autopilot configuration.`,
         );
       }
     }
-    if (wallet && networkKey !== "arc-testnet") {
+    if (wallet) {
       let syncNotice = "";
       const h = await apiGet(
         `/v1/trading/activity?network=${networkKey}&address=${wallet}`,
@@ -4620,7 +4618,6 @@ export function AutopilotWorkspace({
   }, [networkKey]);
 
   useEffect(() => {
-    if (networkKey === "arc-testnet") return;
     let cancelled = false;
     setAutopilotRouteAvailable(false);
     setAutopilotRouteStatus("Checking token contracts and live OKX route…");
@@ -5455,16 +5452,19 @@ export function AutopilotWorkspace({
   async function requestAutopilotPass(plan: "24h" | "7d" | "30d", vault: string) {
     if (!wallet || !ADDRESS.test(vault)) throw new Error("Select an existing Autopilot and connect its owner wallet first");
     const prices = { "24h": aiPolicy?.commercialPass?.price24hUsd || 1.5, "7d": aiPolicy?.commercialPass?.price7dUsd || 10.5, "30d": aiPolicy?.commercialPass?.price30dUsd || 45 };
-    const available = fundingWalletBalance;
-    if (available === null) throw new Error(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
-    if (available < prices[plan]) throw new Error(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
-    const paidFetch = await createWalletPaidFetch(wallet, networkKey);
     const telegramDelivery = new URLSearchParams(window.location.search).get("tg") || undefined;
     const prefix = WEB_NETWORKS[networkKey].route;
-    const response = await paidFetch(`${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`, {
+    const paidUrl = `${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`;
+    const paidBody = JSON.stringify({ owner: wallet, vault, ...(telegramDelivery ? { telegramDelivery } : {}) });
+    const recovering = await hasRecoverablePayment(networkKey, wallet, paidUrl, { method: "POST", body: paidBody }, localStorage);
+    const available = fundingWalletBalance;
+    if (!recovering && available === null) throw new Error(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
+    if (!recovering && available !== null && available < prices[plan]) throw new Error(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
+    const paidFetch = await createWalletPaidFetch(wallet, networkKey);
+    const response = await paidFetch(paidUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "application/json" },
-      body: JSON.stringify({ owner: wallet, vault, ...(telegramDelivery ? { telegramDelivery } : {}) }),
+      body: paidBody,
     });
     const body = await response.json().catch(() => ({})) as { aiPass?: { expiresAt?: string }; error?: string };
     if (!response.ok) throw new Error(body.error || `Autopilot pass purchase failed (${response.status})`);
@@ -5543,7 +5543,6 @@ export function AutopilotWorkspace({
     URL.revokeObjectURL(url);
   }
 
-  if (networkKey === "arc-testnet") return <DisabledArc feature="Autopilot" />;
 
   const displayedCapitalAtomic =
     activeStrategy?.portfolioValueAtomic ||
@@ -7408,18 +7407,6 @@ function BracketRowActions({
   );
 }
 
-function DisabledArc({ feature }: { feature: string }) {
-  return (
-    <div className="card disabled-feature">
-      <span className="network-badge">ARC TESTNET</span>
-      <h2>{feature} is hidden on this network</h2>
-      <p>
-        Arc Testnet remains available for analysis and x402 payment testing.
-        Select X Layer, Base, Arbitrum or Robinhood for supported mainnet workflows.
-      </p>
-    </div>
-  );
-}
 
 export function TelegramWorkspace() { return <TelegramGuide />; }
 
@@ -7759,7 +7746,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <h3>Separate raw evidence from a complete risk report</h3>
               <ol>
                 <li>
-                  Select X Layer, Base, Arbitrum, Robinhood or Arc Testnet in Network &amp;
+                  Select X Layer, Base, Arbitrum, Robinhood or Arc Mainnet in Network &amp;
                   Payment.
                 </li>
                 <li>
@@ -8553,7 +8540,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   <span>USDC · CDP x402</span>
                 </div>
                 <div>
-                  <b>Arc Testnet</b>
+                  <b>Arc Mainnet</b>
                   <span>test USDC · analysis only</span>
                 </div>
                 <div>
@@ -8655,7 +8642,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <h4>Circle Agent Marketplace</h4>
                 <p>
                   The Arc listing exposes the same five analysis and Risk Guard
-                  services with test USDC. Arc Testnet never exposes Spot or
+                  services with test USDC. Arc Mainnet never exposes Spot or
                   Autopilot execution.
                 </p>
                 <code>/arc/v1/analysis/spot/premium</code>

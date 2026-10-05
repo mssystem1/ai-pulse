@@ -4,6 +4,13 @@ import { createHmac } from "node:crypto";
 import { createOkxDexHeaders, createOkxSignature, matchesUnderlyingToken, getOkxTradeTokens, executionAssetAliases, getGenericOkxSwap, betterGenericOkxExitSwap } from "./okxDex.js";
 import type { AppConfig } from "@pulse/config";
 
+test("Arc prepared swaps reject substituted input amounts before returning transaction data", async t => {
+  const from = "0x3600000000000000000000000000000000000000", to = "0x128cc466b61f542da60c70e3aa11c10e19b84edb";
+  const cfg = { hasOkxCredentials: true, OKX_BASE_URL: "https://fixture.invalid", OKX_API_KEY: "fixture", OKX_SECRET_KEY: "fixture", OKX_PASSPHRASE: "fixture" } as AppConfig;
+  t.mock.method(globalThis, "fetch", async () => Response.json({ code: "0", data: [{ tx: { to, data: "0x", value: "0" }, routerResult: { chainIndex: "5042", fromToken: { tokenContractAddress: from }, toToken: { tokenContractAddress: to }, fromTokenAmount: "100001", toTokenAmount: "30000000000000" } }] }));
+  await assert.rejects(getGenericOkxSwap(cfg, { chainId: "5042", fromTokenAddress: from, toTokenAddress: to, amount: "100000", userWalletAddress: to }), /Arc mainnet quote must match the exact input/);
+});
+
 test("a better exit route discovers venue IDs and preserves exact amount, recipient and slippage", async () => {
   const originalFetch = globalThis.fetch;
   const from = `0x${"1".repeat(40)}`, to = `0x${"2".repeat(40)}`, wallet = `0x${"3".repeat(40)}`;

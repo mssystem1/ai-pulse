@@ -23,9 +23,21 @@ import type {
 
 export type PulseClientOptions = {
   baseUrl: string;
+  /** Selects the settlement network for paid services. Recovery remains network-independent. */
+  network?: "xlayer" | "base" | "arbitrum" | "arc" | "robinhood";
   /** Payment signature for x402 (agent wallet / facilitator). Required for paid routes. */
   paymentSignature?: string | (() => string | Promise<string>);
   fetchImpl?: typeof fetch;
+};
+
+export type PulseTradeRequest = {
+  fromTokenAddress: string;
+  toTokenAddress: string;
+  /** Atomic units of the sell token's ERC-20 interface. Arc USDC uses 6 decimals. */
+  amount: string;
+  slippagePercent?: number;
+  slippageMode?: "auto" | "manual";
+  maxAutoSlippagePercent?: number;
 };
 
 export type PulseJob = {
@@ -73,17 +85,20 @@ export class PulsePaymentRequired extends PulseError {
 
 export class PulseClient {
   private baseUrl: string;
+  private network: NonNullable<PulseClientOptions["network"]>;
   private paymentSignature?: string | (() => string | Promise<string>);
   private fetchImpl: typeof fetch;
 
   constructor(opts: PulseClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/$/, "");
+    this.network = opts.network ?? "xlayer";
+    if (this.baseUrl.endsWith(`/${this.network}`)) this.baseUrl = this.baseUrl.slice(0, -this.network.length - 1);
     this.paymentSignature = opts.paymentSignature;
     this.fetchImpl = opts.fetchImpl ?? fetch;
   }
 
   async meta(): Promise<unknown> {
-    return this.request("GET", "/v1/meta");
+    return this.request("GET", `/v1/meta?network=${this.network}`);
   }
 
   async health(): Promise<unknown> {
@@ -114,6 +129,10 @@ export class PulseClient {
     return this.request("POST", "/v1/preflight", body, true) as Promise<PreflightResponse>;
   }
 
+  async spotAnalysis(body: { instId: string; timeframe: string; lang?: "en" | "zh" }, tier: "standard" | "premium" = "standard"): Promise<PulseJobAccepted> {
+    return this.request("POST", `/v1/analysis/spot/${tier}`, body, true) as Promise<PulseJobAccepted>;
+  }
+
   async predictionAnalysis(body: PredictionAnalysisRequest, tier: "standard" | "premium" = "standard"): Promise<PulseJobAccepted> {
     return this.request("POST", `/v1/analysis/prediction/${tier}`, body, true) as Promise<PulseJobAccepted>;
   }
@@ -128,6 +147,57 @@ export class PulseClient {
 
   async eventRiskPreflight(body: EventRiskPreflightRequest): Promise<PulseJobAccepted> {
     return this.request("POST", "/v1/preflight/event-risk", body, true) as Promise<PulseJobAccepted>;
+  }
+
+  async tradingCapabilities(): Promise<unknown> {
+    return this.request("GET", `/v1/trading/capabilities?network=${this.network}`);
+  }
+
+  async tradingAccounts(owner: string, fresh = false): Promise<unknown> {
+    return this.request("GET", `/v1/trading/accounts?${new URLSearchParams({ network: this.network, owner, ...(fresh ? { fresh: "1" } : {}) })}`);
+  }
+
+  async tradeTokens(search = ""): Promise<unknown> {
+    return this.request("GET", `/v1/trading/tokens?${new URLSearchParams({ network: this.network, q: search })}`);
+  }
+
+  async quoteTrade(body: PulseTradeRequest): Promise<unknown> {
+    return this.request("POST", "/v1/trading/quote", { ...body, network: this.network });
+  }
+
+  /** Returns an unsigned transaction; the owner's connected wallet submits it. */
+  async prepareTrade(body: PulseTradeRequest & { userWalletAddress: string }): Promise<unknown> {
+    return this.request("POST", "/v1/trading/prepare-swap", { ...body, network: this.network });
+  }
+
+  async automationOrders(owner: string, fresh = false): Promise<unknown> {
+    return this.request("GET", `/v1/automation/orders?${new URLSearchParams({ network: this.network, owner, ...(fresh ? { fresh: "1" } : {}) })}`);
+  }
+
+  /** Registration includes the API's owner authorization and confirmed order identity. */
+  async registerAutomationOrder(body: Record<string, unknown>): Promise<unknown> {
+    return this.request("POST", "/v1/automation/orders", { ...body, network: this.network });
+  }
+
+  async autopilotStrategies(owner: string): Promise<unknown> {
+    return this.request("GET", `/v1/autopilot/strategies?${new URLSearchParams({ network: this.network, owner })}`);
+  }
+
+  async autopilotConfiguration(vault: string, asset: string): Promise<unknown> {
+    return this.request("GET", `/v1/autopilot/configuration?${new URLSearchParams({ network: this.network, vault, asset })}`);
+  }
+
+  async autopilotPreflight(body: Record<string, unknown>): Promise<unknown> {
+    return this.request("POST", "/v1/autopilot/preflight", { ...body, network: this.network });
+  }
+
+  /** Registration retains server checks for signed policy and deployed vault configuration. */
+  async registerAutopilotStrategy(body: Record<string, unknown>): Promise<unknown> {
+    return this.request("POST", "/v1/autopilot/strategies", { ...body, network: this.network });
+  }
+
+  async autopilotPass(body: { owner: string; vault: string; telegramDelivery?: string }, duration: "24h" | "7d" | "30d" = "24h"): Promise<unknown> {
+    return this.request("POST", `/v1/autopilot/pass/${duration}`, body, true);
   }
 
   async getJob(jobId: string, recoveryToken: string): Promise<{ job: PulseJob; storedReport?: unknown }> {
@@ -204,7 +274,9 @@ export class PulseClient {
       if (sig) headers["PAYMENT-SIGNATURE"] = sig;
     }
 
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const networkService = paid && !path.startsWith("/v1/private/") && this.network !== "xlayer";
+    const prefix = networkService && !this.baseUrl.endsWith(`/${this.network}`) ? `/${this.network}` : "";
+    const res = await this.fetchImpl(`${this.baseUrl}${prefix}${path}`, {
       method,
       headers,
       body: body !== undefined ? JSON.stringify(body) : undefined,

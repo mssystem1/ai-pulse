@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { StoreRedis } from "./storeRedis.js";
 import { PublicActivityStore, researchDelivery } from "./publicActivity.js";
 import type { PaymentReceipt } from "./jobs.js";
-import { NETWORK_REGISTRY } from "@pulse/config";
+import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
 import { closeNativeRedisConnections } from "./nativeRedis.js";
 
 const endpoint=process.env.PUBLIC_ACTIVITY_REDIS_TEST_URL;
@@ -14,7 +14,7 @@ test("local Redis-compatible TCP/Lua: concurrent dedupe, exact volume and cold-r
   const namespace=`pulse-local-activity-test:${randomUUID()}`;
   const redis=new StoreRedis(endpoint!);
   const store=new PublicActivityStore(redis,namespace);
-  const chain=NETWORK_REGISTRY['arc-testnet'];
+  const chain=LEGACY_ARC_TESTNET;
   const receipt={network:chain.caip2,chainId:chain.chainId,provider:chain.paymentProvider,authorizationId:'fixture-local-only',requestHash:'local-hash',verificationResult:'accepted_by_middleware',settlementResult:'settled',settlementMode:'gateway_batch',finality:{status:'gateway_batch_accepted',scope:'gateway'}} as PaymentReceipt;
   const delivery=researchDelivery(receipt,'prediction','2026-09-12T12:00:00Z')!;
   const suffixes=['seen','research','executions-seen','executions','volume'];

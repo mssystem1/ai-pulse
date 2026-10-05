@@ -34,3 +34,48 @@ test("replay without the original recovery capability never attempts another pay
     replay: true,
   }), /one-time recovery capability/);
 });
+
+test("Arc services use the mainnet alias while report recovery stays free", async () => {
+  const calls: { url: string; signature: string | null }[] = [];
+  const client = new PulseClient({ baseUrl: "https://pulse.example", network: "arc", paymentSignature: "arc-signed", fetchImpl: (async (input, init) => {
+    calls.push({ url: String(input), signature: new Headers(init?.headers).get("PAYMENT-SIGNATURE") });
+    return Response.json({});
+  }) as typeof fetch });
+  await client.spotAnalysis({ instId: "BTC-USDT", timeframe: "1H", lang: "en" });
+  await client.eventRiskPreflight({} as never);
+  await client.getJob("job-arc", "recovery");
+  assert.deepEqual(calls, [
+    { url: "https://pulse.example/arc/v1/analysis/spot/standard", signature: "arc-signed" },
+    { url: "https://pulse.example/arc/v1/preflight/event-risk", signature: "arc-signed" },
+    { url: "https://pulse.example/v1/jobs/job-arc", signature: null },
+  ]);
+});
+
+test("Arc execution SDK calls select the same network and pay only for an Autopilot pass", async () => {
+  const calls: { url: string; body?: Record<string, unknown>; signature: string | null }[] = [];
+  const client = new PulseClient({ baseUrl: "https://pulse.example", network: "arc", paymentSignature: "arc-signed", fetchImpl: (async (input, init) => {
+    calls.push({ url: String(input), body: init?.body ? JSON.parse(String(init.body)) : undefined, signature: new Headers(init?.headers).get("PAYMENT-SIGNATURE") });
+    return Response.json({});
+  }) as typeof fetch });
+  await client.tradingCapabilities();
+  await client.prepareTrade({ fromTokenAddress: "USDC", toTokenAddress: "WETH", amount: "100000", userWalletAddress: "owner" });
+  await client.registerAutopilotStrategy({ network: "arc-testnet", vault: "vault", authorization: "signed-policy" });
+  await client.autopilotPass({ owner: "owner", vault: "vault" });
+  assert.equal(calls[0].url, "https://pulse.example/v1/trading/capabilities?network=arc");
+  assert.equal(calls[1].body?.network, "arc");
+  assert.equal(calls[1].body?.amount, "100000");
+  assert.equal(calls[2].body?.network, "arc");
+  assert.equal(calls[2].body?.authorization, "signed-policy");
+  assert.equal(calls[3].url, "https://pulse.example/arc/v1/autopilot/pass/24h");
+  assert.deepEqual(calls.map(call => call.signature), [null, null, null, "arc-signed"]);
+});
+
+test("an Arc-prefixed SDK base URL keeps execution and recovery on the shared API", async () => {
+  const urls: string[] = [];
+  const client = new PulseClient({ baseUrl: "https://pulse.example/arc", network: "arc", fetchImpl: (async input => { urls.push(String(input)); return Response.json({}); }) as typeof fetch });
+  await client.meta();
+  await client.tradingCapabilities();
+  await client.getJob("job", "recover");
+  await client.spotAnalysis({ instId: "ETH-USDT", timeframe: "1H" });
+  assert.deepEqual(urls, ["https://pulse.example/v1/meta?network=arc", "https://pulse.example/v1/trading/capabilities?network=arc", "https://pulse.example/v1/jobs/job", "https://pulse.example/arc/v1/analysis/spot/standard"]);
+});

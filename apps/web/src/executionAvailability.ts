@@ -8,7 +8,6 @@ export function useExecutionAvailability(network: WebNetworkKey, custody: "spot"
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   useEffect(() => {
     let current = true;
-    if (network === "arc-testnet") { setCatalog({ network, status: "ready", pairs: new Set() }); return; }
     const cacheKey = `${network}:${custody}`;
     let entry = cache.get(cacheKey);
     if (!entry || entry.until < Date.now()) {
@@ -25,7 +24,6 @@ export function useExecutionAvailability(network: WebNetworkKey, custody: "spot"
     return () => { current = false; };
   }, [network, custody]);
   return (pair: string) => {
-    if (network === "arc-testnet") return { mapped: false, label: "Research only · Arc Testnet", status: "research" };
     if (!catalog || catalog.network !== network) return { mapped: false, label: "Checking Spot availability…", status: "loading" };
     if (catalog.status !== "ready") return { mapped: false, label: "Spot availability unavailable", status: "unavailable" };
     const mapped = catalog.pairs.has(pair.toUpperCase());

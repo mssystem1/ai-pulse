@@ -96,7 +96,7 @@ const EnvSchema = z.object({
   XAI_INPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(1.25),
   XAI_CACHED_INPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(0.20),
   XAI_OUTPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(2.50),
-  ARC_AI_MODE: z.enum(["fixture", "live"]).default("fixture"),
+  ARC_AI_MODE: z.enum(["fixture", "live"]).default("live"),
   ARC_LIVE_WALLET_HOURLY_LIMIT: z.coerce.number().int().positive().default(10),
   ARC_LIVE_IP_HOURLY_LIMIT: z.coerce.number().int().positive().default(20),
   ARC_LIVE_WALLET_DAILY_LIMIT: z.coerce.number().int().positive().default(25),
@@ -107,7 +107,7 @@ const EnvSchema = z.object({
   BASE_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default("https://base-rpc.publicnode.com"),
   ARBITRUM_RPC_URL: z.string().url().default("https://arb1.arbitrum.io/rpc"),
   ARBITRUM_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default("https://arbitrum-one-rpc.publicnode.com"),
-  ARC_RPC_URL: z.string().url().default("https://rpc.testnet.arc.network"),
+  ARC_RPC_URL: z.string().url().default("https://rpc.mainnet.arc.io"),
   ARC_RPC_FALLBACK_URL: z.union([z.string().url(), z.literal("")]).default(""),
   PRICE_TOKEN_SCAN: z.coerce.number().default(0.20),
   PRICE_WALLET_SCAN: z.coerce.number().default(0.11),
@@ -162,10 +162,7 @@ const EnvSchema = z.object({
   FEATURE_TRADE_ZONE_DATA: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
   FEATURE_TELEGRAM: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
   FEATURE_ARC_MAINNET: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
-  ARC_MAINNET_CHAIN_ID: z.coerce.number().int().nonnegative().default(0),
-  ARC_MAINNET_RPC_URL: z.union([z.string().url(), z.literal("")]).default(""),
-  ARC_MAINNET_EXPLORER_URL: z.union([z.string().url(), z.literal("")]).default(""),
-  ARC_MAINNET_USDC_ADDRESS: z.string().optional().default(""),
+  ARC_MAINNET_CHAIN_ID: z.coerce.number().pipe(z.literal(5042)).default(5042),
   BAZAAR_DISCOVERABLE: z.string().optional().transform((v) => v === "1" || v === "true"),
   PRICE_ANALYSIS_PREDICTION_STANDARD: z.coerce.number().positive().default(0.20),
   PRICE_ANALYSIS_PREDICTION_PREMIUM: z.coerce.number().positive().default(0.30),
@@ -195,8 +192,8 @@ const EnvSchema = z.object({
   REPORT_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(90),
   JOB_STAGE_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
   CIRCLE_GATEWAY_ENABLED: z.string().optional().transform((v) => v === "1" || v === "true"),
-  CIRCLE_GATEWAY_TESTNET_URL: z.string().url().default("https://gateway-api-testnet.circle.com"),
-  CIRCLE_GATEWAY_ACCEPTED_NETWORKS: z.string().default("eip155:5042002"),
+  CIRCLE_GATEWAY_MAINNET_URL: z.string().url().default("https://gateway-api.circle.com"),
+  CIRCLE_GATEWAY_ACCEPTED_NETWORKS: z.string().default("eip155:5042"),
   CIRCLE_GATEWAY_SELLER_ADDRESS: z.string().optional().default(""),
   CDP_FACILITATOR_URL: z.string().url().default("https://api.cdp.coinbase.com/platform/v2/x402"),
   CDP_API_KEY_ID: z.string().optional().default(""),
@@ -253,6 +250,14 @@ export function loadConfig(): AppConfig {
   }
 
   const parsed = EnvSchema.parse(process.env);
+  if (parsed.ENABLED_NETWORKS.split(",").map(v => v.trim()).includes("arc")) {
+    if (!parsed.FEATURE_ARC_MAINNET) throw new Error("Arc is mainnet-only; enable FEATURE_ARC_MAINNET or remove arc from ENABLED_NETWORKS");
+    if (!parsed.X402_MOCK && parsed.ARC_AI_MODE !== "live") throw new Error("Arc mainnet requires ARC_AI_MODE=live for real payments");
+    if (parsed.CIRCLE_GATEWAY_ACCEPTED_NETWORKS.trim() !== "eip155:5042") throw new Error("Arc mainnet accepts only eip155:5042; testnet and other-chain payment signatures are not accepted");
+    for (const url of [parsed.ARC_RPC_URL, parsed.ARC_RPC_FALLBACK_URL, parsed.CIRCLE_GATEWAY_MAINNET_URL]) {
+      if (url && /testnet|sepolia|faucet/i.test(new URL(url).hostname)) throw new Error("Arc mainnet cannot use a testnet RPC or Gateway endpoint");
+    }
+  }
   if (parsed.ARC_AI_MODE === "live" && (parsed.XAI_INPUT_COST_PER_MILLION_USD <= 0 || parsed.XAI_OUTPUT_COST_PER_MILLION_USD <= 0)) {
     throw new Error("ARC_AI_MODE=live requires positive XAI_INPUT_COST_PER_MILLION_USD and XAI_OUTPUT_COST_PER_MILLION_USD for fail-closed cost control");
   }
@@ -302,7 +307,7 @@ export function loadConfig(): AppConfig {
       name: "Selected-network Token Catalog",
       priceUsd: 0,
       free: true,
-      description: "Searchable token contracts for X Layer, Base, Arbitrum and Arc Testnet; manual contract entry remains available.",
+      description: "Searchable token contracts for X Layer, Base, Arbitrum and Arc Mainnet; manual contract entry remains available.",
     },
     "GET /v1/market/ticker": {
       name: "Spot Ticker",
@@ -496,7 +501,7 @@ export function loadConfig(): AppConfig {
     productShortDescription:
       "PULSE turns live Global and selected Prediction Market evidence into readable, recoverable plans, connects Global plans to Agentic-Wallet-signed Spot execution, and offers separate cost-controlled Autopilot start services.",
     productDescription:
-      "PULSE provides first-class Global Market and Prediction Market intelligence, connected-wallet Spot execution, Onchain Pre-Trade Risk Guard, and a separate guarded Autopilot workflow for humans and AI agents. Global Market includes live OKX crypto, xStocks and listed RWA instruments while separating broad analysis coverage from identity-safe on-chain execution. Prediction Market analyzes one explicitly selected Polymarket question read-only. The execution-mainnet catalog has eight paid services: two Global tiers leading to Agentic-Wallet-signed Spot Market or Limit orders, two Prediction tiers, Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot starts directly from its own pair, strategy, capital, risk and duration; it uses deterministic candidate gates, compact prepaid AI entry confirmation and one owner-control dashboard without requiring or reusing a Global report. Arc Testnet exposes only the five analysis/risk services because execution is unavailable there. Reports are durable and wallet-recoverable across X Layer, Base, Arbitrum One and Arc Testnet payment routes.",
+      "PULSE provides first-class Global Market and Prediction Market intelligence, connected-wallet Spot execution, Onchain Pre-Trade Risk Guard, and a separate guarded Autopilot workflow for humans and AI agents. Global Market includes live OKX crypto, xStocks and listed RWA instruments while separating broad analysis coverage from identity-safe on-chain execution. Prediction Market analyzes one explicitly selected Polymarket question read-only. The execution-mainnet catalog has eight paid services: two Global tiers leading to Agentic-Wallet-signed Spot Market or Limit orders, two Prediction tiers, Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot starts directly from its own pair, strategy, capital, risk and duration; it uses deterministic candidate gates, compact prepaid AI entry confirmation and one owner-control dashboard without requiring or reusing a Global report. Arc Mainnet supports the same service workflows; trading activation requires verified mainnet contracts and routes. Reports are durable and wallet-recoverable across X Layer, Base, Arbitrum One and Arc Mainnet payment routes.",
     logoPath,
     logoUrl,
     hasOkxCredentials,
@@ -574,11 +579,11 @@ export function buildAspMetadata(cfg: AppConfig) {
       description: info.description,
     };
   });
-  const publicAlias = (key: NetworkKey) => key === "arc-testnet" ? "arc" : key;
+  const publicAlias = (key: NetworkKey) => key;
   const paymentNetworkEnabled = (key: NetworkKey) => key === "xlayer"
     || (key === "base" && cfg.FEATURE_BASE_PAYMENTS)
     || (key === "arbitrum" && cfg.FEATURE_ARBITRUM_PAYMENTS)
-    || (key === "arc-testnet" && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_ENABLED);
+    || (key === "arc" && cfg.FEATURE_ARC_MAINNET && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_ENABLED);
   const multichainPaidPaths = new Set([
     "/v1/analysis/spot/standard",
     "/v1/analysis/spot/premium",
@@ -595,7 +600,7 @@ export function buildAspMetadata(cfg: AppConfig) {
       if (info.free) return false;
       const [, path] = route.split(" ");
       if (!multichainPaidPaths.has(path)) return false;
-      return key !== "arc-testnet" || !path.startsWith("/v1/autopilot/pass/");
+      return key !== "arc" || !path.startsWith("/v1/autopilot/pass/") || process.env.FEATURE_ARC_TRADING === "1";
     }).map(([route, info]) => {
       const [method, path] = route.split(" ");
       const aliasPath = `/${publicAlias(key)}${path}`;
@@ -604,7 +609,7 @@ export function buildAspMetadata(cfg: AppConfig) {
         priceUsd: info.priceUsd, price: priceLabel(info.priceUsd), free: false,
         description: info.description, networkKey: key, network: network.caip2,
         asset: network.paymentAsset.address, assetSymbol: network.paymentAsset.symbol,
-        payTo: key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+        payTo: key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
         paymentProvider: network.paymentProvider, scheme: "exact",
       };
     });
@@ -647,7 +652,7 @@ export function buildAspMetadata(cfg: AppConfig) {
         "xlayer",
         "base",
         "arbitrum",
-        "arc-testnet",
+        "arc",
         "multichain",
         "okx",
         "spot",
@@ -684,10 +689,10 @@ export function buildAspMetadata(cfg: AppConfig) {
           catalog: "Eight services on each execution mainnet: five analysis/risk services plus three Agentic Wallet Autopilot start services. No duplicate ERC-8004 identity is required.",
         },
         circleAgentMarketplace: {
-          network: "eip155:5042002",
+          network: "eip155:5042",
           servicePrefix: "/arc",
-          settlementAsset: "test USDC",
-          execution: "analysis and Risk Guard only",
+          settlementAsset: "USDC",
+          execution: "Spot and Autopilot subject to mainnet deployment and route readiness",
         },
       },
       autopilotAiPass: {
@@ -697,7 +702,7 @@ export function buildAspMetadata(cfg: AppConfig) {
           { duration: "7d", priceUsd: cfg.PRICE_AUTOPILOT_PASS_7D },
           { duration: "30d", priceUsd: cfg.PRICE_AUTOPILOT_PASS_30D },
         ],
-        catalogPolicy: "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; excluded from Arc Testnet because execution is unavailable there.",
+        catalogPolicy: "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; also supported on Arc mainnet once execution readiness is verified.",
         activation: "Selected during the six-step Autopilot setup and paid through x402 only after the new vault is created and registered. An existing active pass is reused without another charge.",
         renewal: "Manual only. Buying another period appends it to unused paid time; there is no automatic renewal.",
         timer: "Only active Autopilot runtime consumes paid time. Pausing freezes the timer and resuming preserves the unused duration.",
@@ -720,7 +725,7 @@ export function buildAspMetadata(cfg: AppConfig) {
           xlayer: "OKX Agentic Wallet on chain 196; X Layer gas is zero.",
           base: "Agentic Wallet on Base mainnet; keep native ETH for gas.",
           arbitrum: "Agentic Wallet on Arbitrum One; keep native ETH for gas.",
-          arcTestnet: "Analysis and Risk Guard only; Spot and Autopilot workflows are unavailable.",
+          arc: "Circle Gateway research payments on mainnet 5042; Spot and Autopilot require verified Arc contracts and live routes.",
         },
       },
     },

@@ -11,7 +11,7 @@
     "smoke": "tsx src/smoke.ts"
   },
   "dependencies": {
-    "@circle-fin/user-controlled-wallets": "^9.2.0",
+    "@circle-fin/user-controlled-wallets": "^10.8.1",
     "@okxweb3/x402-core": "^0.1.0",
     "@okxweb3/x402-evm": "^0.2.1",
     "@okxweb3/x402-express": "^0.1.1",
@@ -29,7 +29,7 @@
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "ioredis": "^5.11.1",
-    "morgan": "^1.10.0",
+    "morgan": "^1.12.1",
     "viem": "^2.55.5",
     "zod": "^3.24.2"
   },

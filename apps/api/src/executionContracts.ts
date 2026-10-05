@@ -1,4 +1,4 @@
-export type ExecutionNetwork = "xlayer" | "base" | "arbitrum" | "robinhood";
+export type ExecutionNetwork = "xlayer" | "base" | "arbitrum" | "robinhood" | "arc";
 
 export type ExecutionContractKey =
   | "registry"
@@ -11,7 +11,7 @@ export type ExecutionContractKey =
   | "okxRouter"
   | "okxApproval";
 
-const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+const ADDRESS = /^0x(?!0{40}$)[a-fA-F0-9]{40}$/;
 
 /**
  * Public, verified PULSE mainnet deployments. Environment variables remain an
@@ -19,6 +19,18 @@ const ADDRESS = /^0x[a-fA-F0-9]{40}$/;
  * variable must not silently remove an already-published product capability.
  */
 export const PUBLISHED_EXECUTION_CONTRACTS = {
+  arc: {
+    // Source-verified Arc mainnet deployment: deployments/5042.json.
+    registry: "0x67e14b9545b069afbd78e195ec37914466e1807f",
+    oracleRouter: "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+    executionAdapter: "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+    spotFactory: "0xa4546529b1174765d4d8e256c951365359c853fa",
+    spotLimitFactory: "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+    spotBracketFactory: "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+    autopilotFactory: "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+    okxRouter: "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+    okxApproval: "0x2B9899bC46Bf0eE094225995f4bD496d42f261Af",
+  },
   robinhood: {
     registry: "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
     oracleRouter: "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
@@ -67,6 +79,17 @@ export const PUBLISHED_EXECUTION_CONTRACTS = {
 } as const satisfies Record<ExecutionNetwork, Record<ExecutionContractKey, string>>;
 
 const ENV_NAMES: Record<ExecutionNetwork, Record<ExecutionContractKey, string>> = {
+  arc: {
+    registry: "ARC_PULSE_REGISTRY_ADDRESS",
+    oracleRouter: "ARC_ORACLE_ROUTER_ADDRESS",
+    executionAdapter: "ARC_EXECUTION_ADAPTER_ADDRESS",
+    spotFactory: "ARC_SPOT_ORDER_FACTORY_ADDRESS",
+    spotLimitFactory: "ARC_SPOT_LIMIT_FACTORY_ADDRESS",
+    spotBracketFactory: "ARC_SPOT_BRACKET_FACTORY_ADDRESS",
+    autopilotFactory: "ARC_AUTOPILOT_VAULT_FACTORY_ADDRESS",
+    okxRouter: "ARC_OKX_ROUTER_ADDRESS",
+    okxApproval: "ARC_OKX_APPROVAL_ADDRESS",
+  },
   robinhood: {
     registry: "ROBINHOOD_PULSE_REGISTRY_ADDRESS",
     oracleRouter: "ROBINHOOD_ORACLE_ROUTER_ADDRESS",

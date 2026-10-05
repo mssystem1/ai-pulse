@@ -69,7 +69,7 @@ export default function LandingPage() {
           <div className="landing-actions"><a className="landing-button primary" href={link()}>Launch PULSE <span aria-hidden>↗</span></a><a className="landing-text-link" href="#product">Explore the platform <span aria-hidden>↓</span></a></div>
           <p className="landing-hero-note">Global & prediction intelligence · Wallet-approved Spot · Autonomous Autopilot</p>
         </div><SignalSculpture/>
-        <div className="landing-network-line"><span>Networks</span><b>X Layer</b><b>Base</b><b>Arbitrum</b><b>Robinhood</b><b>Arc Testnet</b><button type="button" aria-pressed={motion} onClick={()=>setMotion(!motion)}>Motion {motion ? "on" : "off"} <span aria-hidden>{motion ? "Ⅱ" : "▷"}</span></button></div>
+        <div className="landing-network-line"><span>Networks</span><b>X Layer</b><b>Base</b><b>Arbitrum</b><b>Robinhood</b><b>Arc Mainnet</b><button type="button" aria-pressed={motion} onClick={()=>setMotion(!motion)}>Motion {motion ? "on" : "off"} <span aria-hidden>{motion ? "Ⅱ" : "▷"}</span></button></div>
       </section>
 
       <section className="landing-platform-strip" aria-label="Platform capabilities, not usage statistics"><div className="landing-width">
@@ -112,7 +112,7 @@ export default function LandingPage() {
         ["Do I need to buy research before trading?","No. Spot supports direct pair selection. Global reports can help prepare a trade, but are optional. Autopilot is configured independently and uses its own AI Entry Pass."],
         ["What does PULSE cost?","Global and Prediction Quick reports cost $0.20; Pro reports cost $0.30. Risk Guard costs $0.20. Autopilot Entry Passes are $1.50 for 24 hours, $10.50 for 7 days or $45 for 30 days. Network gas and execution costs are separate. Review the quoted payment before signing."],
         ["What happens when an Entry Pass ends?","Expiry or exhausted AI confirmations blocks new AI entries. Authorized deterministic protection can continue on an unpaused account. Manually pausing the vault stops strategy trading and freezes remaining paid time."],
-        ["Which networks can I use?","PULSE integrates X Layer, Base, Arbitrum and Robinhood mainnet. Robinhood uses USDG for settlement and ETH for gas. Each feature checks deployment readiness, live routes and market data before execution; selecting a network does not guarantee every market or feature is available. Arc Testnet supports research/testing workflows, not Spot or Autopilot execution."],
+        ["Which networks can I use?","PULSE integrates X Layer, Base, Arbitrum and Robinhood mainnet. Robinhood uses USDG for settlement and ETH for gas. Each feature checks deployment readiness, live routes and market data before execution; selecting a network does not guarantee every market or feature is available. Arc mainnet uses native USDC for gas and settlement. Spot and Autopilot require verified mainnet contracts and live routes."],
         ["Does PULSE guarantee a profit?","No. Research, risk checks and automation do not eliminate market, liquidity, contract or execution risk. Review the evidence and only authorize capital and risks you understand."],
       ].map(([q,a])=><details key={q}><summary>{q}<span aria-hidden>+</span></summary><p>{a}</p></details>)}</div></section>
 

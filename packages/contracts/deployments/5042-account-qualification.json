@@ -1,0 +1,55 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "policy": {
+    "pair": "ETH-USDT",
+    "timeframe": "1H",
+    "maxTradePct": 50,
+    "dailyLossPct": 5,
+    "strategy": "trend_following"
+  },
+  "entries": [
+    {
+      "kind": "autopilot",
+      "factory": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "hash": "0xfc3e22d1571d33cdf9f7d92684119537a3b36874dd4f47e803161b442f713a09",
+      "nonce": 13,
+      "status": "success",
+      "maxGasUSDC": "0.051280824002136701",
+      "gasUSDC": "0.033894860001694743",
+      "account": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "observedPaused": true
+    },
+    {
+      "kind": "spot-limit",
+      "factory": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "hash": "0x468153b8d048d7b12642b447e6af80d9f9ccd63f4fa928712d181940e93e3c9f",
+      "nonce": 14,
+      "status": "success",
+      "maxGasUSDC": "0.037788672003149056",
+      "gasUSDC": "0.024970940002497094",
+      "account": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B"
+    },
+    {
+      "kind": "spot-protection",
+      "factory": "0xa4546529b1174765d4d8e256c951365359c853fa",
+      "hash": "0x5f529e9ee585f8ddefd9a1fbf78231f6ff7bd2be694342caabf23d3c4bdcefb9",
+      "nonce": 15,
+      "status": "success",
+      "maxGasUSDC": "0.032071608002672634",
+      "gasUSDC": "0.021189560002118956",
+      "account": "0x1d0d24679a9157E4EeAd472300b77220EC62545c"
+    },
+    {
+      "kind": "spot-bracket",
+      "factory": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "hash": "0x13931f854ddfb65d8220f3506d7a5dea211f69725e4b9ec5eaa4c1b49b691bf2",
+      "nonce": 16,
+      "status": "success",
+      "maxGasUSDC": "0.04814436000401203",
+      "gasUSDC": "0.031820360003182036",
+      "account": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a"
+    }
+  ],
+  "completed": true
+}

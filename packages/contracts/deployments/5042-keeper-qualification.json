@@ -1,0 +1,71 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "approve-order",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 63,
+      "hash": "0xc9b4b37bc4ca86002a8307a9183041dc30e79470ac1ff4625a81e3c9d448fcc4",
+      "status": "success",
+      "maxGasUSDC": "0.001687225413893712",
+      "gasUSDC": "0.001108761114969056"
+    },
+    {
+      "step": "create-order",
+      "to": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "nonce": 64,
+      "hash": "0x655f6acb26528e384d7c6776aadd0b0ef7b4f30cf31fc1855fbc3bc71d4925cc",
+      "status": "success",
+      "maxGasUSDC": "0.006907277788293936",
+      "gasUSDC": "0.004401624426269072"
+    },
+    {
+      "step": "registry-resume",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 65,
+      "hash": "0x4e55c3948a10144e2ae8e607ca32e1e70f20aaca8ae5ba2f923d0eb32d1b80ac",
+      "status": "success",
+      "maxGasUSDC": "0.00083928070331664",
+      "gasUSDC": "0.00055260055569456"
+    },
+    {
+      "step": "approve-output",
+      "to": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+      "nonce": 68,
+      "hash": "0xb9dd08c99fe1fd734112bea6a467e1390b61a9fe37e24e15a1646645f3748e36",
+      "status": "success",
+      "maxGasUSDC": "0.001948010158798699",
+      "gasUSDC": "0.001281941704787909"
+    },
+    {
+      "step": "sell-only-test-output",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 69,
+      "hash": "0x533ca7fa6d97c410ca4b9c11d68059ef065241e4f5e2942b66200ea959465ce0",
+      "status": "success",
+      "maxGasUSDC": "0.006700471425510042",
+      "gasUSDC": "0.004148065516297591"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 70,
+      "hash": "0xf9498f96c50dd4e8e95293e8b6d17e3333124dc8075488506fc72766ac843cb9",
+      "status": "success",
+      "maxGasUSDC": "0.000839640930496045",
+      "gasUSDC": "0.000552840735194274"
+    }
+  ],
+  "data": {
+    "orderId": "2",
+    "creationHash": "0x655f6acb26528e384d7c6776aadd0b0ef7b4f30cf31fc1855fbc3bc71d4925cc",
+    "schedulerAttempted": true,
+    "workerGasUSDC": "0.008171789344587992",
+    "executionHash": "0xc01027ede724b917a28a700a9ea2e3982270b882b7356210b67297cd2f85c516",
+    "sdkRegistrationVerified": true,
+    "scopedKeeperVerified": true,
+    "workflowCompleted": true,
+    "completed": true
+  }
+}

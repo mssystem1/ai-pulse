@@ -4,6 +4,7 @@ import { getNetwork, usdToAtomic } from "@pulse/config";
 
 type PaymentRequirements = {
   scheme?: unknown; network?: unknown; asset?: unknown; amount?: unknown; payTo?: unknown;
+  extra?: { name?: unknown; version?: unknown; verifyingContract?: unknown };
 };
 type PaymentPayload = {
   x402Version?: unknown;
@@ -25,7 +26,7 @@ export type PulseSettlement = Readonly<{
 export type SettlementRequest = Request & { pulseNetworkKey?: NetworkKey; pulseSettlement?: PulseSettlement };
 
 export function canonicalPaymentResource(cfg: Pick<AppConfig, "BASE_URL">, network: NetworkKey, path: string) {
-  const prefix = network === "arc-testnet" ? "arc" : network;
+  const prefix = network === "arc" ? "arc" : network;
   return new URL(`/${prefix}${path}`, cfg.BASE_URL).href;
 }
 
@@ -47,13 +48,17 @@ export function validateSignedPayment(cfg: AppConfig, req: SettlementRequest, pa
   const route = cfg.routes[`${req.method.toUpperCase()} ${req.path}`];
   if (!route || route.free || route.priceUsd <= 0) throw new Error("No paid route configuration");
   const accepted = payload.accepted!;
-  const expectedPayee = key === "arc-testnet" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
+  const expectedPayee = key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
   const expectedAsset = network.paymentAsset.address || cfg.X402_ASSET;
   if (accepted.scheme !== "exact") throw new Error("Payment scheme mismatch");
   if (accepted.network !== network.caip2) throw new Error("Payment network mismatch");
   if (!sameAddress(accepted.asset, expectedAsset)) throw new Error("Payment asset mismatch");
   if (String(accepted.amount) !== usdToAtomic(route.priceUsd)) throw new Error("Payment amount mismatch");
   if (!sameAddress(accepted.payTo, expectedPayee)) throw new Error("Payment payee mismatch");
+  if (key === "arc" && (accepted.extra?.name !== "GatewayWalletBatched" || accepted.extra?.version !== "1"
+    || !sameAddress(accepted.extra?.verifyingContract, "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE"))) {
+    throw new Error("Arc mainnet Gateway signing domain mismatch");
+  }
   if (typeof payload.resource?.url !== "string") throw new Error("Payment resource URL missing");
   const resource = new URL(payload.resource.url, cfg.BASE_URL);
   const allowedPaths = new Set([req.path, req.originalUrl.split("?")[0], new URL(canonicalPaymentResource(cfg, key, req.path)).pathname]);

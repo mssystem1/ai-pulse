@@ -1310,3 +1310,7 @@ html[data-pulse-theme="base"] .trade-mode-tabs button.active,html[data-pulse-the
 .cash-flow-coverage > div span { font-size: .8rem; color: var(--mint); }
 .cash-flow-coverage p { margin: 10px 0; }
 .cash-flow-coverage small { display: block; line-height: 1.6; color: var(--muted); }
+
+/* Mainnet network mark; Horizon appearance keeps its saved preference ID. */
+.timeframe-network-logo.arc { border-radius: 50%; }
+.theme-arc { --chain-primary: #c7d7dc; --chain-secondary: #78c8dd; --chain-glow: rgba(120,200,221,.18); }

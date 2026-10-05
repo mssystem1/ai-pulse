@@ -6,7 +6,7 @@
   "tagline": "Global & Prediction intelligence. Spot execution. Independent guarded Autopilot.",
   "taglineZh": "全球与预测市场情报。现货执行。独立的受保护自动驾驶。",
   "shortDescription": "PULSE turns live OKX Global Market and selected Polymarket evidence into recoverable Quick or Pro reports, connects Global plans to Agentic-Wallet-signed Spot Trading, and offers separate cost-controlled Autopilot start services.",
-  "description": "PULSE provides distinct first-class multichain workflows for humans and agents: Global Market intelligence can prefill an Agentic-Wallet-signed Spot Market or Limit order, Prediction Market delivers focused probability intelligence, and guarded Autopilot starts directly from its own pair, strategy, capital, risk policy and prepaid duration. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. The public execution-mainnet catalog has eight paid services: two Global tiers leading to Spot Market or Limit orders, two Prediction tiers, one Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot does not require or reuse a Global report: deterministic candidate gates decide when compact prepaid AI entry confirmation is eligible, and one owner-control dashboard covers runtime and custody. Reports are durable and wallet-recoverable. Arc Testnet exposes only the five analysis/risk services because Spot and Autopilot execution are unavailable there.",
+  "description": "PULSE provides distinct first-class multichain workflows for humans and agents: Global Market intelligence can prefill an Agentic-Wallet-signed Spot Market or Limit order, Prediction Market delivers focused probability intelligence, and guarded Autopilot starts directly from its own pair, strategy, capital, risk policy and prepaid duration. Global Market covers OKX-listed crypto, xStocks and RWA instruments; execution independently verifies an identity-safe token representation, settlement asset, live OKX Onchain OS route and wallet balance on X Layer, Base or Arbitrum One. Prediction Market analyzes one explicitly selected Polymarket question read-only. The public execution-mainnet catalog has eight paid services: two Global tiers leading to Spot Market or Limit orders, two Prediction tiers, one Onchain Pre-Trade Risk Guard and three Agentic Wallet Autopilot start services for 24h, 7d or 30d. Autopilot does not require or reuse a Global report: deterministic candidate gates decide when compact prepaid AI entry confirmation is eligible, and one owner-control dashboard covers runtime and custody. Reports are durable and wallet-recoverable. Arc mainnet research services use production Gateway. Spot orders and Autopilot require a verified Arc deployment and live route qualification.",
   "website": "https://www.ai-pulse.tech",
   "repository": "https://github.com/mssystem1/ai-pulse",
   "apiOrigin": "https://pulse-api-production-7aae.up.railway.app",
@@ -55,14 +55,14 @@
       "environment": "mainnet"
     },
     {
-      "key": "arc-testnet",
-      "label": "Arc Testnet",
-      "network": "eip155:5042002",
+      "key": "arc",
+      "label": "Arc Mainnet",
+      "network": "eip155:5042",
       "routePrefix": "/arc",
-      "paymentAsset": "Test USDC",
+      "paymentAsset": "USDC",
       "paymentAssetAddress": "0x3600000000000000000000000000000000000000",
       "paymentProvider": "Circle Gateway",
-      "environment": "testnet"
+      "environment": "mainnet"
     }
   ],
   "pricingUsd": {
@@ -131,16 +131,16 @@
       "catalog": "Eight services on each execution mainnet: five analysis/risk services plus three Agentic Wallet Autopilot start services; no duplicate ERC-8004 identity is required."
     },
     "circleAgentMarketplace": {
-      "network": "eip155:5042002",
+      "network": "eip155:5042",
       "servicePrefix": "/arc",
-      "settlementAsset": "test USDC",
+      "settlementAsset": "USDC",
       "execution": "analysis and Risk Guard only"
     }
   },
   "autopilotAiPass": {
     "scope": "one owner-controlled vault",
     "plansUsd": { "24h": 1.50, "7d": 10.50, "30d": 45.00 },
-    "catalogPolicy": "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; excluded from Arc Testnet because execution is unavailable there.",
+    "catalogPolicy": "Three public Agentic Wallet Autopilot start services on X Layer, Base and Arbitrum; Arc Autopilot passes are added only after qualified deployment and FEATURE_ARC_TRADING=1.",
     "activation": "Selected during the six-step setup and paid through x402 only after a new vault is created and registered. Existing active time is reused without another charge.",
     "renewal": "Manual only. A new purchase extends unused paid time and never auto-renews.",
     "timer": "Active runtime consumes paid time; Pause freezes it and Resume preserves the unused duration.",
@@ -162,7 +162,7 @@
       "xlayer": "OKX Agentic Wallet on chain 196; X Layer gas is zero.",
       "base": "Agentic Wallet on Base mainnet; native ETH is required for gas.",
       "arbitrum": "Agentic Wallet on Arbitrum One; native ETH is required for gas.",
-      "arc-testnet": "Analysis and Risk Guard only; Spot and Autopilot workflows are unavailable."
+      "arc": "Research and Risk Guard on mainnet 5042; Spot orders and Autopilot require Arc deployments and live route qualification."
     }
   },
   "wallet": {
@@ -170,7 +170,7 @@
     "marketplaceCallers": "Agent-compatible x402 buyer",
     "aspRegistration": "Agentic Wallet email login via Onchain OS",
     "operatorTesting": "Server checkout is disabled by default and reserved for controlled E2E verification",
-    "funding": "In-app native-to-payment-asset swaps on X Layer, Base and Arbitrum; separate wallet/Gateway USDC balances and Circle Gateway deposit on Arc Testnet",
+    "funding": "In-app native-to-payment-asset swaps on X Layer, Base and Arbitrum; separate wallet/Gateway USDC balances and Circle Gateway deposit on Arc Mainnet",
     "networkSelection": "Last selected enabled network persists across reloads; DEFAULT_NETWORK applies only when no saved choice exists"
   },
   "webExperience": {
@@ -209,7 +209,7 @@
     "xlayer",
     "base",
     "arbitrum",
-    "arc-testnet",
+    "arc",
     "okx",
     "polymarket",
     "prediction-markets",

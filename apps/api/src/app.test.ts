@@ -71,7 +71,7 @@ describe("PULSE API", () => {
     assert.equal((await jfetch(reportPath, { headers: { "PULSE-RECOVERY-TOKEN": first.json.history.recoveryToken } })).res.status, 200);
   });
   it("Risk Guard accepts normalized chain IDs after payment on every network and trailing-slash input remains validated", async () => {
-    for (const [alias, chainId] of [["xlayer", "196"], ["base", "8453"], ["arbitrum", "42161"], ["arc", "5042002"], ["robinhood", "4663"]]) {
+    for (const [alias, chainId] of [["xlayer", "196"], ["base", "8453"], ["arbitrum", "42161"], ["arc", "5042"], ["robinhood", "4663"]]) {
       const path = `/${alias}/v1/preflight/`;
       const invalid = await jfetch(path, { method: "POST", body: "{}" });
       assert.equal(invalid.res.status, 400);
@@ -89,7 +89,7 @@ describe("PULSE API", () => {
     assert.equal(first.res.status, 200);
     assert.equal(first.res.headers.has("PAYMENT-REQUIRED"), false);
     assert.equal(first.json.scope, "platform");
-    assert.equal(first.json.networks.length, NETWORK_KEYS.length);
+    assert.equal(first.json.networks.length, NETWORK_KEYS.length + 1);
     assert.equal(first.json.networks.some((item: {environment:string}) => item.environment === "testnet"), true);
     assert.deepEqual(filtered.json, first.json);
     assert.equal(JSON.stringify(first.json).includes("payer"), false);
@@ -145,7 +145,7 @@ describe("PULSE API", () => {
   before(async () => {
     // Complete, secret-free test profile; do not depend on the operator's .env.
     Object.assign(process.env, {
-      ENABLED_NETWORKS: "xlayer,base,arbitrum,arc-testnet,robinhood",
+      ENABLED_NETWORKS: "xlayer,base,arbitrum,arc,robinhood",
       REPORT_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString("base64url"),
       FEATURE_BASE_PAYMENTS: "1", FEATURE_ARBITRUM_PAYMENTS: "1", FEATURE_ARC_PAYMENTS: "1",
       FEATURE_POLYMARKET: "1", FEATURE_PREDICTION_ANALYSIS: "1", FEATURE_JOBS: "1",
@@ -296,6 +296,16 @@ describe("PULSE API", () => {
     assert.equal(multichainRoute.priceUsd, 0);
   });
 
+  it("Arc metadata describes mainnet settlement and rejects the retired testnet", async () => {
+    const { res, json } = await jfetch("/v1/meta?network=arc");
+    assert.equal(res.status, 200);
+    assert.equal(json.network, "eip155:5042");
+    assert.equal(json.chainId, 5042);
+    assert.equal(json.asset, "USDC");
+    assert.equal(json.paymentProvider, "circle-gateway");
+    assert.equal((await jfetch("/v1/meta?network=arc-testnet")).res.status, 400);
+  });
+
   it("ownership lookup outages reject REST and MCP before payment without hanging", async () => {
     const args = { owner: ADDRESS, vault: `0x${"4".repeat(40)}` };
     for (const mcp of [false, true]) {
@@ -312,7 +322,7 @@ describe("PULSE API", () => {
   it("serves the selected-network token catalog without native pseudo-contracts", async () => {
     const { res, json } = await jfetch("/arc/v1/tokens?q=USDC&limit=5");
     assert.equal(res.status, 200);
-    assert.equal(json.network, "arc-testnet");
+    assert.equal(json.network, "arc");
     assert.equal(json.tokens[0].symbol, "USDC");
     assert.equal(json.tokens.some((token: { address: string }) => /^0x[eE]{40}$/.test(token.address)), false);
   });
@@ -344,7 +354,7 @@ describe("PULSE API", () => {
     }
     assert.ok(services.some((item) => item.path === "/xlayer/v1/analysis/prediction/premium" && item.paymentProvider === "okx"));
     assert.ok(services.some((item) => item.path === "/base/v1/analysis/prediction/premium" && item.network === "eip155:8453" && item.paymentProvider === "cdp"));
-    assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042002" && item.paymentProvider === "circle-gateway"));
+    assert.ok(services.some((item) => item.path === "/arc/v1/analysis/prediction/premium" && item.network === "eip155:5042" && item.paymentProvider === "circle-gateway"));
     assert.equal(services.some((item) => item.path === "/base/v1/token/scan"), false);
     assert.equal(json.asp.name, "PULSE");
     assert.equal(json.asp.product, "PULSE");
@@ -460,7 +470,7 @@ describe("PULSE API", () => {
       method: "POST", body: JSON.stringify({ primaryMarketId: "pm:condition" }),
     });
     assert.equal(res.status, 402);
-    assert.equal(json.network, "eip155:5042002");
+    assert.equal(json.network, "eip155:5042");
     const encoded = res.headers.get("payment-required");
     assert.ok(encoded);
     const challenge = JSON.parse(Buffer.from(encoded!, "base64").toString("utf8"));

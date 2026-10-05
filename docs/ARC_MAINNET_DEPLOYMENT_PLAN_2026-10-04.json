@@ -1,0 +1,101 @@
+{
+  "chainId": 5042,
+  "deployer": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "balanceUSDC": "0",
+  "deploymentFeeCeilingUSDC": "0.298732741",
+  "configurationReserveUSDC": "0.0087",
+  "requiredUSDC": "0.307432741",
+  "enoughGas": false,
+  "contracts": [
+    {
+      "key": "registry",
+      "name": "PulseRegistryV1",
+      "predictedAddress": "0x67E14b9545b069aFbd78e195ec37914466E1807f",
+      "estimatedGas": "419326",
+      "gasLimit": "524157",
+      "nonce": 0,
+      "dataHash": "0xe2be73637ba75b2e04b2445d1d580ad9008d6a615ef5f59ed306b5b9cf5cc00e",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ]
+    },
+    {
+      "key": "oracleRouter",
+      "name": "OracleRouterV1",
+      "predictedAddress": "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5",
+      "estimatedGas": "405285",
+      "gasLimit": "506606",
+      "nonce": 1,
+      "dataHash": "0x748006d124030d12156b1dc23bdf5fe9cea04fe75b3bbce1f419bccda16ef22a",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ]
+    },
+    {
+      "key": "executionAdapter",
+      "name": "OkxSwapAdapterV2",
+      "predictedAddress": "0xA61BeA98E42A943874dc80d958b157173B9f5a6E",
+      "estimatedGas": "737948",
+      "gasLimit": "922435",
+      "nonce": 2,
+      "dataHash": "0xd1d25beb7f80f0ef16d48f2598c3fc898407abc8f99a4b8a0aed95938fb9af36",
+      "constructorArguments": [
+        "0xA7d827622c4F9c884cA8F751b2060DD767F18683"
+      ]
+    },
+    {
+      "key": "spotFactory",
+      "name": "SpotOrderAccountFactoryV2",
+      "predictedAddress": "0x3189D82c8aBEb35e8CA80D079781fC5096eCA289",
+      "estimatedGas": "1507882",
+      "gasLimit": "1884852",
+      "nonce": 3,
+      "dataHash": "0x6b3f06700181eef520a8464e2df78555c2afb2a30b87cca49b6a8a080da8101a",
+      "constructorArguments": [
+        "0x67E14b9545b069aFbd78e195ec37914466E1807f",
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5"
+      ]
+    },
+    {
+      "key": "autopilotFactory",
+      "name": "AutopilotVaultFactoryV2",
+      "predictedAddress": "0xe54Dc99228463dad2C4F2762c9E1baF2D6F2eE07",
+      "estimatedGas": "1987503",
+      "gasLimit": "2484378",
+      "nonce": 4,
+      "dataHash": "0x154685360cd13b368e97ca7236a1ffaa0d1eec270ab1655ce1a665cf552e6bbe",
+      "constructorArguments": [
+        "0x67E14b9545b069aFbd78e195ec37914466E1807f",
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5"
+      ]
+    },
+    {
+      "key": "spotBracketFactory",
+      "name": "SpotBracketAccountFactoryV1",
+      "predictedAddress": "0xC2CF8Dd0ba67142C539053C51fc1Da9cC52e1af3",
+      "estimatedGas": "1881665",
+      "gasLimit": "2352081",
+      "nonce": 5,
+      "dataHash": "0x3a73cd4fa6bc0bf822ad25196f6a8655412e4c8143fc28e92ae9628cdb1ebfe8",
+      "constructorArguments": [
+        "0x67E14b9545b069aFbd78e195ec37914466E1807f",
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5"
+      ]
+    },
+    {
+      "key": "spotProtectionFactory",
+      "name": "SpotOrderAccountFactoryV1",
+      "predictedAddress": "0xa4546529b1174765d4D8e256C951365359C853FA",
+      "estimatedGas": "1301296",
+      "gasLimit": "1626620",
+      "nonce": 6,
+      "dataHash": "0xbd570472b9e254e7d4c4cecbd1f8afb6501544b924ac8177b50866da4381fb79",
+      "constructorArguments": [
+        "0x67E14b9545b069aFbd78e195ec37914466E1807f",
+        "0x8CF94C9fABb4a740cf50ebD438B4896101D665A5"
+      ]
+    }
+  ]
+}

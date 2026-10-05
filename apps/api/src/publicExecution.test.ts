@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NETWORK_REGISTRY } from "@pulse/config";
+import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
 import { publicExecution } from "./publicExecution.js";
 import type { Activity } from "./v6Store.js";
 import type { OnchainAccountSnapshot } from "./onchainDiscovery.js";

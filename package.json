@@ -14,19 +14,28 @@
     "build:vercel": "npm run build -w @pulse/schemas && npm run build -w @pulse/domain && npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/payments && npm run build -w @pulse/buyer && npm run build -w @pulse/sdk && npm run build -w @pulse/api && npm run build -w @pulse/web",
     "e2e:paid": "node scripts/e2e-paid.mjs",
     "test:robinhood-worker": "tsx --experimental-test-module-mocks --test scripts/robinhood-worker-flow.test.mjs",
+    "test:arc-workers": "tsx --experimental-test-module-mocks --test scripts/arc-worker-flow.test.mjs scripts/arc-keeper-flow.test.mjs",
+    "test:cloud-env": "node --test scripts/cloud-env.test.mjs",
+    "check:arc-qualification": "tsc -p scripts/arc-qualification.tsconfig.json",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",
     "dev:web:safe": "scripts\\dev-web.cmd",
     "start:api": "npm run start -w @pulse/api",
-    "test": "npm run test -w @pulse/contracts && npm run test -w @pulse/config && npm run test -w @pulse/domain && npm run test -w @pulse/market && npm run test -w @pulse/analysis && npm run test -w @pulse/payments && npm run test -w @pulse/sdk && npm run test -w @pulse/api && npm run test -w @pulse/web",
-    "smoke": "npm run smoke -w @pulse/api"
-    ,"validate:alerts": "node scripts/validate-alert-rules.mjs"
-    ,"readiness:upstash": "npm run build && node scripts/upstash-queue-readiness.mjs"
-    ,"readiness:blob": "npm run build && node scripts/blob-storage-readiness.mjs"
-    ,"readiness:okx": "npm run build && node scripts/okx-auth-readiness.mjs"
-    ,"audit:autopilot": "npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/api && node scripts/autopilot-readonly-audit.mjs"
-    ,"scan:autopilot": "npm run build -w @pulse/market && npm run build -w @pulse/api && node scripts/autopilot-candidate-scan.mjs"
-    ,"env:cloud:export": "node scripts/export-new-cloud-env.mjs"
+    "test": "npm run test -w @pulse/contracts && npm run test -w @pulse/config && npm run test -w @pulse/domain && npm run test -w @pulse/market && npm run test -w @pulse/analysis && npm run test -w @pulse/payments && npm run test -w @pulse/buyer && npm run test -w @pulse/sdk && npm run test -w @pulse/api && npm run test -w @pulse/web && npm run test:arc-workers && npm run test:cloud-env",
+    "smoke": "npm run smoke -w @pulse/api",
+    "validate:alerts": "node scripts/validate-alert-rules.mjs",
+    "readiness:upstash": "npm run build && node scripts/upstash-queue-readiness.mjs",
+    "readiness:blob": "npm run build && node scripts/blob-storage-readiness.mjs",
+    "readiness:okx": "npm run build && node scripts/okx-auth-readiness.mjs",
+    "audit:autopilot": "npm run build -w @pulse/config && npm run build -w @pulse/market && npm run build -w @pulse/analysis && npm run build -w @pulse/api && node scripts/autopilot-readonly-audit.mjs",
+    "scan:autopilot": "npm run build -w @pulse/market && npm run build -w @pulse/api && node scripts/autopilot-candidate-scan.mjs",
+    "env:cloud:export": "node scripts/export-new-cloud-env.mjs",
+    "readiness:arc": "node scripts/arc-mainnet-readiness.mjs",
+    "plan:arc": "node packages/contracts/scripts/arc-deployment-plan.mjs",
+    "deploy:arc": "npm run deploy:arc -w @pulse/contracts --",
+    "verify:arc": "npm run verify:arc -w @pulse/contracts",
+    "wire:arc": "node scripts/arc-wire-contracts.mjs",
+    "configure:arc": "tsx scripts/arc-configure-execution.ts"
   },
   "engines": {
     "node": "22.x"
@@ -58,7 +67,7 @@
     "@wagmi/connectors": "6.2.0",
     "@base-org/account": "2.5.8",
     "@okxweb3/x402-fetch": "^0.1.0",
-    "axios": "1.19.0",
+    "axios": "1.20.0",
     "viem": "^2.55.5"
   },
   "optionalDependencies": {
@@ -71,6 +80,13 @@
     "@wagmi/core": "2.22.1",
     "@wagmi/connectors": "6.2.0",
     "@base-org/account": "2.5.8",
-    "axios": "1.19.0"
+    "axios": "1.20.0",
+    "@grpc/grpc-js": "1.13.6",
+    "fast-uri": "3.1.8",
+    "qs": "6.16.0",
+    "undici@^6": "6.29.0",
+    "ws@^8": "8.22.0",
+    "adm-zip": "0.6.1",
+    "tmp": "0.2.7"
   }
 }

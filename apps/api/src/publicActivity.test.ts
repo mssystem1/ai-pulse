@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { NETWORK_REGISTRY } from "@pulse/config";
+import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
 import { PublicActivityStore, researchDelivery, jobResearchDelivery } from "./publicActivity.js";
 import type { PaymentReceipt, AnalysisJob } from "./jobs.js";
 
@@ -13,11 +13,13 @@ test("public analysis totals combine chains including Arc, with separate service
   for (const key of Object.keys(NETWORK_REGISTRY) as (keyof typeof NETWORK_REGISTRY)[]) {
     for (const service of ["global", "prediction", "risk"] as const) await store.record(researchDelivery(receipt(key), service, "2026-09-12T10:00:00.000Z"));
   }
+  const legacy = { ...receipt("arc"), network: LEGACY_ARC_TESTNET.caip2, chainId: LEGACY_ARC_TESTNET.chainId };
+  await store.record(researchDelivery(legacy, "risk", legacy.createdAt));
   const stats = await store.snapshot();
   const supportedChains = Object.keys(NETWORK_REGISTRY).length;
   assert.equal(stats.research.global?.count, supportedChains);
   assert.equal(stats.research.prediction?.count, supportedChains);
-  assert.equal(stats.research.risk?.count, supportedChains);
+  assert.equal(stats.research.risk?.count, supportedChains + 1);
   assert.equal(stats.networks.find(chain => chain.chain === "eip155:4663")?.research.risk?.count, 1);
   assert.equal(stats.networks.find(chain => chain.environment === "testnet")?.research.risk?.count, 1);
   assert.equal(stats.execution.spot, null);
@@ -47,7 +49,7 @@ test("execution projection counts a confirmed transaction once and keeps exact s
   const fill = { chain: "eip155:8453", service: "spot" as const, txHash: `0x${"a".repeat(64)}`, at: "2026-09-12T10:00:00Z", settlementAsset: NETWORK_REGISTRY.base.paymentAsset.address!, settlementAtomic: "1234567" };
   assert.equal(await store.recordExecution(fill), true);
   assert.equal(await store.recordExecution({...fill, service:"autopilot"}), false);
-  assert.equal(await store.recordExecution({...fill, chain:NETWORK_REGISTRY["arc-testnet"].caip2}), false);
+  assert.equal(await store.recordExecution({...fill, chain:LEGACY_ARC_TESTNET.caip2}), false);
   assert.equal(await store.recordExecution({...fill, txHash:`0x${"b".repeat(64)}`, settlementAsset:`0x${"c".repeat(40)}`}), false);
   const snapshot=await store.snapshot();
   assert.equal(snapshot.execution.spot?.count,1);

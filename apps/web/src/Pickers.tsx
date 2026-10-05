@@ -610,7 +610,7 @@ export function ExecutionPairPicker({
   useEffect(() => { setItems([]); setError(null); setVerifyingPair(""); setAssetFilter("all"); }, [networkKey, custody]);
 
   useEffect(() => {
-    if (!open || networkKey === "arc-testnet") return;
+    if (!open) return;
     let current = true;
     const timeout = window.setTimeout(async () => {
       setLoading(true);
@@ -634,7 +634,7 @@ export function ExecutionPairPicker({
     .sort((a, b) => routeSortRank(true, routeResult(networkKey, a.pair, custody)) - routeSortRank(true, routeResult(networkKey, b.pair, custody)));
   const base = networkKey === "robinhood" ? rawBase.replace(/\.[A-F0-9]{16}$/, "") : rawBase;
   return <>
-    <button id={id} type="button" className="selector-trigger execution-pair-trigger" aria-haspopup="dialog" aria-expanded={open} disabled={networkKey === "arc-testnet"} onClick={() => setOpen(true)}>
+    <button id={id} type="button" className="selector-trigger execution-pair-trigger" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
       <span className="pair-symbols"><b>{base}</b><i>/</i><span>{quote}</span></span>
       <span className="selector-action">Choose on {network.label}<svg aria-hidden="true" width="11" height="7" viewBox="0 0 11 7" fill="none"><path d="M1 1L5.5 5.5L10 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg></span>
     </button>

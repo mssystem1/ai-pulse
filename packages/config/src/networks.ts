@@ -1,4 +1,4 @@
-export const NETWORK_KEYS = ["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"] as const;
+export const NETWORK_KEYS = ["xlayer", "base", "arbitrum", "arc", "robinhood"] as const;
 
 export type NetworkKey = (typeof NETWORK_KEYS)[number];
 export type PaymentProvider = "okx" | "cdp" | "circle-gateway" | "robinhood-x402";
@@ -103,26 +103,39 @@ export const NETWORK_REGISTRY: Readonly<Record<NetworkKey, PulseNetwork>> = Obje
     contractEvidenceProvider: "generic-evm",
     fundingOptions: ["bridge-native-usdc", "fund-usdc", "swap-to-usdc"],
   }),
-  "arc-testnet": network({
-    key: "arc-testnet",
-    label: "Arc Testnet",
-    chainId: 5_042_002,
-    caip2: "eip155:5042002",
-    environment: "testnet",
-    rpcUrls: ["https://rpc.testnet.arc.network"],
-    explorerUrl: "",
-    nativeAsset: asset({ symbol: "USDC", name: "Test USDC", decimals: 18, address: null }),
+  "arc": network({
+    key: "arc",
+    label: "Arc Mainnet",
+    chainId: 5_042,
+    caip2: "eip155:5042",
+    environment: "mainnet",
+    rpcUrls: ["https://rpc.mainnet.arc.io"],
+    explorerUrl: "https://explorer.arc.io",
+    nativeAsset: asset({ symbol: "USDC", name: "USD Coin", decimals: 18, address: null }),
     paymentAsset: asset({
       symbol: "USDC",
-      name: "Test USDC",
+      name: "USD Coin",
       decimals: 6,
       address: "0x3600000000000000000000000000000000000000",
     }),
     paymentProvider: "circle-gateway",
-    tokenDiscoveryProvider: null,
+    tokenDiscoveryProvider: "generic-evm",
     contractEvidenceProvider: "generic-evm",
-    fundingOptions: ["circle-faucet", "gateway-deposit"],
+    fundingOptions: ["fund-usdc", "gateway-deposit"],
   }),
+});
+
+/** Read-only identity for stored receipts. Never selectable or accepted for a new payment. */
+export const LEGACY_ARC_TESTNET: Omit<PulseNetwork, "key"> & { key: "arc-testnet" } = Object.freeze({
+  ...NETWORK_REGISTRY.arc,
+  key: "arc-testnet",
+  label: "Arc Testnet (retired)",
+  chainId: 5_042_002,
+  caip2: "eip155:5042002",
+  environment: "testnet",
+  rpcUrls: [],
+  explorerUrl: "https://explorer.testnet.arc.io",
+  fundingOptions: [],
 });
 
 export function parseEnabledNetworks(value: string): readonly NetworkKey[] {

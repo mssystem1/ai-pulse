@@ -20,6 +20,7 @@ export default defineConfig({
     proxy: {
       // Optional same-origin proxy if VITE_USE_PROXY=1
       "/v1": { target: "http://127.0.0.1:4000", changeOrigin: true },
+      "/arc": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/healthz": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/mcp": { target: "http://127.0.0.1:4000", changeOrigin: true },
       "/brand": { target: "http://127.0.0.1:4000", changeOrigin: true },

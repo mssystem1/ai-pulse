@@ -3,9 +3,9 @@ info:
   title: PULSE Circle Agent Marketplace API
   version: current
   description: >-
-    Five focused x402 services on Arc Testnet: two Global Market reports, two
+    Five focused x402 services on Arc Mainnet: two Global Market reports, two
     Prediction Market reports and one Onchain Pre-Trade Risk Guard. Payments
-    use test USDC through Circle Gateway. Arc Testnet is analysis/payment only.
+    use USDC through Circle Gateway. The research catalog publishes five mainnet services; Arc execution requires qualified PULSE deployments.
     Spot execution, Autopilot execution and per-vault Autopilot AI passes are
     deliberately outside this five-service marketplace contract.
   contact:
@@ -18,7 +18,7 @@ externalDocs:
   url: https://github.com/mssystem1/Pulse
 servers:
   - url: https://pulse-api-production-7aae.up.railway.app
-    description: Production API origin; Arc routes use Arc Testnet payments
+    description: Production API origin; Arc routes use Arc Mainnet payments
 tags:
   - name: Global Market
   - name: Prediction analysis
@@ -28,10 +28,10 @@ paths:
     post:
       operationId: createArcSpotStandardReport
       summary: Global Quick to Spot Market or Limit
-      description: Concise Global Base analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Testnet itself remains analysis-only.
+      description: Concise Global Base analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Mainnet itself remains analysis-only.
       tags: [Global Market]
       x-pulse-price-usd: 0.20
-      x-x402-network: eip155:5042002
+      x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
       requestBody:
@@ -47,10 +47,10 @@ paths:
     post:
       operationId: createArcSpotPremiumReport
       summary: Global Pro to Spot Market or Limit
-      description: Premium Global analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Testnet itself remains analysis-only.
+      description: Premium Global analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Mainnet itself remains analysis-only.
       tags: [Global Market]
       x-pulse-price-usd: 0.30
-      x-x402-network: eip155:5042002
+      x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
       requestBody:
@@ -68,7 +68,7 @@ paths:
       summary: Prediction Quick
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.20
-      x-x402-network: eip155:5042002
+      x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
       requestBody:
@@ -86,7 +86,7 @@ paths:
       summary: Prediction Pro
       tags: [Prediction analysis]
       x-pulse-price-usd: 0.30
-      x-x402-network: eip155:5042002
+      x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
       requestBody:
@@ -105,7 +105,7 @@ paths:
       description: Deeper PASS/WARN/FAIL review of a token, route, amount or counterparty before an on-chain action.
       tags: [Risk Guard]
       x-pulse-price-usd: 0.15
-      x-x402-network: eip155:5042002
+      x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
       requestBody:
@@ -274,7 +274,7 @@ components:
             $ref: "#/components/schemas/Error"
     PaymentRequired:
       description: >-
-        x402 payment challenge for Arc Testnet test USDC through Circle Gateway.
+        x402 payment challenge for Arc Mainnet USDC through Circle Gateway.
         Payment requirements are returned in the standard payment-required headers and body.
       headers:
         PAYMENT-REQUIRED:

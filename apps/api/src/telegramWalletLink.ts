@@ -97,7 +97,7 @@ export class TelegramWalletLink {
   async history(userId: number) {
     const association = await this.association(userId);
     if (!association) return [];
-    const networks: AnalysisJob["networkKey"][] = ["xlayer", "base", "arbitrum", "arc-testnet", "robinhood"];
+    const networks: AnalysisJob["networkKey"][] = ["xlayer", "base", "arbitrum", "arc", "robinhood", "arc-testnet"];
     const rows = await Promise.all(networks.map(network => this.jobs.listByPayer(association.wallet, network, 30)));
     return rows.flat().filter(job => ["spot","prediction","risk"].includes(job.mode) && job.receipt?.settlementResult === "settled").sort((a,b) => Date.parse(b.createdAt)-Date.parse(a.createdAt)).slice(0,30);
   }

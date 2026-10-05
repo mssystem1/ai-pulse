@@ -65,7 +65,7 @@ if (typeof window !== "undefined") {
   window.dispatchEvent(new Event("eip6963:requestProvider"));
 }
 
-type PaymentRequirementLike = { scheme?: unknown; network?: unknown; asset?: unknown; amount?: unknown; payTo?: unknown };
+type PaymentRequirementLike = { scheme?: unknown; network?: unknown; asset?: unknown; amount?: unknown; payTo?: unknown; extra?: { name?: unknown; version?: unknown; verifyingContract?: unknown } };
 type PaymentRequiredLike = { x402Version?: unknown; resource?: unknown; accepts?: PaymentRequirementLike[] };
 
 const EXPECTED_ROUTE_AMOUNTS: Readonly<Record<string, string>> = Object.freeze({
@@ -91,12 +91,14 @@ export function validatePaymentChallenge(required: PaymentRequiredLike, input: R
   const expectedAmount = approvedAmount || EXPECTED_ROUTE_AMOUNTS[expectedPath];
   if (!expectedAmount) throw new Error(`PULSE has no approved browser price for ${expectedPath}`);
   const browserEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env || {};
-  const expectedPayee = selected === "arc-testnet" ? String(browserEnv.VITE_CIRCLE_GATEWAY_SELLER_ADDRESS || "") : String(browserEnv.VITE_PAY_TO_ADDRESS || "");
+  const expectedPayee = selected === "arc" ? String(browserEnv.VITE_CIRCLE_GATEWAY_SELLER_ADDRESS || "") : String(browserEnv.VITE_PAY_TO_ADDRESS || "");
   if (browserEnv.PROD === true && !expectedPayee) throw new Error("Production payment recipient is not configured in the web deployment");
   const acceptable = required.accepts.some((entry) =>
     entry.scheme === "exact" && entry.network === network.caip2
     && String(entry.asset || "").toLowerCase() === network.payment.address.toLowerCase()
     && String(entry.amount || "") === expectedAmount
+    && (selected !== "arc" || (entry.extra?.name === "GatewayWalletBatched" && entry.extra?.version === "1"
+      && String(entry.extra?.verifyingContract || "").toLowerCase() === "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"))
     && (!expectedPayee || String(entry.payTo || "").toLowerCase() === expectedPayee.toLowerCase()));
   if (!acceptable) throw new Error(`Payment challenge does not match approved ${network.label} asset, price, network, or recipient`);
   const resource = typeof required.resource === "string" ? required.resource : (required.resource as { url?: unknown } | null)?.url;
@@ -314,15 +316,15 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       import("@x402/core/client"), import("@x402/core/http"), import("@x402/evm/exact/client"), import("@circle-fin/x402-batching/client"),
     ]);
     const exact = new StandardExact(signer);
-    const scheme = networkKey === "arc-testnet" ? new circle.CompositeEvmScheme(new circle.BatchEvmScheme(signer), exact) : exact;
+    const scheme = networkKey === "arc" ? new circle.CompositeEvmScheme(new circle.BatchEvmScheme(signer), exact) : exact;
     // Circle's SDK intentionally exposes a minimal compatible client type;
     // runtime protocol shape is the same x402 v2 SchemeNetworkClient contract.
     const core = new x402Client().register(selected.caip2, scheme as never);
     const http = new x402HTTPClient(core);
-    if (networkKey === "robinhood") {
-      if (!navigator.locks) throw new Error("Robinhood payments require a browser with secure payment recovery support. Use a current browser over HTTPS.");
-      const { createRecoverableRobinhoodFetch } = await import("./robinhoodPaymentRecovery");
-      return createRecoverableRobinhoodFetch(userAddress, {
+    if (networkKey === "robinhood" || networkKey === "arc") {
+      if (!navigator.locks) throw new Error(`${selected.label} payments require a browser with secure payment recovery support. Use a current browser over HTTPS.`);
+      const { createRecoverablePaymentFetch } = await import("./paymentRecovery");
+      return createRecoverablePaymentFetch(networkKey, userAddress, {
         storage: localStorage, fetch,
         exclusive: async (key, run) => await navigator.locks.request(key, run),
         sign: async (first, request) => {

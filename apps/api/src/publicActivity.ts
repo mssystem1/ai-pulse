@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { NETWORK_REGISTRY } from "@pulse/config";
+import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
 import type { AnalysisJob, PaymentReceipt } from "./jobs.js";
 import { StoreRedis } from "./storeRedis.js";
 
@@ -16,7 +16,7 @@ type Bucket = { count: number; partial: number; firstAt: string; lastAt: string 
 export type VerifiedExecution = { chain: string; txHash: string; service: "spot" | "autopilot"; at: string; settlementAsset: string; settlementAtomic: string };
 type ExecutionBucket = { count: number; firstAt: string; lastAt: string; amount: string; symbol: string; chain: string; label: string };
 const services: ResearchService[] = ["global", "prediction", "risk"];
-const chains = Object.values(NETWORK_REGISTRY);
+const chains = [...Object.values(NETWORK_REGISTRY), LEGACY_ARC_TESTNET];
 
 /** Delivery identity follows the original chain/payment, not the current RPC or report filename. */
 export function researchDelivery(receipt: PaymentReceipt | null, service: ResearchService, at: string, partial = false): ResearchDelivery | null {

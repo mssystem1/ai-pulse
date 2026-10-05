@@ -1,0 +1,142 @@
+{
+  "chainId": 5042,
+  "network": "arc",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "authorization": "User confirmed funding and a 5 USDC maximum total spend for deployment and live acceptance checks",
+  "maximumTotalSpendUSDC": "5",
+  "observedStartingWalletUSDC": "5.366071",
+  "deploymentStageCapUSDC": "0.50",
+  "configurationStageCapUSDC": "0.10",
+  "fiveResearchPurchasesUSDC": "1.20",
+  "autopilot24hPassUSDC": "1.50",
+  "qualificationGasAndLossReserveUSDC": "1.70",
+  "tradingCapitalPerCheckUSDC": "0.10",
+  "capitalPolicy": "Only bounded qualification deposits and trades; recover unused qualification capital and revoke remaining approvals",
+  "actualDeploymentAndInitialConfigurationGasUSDC": "0.16482280241136",
+  "status": "Seven core and four factory-created PULSE contracts source-verified; live contract, keeper, AI entry, paid service, agent/MCP and one browser workflow qualified; funds recovered and execution paused. Production Circle App ID, remaining signed UI flows and hosted release remain pending.",
+  "accounting": "Reconcile all Arc deployment/configuration/qualification receipts and Gateway charges before each spending phase",
+  "actualConfirmedTransactionGasUSDC": "0.431935778921677042",
+  "actualConfirmedResearchChargesUSDC": "1.20",
+  "confirmedSpentBeforeUnreconciledSwapLossesUSDC": "3.531935778921677042",
+  "gatewayRemainingAfterQualifiedReportsUSDC": "0",
+  "gatewayDepositIsSeparateCapital": true,
+  "confirmedSpotRoundTripLossUSDC": "0.0006",
+  "transactionCount": 92,
+  "gasEvidence": [
+    {
+      "proof": "5042.json",
+      "gasUSDC": "0.16482280241136"
+    },
+    {
+      "proof": "5042-execution-configuration.json",
+      "gasUSDC": "0.00373382765992919"
+    },
+    {
+      "proof": "5042-instance-verification.json",
+      "gasUSDC": "0.111875720009492829"
+    },
+    {
+      "proof": "5042-spot-qualification.json",
+      "gasUSDC": "0.011548920001154892"
+    },
+    {
+      "proof": "5042-gateway-qualification.json",
+      "gasUSDC": "0.003574125"
+    },
+    {
+      "proof": "5042-autopilot-setup-qualification.json",
+      "gasUSDC": "0.0045429023204"
+    },
+    {
+      "proof": "5042-limit-qualification.json",
+      "gasUSDC": "0.02310658271322181"
+    },
+    {
+      "proof": "5042-protection-qualification.json",
+      "gasUSDC": "0.055185771153271131"
+    },
+    {
+      "proof": "5042-keeper-qualification.json",
+      "gasUSDC": "0.020217623397800454"
+    },
+    {
+      "proof": "5042-autopilot-pass-gate-qualification.json",
+      "gasUSDC": "0.001105444496543016"
+    },
+    {
+      "proof": "5042-autopilot-cycle-qualification.json",
+      "gasUSDC": "0.01443445871408716"
+    },
+    {
+      "proof": "5042-autopilot-exit-qualification.json",
+      "gasUSDC": "0.01206899818511656"
+    },
+    {
+      "proof": "5042-agent-gateway-qualification.json",
+      "gasUSDC": "0.00285930142965"
+    },
+    {
+      "proof": "5042-browser-gateway-qualification.json",
+      "gasUSDC": "0.00285930142965"
+    }
+  ],
+  "paidEvidence": [
+    {
+      "proof": "5042-agent-paid-qualification.json",
+      "service": "agent-mcp-risk",
+      "chargeUSDC": ".20"
+    },
+    {
+      "proof": "5042-browser-paid-qualification.json",
+      "service": "browser-risk",
+      "chargeUSDC": "0.20"
+    },
+    {
+      "proof": "5042-global-pro-paid-qualification.json",
+      "service": "global-pro",
+      "chargeUSDC": "0.3"
+    },
+    {
+      "proof": "5042-global-quick-paid-qualification.json",
+      "service": "global-quick",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-prediction-pro-paid-qualification.json",
+      "service": "prediction-pro",
+      "chargeUSDC": "0.3"
+    },
+    {
+      "proof": "5042-prediction-quick-paid-qualification.json",
+      "service": "prediction-quick",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-risk-paid-qualification.json",
+      "service": "risk",
+      "chargeUSDC": "0.2"
+    },
+    {
+      "proof": "5042-autopilot-pass-qualification.json",
+      "service": "autopilot-24h",
+      "chargeUSDC": "1.50"
+    }
+  ],
+  "capitalStillToRecover": [],
+  "updatedAt": "2026-10-05T05:23:55.359Z",
+  "actualConfirmedPaidChargesUSDC": "3.1",
+  "supplementaryAgentAndBrowserChargesUSDC": "0.40",
+  "supplementaryChargeAllocation": "Included in the existing qualification reserve; total approval remains 5 USDC",
+  "actualTotalSpendIncludingTradeLossesUSDC": "3.534676818912683849",
+  "realizedQualificationTradeLossUSDC": "0.002741039991006807",
+  "remainingAuthorizedSpendUSDC": "1.465323181087316151",
+  "walletUSDC": "1.831394181087316151",
+  "qualificationVaultUSDC": "0",
+  "qualificationVaultWETH": "0",
+  "missingNonces": [],
+  "qualificationApprovalsCleared": true,
+  "registryPaused": true,
+  "vaultPaused": true,
+  "balanceEvidence": "ARC_MAINNET_BALANCE_AUDIT_2026-10-05.json",
+  "capitalEvidence": "ARC_MAINNET_CAPITAL_AUDIT_2026-10-05.json"
+}

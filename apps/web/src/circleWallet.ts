@@ -3,11 +3,11 @@ import { API_BASE } from "./api";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import type { InjectedProvider } from "./wallet";
 
-type CircleWallet = { id: string; address: string; blockchain: "ARC-TESTNET"; accountType?: string };
+type CircleWallet = { id: string; address: string; blockchain: "ARC"; accountType?: string };
 type CircleChallengeResult = { type: string; status: string; data?: { signature?: string; txHash?: string; signedTransaction?: string } };
-type CircleSession = { userToken: string; encryptionKey: string; wallets: CircleWallet[]; activeNetwork: "arc-testnet" };
-const SESSION_KEY = "pulse.circle.session";
-const CIRCLE_NETWORK = "arc-testnet" as const;
+type CircleSession = { userToken: string; encryptionKey: string; wallets: CircleWallet[]; activeNetwork: "arc" };
+const SESSION_KEY = "pulse.circle.session.mainnet";
+const CIRCLE_NETWORK = "arc" as const;
 let session: CircleSession | null = null;
 let sdk: W3SSdk | null = null;
 
@@ -42,7 +42,7 @@ async function listArcWallets(options: { waitForCreation?: boolean } = {}): Prom
   const attempts = options.waitForCreation ? 12 : 1;
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     const listed = await circleApi("/wallets") as { wallets?: CircleWallet[] };
-    const wallets = (listed.wallets || []).filter((wallet) => wallet.blockchain === "ARC-TESTNET" && wallet.accountType !== "SCA");
+    const wallets = (listed.wallets || []).filter((wallet) => wallet.blockchain === "ARC" && wallet.accountType !== "SCA");
     if (wallets.length || attempt === attempts - 1) return wallets;
     await wait(1_000);
   }
@@ -60,8 +60,8 @@ function persist() {
 }
 
 function walletFor(key: WebNetworkKey): CircleWallet {
-  if (key !== CIRCLE_NETWORK) throw new Error("Circle email wallet is available only on Arc Testnet in PULSE");
-  const wallet = session?.wallets.find((item) => item.blockchain === "ARC-TESTNET");
+  if (key !== CIRCLE_NETWORK) throw new Error("Circle email wallet is available only on Arc Mainnet in PULSE");
+  const wallet = session?.wallets.find((item) => item.blockchain === "ARC");
   if (!wallet) throw new Error(`Circle EOA wallet is unavailable on ${WEB_NETWORKS[key].label}`);
   return wallet;
 }
@@ -114,24 +114,32 @@ export function getCircleProvider(): InjectedProvider | null {
       if (method === "wallet_switchEthereumChain") {
         const chainHex = String((params[0] as { chainId?: unknown })?.chainId || "");
         const next = (Object.keys(WEB_NETWORKS) as WebNetworkKey[]).find((key) => WEB_NETWORKS[key].chainHex.toLowerCase() === chainHex.toLowerCase());
-        if (next !== CIRCLE_NETWORK) throw Object.assign(new Error("Circle email wallet is available only on Arc Testnet in PULSE"), { code: 4902 });
+        if (next !== CIRCLE_NETWORK) throw Object.assign(new Error("Circle email wallet is available only on Arc Mainnet in PULSE"), { code: 4902 });
         session.activeNetwork = next; persist(); return null;
       }
       if (method === "wallet_addEthereumChain") throw Object.assign(new Error("Circle Wallet networks are managed by Circle"), { code: 4200 });
       if (method === "eth_signTypedData_v4") {
+        if (params.length > 1 && String(params[0]).toLowerCase() !== active.address.toLowerCase()) throw new Error("Circle signing address does not match the connected wallet");
         const raw = String(params[1] || params[0] || "");
+        if (Number(JSON.parse(raw).domain?.chainId) !== 5042) throw new Error("Circle signing requires Arc mainnet chain 5042");
         const result = await challenge("/sign/typed-data", { walletId: active.id, data: raw });
         const signature = result.data?.signature;
         if (!signature) throw new Error("Circle returned no typed-data signature");
         return signature;
       }
-      // Read-only calls are sent directly to the selected public RPC. Contract
-      // execution is intentionally added only after Circle's transaction path is certified.
+      if (method === "personal_sign") {
+        if (String(params[1]).toLowerCase() !== active.address.toLowerCase()) throw new Error("Circle signing address does not match the connected wallet");
+        const message = String(params[0] || "");
+        const result = await challenge("/sign/message", { walletId: active.id, message, encodedByHex: /^0x/.test(message) });
+        if (!result.data?.signature) throw new Error("Circle returned no message signature");
+        return result.data.signature;
+      }
       if (method === "eth_sendTransaction" || method === "eth_sendRawTransaction") {
         if (method === "eth_sendRawTransaction") return rpc(method, params);
         const tx = params[0] as Record<string, string> | undefined;
         if (!tx || String(tx.from || "").toLowerCase() !== active.address.toLowerCase()) throw new Error("Circle transaction source does not match the connected EOA");
         if (!tx.to) throw new Error("Circle contract execution requires a destination contract");
+        if (tx.chainId && Number(tx.chainId) !== 5042) throw new Error("Circle transactions require Arc mainnet chain 5042");
         return executeContractTransaction({
           walletId: active.id,
           contractAddress: tx.to,
@@ -147,6 +155,8 @@ export function getCircleProvider(): InjectedProvider | null {
 
 export async function connectCircleWallet(email: string, preferred: WebNetworkKey) {
   preferred = CIRCLE_NETWORK;
+  const status = await circleApi("/status");
+  if (!status.enabled) throw new Error(String(status.reason || "Arc mainnet email wallet setup is pending"));
   const id = appId();
   let loginResolve: ((value: { userToken: string; encryptionKey: string; refreshToken: string }) => void) | null = null;
   let loginReject: ((reason: unknown) => void) | null = null;
@@ -165,7 +175,7 @@ export async function connectCircleWallet(email: string, preferred: WebNetworkKe
     // verification and before their wallets can be listed.
     const created = await circleApi("/wallets/initialize", {
       method: "POST",
-      body: JSON.stringify({ blockchain: "ARC-TESTNET" }),
+      body: JSON.stringify({ blockchain: "ARC" }),
     });
     const challengeId = String(created.challengeId || "");
     if (!challengeId) throw new Error("Circle returned no EOA wallet creation challenge");
@@ -180,14 +190,14 @@ export async function connectCircleWallet(email: string, preferred: WebNetworkKe
     if (!wallets.length) {
       const created = await circleApi("/wallets/create-arc", { method: "POST", body: "{}" });
       const challengeId = String(created.challengeId || "");
-      if (!challengeId) throw new Error("Circle returned no Arc Testnet wallet creation challenge");
+      if (!challengeId) throw new Error("Circle returned no Arc Mainnet wallet creation challenge");
       await execute(challengeId);
       wallets = await listArcWallets({ waitForCreation: true });
     }
   }
   session.wallets = wallets;
   if (!session.wallets.length) {
-    throw new Error("Circle finished login but no Arc Testnet EOA is available. Check Circle Console → Wallets → User Controlled → Users; if this email was initialized previously without an Arc wallet, create an Arc Testnet EOA for that user or use a new email for this test.");
+    throw new Error("Circle finished login but no Arc Mainnet EOA is available. Check Circle Console → Wallets → User Controlled → Users; if this email was initialized previously without an Arc wallet, create an Arc Mainnet EOA for that user or use a new email for mainnet.");
   }
   const active = walletFor(session.activeNetwork);
   persist();
@@ -197,7 +207,7 @@ export async function connectCircleWallet(email: string, preferred: WebNetworkKe
 export function restoreCircleWallet() {
   try {
     const stored = JSON.parse(window.sessionStorage.getItem(SESSION_KEY) || "null") as CircleSession | null;
-    if (!stored?.userToken || !stored.wallets?.some((wallet) => wallet.blockchain === "ARC-TESTNET")) return null;
+    if (!stored?.userToken || !stored.wallets?.some((wallet) => wallet.blockchain === "ARC")) return null;
     stored.activeNetwork = CIRCLE_NETWORK;
     session = stored;
     sdk = new W3SSdk({ appSettings: { appId: appId() }, authentication: { userToken: stored.userToken, encryptionKey: stored.encryptionKey } });

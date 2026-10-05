@@ -1,0 +1,188 @@
+{
+  "asOf": "2026-10-05T05:38:35.174Z",
+  "chainId": 5042,
+  "mode": "read-only; no signatures or payments",
+  "checks": [
+    {
+      "name": "selected-network-metadata",
+      "ready": true
+    },
+    {
+      "name": "ui-contract-capabilities",
+      "ready": true,
+      "executionEnabled": false
+    },
+    {
+      "name": "circle-email-status",
+      "ready": true,
+      "enabled": false,
+      "detail": "Arc mainnet email login is waiting for the production Circle app and subscription setup"
+    },
+    {
+      "name": "risk",
+      "ready": true,
+      "status": 402,
+      "amountUSDC": 0.2,
+      "network": "eip155:5042",
+      "signingDomain": "GatewayWalletBatched",
+      "challenge": {
+        "x402Version": 2,
+        "resource": {
+          "url": "http://127.0.0.1:8789/arc/v1/preflight",
+          "description": "PULSE Arc Mainnet analysis payment",
+          "mimeType": "application/json"
+        },
+        "accepts": [
+          {
+            "scheme": "exact",
+            "network": "eip155:5042",
+            "asset": "0x3600000000000000000000000000000000000000",
+            "amount": "200000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "maxTimeoutSeconds": 604900,
+            "extra": {
+              "name": "GatewayWalletBatched",
+              "version": "1",
+              "verifyingContract": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
+            }
+          }
+        ]
+      },
+      "requestedUrl": "http://127.0.0.1:8789/arc/v1/preflight"
+    },
+    {
+      "name": "global-quick",
+      "ready": true,
+      "status": 402,
+      "amountUSDC": 0.2,
+      "network": "eip155:5042",
+      "signingDomain": "GatewayWalletBatched",
+      "challenge": {
+        "x402Version": 2,
+        "resource": {
+          "url": "http://127.0.0.1:8789/arc/v1/analysis/spot/standard",
+          "description": "PULSE Arc Mainnet analysis payment",
+          "mimeType": "application/json"
+        },
+        "accepts": [
+          {
+            "scheme": "exact",
+            "network": "eip155:5042",
+            "asset": "0x3600000000000000000000000000000000000000",
+            "amount": "200000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "maxTimeoutSeconds": 604900,
+            "extra": {
+              "name": "GatewayWalletBatched",
+              "version": "1",
+              "verifyingContract": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
+            }
+          }
+        ]
+      },
+      "requestedUrl": "http://127.0.0.1:8789/arc/v1/analysis/spot/standard"
+    },
+    {
+      "name": "global-pro",
+      "ready": true,
+      "status": 402,
+      "amountUSDC": 0.3,
+      "network": "eip155:5042",
+      "signingDomain": "GatewayWalletBatched",
+      "challenge": {
+        "x402Version": 2,
+        "resource": {
+          "url": "http://127.0.0.1:8789/arc/v1/analysis/spot/premium",
+          "description": "PULSE Arc Mainnet analysis payment",
+          "mimeType": "application/json"
+        },
+        "accepts": [
+          {
+            "scheme": "exact",
+            "network": "eip155:5042",
+            "asset": "0x3600000000000000000000000000000000000000",
+            "amount": "300000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "maxTimeoutSeconds": 604900,
+            "extra": {
+              "name": "GatewayWalletBatched",
+              "version": "1",
+              "verifyingContract": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
+            }
+          }
+        ]
+      },
+      "requestedUrl": "http://127.0.0.1:8789/arc/v1/analysis/spot/premium"
+    },
+    {
+      "name": "prediction-quick",
+      "ready": true,
+      "status": 402,
+      "amountUSDC": 0.2,
+      "network": "eip155:5042",
+      "signingDomain": "GatewayWalletBatched",
+      "challenge": {
+        "x402Version": 2,
+        "resource": {
+          "url": "http://127.0.0.1:8789/arc/v1/analysis/prediction/standard",
+          "description": "PULSE Arc Mainnet analysis payment",
+          "mimeType": "application/json"
+        },
+        "accepts": [
+          {
+            "scheme": "exact",
+            "network": "eip155:5042",
+            "asset": "0x3600000000000000000000000000000000000000",
+            "amount": "200000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "maxTimeoutSeconds": 604900,
+            "extra": {
+              "name": "GatewayWalletBatched",
+              "version": "1",
+              "verifyingContract": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
+            }
+          }
+        ]
+      },
+      "requestedUrl": "http://127.0.0.1:8789/arc/v1/analysis/prediction/standard"
+    },
+    {
+      "name": "prediction-pro",
+      "ready": true,
+      "status": 402,
+      "amountUSDC": 0.3,
+      "network": "eip155:5042",
+      "signingDomain": "GatewayWalletBatched",
+      "challenge": {
+        "x402Version": 2,
+        "resource": {
+          "url": "http://127.0.0.1:8789/arc/v1/analysis/prediction/premium",
+          "description": "PULSE Arc Mainnet analysis payment",
+          "mimeType": "application/json"
+        },
+        "accepts": [
+          {
+            "scheme": "exact",
+            "network": "eip155:5042",
+            "asset": "0x3600000000000000000000000000000000000000",
+            "amount": "300000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "maxTimeoutSeconds": 604900,
+            "extra": {
+              "name": "GatewayWalletBatched",
+              "version": "1",
+              "verifyingContract": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
+            }
+          }
+        ]
+      },
+      "requestedUrl": "http://127.0.0.1:8789/arc/v1/analysis/prediction/premium"
+    }
+  ],
+  "ready": true,
+  "predictionSelection": {
+    "primaryMarketId": "pm:0xdf8e2dc5860027decbe6164555c3c1c9645c3bd33e16b9dc57ca87125047d4a8",
+    "additionalMarketIds": [],
+    "lang": "en"
+  }
+}

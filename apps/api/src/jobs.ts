@@ -38,7 +38,7 @@ export type AnalysisJob = Readonly<{
   payer: string;
   /** Validated request data required to resume work after a process restart. */
   input: unknown;
-  networkKey: "xlayer" | "base" | "arbitrum" | "arc-testnet" | "robinhood";
+  networkKey: "xlayer" | "base" | "arbitrum" | "arc" | "robinhood" | "arc-testnet";
   requesterIp: string;
   stage: JobStage;
   events: readonly JobEvent[];

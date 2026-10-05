@@ -1,0 +1,29 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "approve-gateway",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 88,
+      "hash": "0xde8f9c67f78a5abdb9d5bd9c18c99feca1beb3c0fd77a4c17739d84d5e2819aa",
+      "status": "success",
+      "maxGasUSDC": "0.00168686470286",
+      "gasUSDC": "0.00110852055426"
+    },
+    {
+      "step": "deposit-gateway",
+      "to": "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE",
+      "nonce": 89,
+      "hash": "0xb7418d2a7a34a6a7bf16de3730773c8dfe3a7594abcf7ba2221ed2fb4f63ff17",
+      "status": "success",
+      "maxGasUSDC": "0.00281968917487",
+      "gasUSDC": "0.00175078087539"
+    }
+  ],
+  "data": {
+    "depositAtomic": "200000",
+    "responseLossSimulated": true,
+    "completed": true
+  }
+}

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet } from "./api";
 import { assertPaymentBalance, fetchArcGatewayBalance, fetchNetworkBalances, WEB_NETWORKS, type WebNetworkKey } from "./networks";
+import { hasRecoverablePayment } from "./paymentRecovery";
 import { clearJobRecovery, readJobRecovery, saveJobRecovery } from "./jobRecovery";
 import { createWalletPaidFetch } from "./wallet";
 import { PredictionAnalysisReport } from "./Report";
@@ -135,13 +136,18 @@ export function PredictionWorkspace({ networkKey, wallet, lang, prices, onNeedWa
     const route = `/v1/analysis/prediction/${tier}`;
     setBusy(tier); setError(""); setResult(null);
     try {
-      const [balances, gateway] = await Promise.all([fetchNetworkBalances(wallet, networkKey, true), networkKey === "arc-testnet" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null)]);
-      assertPaymentBalance(networkKey === "arc-testnet" ? gateway : balances.payment, prices[route], network.payment.symbol, network.label);
+      const paidUrl = `${API_BASE}/${network.route}${route}`;
+      const paidBody = JSON.stringify({ primaryMarketId: selected.id, additionalMarketIds: [], lang, userNote: note || undefined });
+      const recovering = await hasRecoverablePayment(networkKey, wallet, paidUrl, { method: "POST", body: paidBody }, localStorage);
+      if (!recovering) {
+        const [balances, gateway] = await Promise.all([fetchNetworkBalances(wallet, networkKey, true), networkKey === "arc" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null)]);
+        assertPaymentBalance(networkKey === "arc" ? gateway : balances.payment, prices[route], network.payment.symbol, network.label);
+      }
       const paidFetch = await createWalletPaidFetch(wallet, networkKey);
       const telegramDelivery = new URLSearchParams(window.location.search).get("tg");
-      const response = await paidFetch(`${API_BASE}/${network.route}${route}`, {
+      const response = await paidFetch(paidUrl, {
         method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json", ...(telegramDelivery ? { "PULSE-TELEGRAM-DELIVERY": telegramDelivery } : {}) },
-        body: JSON.stringify({ primaryMarketId: selected.id, additionalMarketIds: [], lang, userNote: note || undefined }),
+        body: paidBody,
       });
       const data = await response.json().catch(() => ({})) as { job?: { id?: string; stage?: string }; recoveryToken?: string } & Record<string, unknown>;
       if (!response.ok) throw new Error(JSON.stringify(data).slice(0, 500));

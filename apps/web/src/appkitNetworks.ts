@@ -16,7 +16,6 @@ export function buildAppKitNetworks(keys: readonly WebNetworkKey[]): [PulseAppKi
       nativeCurrency: network.native,
       rpcUrls: { default: { http: [network.rpc] } },
       blockExplorers: { default: { name: `${network.label} Explorer`, url: network.explorer } },
-      ...(key === "arc-testnet" ? { testnet: true } : {}),
     };
   };
   return [convert(selected[0]), ...selected.slice(1).map(convert)];

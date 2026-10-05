@@ -149,7 +149,7 @@ export const EventRiskPreflightResponseSchema = z.object({
   generatedAt: z.string().datetime(),
 });
 
-export const ChainIdSchema = z.enum(["196", "1", "56", "137", "8453", "42161", "5042002", "4663"]).default("196");
+export const ChainIdSchema = z.enum(["196", "1", "56", "137", "8453", "42161", "5042", "4663"]).default("196");
 
 export const ResolveRequestSchema = z.object({
   query: z.string().min(1).max(128),

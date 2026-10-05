@@ -45,7 +45,7 @@ The corresponding public address must be authorized on every enabled mainnet as 
 - `PulseRegistryV1.autopilotExecutors(address) == true`;
 - `OracleRouterV1.updaters(address) == true`.
 
-The signer needs only enough native gas on each enabled chain: OKB on X Layer and ETH on Base and Arbitrum. It must not be the seller wallet, test wallet, treasury, user wallet or contract owner. User capital remains in owner-controlled accounts and vaults; the executor cannot use the vault owner's withdrawal function, and contract policy limits every automated action.
+The signer needs native gas on each enabled chain: OKB on X Layer, ETH on Base/Arbitrum/Robinhood and native USDC with 18 decimals on Arc mainnet. Arc ERC-20 USDC has 6 decimals and represents the same wallet balance; do not sum the two interfaces. The production executor must not be the seller wallet, qualification wallet, treasury, user wallet or contract owner. User capital remains in owner-controlled accounts and vaults; the executor cannot use the vault owner's withdrawal function, and contract policy limits every automated action. The bounded Arc qualification used the approved deployer in a local harness; production signer separation and roles must be checked before activation.
 
 `CRON_SECRET` has a different purpose: it authenticates `GET /v1/internal/automation/tick` when a serverless scheduler invokes that route. It is not an on-chain key. The recommended Railway topology uses in-process timers, so leave `CRON_SECRET` unset there and do not add it to Vercel.
 
@@ -140,6 +140,18 @@ PRICE_TOKEN_SCAN=0.20
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
 
+The user selected `pulse-api-production-7aae` for the Arc mainnet API release and will deploy manually. Prepare its configuration locally with:
+
+```bash
+npm run env:cloud:export -- --production --api-origin=https://pulse-api-production-7aae.up.railway.app
+```
+
+This writes two ignored local review files: `.env.railway.cloud` contains server settings/secrets and `.env.vercel.cloud` contains only public browser settings. The explicit options set `NODE_ENV=production` and align `BASE_URL`, `VITE_API_URL` and `TELEGRAM_WEBHOOK_BASE_URL` without changing local development settings. Import each into its named host only. Changed existing settings, including Arc mainnet identity and all nine contract/router bindings, are included. Test-wallet credentials and local payment controls are omitted. Review storage isolation, feature gates and production web URLs before import; the export does not update either host or deploy anything. Existing `.env.cloud` operator files are preserved. Keep `FEATURE_ARC_TRADING=0` and `FEATURE_CIRCLE_MAINNET_WALLETS=0` until their activation prerequisites in [the Arc migration audit](ARC_MAINNET_MIGRATION.md) are satisfied.
+
+The local report encryption key matches a public test fixture and is omitted from the Railway export. Keep the secure existing production `REPORT_ENCRYPTION_KEY`; use a securely generated key for new isolated storage. Do not replace the key for existing encrypted reports without re-encrypting those records.
+
+Arc's seven core contracts and four qualification instances are deployed and source-verified; all nine public bindings are populated in the environment templates. See [the current Arc audit](ARC_MAINNET_MIGRATION.md) for live evidence and outstanding release checks. Keep `FEATURE_ARC_TRADING=0` and `FEATURE_CIRCLE_MAINNET_WALLETS=0` until qualification and production Circle setup are complete. A production `CIRCLE_API_KEY_MAINNET` alone does not replace the matching public `VITE_CIRCLE_APP_ID` or subscription/email setup.
+
 PULSE also carries the same verified mainnet release addresses in its server-side
 execution catalog. A valid Railway address variable overrides that catalog for
 an intentional migration; an omitted or malformed duplicate falls back to the
@@ -204,7 +216,7 @@ VITE_API_URL=https://api.example.com
 VITE_REOWN_PROJECT_ID=<public-reown-project-id>
 VITE_CIRCLE_APP_ID=<public-circle-app-id>
 VITE_FEATURE_WALLET_APPKIT=1
-VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc-testnet
+VITE_ENABLED_NETWORKS=xlayer,base,arbitrum,arc
 VITE_PAY_TO_ADDRESS=<public-seller-address>
 VITE_CIRCLE_GATEWAY_SELLER_ADDRESS=<public-seller-address>
 VITE_USE_PROXY=0

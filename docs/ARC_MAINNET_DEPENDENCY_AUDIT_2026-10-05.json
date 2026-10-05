@@ -1,0 +1,261 @@
+{
+  "auditedAt": "2026-10-05T06:27:51.995Z",
+  "command": "npm audit --omit=dev --json",
+  "productionOnly": true,
+  "countsBefore": {
+    "moderate": 35,
+    "high": 7,
+    "critical": 0,
+    "total": 42
+  },
+  "countsAfter": {
+    "info": 0,
+    "low": 0,
+    "moderate": 22,
+    "high": 0,
+    "critical": 0,
+    "total": 22
+  },
+  "patchedVersions": {
+    "axios": "1.20.0",
+    "undici": "6.29.0",
+    "@grpc/grpc-js": "1.13.6",
+    "fast-uri": "3.1.8",
+    "qs": "6.16.0",
+    "morgan": "1.12.1",
+    "ws@8": "8.22.0"
+  },
+  "cleanInstallDryRunPassed": true,
+  "fullDependencyCountsAfter": {
+    "info": 0,
+    "low": 6,
+    "moderate": 22,
+    "high": 0,
+    "critical": 0,
+    "total": 28
+  },
+  "patchedBuildOnlyVersions": {
+    "adm-zip": "0.6.1",
+    "tmp": "0.2.7"
+  },
+  "compilerVersion": "0.8.26",
+  "allSevenVerifiedCreationDataHashesReproduced": true,
+  "remainingAdvisories": [
+    {
+      "name": "decode-uri-component",
+      "severity": "moderate",
+      "title": "decode-uri-component: Denial of service via exponential decoding of malformed percent-encoded input",
+      "url": "https://github.com/advisories/GHSA-vcc3-ghjq-m6fr",
+      "affectedRange": "<=0.4.2"
+    },
+    {
+      "name": "uuid",
+      "severity": "moderate",
+      "title": "uuid: Missing buffer bounds check in v3/v5/v6 when buf is provided",
+      "url": "https://github.com/advisories/GHSA-w5hq-g745-h8pq",
+      "affectedRange": "<11.1.1"
+    }
+  ],
+  "affectedPackages": [
+    {
+      "name": "@circle-fin/w3s-pw-web-sdk",
+      "severity": "moderate",
+      "direct": true,
+      "paths": [
+        "node_modules/@circle-fin/w3s-pw-web-sdk"
+      ]
+    },
+    {
+      "name": "@gemini-wallet/core",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@gemini-wallet/core"
+      ]
+    },
+    {
+      "name": "@metamask/rpc-errors",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/rpc-errors",
+        "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/rpc-errors",
+        "node_modules/@metamask/providers/node_modules/@metamask/rpc-errors",
+        "node_modules/@metamask/rpc-errors"
+      ]
+    },
+    {
+      "name": "@metamask/sdk",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@metamask/sdk"
+      ]
+    },
+    {
+      "name": "@metamask/sdk-communication-layer",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@metamask/sdk/node_modules/@metamask/sdk-communication-layer"
+      ]
+    },
+    {
+      "name": "@metamask/utils",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/json-rpc-engine/node_modules/@metamask/utils",
+        "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils",
+        "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils",
+        "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/utils",
+        "node_modules/@metamask/json-rpc-middleware-stream/node_modules/@metamask/utils",
+        "node_modules/@metamask/providers/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils",
+        "node_modules/@metamask/providers/node_modules/@metamask/utils",
+        "node_modules/@metamask/utils"
+      ]
+    },
+    {
+      "name": "@reown/appkit",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit"
+      ]
+    },
+    {
+      "name": "@reown/appkit-controllers",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers"
+      ]
+    },
+    {
+      "name": "@reown/appkit-pay",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-pay"
+      ]
+    },
+    {
+      "name": "@reown/appkit-scaffold-ui",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-scaffold-ui"
+      ]
+    },
+    {
+      "name": "@reown/appkit-ui",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-ui"
+      ]
+    },
+    {
+      "name": "@reown/appkit-utils",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils"
+      ]
+    },
+    {
+      "name": "@wagmi/connectors",
+      "severity": "moderate",
+      "direct": true,
+      "paths": [
+        "node_modules/@wagmi/connectors"
+      ]
+    },
+    {
+      "name": "@walletconnect/core",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/core",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/core",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/core",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/core"
+      ]
+    },
+    {
+      "name": "@walletconnect/ethereum-provider",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider"
+      ]
+    },
+    {
+      "name": "@walletconnect/sign-client",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/sign-client",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/sign-client",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/sign-client",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/sign-client"
+      ]
+    },
+    {
+      "name": "@walletconnect/universal-provider",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/universal-provider",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/universal-provider",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/universal-provider",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/universal-provider"
+      ]
+    },
+    {
+      "name": "@walletconnect/utils",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/utils",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/utils",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/utils",
+        "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/utils"
+      ]
+    },
+    {
+      "name": "decode-uri-component",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/decode-uri-component"
+      ]
+    },
+    {
+      "name": "query-string",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/query-string"
+      ]
+    },
+    {
+      "name": "uuid",
+      "severity": "moderate",
+      "direct": false,
+      "paths": [
+        "node_modules/@metamask/sdk/node_modules/uuid",
+        "node_modules/uuid"
+      ]
+    },
+    {
+      "name": "wagmi",
+      "severity": "moderate",
+      "direct": true,
+      "paths": [
+        "apps/web/node_modules/wagmi"
+      ]
+    }
+  ],
+  "remainingReview": "Two moderate advisories propagate through older wallet SDK dependencies. Patched decode-uri-component is ESM, incompatible with its existing CommonJS query-string caller; avoid a blind override. UUID advisory affects v3/v5/v6 with caller-provided output buffers; inspected Circle and MetaMask utility callers use v4. Production wallet acceptance remains pending; this is not a vulnerability-free certification."
+}

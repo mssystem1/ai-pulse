@@ -345,7 +345,7 @@ export function getX402InputDefinition(path: string): RouteInputDefinition | und
   let definition = routeInputs[path];
   if (!definition) return undefined;
   if (alias) {
-    const chainId = { xlayer: "196", base: "8453", arbitrum: "42161", arc: "5042002" }[alias];
+    const chainId = { xlayer: "196", base: "8453", arbitrum: "42161", arc: "5042" }[alias];
     definition = { ...definition, fields: definition.fields.map(field => field.name === "chainId" ? { ...field, default: chainId, enum: [chainId!] } : field) };
   }
   if (path === "/v1/preflight" && !definition.fields.some(field => field.name === "lang")) {

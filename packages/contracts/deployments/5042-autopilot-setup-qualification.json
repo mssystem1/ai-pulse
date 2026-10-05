@@ -1,0 +1,38 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "allow-WETH",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 23,
+      "hash": "0xfc5d65ff0f5b22a455ff6edc863c767dc698b370d46f72d1cc006b6b6c881d83",
+      "status": "success",
+      "maxGasUSDC": "0.00309412928922",
+      "gasUSDC": "0.0020430010215"
+    },
+    {
+      "step": "configure-limits",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 24,
+      "hash": "0x78355a652ee0bef1d070d96f5cd7c9c7d7e6fa60ce1e3cc434ac9d350b77ba35",
+      "status": "success",
+      "maxGasUSDC": "0.00230788896162",
+      "gasUSDC": "0.00152090076045"
+    },
+    {
+      "step": "fund-vault",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 25,
+      "hash": "0x3efa58864e5f8786e4a1a1cb8356fe5241e00452540c84334b4407de50cbba71",
+      "status": "success",
+      "maxGasUSDC": "0.001480128678392",
+      "gasUSDC": "0.00097900053845"
+    }
+  ],
+  "data": {
+    "registered": true,
+    "strategyId": "arc:0x2cc3e96f5a95822e45af82bd795ce5506dc3a4ee",
+    "vault": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE"
+  }
+}

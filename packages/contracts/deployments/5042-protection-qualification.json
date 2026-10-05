@@ -1,0 +1,248 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "registry-resume",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 37,
+      "hash": "0x60b03ddfd9b14e9d9184a7f5b2d7422a51b8cadf51e5b2f34f9df1904eb8c8fe",
+      "status": "success",
+      "maxGasUSDC": "0.00083928053182376",
+      "gasUSDC": "0.00055260042019704"
+    },
+    {
+      "step": "bracket-oracle",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 38,
+      "hash": "0x1c61390d69c8c5ec0eef2f193c5830ee3b751fdd273e35ee978dc1378253b6c4",
+      "status": "success",
+      "maxGasUSDC": "0.0010578005068625",
+      "gasUSDC": "0.00069800040135"
+    },
+    {
+      "step": "bracket-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 39,
+      "hash": "0x23c659c5c59aab5d564b0ff4d9208552e18d0cc0bad0c74beac24f650cef1f16",
+      "status": "success",
+      "maxGasUSDC": "0.00168722470301",
+      "gasUSDC": "0.00110876055438"
+    },
+    {
+      "step": "bracket-create",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 40,
+      "hash": "0x3a29a4b58defcdcdc2f0f8ac35322c60ebe753142cf868491a8d6ff61ba934da",
+      "status": "success",
+      "maxGasUSDC": "0.00765727519053",
+      "gasUSDC": "0.00489574244787"
+    },
+    {
+      "step": "bracket-entry-price",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 41,
+      "hash": "0xf7b8dcab8bd04b06c8eb68e7468ed1d393c066e3a294d43d0a92b465a5512748",
+      "status": "success",
+      "maxGasUSDC": "0.0010578005068625",
+      "gasUSDC": "0.00069800040135"
+    },
+    {
+      "step": "bracket-entry",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 42,
+      "hash": "0x46cb9d5cce1ed52d33439cb2ee748ca5d98fb330cb64214a0611f667402c81a1",
+      "status": "success",
+      "maxGasUSDC": "0.013399350420519",
+      "gasUSDC": "0.007480644301368"
+    },
+    {
+      "step": "bracket-pause",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 43,
+      "hash": "0xc5747412c791d7f0d2098c056da34b523751cc915e1d18db48e99027e4038414",
+      "status": "success",
+      "maxGasUSDC": "0.00088670448861085",
+      "gasUSDC": "0.0005841603862758"
+    },
+    {
+      "step": "bracket-resume",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 44,
+      "hash": "0xbbcf4ed6406bba41b18ac26f7895184d846ecac580a7bb4db1f3cb0f38a3dde1",
+      "status": "success",
+      "maxGasUSDC": "0.00088747248903405",
+      "gasUSDC": "0.00058468038661965"
+    },
+    {
+      "step": "bracket-exit-price",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 45,
+      "hash": "0xfb9effd31f50eda0da2ad3a056ba134c2559ea5bb0985224b0cffbb246ad9bee",
+      "status": "success",
+      "maxGasUSDC": "0.0010578006702926",
+      "gasUSDC": "0.0006980005307592"
+    },
+    {
+      "step": "bracket-update",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 46,
+      "hash": "0xefac3a7a22552921cb242018c6ca9cf127c2aa74a812532ecd1f3d5f63505c60",
+      "status": "success",
+      "maxGasUSDC": "0.001217088771228096",
+      "gasUSDC": "0.0008040006113616"
+    },
+    {
+      "step": "bracket-exit",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 47,
+      "hash": "0xef10023eced3369e81d2b17b34f4cb6306b0c20c5a4651d3576f7f5bf549612b",
+      "status": "success",
+      "maxGasUSDC": "0.01229875712448",
+      "gasUSDC": "0.00704110352055"
+    },
+    {
+      "step": "protection-buy-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 48,
+      "hash": "0xd50d01ce95e419bc0b9cc4f46b63606b5f1446e1361a6ea793baf367147e52b2",
+      "status": "success",
+      "maxGasUSDC": "0.00168722470301",
+      "gasUSDC": "0.00110876055438"
+    },
+    {
+      "step": "protection-buy",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 49,
+      "hash": "0x66eccf61211eab215f73a3d8a14d0887ed6aa22f56181923392e104bd1901176",
+      "status": "success",
+      "maxGasUSDC": "0.00821491542288",
+      "gasUSDC": "0.00483704241852"
+    },
+    {
+      "step": "protection-approve",
+      "to": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+      "nonce": 50,
+      "hash": "0xac0a1f605c5f1559ea18b78e5b3d7e5f392276fed7a0267eacb16d871898b866",
+      "status": "success",
+      "maxGasUSDC": "0.00194764881152",
+      "gasUSDC": "0.00128170064085"
+    },
+    {
+      "step": "protection-create",
+      "to": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "nonce": 51,
+      "hash": "0x34d020621388fb17bcb7ea14a55718a1b6e0df741d7f7607c5cd9ce1523d7a73",
+      "status": "success",
+      "maxGasUSDC": "0.00693794689081",
+      "gasUSDC": "0.0043042021521"
+    },
+    {
+      "step": "protection-pause",
+      "to": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "nonce": 52,
+      "hash": "0xbeb0c8d15020e08e1349ae024f49bf1c94b7794c9fb8593ceaf99fdc6a71973d",
+      "status": "success",
+      "maxGasUSDC": "0.00086755236148",
+      "gasUSDC": "0.00057144028572"
+    },
+    {
+      "step": "protection-resume",
+      "to": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "nonce": 53,
+      "hash": "0xf824ab8d906a43fca38577903961bcefb241f668d6b5b765a3c11271e4d9516b",
+      "status": "success",
+      "maxGasUSDC": "0.00086798436166",
+      "gasUSDC": "0.00057172028586"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 54,
+      "hash": "0x07fc0bef84a8f654fd73e0dc1aa94b956556f22c669659594ef051766865a866",
+      "status": "success",
+      "maxGasUSDC": "0.001014565",
+      "gasUSDC": "0.00069105"
+    },
+    {
+      "step": "registry-resume-2",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 55,
+      "hash": "0xd9200cf98ee659c5c55b4dace53111b4eb821c09ccd95daedec643ff73cb63da",
+      "status": "success",
+      "maxGasUSDC": "0.00083928402155",
+      "gasUSDC": "0.00055260317745"
+    },
+    {
+      "step": "protection-exit-price",
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "nonce": 56,
+      "hash": "0x8a2a8e5248b6dd8503fd152faa07ac359f2fa7b871148535efea788e0d9a8c5a",
+      "status": "success",
+      "maxGasUSDC": "0.001057803134834375",
+      "gasUSDC": "0.0006980024822625"
+    },
+    {
+      "step": "protection-update",
+      "to": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "nonce": 57,
+      "hash": "0xbeb3969dbfed94ae23a0da719df04d946438ffa7f1fffd713ef50abc15966c79",
+      "status": "success",
+      "maxGasUSDC": "0.00112853134443975",
+      "gasUSDC": "0.000745062649619625"
+    },
+    {
+      "step": "protection-exit",
+      "to": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "nonce": 58,
+      "hash": "0x860c960dbdb0160bd760f167e40a7b14e23e51b661131cef17f5c8272a57e80a",
+      "status": "success",
+      "maxGasUSDC": "0.01202044096602405",
+      "gasUSDC": "0.006858268047801216"
+    },
+    {
+      "step": "cancel-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 59,
+      "hash": "0x13555d760060d01f7428ec7960f602aa9765b0746e0267c5aacf5413ee722ba0",
+      "status": "success",
+      "maxGasUSDC": "0.001686864808289",
+      "gasUSDC": "0.001108520637399"
+    },
+    {
+      "step": "cancel-create",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 60,
+      "hash": "0xe260ea08b89bafa17d76a441ccf70ed2bf02aaf4a4f860d2dfc2c71c31b2765e",
+      "status": "success",
+      "maxGasUSDC": "0.0076554516682355",
+      "gasUSDC": "0.0048945428143605"
+    },
+    {
+      "step": "cancel-withdraw",
+      "to": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "nonce": 61,
+      "hash": "0xfeeee40c95a345df6d7874a50529a4df5624093f7968512a041e17f49dd116e3",
+      "status": "success",
+      "maxGasUSDC": "0.002058768986493",
+      "gasUSDC": "0.001264320726984"
+    },
+    {
+      "step": "registry-pause-2",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 62,
+      "hash": "0xc7a075b642427c5d5a4e26204d20299af9c7d2e39cb4e58661d88a75ca717683",
+      "status": "success",
+      "maxGasUSDC": "0.0008396404023275",
+      "gasUSDC": "0.000552840317883"
+    }
+  ],
+  "data": {
+    "workflowCompleted": true,
+    "bracketReturnedAtomic": "99400",
+    "protectionReturnedAtomic": "100333",
+    "existingHoldingsSold": false,
+    "cancelledEscrowReturned": true,
+    "completed": true
+  }
+}

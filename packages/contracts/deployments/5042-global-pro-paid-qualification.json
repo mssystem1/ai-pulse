@@ -1,0 +1,14 @@
+{
+  "service": "global-pro",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "paidUSDC": 0.3,
+  "reportJobId": "7eee87a3-3193-4126-b3d7-32f06cac52e9",
+  "stage": "completed",
+  "liveReport": true,
+  "sdkRecovery": true,
+  "unauthorizedStatus": 403,
+  "sameJobOnReplay": true,
+  "observedGatewayChangeUSDC": 0.3,
+  "finality": "gateway_batch_accepted",
+  "qualifiedAt": "2026-10-04T20:42:16.257Z"
+}

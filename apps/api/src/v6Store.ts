@@ -56,7 +56,7 @@ export function receiptPauseState(receipt: FillReceipt, owner: string, account: 
 async function reconcilePassTimer(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
   if (item.passTimerReconciledAt || item.source !== "autopilot" || !item.account || !item.txHash
     || !/^vault_(pause|resume|policy_update|asset_configure|configure|limits_configure)$/.test(item.kind)
-    || !["base", "arbitrum", "xlayer", "robinhood"].includes(item.network)) return item;
+    || !["base", "arbitrum", "xlayer", "robinhood", "arc"].includes(item.network)) return item;
   const client = executionPublicClient(item.network as ExecutionNetwork);
   const verifiedReceipt = receipt || await client.getTransactionReceipt({ hash: item.txHash as `0x${string}` }) as unknown as FillReceipt;
   const paused = receiptPauseState(verifiedReceipt, item.owner, item.account);
@@ -72,11 +72,11 @@ function topicAddress(value?: string) {
   return value && value.length === 66 ? `0x${value.slice(-40)}`.toLowerCase() : "";
 }
 
-async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null): Promise<Activity> {
-  if ((item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue) || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum" || item.network === "robinhood")) return item;
+export async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null, reader?: ReturnType<typeof executionPublicClient>): Promise<Activity> {
+  if ((item.fillPrice && item.fillSide && item.fillQuantity && item.fillQuoteValue) || !item.txHash || !(item.network === "xlayer" || item.network === "base" || item.network === "arbitrum" || item.network === "robinhood" || item.network === "arc")) return item;
   const executionKind = /market_(buy|sell)|automatic_(entry|take_profit|stop_loss|fill)|^(buy|sell)(_partial)?_filled$/i.test(item.kind);
   if (!executionKind) return item;
-  const client = executionPublicClient(item.network as ExecutionNetwork);
+  const client = reader || executionPublicClient(item.network as ExecutionNetwork);
   const fullReceipt = receipt || await client.getTransactionReceipt({ hash: item.txHash as `0x${string}` }) as unknown as FillReceipt;
   const actor = (item.account || item.owner).toLowerCase();
   const expectedTo = item.account || executionContractAddress(item.network as ExecutionNetwork, "okxRouter");
@@ -89,6 +89,9 @@ async function enrichExecutionFill(item: Activity, receipt?: FillReceipt | null)
     if (log.topics[0]?.toLowerCase() !== TRANSFER_TOPIC.toLowerCase()) continue;
     const amount = BigInt(log.data || "0x0");
     const token = log.address.toLowerCase();
+    // Arc emits a native system-ledger mirror alongside the canonical 6-decimal
+    // USDC Transfer. It is not another ERC-20 output and must not be counted.
+    if (item.network === "arc" && token === "0xfffffffffffffffffffffffffffffffffffffffe") continue;
     if (topicAddress(log.topics[1]) === actor) outgoing.set(token, (outgoing.get(token) || 0n) + amount);
     if (topicAddress(log.topics[2]) === actor) incoming.set(token, (incoming.get(token) || 0n) + amount);
   }
@@ -265,7 +268,7 @@ async function writeActivities(owner: string, network: string, items: Activity[]
 }
 
 async function receiptBatch(network: string, rpcUrl: string, hashes: string[]) {
-  const urls = network === "xlayer" || network === "base" || network === "arbitrum" || network === "robinhood" ? executionRpcUrls(network as ExecutionNetwork) : [rpcUrl];
+  const urls = network === "xlayer" || network === "base" || network === "arbitrum" || network === "robinhood" || network === "arc" ? executionRpcUrls(network as ExecutionNetwork) : [rpcUrl];
   let lastError: unknown;
   for (const url of [...new Set([rpcUrl, ...urls])]) {
     try {
@@ -296,7 +299,7 @@ export async function reconcileV6Activity(owner: string, network: string, rpcUrl
     if (!receipt) return item;
     let status: Activity["status"] = receipt.from?.toLowerCase() === owner.toLowerCase() && receipt.status === "0x1" ? "confirmed" : "failed";
     if (item.source === "autopilot" && item.account && /^(buy_filled|sell_partial_filled|sell_filled)$/.test(item.kind)
-      && ["xlayer", "base", "arbitrum", "robinhood"].includes(network) && receipt.status === "0x1") {
+      && ["xlayer", "base", "arbitrum", "robinhood", "arc"].includes(network) && receipt.status === "0x1") {
       try {
         const chain = network as ExecutionNetwork;
         const factory = executionContracts(chain).autopilotFactory;

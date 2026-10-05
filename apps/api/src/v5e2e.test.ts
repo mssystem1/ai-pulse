@@ -23,7 +23,7 @@ it("rejects a saturated Arc IP before issuing a payment challenge", async () => 
     ...loadConfig(), X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "live" as const,
     XAI_INPUT_COST_PER_MILLION_USD: 1, XAI_OUTPUT_COST_PER_MILLION_USD: 1,
     FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true,
-    enabledNetworks: ["xlayer", "arc-testnet"] as const,
+    enabledNetworks: ["xlayer", "arc"] as const,
   };
   const app = createApp(cfg, {
     polymarket: fakePolymarket,
@@ -70,7 +70,7 @@ describe("V5 paid job E2E", () => {
   let server: Server;
   let origin = "";
   before(async () => {
-    const cfg = { ...loadConfig(), X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "fixture" as const, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true, enabledNetworks: ["xlayer", "base", "arbitrum", "arc-testnet"] as const };
+    const cfg = { ...loadConfig(), X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "fixture" as const, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true, enabledNetworks: ["xlayer", "base", "arbitrum", "arc"] as const };
     const app = createApp(cfg, { polymarket: fakePolymarket, spotContext: fakeSpotContext, spotInstrumentExists: async () => true, persistence: { jobs: new MemoryJobStore(), reports: new MemoryReportStore() } });
     await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });
     const address = server.address();
@@ -95,7 +95,7 @@ describe("V5 paid job E2E", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
     assert.equal(final.job?.stage, "completed", JSON.stringify(final.job?.events));
-    assert.equal(final.job?.receipt?.network, "eip155:5042002");
+    assert.equal(final.job?.receipt?.network, "eip155:5042");
     assert.equal(final.job?.regenerationAttempts, 0);
 
     const reportResponse = await fetch(`${origin}/v1/jobs/${body.job.id}/report`, { headers: { "PULSE-RECOVERY-TOKEN": body.recoveryToken } });

@@ -1,0 +1,74 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "registry-resume",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 73,
+      "hash": "0x7f2465887bd6d774119ab9e48483122c8bfc11040cdc1091d07267dbd323ae17",
+      "status": "success",
+      "maxGasUSDC": "0.00083928284491441",
+      "gasUSDC": "0.00055260224778339"
+    },
+    {
+      "step": "vault-resume",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 74,
+      "hash": "0x4caa9ce5e9ad7e7cf1f420080b42cb7787c6d5a784b0c2e0583420c21be72dfc",
+      "status": "success",
+      "maxGasUSDC": "0.000903531062696391",
+      "gasUSDC": "0.000595362421716104"
+    },
+    {
+      "step": "vault-pause",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 77,
+      "hash": "0x6bf9ec89d200d321b94ed065e84df32df83d5487b20812674bee45d92fe1c526",
+      "status": "success",
+      "maxGasUSDC": "0.000837794839870524",
+      "gasUSDC": "0.000551642243878446"
+    },
+    {
+      "step": "withdraw-check",
+      "to": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "nonce": 78,
+      "hash": "0x2b349d38baf8e09d4367e0121b7476c3199b85f9bb5cd5008747a351f03e20d9",
+      "status": "success",
+      "maxGasUSDC": "0.00177672602256259",
+      "gasUSDC": "0.001078844388343526"
+    },
+    {
+      "step": "return-withdrawal",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 79,
+      "hash": "0x478e0f081ed6d83512514f7eaad3a418b361dbad0580da7d8ed4706f15350af0",
+      "status": "success",
+      "maxGasUSDC": "0.001479773015981921",
+      "gasUSDC": "0.000978763981253114"
+    },
+    {
+      "step": "registry-pause",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 80,
+      "hash": "0xc98e86e65117e97a4823676587521c4b0e00ec7f69082ab4251ba9790868868c",
+      "status": "success",
+      "maxGasUSDC": "0.000839642846134705",
+      "gasUSDC": "0.000552842248759626"
+    }
+  ],
+  "data": {
+    "cycleAttempted": true,
+    "lastDecision": "buy_filled",
+    "evaluationCount": "2",
+    "aiCalls": "1",
+    "aiSource": "live",
+    "targetBalanceAfterCycle": "36673893240074",
+    "cycleCompleted": true,
+    "pausedTimerVerified": true,
+    "withdrawalVerified": true,
+    "workerGasAndWithdrawalUSDC": "0.013881616465327534",
+    "workflowComplete": true,
+    "completed": true
+  }
+}
