@@ -157,7 +157,7 @@ export class TelegramCommerce {
     if(this.profile.allowEvm===false&&((rawInput as {instId?:string})?.instId!=="TON-USDT"||networkKey!=="xlayer"))throw new Error("This Mini App supports TON-USDT research only. EVM token inputs and execution are unavailable.");
     let input = service.mode === "spot" ? this.dependencies!.validateGlobal(rawInput) : service.mode === "prediction" ? PredictionAnalysisRequestSchema.parse(rawInput) : TokenScanRequestSchema.parse(rawInput);
     if (!["xlayer", "base", "arbitrum", "robinhood", "arc"].includes(networkKey)) throw new Error("Unsupported network");
-    if (service.mode === "spot" && isArcMarket(String((input as { instId?: string }).instId || "")) && networkKey !== "arc") throw new Error("Arc contract markets require Arc Mainnet; no checkout created");
+    if (service.mode === "spot" && isArcMarket(String((input as { instId?: string }).instId || "")) ) throw new Error("Global Market requires a live OKX instrument. Indexed Arc tokens are available in Risk Guard only; no checkout created");
     if (service.mode === "risk") input = { ...(input as object), chainId: ({ xlayer: "196", base: "8453", arbitrum: "42161", robinhood: "4663", arc: "5042" } as Record<string,string>)[networkKey] };
     const existing = await this.get(orderId);
     if (existing && (existing.userId !== userId || existing.serviceId !== serviceId || requestHash(existing.input) !== requestHash(input) || existing.networkKey !== networkKey)) throw new Error("Order does not match this purchase");

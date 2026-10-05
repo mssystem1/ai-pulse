@@ -151,6 +151,7 @@ export function App() {
   }, [mobileNavOpen]);
 
   const [instId, setInstId] = useState("BTC-USDT");
+  useEffect(() => { if (isArcMarketPair(instId)) setInstId("BTC-USDT"); }, [instId]);
   const executionAvailability = useExecutionAvailability(networkKey);
   const selectedExecution = executionAvailability(instId);
   const [timeframe, setTimeframe] = useState("1H");
@@ -942,9 +943,9 @@ export function App() {
       {(tab === "prediction" || tab === "safety") && <header className="workspace-page-heading"><h1>{experience.title}</h1><p>{experience.lead}</p><div className="nfa">{d.nfa}</div></header>}
 
       {tab === "analyze" && <section className="card global-market-workspace" aria-label="Selected market and chart">
-        <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{networkKey === "arc" ? (lang === "zh" ? "市场交易对" : "Market pair") : d.symbol} <Tip text={networkKey === "arc" ? (lang === "zh" ? "选择 Arc 合约的 USDC 市场，或 OKX 研究市场。核对完整合约地址。" : "Choose an Arc contract market in USDC or an OKX research instrument. Check the full contract address.") : d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={networkKey === "arc" ? (lang === "zh" ? "所选市场的 K 线周期；行情来源按市场区分。" : "Candle interval for the selected market. Data source follows the chosen market.") : d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><span className="market-auto-status" role="status">{marketLoading ? d.loading : lang === "zh" ? "行情自动更新" : "Market data updates automatically"}</span></div>
+        <div className="global-market-controls"><div className="field"><label htmlFor="market-pair">{networkKey === "arc" ? (lang === "zh" ? "市场交易对" : "Market pair") : d.symbol} <Tip text={networkKey === "arc" ? (lang === "zh" ? "选择实时 OKX 研究市场。BTC 对应 Arc cirBTC/USDC，ETH 对应 WETH/USDC。" : "Choose a live OKX research instrument. BTC maps to Arc cirBTC/USDC and ETH to WETH/USDC for execution.") : d.symbolTip}/></label><MarketPairPicker id="market-pair" networkKey={networkKey} lang={lang} value={instId} onSelect={instrument => { supersedeRequests(reportRequestRef); setInstId(instrument.instId); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><div className="field"><label htmlFor="market-timeframe">{d.timeframe} <Tip text={networkKey === "arc" ? (lang === "zh" ? "所选市场的 K 线周期；行情来源按市场区分。" : "Candle interval for the selected market. Data source follows the chosen market.") : d.tfTip}/></label><TimeframePicker id="market-timeframe" value={timeframe} networkKey={networkKey} onChange={next => { supersedeRequests(reportRequestRef); setTimeframe(next); setResult(null); setSpotJob(null); setLoading(false); setBusyAction(null); }}/></div><span className="market-auto-status" role="status">{marketLoading ? d.loading : lang === "zh" ? "行情自动更新" : "Market data updates automatically"}</span></div>
         <p><RouteAvailability network={networkKey} pair={instId} mapped={selectedExecution.mapped} fallback={selectedExecution.label}/></p>
-        <div className="chart-head"><span title={instId}>{marketPairLabel(instId)}</span><span className="muted">{timeframe} · {isArcMarketPair(instId) ? "ARC DEX" : "OKX"} · Free market preview</span></div>{isArcMarketPair(instId) && <small className="market-source-note">{`0x${instId.split(".")[1].slice(0,40)}`} · {lang === "zh" ? "此合约的 USDC 行情；实际成交须重新报价。" : "Contract-specific USDC market; execution requires a fresh quote."}</small>}
+        <div className="chart-head"><span title={instId}>{marketPairLabel(instId)}</span><span className="muted">{timeframe} · OKX · Free market preview</span></div>{networkKey === "arc" && ["BTC-USDT", "ETH-USDT"].includes(instId) && <small className="market-source-note">{instId === "BTC-USDT" ? "Arc cirBTC/USDC" : "Arc WETH/USDC"} · {lang === "zh" ? "图表使用 OKX 参考行情；实际成交使用 Arc 独立报价。" : "Chart uses OKX reference data; Arc execution uses a separate live quote."}</small>}
         <div className="global-market-reference" aria-label="Market reference chart">
         {candles.length > 0 ? <ShortlistMarketChart pair={instId} timeframe={timeframe} mark={Number(ticker?.last || candles.at(-1)?.close)} history={candles.map(candle => candle.close)} fetchedAt={new Date(candles.at(-1)!.ts).toISOString()} lang={lang}/> : <p role="status">{marketError ? (lang === "zh" ? "市场数据暂不可用，请重试。" : "Market data temporarily unavailable. Retrying automatically.") : d.loading}</p>}
         </div>
@@ -1003,7 +1004,7 @@ export function App() {
                   className="btn btn-primary full"
                   disabled={loading || health !== "ONLINE"}
                   onClick={() => void runAnalysis("base")}
-                  title={isArcMarketPair(instId) ? (lang === "zh" ? "从 Gateway 支付研究服务费用，再分析所选合约的 USDC 行情。" : "Pay the research service from Gateway, then analyze this contract’s USDC market data.") : d.baseTip}
+                  title={d.baseTip}
                 >
                   {busyAction === "base" ? d.loading : `${lang === "zh" ? "快速报告" : "Quick report"} · $${routePrices[networkKey === "xlayer" ? "/v1/analysis/base" : "/v1/analysis/spot/standard"].toFixed(2)}`}
                 </button>

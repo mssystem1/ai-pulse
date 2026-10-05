@@ -2,13 +2,11 @@
 
 ## Arc mainnet update — 2026-10-05
 
-Arc discovery now combines the [RadarDex index exposed by Arcodex](https://www.arcodex.fun/tokens) with official Arc token deployments. The live read returned **2,000 indexed contracts**, plus USDC, WETH, cirBTC and EURC: **2,004 Risk Guard tokens**, **2,003 address-specific USDC markets**, and two canonical exchange-research mappings (`ETH-USDT` → published WETH; `BTC-USDT` → published cirBTC). The actual SDK/API check returned **2,005 execution catalog entries** and **3,146 Global instruments**, combining Arc markets and OKX research instruments. These are observed catalog counts, not counts of safe or fully qualified markets.
+Global Market uses the live OKX research catalog, preserving the existing Base and Arbitrum logic. Arc Spot and Autopilot currently map BTC-USDT to the published cirBTC/USDC deployment and ETH-USDT to WETH/USDC. Search cirBTC to find the BTC mapping. Execution selection checks live OKX ticker/history, chain-5042 contract metadata and both indicative Arc swap directions. Autopilot additionally requires 50 fresh consecutive completed OKX candles for the selected market/timeframe. Actual order amounts are requoted before signing.
 
-Global, Spot and Autopilot share complete-address `SYMBOL.<40-hex-address>-USDC` IDs. Use the exact ID returned by the catalog, including its capitalization. Duplicate tickers are retained as distinct contracts; the UI displays a contract hint and full-address tooltip. Risk Guard searches names, symbols and addresses and still accepts a manual address. Search supports the full catalog while rendering batches of 100 to keep large pickers usable.
+The broader [RadarDex index via Arcodex](https://www.arcodex.fun/tokens) is only for Token Risk Guard discovery. Its 2,000 indexed contracts plus reviewed USDC, WETH, cirBTC and EURC returned 2,004 Risk Guard entries; this is bounded provider coverage rather than the entire chain. Name/symbol/full-address search and manual address entry remain available. Quote success does not promote a token into Global, Spot or Autopilot. Legacy native market IDs are rejected before checkout or AI usage.
 
-The route resolver verifies Arc chain 5042, actual token metadata, canonical Arc USDC, an entry quote and its reverse exit quote. Unknown provider evidence remains unknown. The actual order requotes its amount, so an indicative one-USDC route does not guarantee another amount or future liquidity. Native memecoin research uses the selected contract's USDC candle feed, preserving source/freshness and approximate-statistics disclosures. Autopilot additionally requires at least 50 recent consecutive completed candles for the actual contract and timeframe. Listings alone cannot qualify a strategy or authorize payment/funding.
-
-Both Global and execution catalog requests are bounded at 5,000. The upstream index returned 2,000 despite the larger request; this covers that feed, not every Arc contract. The browser displayed address-specific COOL markets and verified routes; direct SDK checks confirmed COOL's exact contract, USDC routing and 1H readiness. See [current catalog and withdrawal evidence](ARC_MAINNET_CATALOG_WITHDRAWAL_AUDIT_2026-10-05.json). Production execution remains paused pending final acceptance and manual release.
+Earlier catalog evidence describing 2,005 execution entries, 3,146 Global instruments or native memecoin candle support documents a superseded experiment. It is not the current execution catalog. Production trading remains paused pending final acceptance and manual release.
 
 ## Earlier multichain review
 
@@ -51,3 +49,11 @@ Deployment metadata is not a liquidity guarantee. Added candidates still need a 
 - Read-only quote evidence is recorded above; synthetic browser tests never access wallets or production endpoints.
 
 Deploy the market package, API and web together. No additional AI screening or subscription cost is introduced.
+
+## Arc mainnet correction — 5 October 2026
+
+Global uses the live OKX exchange research catalog, as on Base and Arbitrum. Arc execution currently exposes BTC-USDT → cirBTC/USDC and ETH-USDT → WETH/USDC, using exact reviewed deployments. Search cirBTC to find BTC. Selection requires fresh OKX market data and both Arc swap directions; Autopilot also requires 50 recent consecutive closed OKX candles.
+
+The wider RadarDex/Arcodex index remains searchable only in Token Risk Guard. Quote success cannot promote an indexed memecoin into research or automated trading. API, MCP and Telegram reject legacy native research IDs before checkout; the workers reject unsupported Arc bindings before consuming an AI confirmation or preparing a transaction. Existing Base and Arbitrum catalog and routing rules are unchanged.
+
+The [current policy audit](ARC_MAINNET_OKX_MARKET_POLICY_AUDIT_2026-10-05.json) records live ticker/history, two-way quotes and 0.11 USDC guarded Autopilot preflight for both mappings. Browser checks cover Global pair/timeframe changes, Spot, Autopilot, exact-address Risk Guard discovery and live free contract inspection. All paid checkout and worker execution checks in this correction use isolated fixtures; no additional funds were spent.

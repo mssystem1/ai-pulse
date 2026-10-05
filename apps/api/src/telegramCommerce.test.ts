@@ -31,7 +31,7 @@ test("service menu exposes all five services and strips stale navigation secrets
   assert.deepEqual(urls.map(url => url.searchParams.get("service")).filter(Boolean), TELEGRAM_SERVICES.map(service => service.id));
 });
 
-test("Arc Stars checkout pins Risk Guard chain 5042 and native Global market identity", async t => {
+test("Arc Stars checkout pins Risk Guard chain 5042, rejects indexed Global tokens and keeps OKX research", async t => {
   const env = { TELEGRAM_STARS_ENABLED: "1", TELEGRAM_STARS_RISK_GUARD: "25", TELEGRAM_STARS_GLOBAL_QUICK: "25" };
   const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
   Object.assign(process.env, env);
@@ -44,20 +44,21 @@ test("Arc Stars checkout pins Risk Guard chain 5042 and native Global market ide
     { appUrl: "https://pulse.test", webhookSecret: "fixture-secret" });
   const address = "0xeb64987643db71c76b2a2be7e723decc995e5b37";
   const nativeId = "COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC";
-  await assert.rejects(commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "base"), /Arc Mainnet/);
-  assert.equal(invoices, 0, "a mismatched native market cannot create a checkout");
+  await assert.rejects(commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "base"), /Risk Guard only/);
+  await assert.rejects(commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "arc"), /Risk Guard only/);
+  assert.equal(invoices, 0, "indexed tokens cannot create a Global checkout on any network");
   const paid = async (orderId: string, charge: string) => commerce.handleUpdate({ message: { chat: { id: 123, type: "private" }, from: { id: 123 }, successful_payment: { currency: "XTR", total_amount: 25, invoice_payload: orderId, telegram_payment_charge_id: charge } } });
   const risk = await commerce.createInvoice(123, "risk-guard", { address, chainId: "196", lang: "en" }, "arc");
   await paid(risk.orderId, "fixture-arc-risk");
   await paid(risk.orderId, "fixture-arc-risk");
-  const global = await commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "arc");
+  const global = await commerce.createInvoice(123, "global-quick", { instId: "BTC-USDT", timeframe: "1H", lang: "en" }, "arc");
   await paid(global.orderId, "fixture-arc-global");
   const owned = await jobs.listByPayer("telegram:123", "arc");
   assert.equal(owned.length, 2, "duplicate payment delivery cannot enqueue another job");
   const riskJob = owned.find(job => job.mode === "risk")!;
   assert.equal((riskJob.input as { chainId: string }).chainId, "5042");
   assert.equal((riskJob.input as { address: string }).address, address);
-  assert.equal((owned.find(job => job.mode === "spot")!.input as { instId: string }).instId, nativeId);
+  assert.equal((owned.find(job => job.mode === "spot")!.input as { instId: string }).instId, "BTC-USDT");
   assert.ok(owned.every(job => job.receipt?.provider === "telegram_stars" && job.receipt.network === "telegram:stars"));
   assert.equal((await jobs.listByPayer("telegram:123", "xlayer")).length, 0);
 });

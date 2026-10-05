@@ -77,7 +77,7 @@ import { getCdpNativeUsdcSwap } from "./cdpSwap.js";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
 import { createPersistence, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type AnalysisJob, type PaymentReceipt } from "./jobs.js";
 import { executionTicker, isRobinhoodMarket, robinhoodCandles } from "./robinhoodMarkets.js";
-import { isArcMarket, resolveArcMarket, arcCandles, arcMarketContext, arcMarketCatalog } from "./arcMarkets.js";
+import { isArcMarket, arcTokenCatalog } from "./arcMarkets.js";
 import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
 import { ArcBudgetExceededError, createArcBudgetStore, paymentPayer, type ArcBudgetStore } from "./arcBudget.js";
@@ -96,7 +96,7 @@ import { paidReplayRecoveryToken, verifyPaidReplayRecoveryToken } from "./paidJo
 import { prepareRobinhoodFunding, robinhoodFundingFailureCode } from "./robinhoodFunding.js";
 
 const AnalysisBodySchema = z.object({
-  instId: z.string().min(3).max(64).refine(id => /^[A-Z0-9]+-[A-Z0-9]+$/.test(id) || isArcMarket(id), "Select a listed market or an Arc contract market"),
+  instId: z.string().min(3).max(64).refine(id => /^[A-Z0-9]+-[A-Z0-9]+$/.test(id) || isArcMarket(id), "Select a live OKX research market"),
   timeframe: z.enum(["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"]).default("1H"),
   lang: z.enum(["en", "zh"]).optional().default("en"),
   chartImageBase64: z.string().optional(),
@@ -176,7 +176,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   };
   const reportHistoryAuth = new ReportHistoryAuth(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || ((input: Parameters<typeof buildMarketContext>[0]) =>
-    isArcMarket(input.instId) ? arcMarketContext({ ...input, timeframe: input.timeframe || "1H", candleLimit: input.candleLimit || 120 }) : buildMarketContext(input));
+    buildMarketContext(input));
   const arcBudget = dependencies.arcBudget || createArcBudgetStore({
     QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, REDIS_URL: cfg.REDIS_URL, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
     PERSISTENCE_NAMESPACE: cfg.PERSISTENCE_NAMESPACE,
@@ -352,11 +352,11 @@ export function createApp(cfg: AppConfig, dependencies: {
       const q = String(req.query.q || "");
       const limit = Math.min(Math.max(Number(req.query.limit) || 40, 1), 5_000);
       const arc = req.query.network === "arc" || (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey === "arc";
-      const list = await observeProvider("okx", "spot_instruments", () => searchSpotInstruments(q, limit)).catch(error => { if (!arc) throw error; return []; });
-      const indexed = arc ? (await arcMarketCatalog()).filter(item => !q || [item.pair, item.token.symbol, item.token.name, item.token.address].some(v => v.toLowerCase().includes(q.toLowerCase())))
-        .map(item => ({ instId: item.pair, baseCcy: item.token.symbol, quoteCcy: "USDC", name: item.token.name, state: "live", assetClass: item.assetClass, contractAddress: item.token.address, marketSource: "Arc indexed DEX" })) : [];
-      const instruments = [...indexed, ...list].slice(0, limit);
-      res.json({ service: "instruments", query: q, count: instruments.length, instruments, ...(arc ? { network: "arc", chainId: 5042, indexedCount: indexed.length } : {}) });
+      // Keep the same OKX research universe on every network. Arc's wrappers
+      // are execution mappings, not additional exchange instruments.
+      const search = arc && q.trim().toUpperCase() === "CIRBTC" ? "BTC" : arc && q.trim().toUpperCase() === "WETH" ? "ETH" : q;
+      const instruments = await observeProvider("okx", "spot_instruments", () => searchSpotInstruments(search, limit));
+      res.json({ service: "instruments", query: q, count: instruments.length, instruments, ...(arc ? { network: "arc", chainId: 5042 } : {}) });
     } catch (e) {
       res.status(502).json({ error: String(e) });
     }
@@ -384,6 +384,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     try {
       const instId = String(req.query.instId || "");
       if (!instId) return res.status(400).json({ error: "instId required" });
+      if (isArcMarket(instId)) return res.status(422).json({ error: "Indexed Arc tokens are available in Risk Guard only. Choose a live OKX research pair.", code: "spot_instrument_unavailable" });
       const ticker = await observeProvider("okx", "ticker", () => executionTicker(cfg, instId));
       res.json({ service: "ticker", free: true, ticker });
     } catch (e) {
@@ -395,12 +396,13 @@ export function createApp(cfg: AppConfig, dependencies: {
     try {
       const instId = String(req.query.instId || "");
       if (!instId) return res.status(400).json({ error: "instId required" });
+      if (isArcMarket(instId)) return res.status(422).json({ error: "Choose a live OKX research pair; indexed Arc tokens belong to Risk Guard only", code: "spot_instrument_unavailable" });
       const bar = toOkxBar(String(req.query.bar || req.query.timeframe || "1H"));
       const limit = req.query.limit === undefined ? 100 : Number(req.query.limit);
       const before = req.query.before === undefined ? undefined : Number(req.query.before);
       if (!Number.isInteger(limit) || limit < 1 || limit > 300 || (before !== undefined && (!Number.isSafeInteger(before) || before <= 0)))
         return res.status(400).json({ error: "limit must be 1–300; before must be a positive timestamp in milliseconds" });
-      const candles = await observeProvider("okx", "candles", () => isArcMarket(instId) ? arcCandles(instId, bar, limit, before) : isRobinhoodMarket(instId) ? robinhoodCandles(cfg, instId, bar, limit, before) : before === undefined ? getCandles(instId, bar, limit) : getHistoricalCandles(instId, bar, limit, before));
+      const candles = await observeProvider("okx", "candles", () => isRobinhoodMarket(instId) ? robinhoodCandles(cfg, instId, bar, limit, before) : before === undefined ? getCandles(instId, bar, limit) : getHistoricalCandles(instId, bar, limit, before));
       res.json({ service: "candles", free: true, instId, bar, candles,
         priceCurrency: isRobinhoodMarket(instId) ? "USD" : instId.split("-").at(-1), nextBefore: candles[0]?.ts ?? null });
     } catch (e) {
@@ -873,6 +875,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         provider: "PULSE network registry",
       }] : [];
       const routed = await observeProvider("okx_dex", "token_catalog", () => getOkxTradeTokens(cfg, String(network.chainId), q, limit)).catch(() => []);
+      const indexed = key === "arc" ? await arcTokenCatalog().catch(() => []) : [];
       const normalizedQuery = q.toLowerCase();
       const relevance = (item: { symbol: string; name: string }) => {
         const symbol = item.symbol.toLowerCase();
@@ -884,7 +887,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         if (name.startsWith(normalizedQuery)) return 1;
         return 0;
       };
-      const tokens = [...configured, ...routed]
+      const tokens = [...configured, ...indexed, ...routed]
         .filter((item) => !/^0x[eE]{40}$/.test(item.address) && !/^0x0{40}$/.test(item.address))
         .filter((item, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === item.address.toLowerCase()) === index)
         .filter((item) => !normalizedQuery || [item.symbol, item.name, item.address].some((value) => value.toLowerCase().includes(normalizedQuery)))
@@ -1135,13 +1138,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (req.method !== "POST" || !spotEvidencePaths.has(req.path)) return next();
     try {
       if (isArcMarket(req.body.instId)) {
-        const network = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey;
-        if (network !== "arc") return res.status(422).json({ error: "Choose Arc Mainnet for this contract market", code: "spot_instrument_network_mismatch" });
-        await resolveArcMarket(req.body.instId);
-        // Require usable source evidence before checkout; a catalog row alone
-        // must not sell research for an unavailable or stale contract market.
-        await loadSpotContext({ instId: req.body.instId, timeframe: req.body.timeframe, candleLimit: 80 });
-        return next();
+        return res.status(422).json({ error: "Indexed Arc tokens are available in Token Risk Guard only. Global Market requires a live OKX instrument.", code: "spot_instrument_unavailable" });
       }
       if (!(await spotInstrumentExists(req.body.instId))) return res.status(422).json({ error: "Selected instrument is not a live OKX Spot market", code: "spot_instrument_unavailable" });
       return next();
@@ -1328,12 +1325,11 @@ export function createApp(cfg: AppConfig, dependencies: {
       }
       const selectedNetwork = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer";
       const defiChainId = selectedNetwork === "xlayer" ? "196" : selectedNetwork === "base" ? "8453" : selectedNetwork === "arbitrum" ? "42161" : selectedNetwork === "arc" ? "5042" : null;
-      const nativeArcMarket = isArcMarket(body.instId) ? await resolveArcMarket(body.instId) : null;
-      const assetSymbol = nativeArcMarket?.token.symbol || body.instId.split("-")[0]?.trim().toUpperCase() || "";
+      const assetSymbol = body.instId.split("-")[0]?.trim().toUpperCase() || "";
       // Reuse the same identity-preserving chain aliases as Spot and
       // Autopilot. This makes BTC -> cbBTC and DOGE -> cbDOGE on Base visible
       // in DeFi without ever substituting an unrelated derivative.
-      const exactInstrument = (nativeArcMarket ? [] : await searchSpotInstruments(body.instId, 20))
+      const exactInstrument = (await searchSpotInstruments(body.instId, 20))
         .find((instrument) => instrument.instId.toUpperCase() === body.instId.toUpperCase());
       const defiAliases = defiChainId
         ? executionAssetAliases(assetSymbol, defiChainId, exactInstrument?.assetClass)
@@ -1346,7 +1342,7 @@ export function createApp(cfg: AppConfig, dependencies: {
           getOkxTradeTokens(cfg, defiChainId, alias, 100).catch(() => []),
         ))).flat().filter((token, index, all) => all.findIndex((candidate) => candidate.address.toLowerCase() === token.address.toLowerCase()) === index);
         const bySymbol = new Map(tokenCandidates.map((token) => [token.symbol.toUpperCase(), token]));
-        const executionToken = nativeArcMarket?.token || defiAliases.map((alias) => bySymbol.get(alias.toUpperCase())).find(Boolean);
+        const executionToken = defiAliases.map((alias) => bySymbol.get(alias.toUpperCase())).find(Boolean);
         if (executionToken) {
           defiAsset = executionToken.symbol;
           defiTokenAddress = executionToken.address;

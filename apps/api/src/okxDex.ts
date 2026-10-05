@@ -557,16 +557,6 @@ export async function getOkxTradeTokens(
   if (query === "eth" || query === "weth") { aliases.add("eth"); aliases.add("weth"); }
   if (query === "usdt" || query === "usdt0" || query === "usdc") { aliases.add("usdt"); aliases.add("usdt0"); aliases.add("usdc"); }
   let chainTokens = cached.tokens;
-  if (chainId === "5042") {
-    const { arcTokenCatalog } = await import("./arcMarkets.js");
-    const indexed = await arcTokenCatalog().catch(() => []);
-    chainTokens = [...chainTokens, ...indexed.map(token => ({
-      tokenSymbol: token.symbol, tokenName: token.name, tokenContractAddress: token.address,
-      decimals: token.decimals, tokenLogoUrl: token.logoUrl, tokenSource: token.provider,
-      priceUsd: token.priceUsd, change24h: token.change24h, liquidityUsd: token.liquidityUsd,
-      marketCapUsd: token.marketCapUsd, holders: token.holders,
-    }))];
-  }
   if (chainId === "4663") {
     const { robinhoodStockCatalog } = await import("./robinhoodAssetRegistry.js");
     const stocks = await robinhoodStockCatalog().catch(() => []);
@@ -590,7 +580,8 @@ export async function getOkxTradeTokens(
   }));
   const candidates = [...(OFFICIAL_WRAPPED_ASSETS[chainId] || []), ...curated, ...chainTokens]
     .filter((item, index, all) => all.findIndex((candidate) => String(candidate.tokenContractAddress).toLowerCase() === String(item.tokenContractAddress).toLowerCase()) === index);
-  return candidates.filter((item) => !query || [item.tokenSymbol, item.tokenName, item.tokenContractAddress]
+  return candidates.filter(item => chainId !== "5042" || (OFFICIAL_WRAPPED_ASSETS["5042"] || []).some(known => String(known.tokenContractAddress).toLowerCase() === String(item.tokenContractAddress).toLowerCase()))
+    .filter((item) => !query || [item.tokenSymbol, item.tokenName, item.tokenContractAddress]
     .some((value) => [...aliases].some((alias) => String(value || "").toLowerCase().includes(alias))))
     .slice(0, Math.min(Math.max(limit, 1), 5_000))
     .map((item) => ({

@@ -4,12 +4,13 @@ import { getOkxTradeTokens, okxDexGetMany, createOkxDexHeaders } from "./okxDex.
 import { ROBINHOOD_USDG, NATIVE_ETH, ROBINHOOD_WETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodStockCatalog } from "./robinhoodAssetRegistry.js";
 import { robinhoodIssuerPrice } from "./robinhoodIssuerPrice.js";
-import { isArcMarket, arcMarketContext } from "./arcMarkets.js";
+import { isArcMarket, assertArcOkxMarket } from "./arcMarkets.js";
 
 const candleCaches = new WeakMap<AppConfig, Map<string, { expiresAt: number; request: Promise<Candle[]> }>>();
 
 export const isRobinhoodMarket = (pair: string) => /^[A-Z0-9_]{1,16}\.[A-F0-9]{16}-USDG$/.test(pair);
 export function assertExecutionMarketIdentity(network: string, pair: string) {
+  if (network === "arc") assertArcOkxMarket(pair);
   if (network === "robinhood" && !isRobinhoodMarket(pair))
     throw new Error("Choose a Robinhood asset from the market picker; execution requires its contract-specific USDG market, not a research ticker");
 }
@@ -141,7 +142,7 @@ export function robinhoodSettlementMark(asset: Pick<Candle, "ts" | "close">, set
 }
 
 export async function executionSettlementTicker(cfg: AppConfig, pair: string) {
-  if (isArcMarket(pair)) return (await arcMarketContext({ instId: pair, timeframe: "1H", candleLimit: 25 })).ticker;
+  if (isArcMarket(pair)) throw new Error("Indexed Arc tokens belong to Risk Guard only; choose a live OKX market");
   if (!isRobinhoodMarket(pair)) return getTicker(pair);
   const market = await resolveRobinhoodMarket(cfg, pair);
   const [latestAsset, latestSettlement] = await robinhoodLiveMarks(cfg, [market.token.address, ROBINHOOD_USDG]);
@@ -197,9 +198,9 @@ export async function robinhoodMarketContext(cfg: AppConfig, input: { instId: st
     summary: summarizeCandles(candles), fetchedAt: new Date().toISOString() };
 }
 export const executionMarketContext = (cfg: AppConfig, input: { instId: string; timeframe: string; candleLimit: number; completedOnly?: boolean }) =>
-  isArcMarket(input.instId) ? arcMarketContext(input) : isRobinhoodMarket(input.instId) ? robinhoodMarketContext(cfg, input) : buildMarketContext(input);
+  isArcMarket(input.instId) ? Promise.reject(new Error("Indexed Arc tokens belong to Risk Guard only")) : isRobinhoodMarket(input.instId) ? robinhoodMarketContext(cfg, input) : buildMarketContext(input);
 export const executionTicker = async (cfg: AppConfig, pair: string) => isArcMarket(pair)
-  ? (await arcMarketContext({ instId: pair, timeframe: "1H", candleLimit: 25 })).ticker : isRobinhoodMarket(pair)
+  ? Promise.reject(new Error("Indexed Arc tokens belong to Risk Guard only")) : isRobinhoodMarket(pair)
   ? (await robinhoodMarketContext(cfg, { instId: pair, timeframe: "1H", candleLimit: 25 })).ticker : getTicker(pair);
 
 /** Reference candles are signals, never prices or liquidity for the traded token. */

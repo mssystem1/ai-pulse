@@ -2,6 +2,7 @@ import { createPublicClient, http, parseAbi } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import type { AppConfig } from "@pulse/config";
 import { executionContracts, executionContractAddress } from "./executionContracts.js";
+import { executionSignerKey } from "./executionSigner.js";
 
 type Readiness = { ready: boolean; reason?: string };
 const ADDRESS = /^0x(?!0{40}$)[a-fA-F0-9]{40}$/;
@@ -22,7 +23,7 @@ export async function arcAutomationReadiness(cfg: AppConfig): Promise<Readiness>
   }
   const router = executionContractAddress("arc", "okxRouter");
   const spender = executionContractAddress("arc", "okxApproval");
-  const key = cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY;
+  const key = executionSignerKey(cfg, "arc");
   if (!cfg.hasOkxCredentials) return { ready: false, reason: "Arc execution requires live OKX route credentials" };
   if (!ADDRESS.test(router) || !ADDRESS.test(spender) || !/^0x[a-fA-F0-9]{64}$/.test(key)) return { ready: false, reason: "Arc requires verified router/spender addresses and a configured execution signer" };
   try {

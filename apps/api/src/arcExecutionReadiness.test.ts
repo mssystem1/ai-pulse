@@ -5,6 +5,7 @@ import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { assertRobinhoodQuoteIdentity } from "./okxDex.js";
 import { executionContracts } from "./executionContracts.js";
 import { decodeAbiParameters, decodeFunctionData, deploylessCallViaBytecodeBytecode, encodeFunctionResult, multicall3Abi, parseAbi } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 
 const evidenceAbi = parseAbi([
   "function registry() view returns(address)", "function oracle() view returns(address)",
@@ -45,7 +46,8 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
   process.env.FEATURE_ARC_TRADING = "1";
   const cfg = { enabledNetworks: ["arc"], FEATURE_ARC_MAINNET: true, hasOkxCredentials: true,
     ARC_RPC_URL: "https://primary.fixture.invalid", ARC_RPC_FALLBACK_URL: "https://fallback.fixture.invalid",
-    AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${"1".repeat(64)}`, TEST_WALLET_PRIVATE_KEY: "" } as AppConfig;
+    ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${"2".repeat(64)}`, AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${"1".repeat(64)}`, TEST_WALLET_PRIVATE_KEY: "" } as AppConfig;
+  const arcSigner = privateKeyToAccount(cfg.ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY as `0x${string}`).address;
   const contracts = executionContracts("arc");
   type Options = { primaryFailure?: "early" | "late"; allUnavailable?: boolean; primaryChain?: number;
     fallbackChain?: number; missingCode?: boolean; incorrectFactory?: boolean; deniedRole?: boolean; paused?: boolean; insufficientGas?: boolean;
@@ -64,7 +66,10 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
       if (request.method === "eth_chainId") result = `0x${(provider === "primary" ? options.primaryChain ?? 5042 : options.fallbackChain ?? 5042).toString(16)}`;
       else if (request.method === "eth_getCode") result = options.missingCode && negative ? "0x" : "0x6000";
       else if (request.method === "eth_gasPrice") result = "0x1";
-      else if (request.method === "eth_getBalance") result = options.insufficientGas ? "0x1" : "0x989680";
+      else if (request.method === "eth_getBalance") {
+        assert.equal(request.params[0].toLowerCase(), arcSigner.toLowerCase(), "gas evidence must belong to the Arc-specific signer");
+        result = options.insufficientGas ? "0x1" : "0x989680";
+      }
       else if (request.method === "eth_call") {
         // Decode the actual viem deployless constructor and nested aggregate3.
         assert.equal(request.params[0].to, undefined);
@@ -72,7 +77,9 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
           `0x${request.params[0].data.slice(deploylessCallViaBytecodeBytecode.length)}`);
         const { args } = decodeFunctionData({ abi: multicall3Abi, data });
         const responses = args[0].map(call => {
-          const { functionName } = decodeFunctionData({ abi: evidenceAbi, data: call.callData });
+          const { functionName, args: callArgs } = decodeFunctionData({ abi: evidenceAbi, data: call.callData });
+          if (["spotKeepers", "autopilotExecutors", "updaters"].includes(functionName))
+            assert.equal(String(callArgs?.[0]).toLowerCase(), arcSigner.toLowerCase(), "on-chain roles must be checked for the Arc-specific signer");
           reads.push({ provider, method: "multicall", functionName });
           if (options.partialFailure && provider === "primary" && functionName === "updaters") return { success: false, returnData: "0x" };
           const value = functionName === "registry" || functionName === "oracle"

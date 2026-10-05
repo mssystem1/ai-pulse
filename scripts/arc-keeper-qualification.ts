@@ -6,6 +6,7 @@ import { decodeEventLog, encodeFunctionData, erc20Abi, formatEther, parseAbi, pa
 import { privateKeyToAccount } from "viem/accounts";
 import { PulseClient } from "../packages/sdk/src/index.js";
 import { qualificationJournal } from "./arc-qualification-journal.js";
+import { executionSignerKey } from "../apps/api/src/executionSigner.js";
 
 const usdc = "0x3600000000000000000000000000000000000000" as Address;
 const weth = "0x128cc466b61f542da60c70e3aa11c10e19b84edb" as Address;
@@ -30,7 +31,7 @@ async function main() {
   const cfg = loadConfig(), contracts = executionContracts("arc");
   const accounts = JSON.parse(await readFile("packages/contracts/deployments/5042-account-qualification.json", "utf8"));
   const limit = accounts.entries.find((entry: {kind: string}) => entry.kind === "spot-limit")?.account as Address;
-  const executor = privateKeyToAccount((cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY) as Hex);
+  const executor = privateKeyToAccount(executionSignerKey(cfg, "arc") as Hex);
   if (!limit || accounts.owner.toLowerCase() !== cfg.TEST_WALLET_ADDRESS.toLowerCase() || executor.address.toLowerCase() !== cfg.TEST_WALLET_ADDRESS.toLowerCase())
     throw new Error("Qualification owner/executor mismatch");
   const router = executionContractAddress("arc", "okxRouter"), spender = executionContractAddress("arc", "okxApproval");

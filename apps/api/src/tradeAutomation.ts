@@ -13,6 +13,7 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import type { AppConfig } from "@pulse/config";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
+import { executionSignerKey, hasExecutionSigner } from "./executionSigner.js";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, robinhoodOrderMarket } from "./robinhoodMarkets.js";
@@ -826,8 +827,7 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
   if (running) return;
   running = true;
   try {
-    const rawKey = (cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY) as `0x${string}`;
-    if (!/^0x[a-fA-F0-9]{64}$/.test(rawKey || "")) return;
+    if (!hasExecutionSigner(cfg)) return;
     const items = await list();
     for (const item of items
       .filter((o) => Object.hasOwn(networks, o.network) && (o.status === "active" || o.status === "paused"))
@@ -835,6 +835,8 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
         && (o.network !== "arc" || process.env.FEATURE_ARC_TRADING === "1")
         && (!scope || (o.network === scope.network && o.account.toLowerCase() === scope.account.toLowerCase() && o.orderId === scope.orderId)))
       .slice(0, 100)) {
+      const rawKey = executionSignerKey(cfg, item.network) as `0x${string}`;
+      if (!/^0x[a-fA-F0-9]{64}$/.test(rawKey)) continue;
       try {
         if (item.network === "arc") {
           const readiness = await arcAutomationReadiness(cfg);

@@ -26,7 +26,6 @@ import {
 import { z } from "zod";
 import { saveReport } from "./store.js";
 import { autopilotPassTargetExists } from "./autopilotAutomation.js";
-import { isArcMarket } from "./arcMarkets.js";
 import { executionTicker } from "./robinhoodMarkets.js";
 
 type JsonRpc = {
@@ -141,7 +140,7 @@ const TOOLS = [
   { name: "job_report", description: "Free authenticated final-report retrieval for a previously paid durable job; never pay again to retrieve", inputSchema: { type: "object", properties: { jobId: { type: "string" }, recoveryToken: { type: "string" } }, required: ["jobId", "recoveryToken"] } },
 ];
 
-const marketIdArgs = z.string().min(3).max(64).refine(value => /^[A-Z0-9]+-[A-Z0-9]+$/.test(value) || isArcMarket(value), "Select a listed market or an Arc contract market");
+const marketIdArgs = z.string().min(3).max(64).regex(/^[A-Z0-9]+-[A-Z0-9]+$/, "Select a live OKX market");
 const AnalysisArgs = z.object({
   instId: marketIdArgs,
   timeframe: z.enum(["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"]).default("1H"),
@@ -191,14 +190,14 @@ function availableTools(cfg: AppConfig) {
       ...original,
       inputSchema: { ...original.inputSchema, required: ["instId", "timeframe", "lang"], properties: {
         ...original.inputSchema.properties,
-        instId: { type: "string", pattern: "^(?:[A-Z0-9]+-[A-Z0-9]+|[A-Z0-9_]{1,16}\\.[A-F0-9]{40}-USDC)$", maxLength: 64, description: "Exact catalog ID. Arc native markets include the complete contract address and use USDC." },
+        instId: { type: "string", pattern: "^[A-Z0-9]+-[A-Z0-9]+$", maxLength: 64, description: "Live OKX instrument ID, for example BTC-USDT. Arc execution maps BTC to cirBTC and ETH to WETH; indexed tokens are Risk Guard only." },
         timeframe: { type: "string", enum: ["1m", "3m", "5m", "15m", "30m", "1H", "2H", "4H", "6H", "12H", "1D", "1W", "1Dutc", "1Wutc"] },
         userNote: { type: "string", maxLength: 500 },
       } },
     } : original.name === "preflight" || original.name.startsWith("prediction_analysis_") ? {
       ...original, inputSchema: { ...original.inputSchema, required: original.name === "preflight" ? ["tokenAddress", "lang"] : ["primaryMarketId", "lang"], properties: { ...original.inputSchema.properties, lang: { type: "string", enum: ["en", "zh"], description: "Collect report language together with the other required inputs." } } },
     } : original;
-    if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Quick → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise Buy-or-Wait plan using the selected market's data, including Arc contract-specific USDC markets, followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
+    if (tool.name === "spot_analysis_standard") return { ...tool, description: `Global Quick → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_BASE)} · concise Buy-or-Wait plan using the selected market's data, followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
     if (tool.name === "spot_analysis_premium") return { ...tool, description: `Global Pro → Spot Market or Limit · ${priceLabel(cfg.PRICE_ANALYSIS_PREMIUM)} · chart, Fibonacci, pivots and Elliott paths followed by a separately reviewed, Agentic-Wallet-signed Spot order` };
     if (tool.name === "prediction_analysis_standard") return { ...tool, description: `Prediction Quick · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_STANDARD)} · concise evidence, probability and invalidation` };
     if (tool.name === "prediction_analysis_premium") return { ...tool, description: `Prediction Pro · ${priceLabel(cfg.PRICE_ANALYSIS_PREDICTION_PREMIUM)} · detailed counter-case plus independent 4H underlying chart` };

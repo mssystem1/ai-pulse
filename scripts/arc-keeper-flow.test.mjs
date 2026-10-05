@@ -72,7 +72,7 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   const store=await import('../apps/api/src/v6Store.ts');
   mock.module('../apps/api/src/v6Store.ts',{namedExports:{...store,recordV6Activity:async row=>{activities.push(row);return row;}}});
   const {runTradeAutomationCycle}=await import('../apps/api/src/tradeAutomation.ts');
-  const cfg={TEST_WALLET_PRIVATE_KEY:`0x${'1'.repeat(64)}`};
+  const cfg={ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY:`0x${'1'.repeat(64)}`};
   const run=i=>runTradeAutomationCycle(cfg,{network:'arc',account:addresses[i],orderId:'1'});
   await run(0);assert.equal(items[0].status,'filled');assert.equal(submitted.length,2);
   await run(0);assert.equal(submitted.length,2,'a confirmed limit fill cannot repeat');

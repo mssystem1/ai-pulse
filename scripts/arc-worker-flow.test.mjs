@@ -27,7 +27,9 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   const pair = nativeMarket ? 'COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC' : 'ETH-USDT';
   const signalMarket = pair;
   const analysisToSettlement = 1;
-  let now = Date.now(), mark = 100 * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
+  // Keep the simulated five-minute cycle inside one candle window.
+  let now = Math.floor(Date.now() / 3600000) * 3600000 + 900000,
+    mark = 100 * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
   mock.timers.enable({ apis: ['Date'], now });
   const strings = new Map(), hashes = new Map();
   let failDurableConfirmationOnce = recoveryCase === 'storage_confirmation';
@@ -73,7 +75,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   const lastCandle = Math.floor(now / 3600000) * 3600000 - 3600000;
   const candles = Array.from({ length: 120 }, (_, i) => ({ ts: lastCandle - (119 - i) * 3600000,
     open: 40 + i * .5, high: 41 + i * .5, low: 39 + i * .5, close: 40.5 + i * .5, volume: 100, volumeCcy: 10000, confirmed: true }));
-  const market = { instId: signalMarket, timeframe: '1H', candles, ticker: { instId: signalMarket, last: 100, ts: String(lastCandle), change24hPct: 2 }, fetchedAt: new Date(now).toISOString() };
+  const market = { instId: signalMarket, source: 'okx-public-spot', timeframe: '1H', candles, ticker: { instId: signalMarket, last: 100, ts: String(now), change24hPct: 2 }, fetchedAt: new Date(now).toISOString() };
   mock.module('../apps/api/src/robinhoodMarkets.ts', { namedExports: { ...marketModule,
     executionMarketContext: async (_cfg, input) => {
       assert.equal(input.instId, pair, 'the worker uses the complete owner-authorized contract market');
@@ -167,7 +169,11 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
     if (request.functionName === 'execute' && request.args[4].toLowerCase() === settlement.toLowerCase()) pendingBuyHash = hash;
     return hash;
   } };
-  mock.module('viem', { namedExports: { ...viem, createWalletClient: () => wallet } });
+  mock.module('viem', { namedExports: { ...viem, createWalletClient: input => {
+    assert.equal(input.chain.id, 5042);
+    assert.equal(input.account.address, signer.address, 'Arc uses its dedicated key even when a different shared key is configured');
+    return wallet;
+  } } });
   const discovery = await import('../apps/api/src/onchainDiscovery.ts');
   let runtimeReads = 0, pauseOnRead = Infinity;
   mock.module('../apps/api/src/onchainDiscovery.ts', { namedExports: { ...discovery,
@@ -213,18 +219,27 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
       return activityStore.listV6Activity(walletOwner, network);
     },
   } });
-  const { runAutopilotCycle } = await import('../apps/api/src/autopilotAutomation.ts');
-  const cfg = { AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${'1'.repeat(64)}`, AUTOPILOT_KILL_SWITCH: false, hasXaiKey: false };
+  const { runAutopilotCycle, autopilotPassTargetExists, grantAutopilotPass } = await import('../apps/api/src/autopilotAutomation.ts');
+  const cfg = { ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${'1'.repeat(64)}`,
+    AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${'7'.repeat(64)}`, AUTOPILOT_KILL_SWITCH: false, hasXaiKey: false };
   const stored = () => JSON.parse(hashes.get(strategyKey).get(strategy.id));
+  assert.equal(await autopilotPassTargetExists({ owner, network: 'arc', vault }), !nativeMarket,
+    'only a reviewed Arc market can reach pass checkout');
   if (nativeMarket) {
-    const missing = candles.splice(80, 1)[0];
+    await assert.rejects(grantAutopilotPass({ owner, network: 'arc', vault, days: 1 }), /Risk Guard only/);
     await runAutopilotCycle(cfg, {network:'arc',vault});
-    assert.match(stored().lastError, /50 recent, consecutive completed candles/);
-    assert.equal(pass.signalsUsed, 0, 'a native history gap cannot consume an AI confirmation');
-    assert.equal(submitted.length, 0, 'a native history gap prevents both oracle and execution writes');
-    candles.splice(80, 0, missing);
-    hashes.get(strategyKey).set(strategy.id, JSON.stringify({ ...stored(), lastDecision: 'hold_paused' }));
+    assert.match(stored().lastError, /Risk Guard only/);
+    assert.equal(pass.signalsUsed, 0, 'an indexed meme cannot consume an AI confirmation');
+    assert.equal(submitted.length, 0, 'an indexed meme cannot write oracle or execution transactions');
+    return;
   }
+  market.ticker.ts = String(now - 181_000);
+  await runAutopilotCycle(cfg, {network:'arc',vault});
+  assert.match(stored().lastError, /Live OKX market data is unavailable/);
+  assert.equal(pass.signalsUsed, 0, 'stale OKX data cannot consume an AI confirmation');
+  assert.equal(submitted.length, 0, 'stale OKX data cannot prepare an oracle update or trade');
+  market.ticker.ts = String(now);
+  hashes.set(strategyKey, new Map([[strategy.id, JSON.stringify(strategy)]]));
   await runAutopilotCycle(cfg, {network:'arc',vault});
   assert.equal(stored().entryQuoteRetryPending, true, JSON.stringify(stored()));
   assert.equal(targetBalance, 0n);
@@ -324,6 +339,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
 
   // Owner control must win even when the entry signal already passed.
   const raceStrategy = { ...strategy, id: 'owner-pause-race' };
+  market.ticker.ts = String(now);
   pass = { ...pass, expiresAt: new Date(now + 86400000).toISOString() };
   hashes.set(strategyKey, new Map([[raceStrategy.id, JSON.stringify(raceStrategy)]]));
   runtimeReads = 0; pauseOnRead = 3; mark = 100 * analysisToSettlement;
@@ -337,7 +353,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
 
 // Node module mocks are process-wide. Exercise the same actual worker with a
 // native contract market in a fresh, secret-free process instead of sharing mocks.
-if (!nativeMarket && !recoveryCase) test('Arc native contract worker integration', { timeout: 60_000 }, async () => {
+if (!nativeMarket && !recoveryCase) test('Arc worker rejects indexed memecoins before AI or execution', { timeout: 60_000 }, async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
   Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_NATIVE: '1' });

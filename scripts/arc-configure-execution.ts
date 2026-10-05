@@ -12,7 +12,7 @@ async function main() {
   const chain = { id: 5042, name: "Arc Mainnet", nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: [url] } } };
   const client = createPublicClient({ chain, transport: http(url, { timeout: 15_000, retryCount: 0 }) });
   const key = process.env.CONTRACT_DEPLOYER_PRIVATE_KEY || process.env.TEST_WALLET_PRIVATE_KEY;
-  const executorKey = process.env.AUTOMATION_EXECUTOR_PRIVATE_KEY || process.env.TEST_WALLET_PRIVATE_KEY;
+  const executorKey = process.env.ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY || process.env.AUTOMATION_EXECUTOR_PRIVATE_KEY || process.env.TEST_WALLET_PRIVATE_KEY;
   if (!/^0x[\da-f]{64}$/i.test(key || "") || !/^0x[\da-f]{64}$/i.test(executorKey || "")) throw new Error("Required local signer is missing");
   const account = privateKeyToAccount(key as Hex);
   const executor = privateKeyToAccount(executorKey as Hex).address;

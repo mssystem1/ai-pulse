@@ -1,0 +1,290 @@
+{
+  "auditedAt": "2026-10-05T17:16:37.947Z",
+  "chainId": 5042,
+  "scope": "Correction of Arc catalog and execution policy; no hosting release or production activation",
+  "policy": {
+    "global": "Existing live OKX exchange research catalog, following Base and Arbitrum behavior",
+    "execution": [
+      {
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "symbol": "cirBTC",
+        "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0"
+      },
+      {
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "symbol": "WETH",
+        "address": "0x128cc466b61f542da60c70e3aa11c10e19b84edb"
+      }
+    ],
+    "riskGuard": "Broad indexed tokens and memecoins remain address-scoped discovery only",
+    "routeAvailability": "Exact reviewed mapping, chain-5042 metadata, fresh OKX ticker/candles, and indicative entry plus exit quotes",
+    "autopilot": "Same reviewed mapping and live OKX source; at least 50 recent consecutive completed candles before setup or AI consumption, with fresh ticker checks in the worker",
+    "oracle": "Restricted PULSE executor updates the deployed OracleRouter from OKX reference observations; actual Arc swap amounts are independently quoted",
+    "priceBoundary": "BTC-USDT and ETH-USDT are exchange references, not executable USDC prices or guarantees of wrapper parity",
+    "otherNetworks": "Base and Arbitrum catalog/routing/trading decisions unchanged",
+    "legacySelections": "Native indexed market IDs rejected before research checkout, pass checkout, AI consumption and transaction preparation"
+  },
+  "liveReadOnly": {
+    "observedAt": "2026-10-05T16:40:23.765Z",
+    "chainId": 5042,
+    "transactionsSent": 0,
+    "spendUSDC": 0,
+    "checks": [
+      {
+        "workflow": "execution-catalog",
+        "status": 200,
+        "total": 2,
+        "pairs": [
+          {
+            "pair": "BTC-USDT",
+            "executionPair": "cirBTC/USDC",
+            "symbol": "cirBTC",
+            "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0"
+          },
+          {
+            "pair": "ETH-USDT",
+            "executionPair": "WETH/USDC",
+            "symbol": "WETH",
+            "address": "0x128cc466b61f542da60c70e3aa11c10e19b84edb"
+          }
+        ]
+      },
+      {
+        "workflow": "global-catalog",
+        "status": 200,
+        "count": 1143,
+        "containsNativeContractIds": false,
+        "containsBTC": true
+      },
+      {
+        "workflow": "spot-autopilot",
+        "pair": "BTC-USDT",
+        "executionToken": "cirBTC",
+        "routeStatus": 200,
+        "available": true,
+        "base": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+        "settlement": "0x3600000000000000000000000000000000000000",
+        "tickerStatus": 200,
+        "tickerId": "BTC-USDT",
+        "tickerTimestamp": "1791218426566",
+        "tickerPrice": 85249.5,
+        "candleStatus": 200,
+        "candleCount": 100,
+        "historyStatus": 200,
+        "historyReady": true,
+        "signalSource": "okx-public-spot",
+        "historyReason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+      },
+      {
+        "workflow": "spot-autopilot",
+        "pair": "ETH-USDT",
+        "executionToken": "WETH",
+        "routeStatus": 200,
+        "available": true,
+        "base": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+        "settlement": "0x3600000000000000000000000000000000000000",
+        "tickerStatus": 200,
+        "tickerId": "ETH-USDT",
+        "tickerTimestamp": "1791218431023",
+        "tickerPrice": 2692.02,
+        "candleStatus": 200,
+        "candleCount": 100,
+        "historyStatus": 200,
+        "historyReady": true,
+        "signalSource": "okx-public-spot",
+        "historyReason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+      },
+      {
+        "workflow": "risk-guard-discovery",
+        "status": 200,
+        "count": 2004,
+        "cirBTC": [
+          {
+            "symbol": "cirBTC",
+            "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0"
+          },
+          {
+            "symbol": "CIRBTC",
+            "address": "0x5697bac77916f09a941bde9cd28144f0791d129b"
+          },
+          {
+            "symbol": "CIRBTC",
+            "address": "0x7a1a77368d7b530e18268154184be22d978630d6"
+          },
+          {
+            "symbol": "COOLBTC",
+            "address": "0x597cf72820865ce3cef7ecb158afdebc9b46a3d0"
+          }
+        ],
+        "indexedSample": {
+          "symbol": "COOL",
+          "address": "0xeb64987643db71c76b2a2be7e723decc995e5b37",
+          "sources": [
+            "RadarDex via Arcodex · indexed Arc mainnet"
+          ]
+        }
+      },
+      {
+        "workflow": "indexed-token-exclusion",
+        "pair": "COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC",
+        "routeStatus": 200,
+        "available": false,
+        "tickerStatus": 422,
+        "reason": "Indexed Arc tokens are available in Risk Guard only. Choose a live OKX research pair."
+      },
+      {
+        "workflow": "okx-native-market-chain-coverage",
+        "status": 200,
+        "providerCode": "0",
+        "chainCount": 54,
+        "arcListed": true
+      }
+    ],
+    "sources": {
+      "cirBTC": "https://www.arc.io/blog/cirbtc-is-now-live-on-arc",
+      "okxMarketChains": "https://web3.okx.com/onchainos/dev-docs/market/market-price-chains"
+    }
+  },
+  "liveAutopilotPreflight": {
+    "provenance": "Local production API using live Arc RPC and OKX providers; read-only POST /v1/autopilot/preflight through a wrapper blocking payments and transaction preparation",
+    "timeframe": "4H",
+    "amountAtomic": "110000",
+    "settlementDecimals": 6,
+    "maxTradeValueAtomic": "110000",
+    "maxSlippageBps": 100,
+    "checks": [
+      {
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "status": 200,
+        "ready": true
+      },
+      {
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "status": 200,
+        "ready": true
+      }
+    ],
+    "limitation": "Quotes and guard checks at the observation time, not transactions or guarantees for other trade sizes"
+  },
+  "browser": {
+    "origin": "http://127.0.0.1:5179",
+    "build": "Production Vite output with public release environment",
+    "api": "Local production API; workers disabled, mutations/payment routes blocked; unsigned quote, preflight and free inspection permitted",
+    "wallet": "Read-only EIP-1193 harness using the public qualification address; signing and transaction submission throw",
+    "mobile": {
+      "viewportWidth": 390,
+      "documentScrollWidth": 390
+    },
+    "desktop": {
+      "viewportWidth": 1440,
+      "documentScrollWidth": 1417,
+      "horizontalOverflow": false,
+      "checks": "Global live OKX catalog, Chinese Arc Docs and final Spot picker with two verified routes; desktop scrollbar accounts for the narrower document width"
+    },
+    "checks": [
+      {
+        "workflow": "Global picker",
+        "result": "1,143 live OKX instruments, two route-available Arc mappings, cirBTC searchable under BTC, no indexed Arc contract instruments"
+      },
+      {
+        "workflow": "Global market change",
+        "result": "Selected ETH-USDT and changed 1H to 4H; live OKX preview updated with WETH/USDC execution note"
+      },
+      {
+        "workflow": "Spot",
+        "result": "cirBTC/USDC wallet ticket and two verified picker entries; BTC OKX ticker and candle chart rendered; production transaction controls remain disabled"
+      },
+      {
+        "workflow": "Autopilot",
+        "result": "Two verified ERC-20 picker entries; selected WETH, completed OKX history ready and WETH/USDC funding route shown; production setup remains disabled"
+      },
+      {
+        "workflow": "Risk Guard discovery",
+        "result": "2,004 tokens; exact COOL address search returned one row and selected the matching contract; official cirBTC appears separately from similarly named contracts"
+      },
+      {
+        "workflow": "Risk Guard free inspection",
+        "address": "0xeb64987643db71c76b2a2be7e723decc995e5b37",
+        "chainId": "5042",
+        "blockNumber": 24422918,
+        "bytecodeBytes": 1425,
+        "symbol": "COOL",
+        "decimals": 18,
+        "safetyVerdict": "unknown",
+        "result": "Live contract evidence displayed without payment or signing"
+      },
+      {
+        "workflow": "Docs",
+        "result": "English and Chinese Arc guide includes OKX-only policy, exact cirBTC address, Risk Guard-only index, wallet/Gateway capital separation, withdrawal and pending activation"
+      }
+    ],
+    "walletSigningRequests": 0,
+    "limitation": "Browser wallet selection/signing is a read-only harness; it does not qualify real production Circle email-wallet or owner-signing acceptance"
+  },
+  "regression": {
+    "api": {
+      "tests": 342,
+      "pass": 341,
+      "fail": 0,
+      "skipped": 1
+    },
+    "web": {
+      "tests": 154,
+      "pass": 154,
+      "fail": 0,
+      "skipped": 0
+    },
+    "arcWorkers": {
+      "passed": 8,
+      "details": "Seven Autopilot checks plus keeper check; exact mapping, unsupported pass/native-market rejection, stale ticker before AI/writes, guarded WETH entry/exits, owner pause and five durable recovery cases"
+    },
+    "sdk": {
+      "passed": 6
+    },
+    "cloudEnvironment": {
+      "passed": 7
+    },
+    "isolatedWorkflowCoverage": "Arc paid OKX Global checkout/job/report/replay and indexed Risk Guard report delivery tested with payment/provider/storage fixtures; no new paid report purchased in this correction",
+    "builds": {
+      "apiTypeScript": "passed",
+      "webTypeScript": "passed",
+      "productionVite": "passed",
+      "socialShare": "passed"
+    },
+    "browserSecretScan": {
+      "artifacts": 236,
+      "serverValues": 28,
+      "leaks": 0
+    },
+    "environmentBindings": {
+      "files": [
+        ".env",
+        ".env.example",
+        ".env.local.example",
+        ".env.production.example"
+      ],
+      "publicContractBindingsPerFile": 9,
+      "validAndUnique": true
+    }
+  },
+  "remaining": [
+    "Manual hosting release is reserved for the user; hosted artifacts may still show the superseded indexed execution catalog",
+    "Production Arc trading remains disabled and contracts remain paused pending remaining live acceptance",
+    "Production Circle subscription/App ID/email setup remains pending; email wallets stay disabled",
+    "Actual cirBTC execution and a genuine live worker risk exit are not qualified by these read-only checks",
+    "Dedicated restricted Arc executor provisioning and any unresolved transaction recovery must be completed before production activation/key rotation"
+  ],
+  "qualificationBoundary": "OKX lists Arc in chain-level market API coverage; this does not prove data coverage for every indexed token. No categorical claim that all Arc memes lack OKX data is made.",
+  "transactionsSent": 0,
+  "spendUSDC": 0,
+  "hostingDeployed": false,
+  "pushed": false,
+  "productionFlags": {
+    "FEATURE_ARC_TRADING": false,
+    "FEATURE_CIRCLE_MAINNET_WALLETS": false
+  }
+}

@@ -125,6 +125,7 @@ const EnvSchema = z.object({
   TEST_WALLET_PRIVATE_KEY: z.string().optional().default(""),
   TEST_WALLET_ADDRESS: z.string().optional().default(""),
   AUTOMATION_EXECUTOR_PRIVATE_KEY: z.string().optional().default(""),
+  ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY: z.string().optional().default(""),
   CRON_SECRET: z.string().optional().default(""),
   ENABLE_SERVER_PAY: z
     .string()

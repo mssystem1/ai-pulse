@@ -9,7 +9,8 @@ export function splitCloudEnv(template, local) {
   for (const key of template.keys()) {
     const value = local.get(key);
     if (!value || key.startsWith("TEST_WALLET") || operatorOnly.has(key)) continue;
-    if (key === "AUTOMATION_EXECUTOR_PRIVATE_KEY" && value.toLowerCase() === local.get("TEST_WALLET_PRIVATE_KEY")?.toLowerCase()) continue;
+    if (["AUTOMATION_EXECUTOR_PRIVATE_KEY", "ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY"].includes(key)
+      && value.toLowerCase() === local.get("TEST_WALLET_PRIVATE_KEY")?.toLowerCase()) continue;
     if (key === "REPORT_ENCRYPTION_KEY" && new Set(value).size < 3) continue;
     if (key.startsWith("VITE_")) {
       if (browserSecretName.test(key)) throw new Error(`Refusing browser credential variable ${key}`);

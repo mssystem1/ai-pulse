@@ -1196,13 +1196,13 @@ export function SpotWorkspace({
   useEffect(() => { setSpotPage("setup"); }, [incomingTrade, initialPair]);
   const [dismissedTrade, setDismissedTrade] = useState<ReportTradeIntent | null>(null);
   const [rebasedTrade, setRebasedTrade] = useState<{ source: ReportTradeIntent; network: WebNetworkKey; intent: ReportTradeIntent } | null>(null);
-  const initialTrade = incomingTrade && incomingTrade !== dismissedTrade
+  const initialTrade = incomingTrade && !isArcMarketPair(incomingTrade.pair) && incomingTrade !== dismissedTrade
     ? rebasedTrade?.source === incomingTrade && rebasedTrade.network === networkKey ? rebasedTrade.intent : incomingTrade : null;
   const [capability, setCapability] = useState<Capability | null>(null);
-  const [pair, setPair] = useState(initialPair);
+  const [pair, setPair] = useState(isArcMarketPair(initialPair) ? "BTC-USDT" : initialPair);
   const [marketTimeframe, setMarketTimeframe] = useState(initialTrade?.timeframe || "1H");
   const [capabilityUnavailable, setCapabilityUnavailable] = useState(false);
-  useEffect(() => setPair(initialPair), [initialPair, incomingTrade, networkKey]);
+  useEffect(() => setPair(isArcMarketPair(initialPair) ? "BTC-USDT" : initialPair), [initialPair, incomingTrade, networkKey]);
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [executionMode, setExecutionMode] = useState<"market" | "limit">(
     "market",
@@ -1210,6 +1210,8 @@ export function SpotWorkspace({
   const [baseToken, setBaseToken] = useState<TradeToken | null>(null);
   const [quoteToken, setQuoteToken] = useState<TradeToken | null>(null);
   const [mappingScope, setMappingScope] = useState("");
+  const [mappingPending, setMappingPending] = useState(true);
+  const [routePending, setRoutePending] = useState(false);
   const [tokenStatus, setTokenStatus] = useState(
     "Resolving report pair on this network…",
   );
@@ -1312,6 +1314,7 @@ export function SpotWorkspace({
     setBaseToken(null);
     setQuoteToken(null);
     setMappingScope("");
+    setMappingPending(true);
     setFromToken("");
     setToToken("");
     setProtectedAsset("");
@@ -1381,7 +1384,7 @@ export function SpotWorkspace({
           setTokenStatus(
             error instanceof Error ? error.message : String(error),
           ),
-      );
+      ).finally(() => { if (!cancelled) setMappingPending(false); });
     return () => {
       cancelled = true;
     };
@@ -1389,11 +1392,13 @@ export function SpotWorkspace({
 
   useEffect(() => {
     if (mappingScope !== expectedMappingScope) {
+      setRoutePending(false);
       setRouteAvailable(false);
       setRouteStatus("Mapping the selected pair on this network…");
       return;
     }
     if (!baseToken || !quoteToken) {
+      setRoutePending(false);
       setRouteAvailable(false);
       setRouteStatus("No executable token mapping on this network");
       let cancelled = false;
@@ -1408,6 +1413,7 @@ export function SpotWorkspace({
     setRouteAvailable(false);
     setRouteError("");
     setRouteStatus("Checking live OKX route…");
+    setRoutePending(true);
     void apiPost("/v1/trading/quote", {
       network: networkKey,
       fromTokenAddress: quoteToken.address,
@@ -1443,7 +1449,7 @@ export function SpotWorkspace({
             },
           );
         }
-      });
+      }).finally(() => { if (!cancelled) setRoutePending(false); });
     return () => {
       cancelled = true;
     };
@@ -2828,7 +2834,9 @@ export function SpotWorkspace({
           <strong className={routeAvailable ? "found" : "checking"}>
             {routeAvailable
               ? "Route ready"
-              : mappingReady
+              : routePending
+                ? "Checking route"
+                : mappingReady && !mappingPending
                 ? "Route unavailable"
                 : "Resolving pair"}
           </strong>
@@ -2963,7 +2971,7 @@ export function SpotWorkspace({
                 : ""}
             </p>
           </div>
-          {!mappingReady && (
+          {!mappingReady && !mappingPending && (
             <div className="route-suggestion">
               <strong>
                 This pair is not executable on {WEB_NETWORKS[networkKey].label}
@@ -3000,7 +3008,7 @@ export function SpotWorkspace({
               </button>
             </div>
           )}
-          {!routeAvailable && mappingReady && (
+          {!routeAvailable && mappingReady && !routePending && (
             <div className="route-suggestion route-blocked">
               <strong>{executionPair} exists, but Spot execution is blocked</strong>
               <p>
@@ -3028,8 +3036,8 @@ export function SpotWorkspace({
 
           {!executionReady && (
             <div className="execution-unavailable-state" role="status">
-              <strong>No order can be created for this selection</strong>
-              <span>Choose a pair whose on-chain token, settlement asset and live route are all verified on {WEB_NETWORKS[networkKey].label}. PULSE will then show the Market or Limit ticket with real symbols and balances.</span>
+              <strong>{mappingPending || routePending ? "Checking market data and the selected route…" : "No order can be created for this selection"}</strong>
+              <span>{mappingPending || routePending ? "PULSE is checking the token mapping and live provider evidence before enabling this ticket." : `Choose a pair whose on-chain token, settlement asset and live route are all verified on ${WEB_NETWORKS[networkKey].label}. PULSE will then show the Market or Limit ticket with real symbols and balances.`}</span>
             </div>
           )}
 
@@ -4162,7 +4170,7 @@ export function AutopilotWorkspace({
   const [pair, setPair] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("4H");
   const historyScope = `${networkKey}:${pair}:${timeframe}`;
-  const requiresMarketHistory = networkKey === "robinhood" || networkKey === "arc" && isArcMarketPair(pair);
+  const requiresMarketHistory = networkKey === "robinhood" || networkKey === "arc";
   const [historyCheck, setHistoryCheck] = useState<{ scope: string; ready: boolean; reason: string; signalMarket?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> } | null>(null);
   const [historyAttempt, setHistoryAttempt] = useState(0);
   const [checkOtherTimeframes, setCheckOtherTimeframes] = useState(false);
@@ -7489,14 +7497,14 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <p>{lang === "zh" ? "若提取中断，请使用“继续提取”，并保留浏览器恢复记录；不会自动创建新的扣款授权。备用合约提取需明确发起、等待实际领取区块（通常约七天），再领取到钱包。已有备用提取等待期间不能追加金额，以免重置等待期。" : "If interrupted, use Resume withdrawal and keep browser recovery storage; a new debit is not authorized automatically. The contract fallback requires explicit initiation, a wait until the actual claim block (usually about seven days), then a claim to the wallet. Additional delayed withdrawals are blocked while one is pending to avoid resetting its delay."}</p>
               <p>{lang === "zh" ? "Gateway 提取不等于从交易账户或 vault 提取资金，也不会停止策略。请分别使用账户的取消、暂停与提取控件。" : "Gateway withdrawal does not withdraw trading-account or vault capital and does not stop a strategy. Use the account's cancel, pause and withdrawal controls separately."}</p>
               <h4>{lang === "zh" ? "Arc 原生代币、模因币与路由" : "Arc-native tokens, memecoins and routes"}</h4>
-              <p>{lang === "zh" ? "Global Market、Spot 与 Autopilot 使用 Arc 合约目录。Risk Guard 支持按名称、代码或地址搜索，也支持手动输入合约。目录包含官方部署与 RadarDex 经 Arcodex 提供的主网索引；收录不是安全结论。" : "Global Market, Spot and Autopilot use the Arc contract catalog. Risk Guard searches names, tickers and addresses and also accepts a manually entered contract. Discovery combines official deployments with the mainnet index from RadarDex via Arcodex. A listing is not a safety verdict."}</p>
+              <p>{lang === "zh" ? "Global Market 与 Base、Arbitrum 一样使用实时 OKX 研究市场。Arc Spot 与 Autopilot 当前将 BTC-USDT 映射到 cirBTC/USDC，将 ETH-USDT 映射到 WETH/USDC。更广泛的索引代币与模因币目录仅用于 Token Risk Guard，可按名称、代码或合约地址搜索；收录不是安全结论。" : "Global Market uses live OKX research instruments, following the same logic as Base and Arbitrum. Arc Spot and Autopilot currently map BTC-USDT to cirBTC/USDC and ETH-USDT to WETH/USDC. The wider indexed token and memecoin catalog is available only in Token Risk Guard, including search by name, ticker or contract address. A listing is not a safety verdict."}</p>
               <ul>
-                <li>{lang === "zh" ? "同名代币按完整合约地址区分。研究中的 ETH/BTC 仅映射到 Arc 官方 WETH/cirBTC 合约；模因币使用自身合约的 USDC 行情，不借用同名交易所币种价格。" : "Duplicate tickers remain distinct by full contract address. Exchange ETH/BTC research maps only to the published Arc WETH/cirBTC contracts. Memecoins use their own contract's USDC prices rather than an exchange asset with a similar ticker."}</li>
-                <li>{lang === "zh" ? "“Route available”默认开启，自动检查合约与买入、卖出路由。选择“All assets”可查看尚未确认路由的条目；报价故障会显示未知并重试。下单金额仍需重新报价。" : "Route available is selected by default and automatically checks the contract plus entry and exit routes. Choose All assets to browse entries whose routes have not been confirmed. Provider failures remain unknown and are retried. Your actual order amount is quoted again."}</li>
-                <li>{lang === "zh" ? "Autopilot 还需要所选合约与周期的至少 50 根连续、近期、已收盘 K 线。流动性或行情不足时，先更换市场或重试，再考虑充值或购买通行证。" : "Autopilot also needs at least 50 consecutive, recent completed candles for that contract and timeframe. If routes or history are unavailable, choose another market or retry before funding or purchasing a pass."}</li>
+                <li>{lang === "zh" ? "BTC 使用 Circle Wrapped Bitcoin（cirBTC），合约 0x171A4217b86A807A64eB94757Db6849fb4bDbAA0；ETH 使用官方 Arc WETH。图表、信号和 oracle 更新使用 OKX 参考价格，实际交易需 Arc 独立报价。索引模因币不能用于 Global、Spot 或 Autopilot。" : "BTC executes as Circle Wrapped Bitcoin (cirBTC), contract 0x171A4217b86A807A64eB94757Db6849fb4bDbAA0. ETH executes as the published Arc WETH. Charts, signals and oracle updates use OKX reference prices; the actual swap receives its own Arc quote. Indexed memecoins cannot be selected for Global, Spot or Autopilot."}</li>
+                <li>{lang === "zh" ? "“Route available”默认开启，自动检查实时 OKX 行情、合约与买入、卖出路由。选择“All assets”可查看尚未确认路由的条目；报价故障会显示未知并重试。下单金额仍需重新报价。" : "Route available is selected by default and automatically checks live OKX market data, the contract, and entry and exit routes. Choose All assets to browse entries whose routes have not been confirmed. Provider failures remain unknown and are retried. Your actual order amount is quoted again."}</li>
+                <li>{lang === "zh" ? "Autopilot 还需要所选市场与周期的至少 50 根 OKX连续、近期、已收盘 K 线。流动性或行情不足时，先更换市场或重试，再考虑充值或购买通行证。" : "Autopilot also needs at least 50 consecutive, recent completed candles from OKX for that market and timeframe. If routes or history are unavailable, choose another market or retry before funding or purchasing a pass."}</li>
               </ul>
               <h4>{lang === "zh" ? "当前可用性与恢复" : "Current availability and recovery"}</h4>
-              <p>{lang === "zh" ? "Agent 与 SDK 使用目录中的完整合约市场 ID，并选择 Arc 网络。Telegram 聊天中的 Global 输入同一 ID 加周期；Risk Guard 输入 arc 加完整代币合约地址。聊天报告使用 Telegram Stars 结算，不会充值钱包或 Gateway，也不会授权交易。TON Mini App 仍提供其独立的 TON 研究服务。" : "Agents and SDK clients use the complete contract market ID from the catalog and select Arc. In Telegram chat, Global accepts that same ID plus a timeframe; Risk Guard accepts arc followed by the full token contract address. Chat reports are paid with Telegram Stars and do not fund a wallet or Gateway or authorize trading. The TON Mini App retains its separate TON research services."}</p>
+              <p>{lang === "zh" ? "Agent 与 SDK 使用 BTC-USDT 等 OKX 市场 ID，并选择 Arc 网络。Telegram 聊天中的 Global 输入 BTC-USDT 加周期；Risk Guard 输入 arc 加完整代币合约地址。聊天报告使用 Telegram Stars 结算，不会充值钱包或 Gateway，也不会授权交易。TON Mini App 仍提供其独立的 TON 研究服务。" : "Agents and SDK clients use OKX instrument IDs such as BTC-USDT and select Arc. In Telegram chat, Global accepts BTC-USDT plus a timeframe; Risk Guard accepts arc followed by the full token contract address. Chat reports are paid with Telegram Stars and do not fund a wallet or Gateway or authorize trading. The TON Mini App retains its separate TON research services."}</p>
               <p>{lang === "zh" ? "Arc 交易合约已部署并公开验证，但 Spot 和 Autopilot 的生产激活仍暂停。研究服务按各自状态提供；连接 Arc 或持有 USDC 不会绕过交易可用性检查。Circle 邮箱钱包的生产配置仍在准备中，因此邮箱登录暂未开启。" : "Arc trading contracts are deployed and publicly verified, while production Spot and Autopilot activation remains paused. Research services follow their own availability. Connecting Arc or holding USDC does not override execution checks. Production Circle email-wallet setup is still pending, so email sign-in remains disabled."}</p>
               <p>{lang === "zh" ? "账户读取失败时，请重试同步；无法确定已有账户不等于需要新建账户。已付报告可通过 Report history 恢复，无需再次付款。旧 Arc 测试网报告保留原网络标签与独立归档。" : "Retry synchronization when account discovery fails. An unknown existing-account state does not mean you need to create another account. Recover paid reports through Report history without another payment. Old Arc testnet reports retain their original network labels and separate archive."}</p>
               <p>{lang === "zh" ? "Autopilot 交易超时后会核对原交易回执，期间不会创建新交易或消耗新的 AI 确认。恢复只会重发同一笔已签名交易，并继续检查暂停状态、策略与报价有效期。若报价过期或策略改变且原交易仍未确定，保持 Hold，由运营人员核对原交易；超时不代表交易失败。" : "After an Autopilot trade times out, PULSE checks the original receipt before creating another trade or consuming another AI confirmation. Recovery can resend only that same signed transaction while the vault is unpaused and its policy and quote remain valid. If the quote expires or the policy changes while the transaction remains unresolved, the strategy stays on Hold for operator reconciliation. A timeout does not prove that a trade failed."}</p>

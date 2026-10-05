@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import { splitCloudEnv, serializeCloudEnv, parseCloudEnv, prepareCloudRelease } from "./cloud-env.mjs";
 
 test("cloud exports isolate Circle/worker secrets and carry existing Arc changes", () => {
-  const values = new Map(Object.entries({ CIRCLE_API_KEY_MAINNET: "server-only", AUTOMATION_EXECUTOR_PRIVATE_KEY: "server-signer",
+  const values = new Map(Object.entries({ CIRCLE_API_KEY_MAINNET: "server-only", AUTOMATION_EXECUTOR_PRIVATE_KEY: "server-signer", ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY: "arc-server-signer",
     VITE_CIRCLE_APP_ID: "public-app-id", VITE_ENABLED_NETWORKS: "arc", ENABLED_NETWORKS: "arc", ARC_PULSE_REGISTRY_ADDRESS: "public-contract",
     TEST_WALLET_PRIVATE_KEY: "qualification-only", TEST_WALLET_ADDRESS: "qualification-owner", ENABLE_SERVER_PAY: "1", RUN_LIVE_PAY: "1", EMPTY: "" }));
   const { railway, vercel } = splitCloudEnv(values, values);
   assert.deepEqual([...vercel.keys()], ["VITE_CIRCLE_APP_ID", "VITE_ENABLED_NETWORKS"]);
   assert.equal(railway.get("CIRCLE_API_KEY_MAINNET"), "server-only");
   assert.equal(railway.get("AUTOMATION_EXECUTOR_PRIVATE_KEY"), "server-signer");
+  assert.equal(railway.get("ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY"), "arc-server-signer");
+  assert.ok(!serializeCloudEnv(vercel, "Vercel").includes("arc-server-signer"));
   assert.equal(railway.get("ENABLED_NETWORKS"), "arc");
   assert.equal(railway.get("ARC_PULSE_REGISTRY_ADDRESS"), "public-contract");
   assert.ok(!serializeCloudEnv(vercel, "Vercel").includes("server-only"));
@@ -22,7 +24,7 @@ test("a mistakenly prefixed browser secret stops exports before files are writte
 });
 
 test("qualification signer cannot be exported as the production executor", () => {
-  const values = new Map([["AUTOMATION_EXECUTOR_PRIVATE_KEY", "0xABCD"], ["TEST_WALLET_PRIVATE_KEY", "0xabcd"]]);
+  const values = new Map([["AUTOMATION_EXECUTOR_PRIVATE_KEY", "0xABCD"], ["ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY", "0xABCD"], ["TEST_WALLET_PRIVATE_KEY", "0xabcd"]]);
   assert.equal(splitCloudEnv(values, values).railway.size, 0);
 });
 

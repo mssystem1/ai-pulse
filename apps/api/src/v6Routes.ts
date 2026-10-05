@@ -14,8 +14,9 @@ import { isRobinhoodMarket, resolveRobinhoodMarket, robinhoodMarketCatalog, robi
 import { ROBINHOOD_USDG, NATIVE_ETH, robinhoodExecutionIdentity } from "./robinhoodExecutionAssets.js";
 import { robinhoodAutomationReadiness } from "./robinhoodExecutionReadiness.js";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
+import { executionSignerKey } from "./executionSigner.js";
 import { validateArcSwap } from "./arcSwap.js";
-import { ARC_USDC, isArcMarket, arcMarketCatalog, resolveArcMarket, verifyArcToken } from "./arcMarkets.js";
+import { ARC_USDC, ARC_OKX_MARKETS, arcSwapMarket, arcOkxMarketContext, verifyArcToken } from "./arcMarkets.js";
 import {
   executionContractAddress,
   executionContracts,
@@ -58,7 +59,7 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
       reasons: { spot: "Robinhood execution qualification is not enabled", autopilot: "Robinhood execution qualification is not enabled" } });
     const onchainReadiness = network === "robinhood" ? await robinhoodAutomationReadiness(cfg) : network === "arc" ? await arcAutomationReadiness(cfg) : { ready: true };
     const marketReady = cfg.hasOkxCredentials && (network !== "arc" || onchainReadiness.ready);
-    const automationReady = onchainReadiness.ready && process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY || "");
+    const automationReady = onchainReadiness.ready && process.env.AUTOMATION_WORKER_ENABLED === "1" && /^0x[a-fA-F0-9]{64}$/.test(executionSignerKey(cfg, network as keyof typeof NETWORKS));
     const autopilotRuntimeReady = automationReady && cfg.hasXaiKey && Boolean(kvConfigured() && process.env.BLOB_READ_WRITE_TOKEN);
     res.json({
       product: "PULSE",
@@ -104,6 +105,10 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     if (!parsed.success) return res.status(400).json({ error: parsed.error.flatten() });
     try {
       const chainId = NETWORKS[parsed.data.network].chainId;
+      if (parsed.data.network === "arc") {
+        const market = arcSwapMarket(parsed.data.fromTokenAddress, parsed.data.toTokenAddress);
+        await arcOkxMarketContext({ instId: market.pair, timeframe: "1H", candleLimit: 60 });
+      }
       const quote = await getGenericOkxQuote(cfg, { ...parsed.data, chainId, slippagePercent: String(parsed.data.slippagePercent) });
       res.json({ service: "spot_quote", provider: "OKX Onchain OS", expiresAt: new Date(Date.now() + 30_000).toISOString(), quote });
     } catch (error) { res.status(502).json({ error: error instanceof Error ? error.message : String(error) }); }
@@ -132,20 +137,14 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     if (!chain) return res.status(400).json({ error: "Select X Layer, Base, Arbitrum, Robinhood or Arc mainnet" });
     if (network === "arc") {
       try {
-        const catalog = await arcMarketCatalog();
-        const filtered = catalog.filter(item => !query || [item.pair, item.executionPair, item.token.address, item.token.name].some(value => value.toUpperCase().includes(query)));
-        // Canonical wrappers also map Global's exchange research to the exact
-        // Arc deployment. A ticker match from an arbitrary meme is insufficient.
-        const tokens = await getOkxTradeTokens(cfg, "5042", "", 5_000);
-        const canonical = tokens.flatMap(token => {
-          const base = token.address.toLowerCase() === "0x128cc466b61f542da60c70e3aa11c10e19b84edb" ? "ETH"
-            : token.address.toLowerCase() === "0x171a4217b86a807a64eb94757db6849fb4bdbaa0" ? "BTC" : null;
-          if (!base || (query && ![`${base}-USDT`, token.symbol, token.address, token.name].some(v => v.toUpperCase().includes(query)))) return [];
-          return [{ pair: `${base}-USDT`, analysisBase: base, executionPair: `${token.symbol}/USDC`, assetClass: "crypto", token, routeStatus: "checked-automatically" }];
-        });
-        const pairs = [...canonical, ...filtered];
+        const instruments = await listSpotInstruments(5_000);
+        const live = new Map(instruments.map(instrument => [instrument.instId, instrument]));
+        const pairs = ARC_OKX_MARKETS.filter(market => live.get(market.pair)?.quoteCcy === "USDT")
+          .filter(market => !query || [market.pair, market.symbol, market.address, market.name].some(value => value.toUpperCase().includes(query)))
+          .map(({ pair, ...token }) => ({ pair, analysisBase: pair.split("-")[0], executionPair: token.symbol + "/USDC",
+            assetClass: live.get(pair)!.assetClass, token: { ...token, chainId: "5042", provider: "Arc official mainnet deployment", logoUrl: null }, routeStatus: "checked-automatically" }));
         return res.json({ network, chainId: "5042", settlementSymbol: "USDC", custody: erc20Custody ? "erc20" : "wallet", total: pairs.length,
-          pairs: pairs.slice(0, limit), provider: "Arc contract catalog · RadarDex via Arcodex · OKX routing", coverage: "Indexed Arc-native assets plus canonical BTC/ETH mappings. Listing is not a safety result or a live route." });
+          pairs: pairs.slice(0, limit), provider: "OKX live instruments and reviewed Arc deployments", coverage: "BTC maps to cirBTC; ETH maps to WETH. Live OKX data and entry/exit routes are checked on selection. Indexed tokens belong to Risk Guard only." });
       } catch { return res.status(502).json({ error: "Arc asset catalog temporarily unavailable", retryable: true }); }
     }
     if (network === "robinhood") {
@@ -212,15 +211,6 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     const settlementSymbol = network === "robinhood" ? "USDG" : network === "xlayer" ? "USDT0" : "USDC";
     const erc20Custody = String(req.query.custody || "").toLowerCase() === "erc20";
     try {
-      if (network === "arc" && isArcMarket(pair)) {
-        const market = await resolveArcMarket(pair);
-        await verifyArcToken(market.token);
-        const quote = { symbol: "USDC", name: "USD Coin", address: ARC_USDC, decimals: 6 };
-        const route = await getGenericOkxQuote(cfg, { chainId: "5042", fromTokenAddress: quote.address, toTokenAddress: market.token.address, amount: "1000000", slippagePercent: "1" });
-        await getGenericOkxQuote(cfg, { chainId: "5042", fromTokenAddress: market.token.address, toTokenAddress: quote.address, amount: route.toTokenAmount, slippagePercent: "1" });
-        return res.json({ network, pair, available: true, base: market.token, quote, executionPair: market.executionPair,
-          custody: erc20Custody ? "erc20" : "wallet", mapping: "chain-contract", explanation: "Arc-native contract-specific market; entry and exit routes checked against Arc USDC." });
-      }
       if (network === "robinhood" && isRobinhoodMarket(pair)) {
         const market = await resolveRobinhoodMarket(cfg, pair);
         if (erc20Custody && market.token.address.toLowerCase() === NATIVE_ETH) return res.json({ network, pair, available: false, reason: "Autopilot and contract orders require wrapped ETH, not native ETH." });
@@ -272,6 +262,10 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
             amount: String(10 ** Math.min(quote.decimals, 15)),
             slippagePercent: "1",
           });
+          if (network === "arc") {
+            await verifyArcToken(option);
+            await arcOkxMarketContext({ instId: pair, timeframe: "1H", candleLimit: 60 });
+          }
           if (network === "arc") await getGenericOkxQuote(cfg, { chainId: "5042", fromTokenAddress: option.address, toTokenAddress: quote.address,
             amount: entry.toTokenAmount, slippagePercent: "1" });
           const executionMark = network === "robinhood" && req.query.includeExecutionMark === "1"
@@ -307,6 +301,10 @@ export function createV6Router(cfg: AppConfig, publicActivity?: PublicActivitySt
     }
     try {
       const chainId = NETWORKS[parsed.data.network].chainId;
+      if (parsed.data.network === "arc") {
+        const market = arcSwapMarket(parsed.data.fromTokenAddress, parsed.data.toTokenAddress);
+        await arcOkxMarketContext({ instId: market.pair, timeframe: "1H", candleLimit: 60 });
+      }
       let effectiveSlippage = parsed.data.slippagePercent;
       if (parsed.data.slippageMode === "auto") {
         const quote = await getGenericOkxQuote(cfg, {

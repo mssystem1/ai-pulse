@@ -5,6 +5,7 @@ import express from "express";
 import { decodeEventLog, encodeFunctionData, erc20Abi, formatEther, formatUnits, parseAbi, parseEther, parseUnits, type Address, type Hex, type TransactionReceipt } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { qualificationJournal } from "./arc-qualification-journal.js";
+import { executionSignerKey } from "../apps/api/src/executionSigner.js";
 
 async function main() {
   config({ quiet: true });
@@ -22,7 +23,7 @@ async function main() {
   const setup = JSON.parse(await readFile("packages/contracts/deployments/5042-autopilot-setup-qualification.json", "utf8"));
   const vault = setup.data.vault as Address;
   if (!setup.data.registered || setup.owner.toLowerCase() !== cfg.TEST_WALLET_ADDRESS.toLowerCase()) throw new Error("Qualification registered vault mismatch");
-  const executor = privateKeyToAccount((cfg.AUTOMATION_EXECUTOR_PRIVATE_KEY || cfg.TEST_WALLET_PRIVATE_KEY) as Hex);
+  const executor = privateKeyToAccount(executionSignerKey(cfg, "arc") as Hex);
   if (executor.address.toLowerCase() !== cfg.TEST_WALLET_ADDRESS.toLowerCase()) throw new Error("Qualification executor must be the test wallet");
   const broadcast = process.argv.includes("--broadcast");
   const q = await qualificationJournal({ path: "packages/contracts/deployments/5042-autopilot-cycle-qualification.json", rpcUrl: cfg.ARC_RPC_URL,
