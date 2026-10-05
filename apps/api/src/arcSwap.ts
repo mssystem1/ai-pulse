@@ -30,27 +30,30 @@ export async function validateArcSwap(swap: Awaited<ReturnType<typeof getGeneric
     // on Arc; provider quote metadata alone cannot establish those assets.
     // https://github.com/okxlabs/Web3-DEX-Router-EVM-V1/blob/main/contracts/8/libraries/UniswapTokenInfoHelper.sol
     if (BigInt(tx.value) !== 0n || (pools.at(-1)! & (1n << 253n)) !== 0n) throw new Error("Arc direct pool route requires ERC-20 assets without native wrapping");
-    if (!poolTokens) {
-      const client = createPublicClient({ transport: http(process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io", { timeout: 8000, retryCount: 0 }) });
-      if (await client.getChainId() !== 5042) throw new Error("Arc route pool RPC network mismatch");
-      const abi = parseAbi(["function token0() view returns(address)", "function token1() view returns(address)"]);
-      poolTokens = async address => Promise.all([
-        client.readContract({ address, abi, functionName: "token0" }),
-        client.readContract({ address, abi, functionName: "token1" }),
-      ]);
+    if (poolTokens) {
+      await validatePoolPath(pools, input.from, input.to, poolTokens);
+      return { minimum, expiresAt: now + 30_000 };
     }
-    let current = input.from.toLowerCase();
-    for (const packed of pools) {
-      const address = `0x${(packed & mask).toString(16).padStart(40, "0")}` as Address;
-      let tokens: readonly [Address, Address];
-      try { tokens = await poolTokens(address); } catch { throw new Error("Arc route pool evidence unavailable"); }
-      const reversed = (packed & (1n << 255n)) !== 0n;
-      const [from, to] = reversed ? [tokens[1], tokens[0]] : tokens;
-      if (from.toLowerCase() !== current) throw new Error("Arc route pool token path mismatch");
-      current = to.toLowerCase();
+    const urls = [...new Set([process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io", process.env.ARC_RPC_FALLBACK_URL]
+      .filter((url): url is string => Boolean(url?.trim())).map(url => url.trim()))];
+    const abi = parseAbi(["function token0() view returns(address)", "function token1() view returns(address)"]);
+    for (const url of urls) {
+      const client = createPublicClient({ transport: http(url, { timeout: 8000, retryCount: 0 }) });
+      let chainId: number;
+      try { chainId = await client.getChainId(); } catch { continue; }
+      if (chainId !== 5042) throw new Error("Arc route pool RPC network mismatch");
+      try {
+        // Restart the complete path on a verified endpoint after a read outage.
+        await validatePoolPath(pools, input.from, input.to, async address => Promise.all([
+          client.readContract({ address, abi, functionName: "token0" }),
+          client.readContract({ address, abi, functionName: "token1" }),
+        ]));
+        return { minimum, expiresAt: now + 30_000 };
+      } catch (error) {
+        if (!(error instanceof Error) || error.message !== "Arc route pool evidence unavailable") throw error;
+      }
     }
-    if (current !== input.to.toLowerCase()) throw new Error("Arc route pool output token mismatch");
-    return { minimum, expiresAt: now + 30_000 };
+    throw new Error("Arc route pool evidence unavailable");
   }
   const receiver = decoded.functionName === "dagSwapTo" ? decoded.args[1] : tx.from;
   const base = decoded.functionName === "dagSwapTo" ? decoded.args[2] : decoded.args[1];
@@ -60,4 +63,20 @@ export async function validateArcSwap(swap: Awaited<ReturnType<typeof getGeneric
   if (base.minReturnAmount <= 0n || base.minReturnAmount < minimum || base.minReturnAmount > BigInt(quote.toTokenAmount)) throw new Error("Arc route minimum received mismatch");
   if (base.deadLine <= BigInt(Math.floor(now / 1000) + 15)) throw new Error("Arc route expired");
   return { minimum: base.minReturnAmount, expiresAt: Math.min(now + 30_000, Number(base.deadLine) * 1000) };
+}
+
+async function validatePoolPath(pools: readonly bigint[], input: string, output: string,
+  read: (pool: Address) => Promise<readonly [Address, Address]>) {
+  const mask = (1n << 160n) - 1n;
+  let current = input.toLowerCase();
+  for (const packed of pools) {
+    const address = `0x${(packed & mask).toString(16).padStart(40, "0")}` as Address;
+    let tokens: readonly [Address, Address];
+    try { tokens = await read(address); } catch { throw new Error("Arc route pool evidence unavailable"); }
+    const reversed = (packed & (1n << 255n)) !== 0n;
+    const [from, to] = reversed ? [tokens[1], tokens[0]] : tokens;
+    if (from.toLowerCase() !== current) throw new Error("Arc route pool token path mismatch");
+    current = to.toLowerCase();
+  }
+  if (current !== output.toLowerCase()) throw new Error("Arc route pool output token mismatch");
 }

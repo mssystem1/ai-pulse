@@ -1,0 +1,237 @@
+{
+  "asOf": "2026-10-05T10:37:57.520Z",
+  "scope": "Arc execution readiness and direct pool-route RPC failover; no production activation or signed-wallet qualification",
+  "baseline": {
+    "asOf": "2026-10-05T10:18:49.857Z",
+    "mode": "public read-only; no signing or activation",
+    "chainId": 5042,
+    "providers": [
+      {
+        "label": "primary",
+        "rpc": "https://rpc.mainnet.arc.io",
+        "checks": [
+          {
+            "name": "chain",
+            "available": true,
+            "chainId": 5042
+          },
+          {
+            "name": "core-runtime",
+            "available": true,
+            "matches": [
+              {
+                "name": "registry",
+                "matches": true
+              },
+              {
+                "name": "oracleRouter",
+                "matches": true
+              },
+              {
+                "name": "executionAdapter",
+                "matches": true
+              },
+              {
+                "name": "spotFactory",
+                "matches": true
+              },
+              {
+                "name": "autopilotFactory",
+                "matches": true
+              },
+              {
+                "name": "spotBracketFactory",
+                "matches": true
+              },
+              {
+                "name": "spotProtectionFactory",
+                "matches": true
+              }
+            ]
+          },
+          {
+            "name": "factory-bindings",
+            "available": true,
+            "factories": [
+              {
+                "name": "spotFactory",
+                "matches": true
+              },
+              {
+                "name": "spotProtectionFactory",
+                "matches": true
+              },
+              {
+                "name": "spotBracketFactory",
+                "matches": true
+              },
+              {
+                "name": "autopilotFactory",
+                "matches": true
+              }
+            ]
+          },
+          {
+            "name": "qualification-roles-and-pause",
+            "available": false,
+            "errorName": "ContractFunctionExecutionError",
+            "shortMessage": "Request exceeds defined limit.",
+            "details": "rate limit exceeded"
+          }
+        ]
+      },
+      {
+        "label": "fallback",
+        "rpc": "https://rpc.quicknode.mainnet.arc.io",
+        "checks": [
+          {
+            "name": "chain",
+            "available": true,
+            "chainId": 5042
+          },
+          {
+            "name": "core-runtime",
+            "available": true,
+            "matches": [
+              {
+                "name": "registry",
+                "matches": true
+              },
+              {
+                "name": "oracleRouter",
+                "matches": true
+              },
+              {
+                "name": "executionAdapter",
+                "matches": true
+              },
+              {
+                "name": "spotFactory",
+                "matches": true
+              },
+              {
+                "name": "autopilotFactory",
+                "matches": true
+              },
+              {
+                "name": "spotBracketFactory",
+                "matches": true
+              },
+              {
+                "name": "spotProtectionFactory",
+                "matches": true
+              }
+            ]
+          },
+          {
+            "name": "factory-bindings",
+            "available": true,
+            "factories": [
+              {
+                "name": "spotFactory",
+                "matches": true
+              },
+              {
+                "name": "spotProtectionFactory",
+                "matches": true
+              },
+              {
+                "name": "spotBracketFactory",
+                "matches": true
+              },
+              {
+                "name": "autopilotFactory",
+                "matches": true
+              }
+            ]
+          },
+          {
+            "name": "qualification-roles-and-pause",
+            "available": false,
+            "errorName": "ContractFunctionExecutionError",
+            "shortMessage": "Request exceeds defined limit.",
+            "details": "rate limit exceeded"
+          }
+        ]
+      }
+    ],
+    "additionalSpendUsdc": "0",
+    "transactionsBroadcast": 0
+  },
+  "changes": {
+    "configuredFallbackRechecksCompleteEvidence": true,
+    "factoryAndRoleReadsPerSimulation": 15,
+    "healthyGateRpcRequests": 13,
+    "previousHealthyGateRpcRequests": 27,
+    "pausedGateRpcRequests": 11,
+    "concurrentChecksShareInflightReads": true,
+    "completedPermissionsOrPauseStateCached": false,
+    "wrongChainAndKnownNegativeEvidenceFailClosed": true,
+    "negativeCodeBindingRoleOrPauseNotMaskedByPartialReadFailure": true,
+    "emptyOrTruncatedMulticallCannotCertifyReadiness": true,
+    "directPoolRouteRevalidatesEveryHopOnFallback": true,
+    "fallbackConfiguredInLocalEnvironmentAndAllThreeExamples": true,
+    "publicFallbackReference": "https://docs.arc.io/arc/references/connect-to-arc"
+  },
+  "validation": {
+    "focusedReadinessAndRouteTests": {
+      "passed": 33,
+      "failed": 0,
+      "skipped": 0
+    },
+    "isolatedKeeperAndAutopilotWorkerTests": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "qualification": "Real scheduler/policy/journal code with isolated chain/storage/market fixtures"
+    },
+    "apiApplicationTests": {
+      "passed": 44,
+      "failed": 0,
+      "skipped": 0
+    },
+    "apiTypeScriptBuildPassed": true,
+    "cloudExportTests": {
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0
+    },
+    "compiledGate": {
+      "asOf": "2026-10-05T10:37:57.520Z",
+      "mode": "compiled API gate; read-only mainnet acceptance",
+      "chainId": 5042,
+      "qualificationOwner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+      "qualificationOwnerOnly": true,
+      "productionExecutorQualified": false,
+      "persistedTradingFlag": "0",
+      "persistedEmailWalletFlag": "0",
+      "isolatedProcessReachedRpcBranch": true,
+      "checks": [
+        {
+          "label": "primary",
+          "ready": false,
+          "reason": "Arc automated execution is paused on-chain"
+        },
+        {
+          "label": "fallback",
+          "ready": false,
+          "reason": "Arc automated execution is paused on-chain"
+        }
+      ],
+      "elapsedMs": 6334,
+      "additionalSpendUsdc": "0",
+      "transactionsBroadcast": 0,
+      "activationPerformed": false
+    }
+  },
+  "deploymentPerformed": false,
+  "pushPerformed": false,
+  "additionalSpendUsdc": "0",
+  "transactionsBroadcast": 0,
+  "remaining": [
+    "User's manual frontend/API release, including this readiness correction and fallback setting",
+    "Dedicated production executor setup and on-chain authorization; qualification-owner evidence does not qualify that executor",
+    "Production Circle app/subscription/email setup and live login/signing; user requested email wallets stay disabled",
+    "Remaining hosted and signed acceptance before explicit Arc trading activation"
+  ]
+}

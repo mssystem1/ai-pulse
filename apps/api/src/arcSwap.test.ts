@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeFunctionData } from "viem";
+import { decodeFunctionData, encodeFunctionData, encodeFunctionResult, parseAbi } from "viem";
 import { OKX_DAG_ABI } from "./okxDag.js";
 import { validateArcSwap } from "./arcSwap.js";
 
@@ -40,4 +40,69 @@ test("Arc direct V3 routes derive every token hop from mainnet pool evidence", a
   await assert.rejects(validateArcSwap(make(), input, now, async () => [usdc, other]), /output token/);
   await assert.rejects(validateArcSwap(make(), input, now, async () => { throw new Error("RPC outage"); }), /evidence unavailable/);
   for (const bad of [make([pool | (1n << 255n)]), make([pool | (1n << 253n)]), make([], BigInt(owner)), make([pool], BigInt(other)), make([pool], BigInt(owner), 1n), make([pool], BigInt(owner), 100000n, 1n)]) await assert.rejects(validateArcSwap(bad, input, now, read));
+});
+
+test("Arc pool validation uses fallback only for outages and rechecks every hop on mainnet", async t => {
+  const names = ["ARC_RPC_URL", "ARC_RPC_FALLBACK_URL", "ARC_OKX_ROUTER_ADDRESS"];
+  const before = Object.fromEntries(names.map(name => [name, process.env[name]]));
+  t.after(() => { for (const [name, value] of Object.entries(before)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } });
+  process.env.ARC_RPC_URL = "https://primary.fixture.invalid";
+  process.env.ARC_RPC_FALLBACK_URL = "https://fallback.fixture.invalid";
+  process.env.ARC_OKX_ROUTER_ADDRESS = router;
+  const secondPool = `0x${"4".repeat(40)}` as const;
+  const middle = `0x${"3".repeat(40)}` as const;
+  const swap = { ...sample(), tx: { ...sample().tx, data: encodeFunctionData({ abi: OKX_DAG_ABI,
+    functionName: "uniswapV3SwapTo", args: [BigInt(owner), 100000n, base.minReturnAmount, [BigInt(other), BigInt(secondPool)]] }) } };
+  const abi = parseAbi(["function token0() view returns(address)", "function token1() view returns(address)"]);
+  type Options = { failure?: "early" | "late"; allUnavailable?: boolean; wrongPrimaryChain?: boolean;
+    wrongFallbackChain?: boolean; mismatch?: "primary" | "fallback" };
+  const run = async (options: Options, verify: (operation: Promise<Awaited<ReturnType<typeof validateArcSwap>>>) => Promise<unknown>) => {
+    const reads: Array<{ provider: string; method: string; address?: string; functionName?: string }> = [];
+    const fetchMock = t.mock.method(globalThis, "fetch", async (requestUrl, init) => {
+      const provider = String(requestUrl).includes("primary") ? "primary" : "fallback";
+      const request = JSON.parse(String(init?.body));
+      const address = request.params?.[0]?.to?.toLowerCase();
+      const functionName = request.method === "eth_call" ? decodeFunctionData({ abi, data: request.params[0].data }).functionName : undefined;
+      reads.push({ provider, method: request.method, address, functionName });
+      if (options.allUnavailable || (provider === "primary" && (options.failure === "early"
+        || (options.failure === "late" && address === secondPool && functionName === "token1")))) return new Response("unavailable", { status: 503 });
+      let result: string;
+      if (request.method === "eth_chainId") result = (provider === "primary" ? options.wrongPrimaryChain : options.wrongFallbackChain) ? "0x4cef52" : "0x13b2";
+      else if (functionName) result = encodeFunctionResult({ abi, functionName,
+        result: functionName === "token0" ? (address === other ? usdc : middle)
+          : options.mismatch === provider ? other : address === other ? middle : weth });
+      else throw new Error(`Unexpected read-only RPC method: ${request.method}`);
+      return Response.json({ jsonrpc: "2.0", id: request.id, result });
+    });
+    try { await verify(validateArcSwap(swap, input, now)); return reads; }
+    finally { fetchMock.mock.restore(); }
+  };
+  await t.test("healthy primary does not contact fallback", async () => {
+    const reads = await run({}, async operation => assert.equal((await operation).minimum, base.minReturnAmount));
+    assert.ok(reads.every(read => read.provider === "primary"));
+  });
+  for (const failure of ["early", "late"] as const) await t.test(`${failure} outage revalidates both hops on fallback`, async () => {
+    const reads = await run({ failure }, async operation => assert.equal((await operation).minimum, base.minReturnAmount));
+    const fallback = reads.filter(read => read.provider === "fallback");
+    assert.equal(fallback[0].method, "eth_chainId");
+    assert.deepEqual(fallback.filter(read => read.method === "eth_call").map(read => [read.address, read.functionName]),
+      [[other, "token0"], [other, "token1"], [secondPool, "token0"], [secondPool, "token1"]]);
+  });
+  await t.test("primary testnet cannot be masked by a healthy fallback", async () => {
+    const reads = await run({ wrongPrimaryChain: true }, operation => assert.rejects(operation, /RPC network mismatch/));
+    assert.deepEqual(reads.map(read => read.method), ["eth_chainId"]);
+  });
+  await t.test("testnet fallback cannot supply pool evidence", async () => {
+    const reads = await run({ failure: "early", wrongFallbackChain: true }, operation => assert.rejects(operation, /RPC network mismatch/));
+    assert.deepEqual(reads.map(read => read.method), ["eth_chainId", "eth_chainId"]);
+  });
+  for (const mismatch of ["primary", "fallback"] as const) await t.test(`${mismatch} token mismatch blocks execution`, async () => {
+    const reads = await run({ mismatch, ...(mismatch === "fallback" ? { failure: "early" as const } : {}) },
+      operation => assert.rejects(operation, /pool token path mismatch/));
+    if (mismatch === "primary") assert.ok(reads.every(read => read.provider === "primary"));
+  });
+  await t.test("unavailable providers fail closed", async () => {
+    const reads = await run({ allUnavailable: true }, operation => assert.rejects(operation, /pool evidence unavailable/));
+    assert.deepEqual(reads.map(read => read.method), ["eth_chainId", "eth_chainId"]);
+  });
 });
