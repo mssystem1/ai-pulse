@@ -75,7 +75,7 @@ export async function fetchNetworkBalances(address: string, key: WebNetworkKey, 
   return { native: units(native, network.native.decimals), payment };
 }
 
-export async function fetchArcGatewayBalance(address: string): Promise<number> {
+export async function fetchArcGatewayBalanceAtomic(address: string): Promise<bigint> {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) throw new Error("Invalid Gateway depositor address");
   const response = await fetch("https://gateway-api.circle.com/v1/balances", {
     method: "POST", headers: { "Content-Type": "application/json" },
@@ -90,7 +90,10 @@ export async function fetchArcGatewayBalance(address: string): Promise<number> {
     const [whole, fraction = ""] = item.balance.split(".");
     atomic += BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
   }
-  return units(atomic, 6);
+  return atomic;
+}
+export async function fetchArcGatewayBalance(address: string): Promise<number> {
+  return units(await fetchArcGatewayBalanceAtomic(address), 6);
 }
 
 export const ARC_GATEWAY_WALLET = "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE" as const;
@@ -110,13 +113,15 @@ export function parseGatewayDepositAmount(amount: string): bigint {
   if (!/^\d{1,30}(?:\.\d{1,6})?$/.test(amount)) throw new Error("Enter a positive USDC amount with at most 6 decimal places");
   const [whole, fraction = ""] = amount.split(".");
   const value = BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0"));
-  if (value <= 0n) throw new Error("Enter a positive Gateway deposit amount");
+  if (value <= 0n) throw new Error("Enter a positive Gateway USDC amount");
   return value;
 }
 
 export async function depositArcGateway(provider: { request(args: { method: string; params?: unknown[] }): Promise<unknown> }, address: string, amount: string) {
   const value = parseGatewayDepositAmount(amount);
   await switchWalletNetwork(provider, "arc");
+  const accounts = await provider.request({ method: "eth_accounts" });
+  if (!Array.isArray(accounts) || String(accounts[0]).toLowerCase() !== address.toLowerCase()) throw new Error("Wallet account changed; reconnect the Gateway depositor before signing");
   const { createWalletClient, createPublicClient, custom, http, erc20Abi, defineChain } = await import("viem");
   const arc = defineChain({ id: WEB_NETWORKS.arc.chainId, name: WEB_NETWORKS.arc.label, nativeCurrency: WEB_NETWORKS.arc.native, rpcUrls: { default: { http: [WEB_NETWORKS.arc.rpc] } } });
   const account = address as `0x${string}`;
@@ -128,6 +133,9 @@ export async function depositArcGateway(provider: { request(args: { method: stri
   const approvalHash = await wallet.writeContract({ account, address: WEB_NETWORKS["arc"].payment.address, abi: erc20Abi, functionName: "approve", args: [ARC_GATEWAY_WALLET, value], gas: 120_000n });
   const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
   if (approvalReceipt.status !== "success") throw new Error("Gateway USDC approval reverted; no deposit submitted");
+  await switchWalletNetwork(provider, "arc");
+  const depositor = await provider.request({ method: "eth_accounts" });
+  if (!Array.isArray(depositor) || String(depositor[0]).toLowerCase() !== address.toLowerCase()) throw new Error("Wallet account changed after approval; no Gateway deposit submitted");
   const depositHash = await wallet.writeContract({ account, address: ARC_GATEWAY_WALLET, abi: gatewayAbi, functionName: "deposit", args: [WEB_NETWORKS["arc"].payment.address, value], gas: 350_000n });
   const depositReceipt = await publicClient.waitForTransactionReceipt({ hash: depositHash });
   if (depositReceipt.status !== "success") throw new Error("Gateway deposit reverted");

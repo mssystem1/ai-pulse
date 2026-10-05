@@ -15,13 +15,13 @@
   "actualDeploymentAndInitialConfigurationGasUSDC": "0.16482280241136",
   "status": "Seven core and four factory-created PULSE contracts source-verified; live contract, keeper, AI entry, paid service, agent/MCP and one browser workflow qualified; funds recovered and execution paused. Production Circle App ID, remaining signed UI flows and hosted release remain pending.",
   "accounting": "Reconcile all Arc deployment/configuration/qualification receipts and Gateway charges before each spending phase",
-  "actualConfirmedTransactionGasUSDC": "0.431935778921677042",
+  "actualConfirmedTransactionGasUSDC": "0.437333761620667042",
   "actualConfirmedResearchChargesUSDC": "1.20",
-  "confirmedSpentBeforeUnreconciledSwapLossesUSDC": "3.531935778921677042",
+  "confirmedSpentBeforeUnreconciledSwapLossesUSDC": "3.540833761620667042",
   "gatewayRemainingAfterQualifiedReportsUSDC": "0",
   "gatewayDepositIsSeparateCapital": true,
   "confirmedSpotRoundTripLossUSDC": "0.0006",
-  "transactionCount": 92,
+  "transactionCount": 95,
   "gasEvidence": [
     {
       "proof": "5042.json",
@@ -78,6 +78,10 @@
     {
       "proof": "5042-browser-gateway-qualification.json",
       "gasUSDC": "0.00285930142965"
+    },
+    {
+      "proof": "5042-gateway-withdrawal-qualification.json",
+      "gasUSDC": "0.00539798269899"
     }
   ],
   "paidEvidence": [
@@ -122,15 +126,22 @@
       "chargeUSDC": "1.50"
     }
   ],
-  "capitalStillToRecover": [],
-  "updatedAt": "2026-10-05T05:23:55.359Z",
+  "capitalStillToRecover": [
+    {
+      "account": "Circle Gateway",
+      "asset": "USDC",
+      "amount": "0.0065",
+      "status": "Retained service-payment balance; no delayed withdrawal initiated"
+    }
+  ],
+  "updatedAt": "2026-10-05T12:28:13.318Z",
   "actualConfirmedPaidChargesUSDC": "3.1",
   "supplementaryAgentAndBrowserChargesUSDC": "0.40",
   "supplementaryChargeAllocation": "Included in the existing qualification reserve; total approval remains 5 USDC",
-  "actualTotalSpendIncludingTradeLossesUSDC": "3.534676818912683849",
+  "actualTotalSpendIncludingTradeLossesUSDC": "3.543574801611673849",
   "realizedQualificationTradeLossUSDC": "0.002741039991006807",
-  "remainingAuthorizedSpendUSDC": "1.465323181087316151",
-  "walletUSDC": "1.831394181087316151",
+  "remainingAuthorizedSpendUSDC": "1.439925198388326151",
+  "walletUSDC": "1.815996198388326151",
   "qualificationVaultUSDC": "0",
   "qualificationVaultWETH": "0",
   "missingNonces": [],
@@ -138,5 +149,16 @@
   "registryPaused": true,
   "vaultPaused": true,
   "balanceEvidence": "ARC_MAINNET_BALANCE_AUDIT_2026-10-05.json",
-  "capitalEvidence": "ARC_MAINNET_CAPITAL_AUDIT_2026-10-05.json"
+  "capitalEvidence": "ARC_MAINNET_CAPITAL_AUDIT_2026-10-05.json",
+  "conservativeAuthorizationUsedUSDC": "3.560074801611673849",
+  "gatewayWithdrawalQualification": {
+    "proof": "5042-gateway-withdrawal-qualification.json",
+    "depositedUSDC": "0.02",
+    "withdrawnUSDC": "0.01",
+    "gatewayFeeUSDC": "0.0035",
+    "gasUSDC": "0.00539798269899",
+    "remainingGatewayUSDC": "0.0065",
+    "mintHash": "0x94fa886dab34db2044ae061fb701ba509d0706428e73c6c31d3cbdbe48b42907"
+  },
+  "authorizationAccounting": "Conservatively includes the full additional 0.02 USDC Gateway deposit, despite 0.01 returned and 0.0065 retained, plus all confirmed gas. Original 5 USDC approval unchanged."
 }

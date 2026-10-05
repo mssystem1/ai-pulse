@@ -11,7 +11,7 @@ export function useExecutionAvailability(network: WebNetworkKey, custody: "spot"
     const cacheKey = `${network}:${custody}`;
     let entry = cache.get(cacheKey);
     if (!entry || entry.until < Date.now()) {
-      const promise = apiGet(`/v1/trading/pairs?network=${network}&limit=1000${custody === "erc20" ? "&custody=erc20" : ""}`).then(response => {
+      const promise = apiGet(`/v1/trading/pairs?network=${network}&limit=5000${custody === "erc20" ? "&custody=erc20" : ""}`).then(response => {
         if (!response.ok) return { network, status: "unavailable" as const, pairs: new Set<string>() };
         const data = response.data as { pairs?: Array<{ pair: string; researchPairs?: string[] }> };
         if (!Array.isArray(data?.pairs)) return { network, status: "unavailable" as const, pairs: new Set<string>() };

@@ -16,6 +16,7 @@ import { put } from "@vercel/blob";
 import { opportunityUniverse } from "./opportunityUniverse.js";
 import { buildMarketContext, listSpotInstruments } from "@pulse/market";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, robinhoodAutopilotContext, resolveRobinhoodMarket } from "./robinhoodMarkets.js";
+import { isArcMarket, assertArcExecutionBinding, arcMarketContext, assertArcAutomationHistory } from "./arcMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
@@ -188,7 +189,7 @@ const StrategySchema = z.object({
   vault: z.string().regex(ADDRESS),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
-  pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
+  pair: z.string().regex(/^[A-Z0-9._-]{3,64}$/),
   timeframe: z.enum(["15m", "1H", "4H", "1D"]),
   strategyType: z.enum(["trend_following", "breakout", "mean_reversion"]).optional(),
   buyAmountAtomic: z
@@ -217,7 +218,7 @@ const StrategyPreflightSchema = z.object({
   network: z.enum(["xlayer", "base", "arbitrum", "robinhood", "arc"]),
   settlementAsset: Erc20AddressSchema,
   targetAsset: Erc20AddressSchema,
-  pair: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
+  pair: z.string().regex(/^[A-Z0-9._-]{3,64}$/),
   timeframe: z.enum(["15m", "1H", "4H", "1D"]).optional(),
   amountAtomic: z.string().regex(/^\d+$/).refine((value) => BigInt(value) > 0n),
   maxTradeValueAtomic: z.string().regex(/^\d+$/).refine(value => BigInt(value) > 0n).optional(),
@@ -667,6 +668,7 @@ function authorizationMessage(input: z.infer<typeof StrategySchema>) {
 }
 async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppConfig) {
   assertExecutionMarketIdentity(input.network, input.pair);
+  if (input.network === "arc") assertArcExecutionBinding(input.pair, input.targetAsset, input.settlementAsset);
   const { publicClient } = clients(input.network);
   const address = input.vault as `0x${string}`;
   const factory = configs[input.network].factory();
@@ -702,7 +704,9 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppCon
     throw new Error("Vault was not created by the configured Autopilot factory");
   const [base, quote, extra] = input.pair.toUpperCase().split("-");
   const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[input.network].id), name));
-  if (input.network === "robinhood" && isRobinhoodMarket(input.pair)) {
+  if (input.network === "arc" && isArcMarket(input.pair)) {
+    if (input.policy.signalMarket && input.policy.signalMarket !== input.pair) throw new Error("Arc strategy signals must use the selected contract market");
+  } else if (input.network === "robinhood" && isRobinhoodMarket(input.pair)) {
     await verifyRobinhoodMarketBinding(cfg, input.pair, input.targetAsset, input.settlementAsset);
     const binding = await resolveRobinhoodMarket(cfg, input.pair);
     if (input.policy.signalMarket && ![input.pair, ...binding.researchPairs].includes(input.policy.signalMarket))
@@ -717,11 +721,16 @@ async function verifyStrategy(input: z.infer<typeof StrategySchema>, cfg: AppCon
 export function createAutopilotAutomationRouter(cfg: AppConfig) {
   const router = Router();
   router.get("/v1/autopilot/market-readiness", asyncRoute(async (req, res) => {
-    const parsed = z.object({ network: z.literal("robinhood"), pair: z.string().max(64).refine(isRobinhoodMarket), timeframe: z.enum(["15m", "1H", "4H", "1D"]), alternatives: z.enum(["1"]).optional() }).safeParse(req.query);
-    if (!parsed.success) return res.status(400).json({ error: "Choose a Robinhood token and a supported timeframe" });
-    const { pair, timeframe, alternatives } = parsed.data;
+    const parsed = z.object({ network: z.enum(["robinhood", "arc"]), pair: z.string().max(64), timeframe: z.enum(["15m", "1H", "4H", "1D"]), alternatives: z.enum(["1"]).optional() }).safeParse(req.query);
+    if (!parsed.success || (parsed.data.network === "arc" ? !isArcMarket(parsed.data.pair) : !isRobinhoodMarket(parsed.data.pair))) return res.status(400).json({ error: "Choose a contract market and a supported timeframe" });
+    const { network, pair, timeframe, alternatives } = parsed.data;
     const check = async (value: string) => {
       try {
+        if (network === "arc") {
+          const market = await arcMarketContext({ instId: pair, timeframe: value, candleLimit: 120, completedOnly: true });
+          assertArcAutomationHistory(market.candles, value);
+          return { timeframe: value, ready: true, signalMarket: pair, signalSource: "arc-indexed-dex", reason: "Arc contract-specific completed history is available. Live entry, exit and wallet checks still run before setup." };
+        }
         const context = await robinhoodAutopilotContext(cfg, { instId: pair, timeframe: value });
         return { timeframe: value, ready: true, signalMarket: context.signalMarket, signalSource: context.signalSource,
           reason: context.signalSource === "verified-reference" ? `Signals use verified ${context.signalMarket} history. Trades and protection use the actual Robinhood token/USDG price. This source is included in your signed policy.` : "Token DEX strategy history is available. Route and wallet checks still run before setup." };
@@ -767,6 +776,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       let signalMarket: string | undefined;
       let settlementMark: number | undefined;
       assertExecutionMarketIdentity(network, pair);
+      if (network === "arc") assertArcExecutionBinding(pair, targetAsset, settlementAsset);
       if (network === "robinhood") {
         const readiness = await robinhoodAutomationReadiness(cfg);
         if (!readiness.ready) throw new Error(readiness.reason);
@@ -789,7 +799,12 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       const [targetSymbol, settlementSymbol, targetName, settlementName] = metadata.map(String);
       const [base, quote, extra] = pair.toUpperCase().split("-");
       const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(configs[network].id), name));
-      if (network === "robinhood" && isRobinhoodMarket(pair)) {
+      if (network === "arc" && isArcMarket(pair)) {
+        if (!parsed.data.timeframe) throw new Error("Choose the Arc Autopilot timeframe before setup");
+        const market = await arcMarketContext({ instId: pair, timeframe: parsed.data.timeframe, candleLimit: 120, completedOnly: true });
+        assertArcAutomationHistory(market.candles, parsed.data.timeframe);
+        signalMarket = pair; settlementMark = market.ticker.last;
+      } else if (network === "robinhood" && isRobinhoodMarket(pair)) {
         await verifyRobinhoodMarketBinding(cfg, pair, targetAsset, settlementAsset);
         if (!parsed.data.timeframe) throw new Error("Choose the Robinhood Autopilot timeframe before setup");
         const context = await robinhoodAutopilotContext(cfg, { instId: pair, timeframe: parsed.data.timeframe });
@@ -1056,6 +1071,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           if (!readiness.ready) throw new Error(readiness.reason);
         }
         assertExecutionMarketIdentity(s.network, s.pair);
+        if (s.network === "arc") assertArcExecutionBinding(s.pair, s.targetAsset, s.settlementAsset);
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
         const lastRiskCheck = Date.parse(s.lastRiskCheckAt || "");
@@ -1231,6 +1247,9 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             candleLimit: 120,
             completedOnly: true,
           });
+          if (s.network === "arc" && isArcMarket(s.pair)) {
+            assertArcAutomationHistory(market.candles, s.timeframe);
+          }
           const candleTs = market.candles.at(-1)?.ts || 0;
           // A quote rejected before submission did not execute the approved
           // entry. Recheck its real route without fabricating another signal;

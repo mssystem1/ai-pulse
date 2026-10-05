@@ -41,7 +41,7 @@ async function liveSpotInstruments() {
 
 export type SpotTicker = {
   /** Explicit for feeds whose currency differs from the execution settlement token. */
-  priceCurrency?: "USD" | "USDT" | "USDG";
+  priceCurrency?: "USD" | "USDT" | "USDG" | "USDC";
   statisticsApproximate?: boolean;
   instId: string;
   last: number;
@@ -66,7 +66,7 @@ export type Candle = {
 };
 
 export type SpotMarketContext = {
-  source: "okx-public-spot" | "okx-robinhood-dex";
+  source: "okx-public-spot" | "okx-robinhood-dex" | "arc-indexed-dex";
   instId: string;
   bar: string;
   ticker: SpotTicker;

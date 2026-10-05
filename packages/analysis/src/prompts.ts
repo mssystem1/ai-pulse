@@ -18,7 +18,7 @@ export function systemPrompt(tier: AnalysisTier, lang: AnalysisLang): string {
 - Derive wave targets from the supplied Fibonacci retracement/extension relationships and price levels. Every path needs a trigger, target, invalidation, sequence, and explanation.
 - Risk plan: suggested invalidation, rough R:R framing, position-sizing caution for agents.
 - Agent checklist: 5 actionable bullets an AI agent must verify before executing.
-- Cite levels only from the provided OKX candle series (no external chart images).
+- Cite levels only from the provided source-labelled candle series (no external chart images).
 </premium_requirements>`
       : `
 <base_requirements>
@@ -27,14 +27,14 @@ export function systemPrompt(tier: AnalysisTier, lang: AnalysisLang): string {
 - One primary target zone and one invalidation.
 - Provide a concise Elliott hypothesis and 1-2 wave-specific next paths (for example wave 3 continuation, wave 5 continuation, A-B-C correction, wave C continuation, or count invalidation). Do not output generic bull/base/bear scenarios.
 - Short agent action line (wait / size-down / ok-within-risk).
-- Rely only on the provided OKX OHLCV / ticker JSON (no chart images).
+- Rely only on the provided source-labelled OHLCV / ticker JSON (no chart images).
 </base_requirements>`;
 
-  return `You are PULSE Market Desk — a senior crypto spot market analyst for OKX spot markets.
+  return `You are PULSE Market Desk — a senior analyst for exchange and contract-specific spot markets.
 You assist both human traders and AI agents.
 
 <rules>
-1. Use ONLY the provided market JSON (ticker + OHLCV summary/candles from OKX). Do not invent candles or use chart images.
+1. Use ONLY the provided market JSON (ticker + OHLCV summary/candles, with their declared source and price currency). Do not invent candles or use chart images.
 
 2. If data is thin or inconsistent, lower confidence and say what is missing.
 3. You MAY give scenario price targets, but label them as scenarios not guarantees.
@@ -98,7 +98,7 @@ export function userPromptPayload(opts: {
   userNote?: string;
 }): string {
   return `<task tier="${opts.tier}" lang="${opts.lang}">
-Analyze OKX spot ${opts.instId} on timeframe ${opts.timeframe}.
+Analyze spot market ${opts.instId} on timeframe ${opts.timeframe}.
 Chart image attached: ${opts.hasImage ? "yes" : "no"}.
 ${opts.userNote ? `User note: ${opts.userNote}` : ""}
 </task>

@@ -546,6 +546,7 @@ export async function getOkxTradeTokens(
     }
     let tokens: Record<string, unknown>[];
     try { tokens = await request; }
+    catch (error) { if (chainId !== "5042") throw error; tokens = []; }
     finally { if (tradeTokenRequests.get(cacheKey) === request) tradeTokenRequests.delete(cacheKey); }
     cached = { expiresAt: Date.now() + 5 * 60_000, tokens };
     tradeTokenCache.set(cacheKey, cached);
@@ -556,6 +557,16 @@ export async function getOkxTradeTokens(
   if (query === "eth" || query === "weth") { aliases.add("eth"); aliases.add("weth"); }
   if (query === "usdt" || query === "usdt0" || query === "usdc") { aliases.add("usdt"); aliases.add("usdt0"); aliases.add("usdc"); }
   let chainTokens = cached.tokens;
+  if (chainId === "5042") {
+    const { arcTokenCatalog } = await import("./arcMarkets.js");
+    const indexed = await arcTokenCatalog().catch(() => []);
+    chainTokens = [...chainTokens, ...indexed.map(token => ({
+      tokenSymbol: token.symbol, tokenName: token.name, tokenContractAddress: token.address,
+      decimals: token.decimals, tokenLogoUrl: token.logoUrl, tokenSource: token.provider,
+      priceUsd: token.priceUsd, change24h: token.change24h, liquidityUsd: token.liquidityUsd,
+      marketCapUsd: token.marketCapUsd, holders: token.holders,
+    }))];
+  }
   if (chainId === "4663") {
     const { robinhoodStockCatalog } = await import("./robinhoodAssetRegistry.js");
     const stocks = await robinhoodStockCatalog().catch(() => []);
@@ -589,6 +600,8 @@ export async function getOkxTradeTokens(
       decimals: Number(item.decimals ?? item.decimal ?? 18),
       logoUrl: typeof item.tokenLogoUrl === "string" ? item.tokenLogoUrl : null,
       chainId,
+      ...(chainId === "5042" ? { priceUsd: item.priceUsd ?? null, change24h: item.change24h ?? null,
+        liquidityUsd: item.liquidityUsd ?? null, marketCapUsd: item.marketCapUsd ?? null, holders: item.holders ?? null } : {}),
       ...(typeof item.priceMultiplier === "string" ? { priceMultiplier: item.priceMultiplier } : {}),
       provider: item.tokenSource === "Coinbase" ? "Coinbase wrapped asset · OKX Onchain OS route" : String(item.tokenSource || "OKX Onchain OS"),
     }))

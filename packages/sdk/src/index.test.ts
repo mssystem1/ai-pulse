@@ -2,6 +2,19 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PulseClient } from "./index.js";
 
+test("Arc catalog and readiness SDK methods preserve full contract IDs and never attach a payment", async () => {
+  const calls: { url: string; signature: string | null }[] = [];
+  const client = new PulseClient({ baseUrl: "https://pulse.example", network: "arc", paymentSignature: "unused", fetchImpl: (async (input, init) => {
+    calls.push({ url: String(input), signature: new Headers(init?.headers).get("PAYMENT-SIGNATURE") }); return Response.json({});
+  }) as typeof fetch });
+  const pair = `MEME.${"a".repeat(40)}-USDC`;
+  await client.tradingPairs("MEME"); await client.resolveTradeMarket(pair); await client.autopilotMarketReadiness(pair, "15m");
+  for (const call of calls) { const url = new URL(call.url); assert.equal(url.searchParams.get("network"), "arc"); assert.equal(call.signature, null); }
+  assert.equal(new URL(calls[0].url).searchParams.get("limit"), "5000");
+  assert.equal(new URL(calls[1].url).searchParams.get("pair"), pair);
+  assert.equal(new URL(calls[2].url).searchParams.get("pair"), pair);
+});
+
 test("canonical analysis returns a job and polls it without another payment", async () => {
   const calls: Array<{ url: string; headers: Headers }> = [];
   const responses = [

@@ -1314,3 +1314,11 @@ html[data-pulse-theme="base"] .trade-mode-tabs button.active,html[data-pulse-the
 /* Mainnet network mark; Horizon appearance keeps its saved preference ID. */
 .timeframe-network-logo.arc { border-radius: 50%; }
 .theme-arc { --chain-primary: #c7d7dc; --chain-secondary: #78c8dd; --chain-glow: rgba(120,200,221,.18); }
+.arc-gateway-funding { min-width: 0; }
+.arc-gateway-funding .quote-meta { display: flex; flex-wrap: wrap; gap: 12px; }
+.arc-gateway-funding .quote-meta > span { flex: 1 1 135px; min-width: 0; overflow-wrap: anywhere; }
+.gateway-withdraw-fallback { padding: 14px; border: 1px solid var(--line); border-radius: 12px; }
+.gateway-withdraw-fallback summary { cursor: pointer; line-height: 1.5; }
+.gateway-withdraw-fallback > * + * { margin-top: 12px; }
+.gateway-withdraw-fallback label { display: block; line-height: 1.6; }
+.gateway-withdraw-fallback input[type="checkbox"] { width: auto; margin-right: 6px; }

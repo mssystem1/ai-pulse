@@ -161,6 +161,21 @@ export class PulseClient {
     return this.request("GET", `/v1/trading/tokens?${new URLSearchParams({ network: this.network, q: search })}`);
   }
 
+  /** Includes address-specific Arc USDC markets; a listing is not a verified route. */
+  async tradingPairs(search = "", limit = 5000): Promise<unknown> {
+    return this.request("GET", `/v1/trading/pairs?${new URLSearchParams({ network: this.network, q: search, limit: String(Math.min(5000, Math.max(1, Math.floor(limit)))) })}`);
+  }
+
+  /** Read-only entry and exit route checks. Actual execution requotes its amount. */
+  async resolveTradeMarket(pair: string): Promise<unknown> {
+    return this.request("GET", `/v1/trading/resolve-pair?${new URLSearchParams({ network: this.network, pair, custody: "erc20" })}`);
+  }
+
+  /** Checks contract-specific completed history before funding or purchasing a pass. */
+  async autopilotMarketReadiness(instId: string, timeframe = "1H"): Promise<unknown> {
+    return this.request("GET", `/v1/autopilot/market-readiness?${new URLSearchParams({ network: this.network, pair: instId, timeframe })}`);
+  }
+
   async quoteTrade(body: PulseTradeRequest): Promise<unknown> {
     return this.request("POST", "/v1/trading/quote", { ...body, network: this.network });
   }

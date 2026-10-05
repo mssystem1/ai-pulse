@@ -59,6 +59,7 @@ const snapshots = new Map<string, { value: OnchainAccountSnapshot; expiresAt: nu
 const inflight = new Map<string, Promise<OnchainAccountSnapshot>>();
 
 export async function readSnapshot(network: ExecutionNetwork, owner: string, client: PublicClient = executionPublicClient(network)): Promise<OnchainAccountSnapshot> {
+  if (await client.getChainId() !== NETWORKS[network].id) throw new Error("Account discovery RPC returned the wrong network");
   const protectionFactory = executionContractAddress(network, "spotFactory");
   const limitFactory = executionContractAddress(network, "spotLimitFactory");
   const bracketFactory = executionContractAddress(network, "spotBracketFactory");
@@ -71,20 +72,26 @@ export async function readSnapshot(network: ExecutionNetwork, owner: string, cli
   ];
   const results = contracts.length ? await client.multicall({ contracts, allowFailure: true }) : [];
   let cursor = 0;
-  const account = (configured: string | null) => {
+  const account = (configured: string | null, kind: string) => {
     if (!configured) return null;
     const result = results[cursor++];
-    const value = result?.status === "success" ? String(result.result) : "";
-    return ADDRESS.test(value) && !ZERO.test(value) ? value : null;
+    if (result?.status !== "success" || typeof result.result !== "string" || !ADDRESS.test(result.result)) {
+      throw new Error(`Spot ${kind} account discovery is unavailable; existing accounts must not be treated as absent.`);
+    }
+    return ZERO.test(result.result) ? null : result.result;
   };
-  const protection = account(protectionFactory);
-  const limit = account(limitFactory);
-  const bracket = account(bracketFactory);
+  const protection = account(protectionFactory, "protection");
+  const limit = account(limitFactory, "limit");
+  const bracket = account(bracketFactory, "bracket");
   let vaultAddresses: string[] = [];
   if (autopilotFactory) {
     const result = results[cursor++];
     if (result?.status !== "success" || !Array.isArray(result.result)) throw new Error("Autopilot account discovery is unavailable; existing accounts must not be treated as absent.");
-    vaultAddresses = result.result.map(String).filter((value) => ADDRESS.test(value) && !ZERO.test(value));
+    if (result.result.some(value => typeof value !== "string" || !ADDRESS.test(value) || ZERO.test(value))
+      || new Set(result.result.map(value => value.toLowerCase())).size !== result.result.length) {
+      throw new Error("Autopilot account discovery returned invalid accounts; existing accounts must not be treated as absent.");
+    }
+    vaultAddresses = result.result;
   }
   const vaults: OnchainAccountSnapshot["vaults"] = [];
   // Bounded batches, not two concurrent RPC calls per vault. Keep factory order
@@ -120,19 +127,22 @@ export async function readSnapshot(network: ExecutionNetwork, owner: string, cli
 }
 
 /** One cached, coalesced contract snapshot replaces independent browser factory polling. */
-export async function getOnchainAccountSnapshot(network: ExecutionNetwork, owner: string, fresh = false) {
+export async function getOnchainAccountSnapshot(network: ExecutionNetwork, owner: string, fresh = false, reader = readSnapshot) {
   const key = `${network}:${owner.toLowerCase()}`;
   const cached = snapshots.get(key);
   if (!fresh && cached && cached.expiresAt > Date.now()) return cached.value;
-  const pending = inflight.get(key);
-  if (pending) return pending;
-  const request = readSnapshot(network, owner)
-    .then((value) => { snapshots.set(key, { value, expiresAt: Date.now() + 30_000 }); return value; })
-    .catch((error) => {
-      if (cached) return { ...cached.value, stale: true };
-      throw error;
-    })
-    .finally(() => inflight.delete(key));
-  inflight.set(key, request);
-  return request;
+  let request = inflight.get(key);
+  if (!request) {
+    request = reader(network, owner)
+      .then((value) => { snapshots.set(key, { value, expiresAt: Date.now() + 30_000 }); return value; })
+      .finally(() => inflight.delete(key));
+    inflight.set(key, request);
+  }
+  try { return await request; }
+  catch (error) {
+    // Display may keep a visibly stale snapshot. Confirmation after a wallet
+    // transaction must wait for a new read, including when sharing a request.
+    if (cached && !fresh) return { ...cached.value, stale: true };
+    throw error;
+  }
 }

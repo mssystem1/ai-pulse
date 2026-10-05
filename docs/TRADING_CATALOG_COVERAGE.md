@@ -1,5 +1,17 @@
 # Trading catalog coverage and route ordering
 
+## Arc mainnet update — 2026-10-05
+
+Arc discovery now combines the [RadarDex index exposed by Arcodex](https://www.arcodex.fun/tokens) with official Arc token deployments. The live read returned **2,000 indexed contracts**, plus USDC, WETH, cirBTC and EURC: **2,004 Risk Guard tokens**, **2,003 address-specific USDC markets**, and two canonical exchange-research mappings (`ETH-USDT` → published WETH; `BTC-USDT` → published cirBTC). The actual SDK/API check returned **2,005 execution catalog entries** and **3,146 Global instruments**, combining Arc markets and OKX research instruments. These are observed catalog counts, not counts of safe or fully qualified markets.
+
+Global, Spot and Autopilot share complete-address `SYMBOL.<40-hex-address>-USDC` IDs. Use the exact ID returned by the catalog, including its capitalization. Duplicate tickers are retained as distinct contracts; the UI displays a contract hint and full-address tooltip. Risk Guard searches names, symbols and addresses and still accepts a manual address. Search supports the full catalog while rendering batches of 100 to keep large pickers usable.
+
+The route resolver verifies Arc chain 5042, actual token metadata, canonical Arc USDC, an entry quote and its reverse exit quote. Unknown provider evidence remains unknown. The actual order requotes its amount, so an indicative one-USDC route does not guarantee another amount or future liquidity. Native memecoin research uses the selected contract's USDC candle feed, preserving source/freshness and approximate-statistics disclosures. Autopilot additionally requires at least 50 recent consecutive completed candles for the actual contract and timeframe. Listings alone cannot qualify a strategy or authorize payment/funding.
+
+Both Global and execution catalog requests are bounded at 5,000. The upstream index returned 2,000 despite the larger request; this covers that feed, not every Arc contract. The browser displayed address-specific COOL markets and verified routes; direct SDK checks confirmed COOL's exact contract, USDC routing and 1H readiness. See [current catalog and withdrawal evidence](ARC_MAINNET_CATALOG_WITHDRAWAL_AUDIT_2026-10-05.json). Production execution remains paused pending final acceptance and manual release.
+
+## Earlier multichain review
+
 Reviewed September 28, 2026. This follows the screenshot with unavailable XBSP/XBE entries above routable CRV/COMP.
 
 ## Findings and changes

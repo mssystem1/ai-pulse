@@ -4,6 +4,7 @@ import { getOkxTradeTokens, okxDexGetMany, createOkxDexHeaders } from "./okxDex.
 import { ROBINHOOD_USDG, NATIVE_ETH, ROBINHOOD_WETH } from "./robinhoodExecutionAssets.js";
 import { robinhoodStockCatalog } from "./robinhoodAssetRegistry.js";
 import { robinhoodIssuerPrice } from "./robinhoodIssuerPrice.js";
+import { isArcMarket, arcMarketContext } from "./arcMarkets.js";
 
 const candleCaches = new WeakMap<AppConfig, Map<string, { expiresAt: number; request: Promise<Candle[]> }>>();
 
@@ -140,6 +141,7 @@ export function robinhoodSettlementMark(asset: Pick<Candle, "ts" | "close">, set
 }
 
 export async function executionSettlementTicker(cfg: AppConfig, pair: string) {
+  if (isArcMarket(pair)) return (await arcMarketContext({ instId: pair, timeframe: "1H", candleLimit: 25 })).ticker;
   if (!isRobinhoodMarket(pair)) return getTicker(pair);
   const market = await resolveRobinhoodMarket(cfg, pair);
   const [latestAsset, latestSettlement] = await robinhoodLiveMarks(cfg, [market.token.address, ROBINHOOD_USDG]);
@@ -195,8 +197,9 @@ export async function robinhoodMarketContext(cfg: AppConfig, input: { instId: st
     summary: summarizeCandles(candles), fetchedAt: new Date().toISOString() };
 }
 export const executionMarketContext = (cfg: AppConfig, input: { instId: string; timeframe: string; candleLimit: number; completedOnly?: boolean }) =>
-  isRobinhoodMarket(input.instId) ? robinhoodMarketContext(cfg, input) : buildMarketContext(input);
-export const executionTicker = async (cfg: AppConfig, pair: string) => isRobinhoodMarket(pair)
+  isArcMarket(input.instId) ? arcMarketContext(input) : isRobinhoodMarket(input.instId) ? robinhoodMarketContext(cfg, input) : buildMarketContext(input);
+export const executionTicker = async (cfg: AppConfig, pair: string) => isArcMarket(pair)
+  ? (await arcMarketContext({ instId: pair, timeframe: "1H", candleLimit: 25 })).ticker : isRobinhoodMarket(pair)
   ? (await robinhoodMarketContext(cfg, { instId: pair, timeframe: "1H", candleLimit: 25 })).ticker : getTicker(pair);
 
 /** Reference candles are signals, never prices or liquidity for the traded token. */

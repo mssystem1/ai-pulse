@@ -30,7 +30,7 @@ import { rebaseReportTrade } from "./reportTradeHandoff";
 import { reportTierLabel } from "./reportLabels";
 import type { Lang } from "./i18n";
 import { ShortlistMarketChart, SpotMarketPreview } from "./SpotMarketPreview";
-import { confirmedTradeMarkers } from "./marketPreview";
+import { confirmedTradeMarkers, isArcMarketPair } from "./marketPreview";
 import { AutopilotDecisionJournal, type DecisionEntry } from "./AutopilotDecisionJournal";
 import { decisionAuditColumns, serializeAuditCsv } from "./autopilotExport";
 import { renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
@@ -4162,15 +4162,16 @@ export function AutopilotWorkspace({
   const [pair, setPair] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState("4H");
   const historyScope = `${networkKey}:${pair}:${timeframe}`;
+  const requiresMarketHistory = networkKey === "robinhood" || networkKey === "arc" && isArcMarketPair(pair);
   const [historyCheck, setHistoryCheck] = useState<{ scope: string; ready: boolean; reason: string; signalMarket?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> } | null>(null);
   const [historyAttempt, setHistoryAttempt] = useState(0);
   const [checkOtherTimeframes, setCheckOtherTimeframes] = useState(false);
   useEffect(() => {
-    if (!setupOpen || networkKey !== "robinhood" || !/\.[A-F0-9]{16}-USDG$/.test(pair)) return;
+    if (!setupOpen || !requiresMarketHistory) return;
     let cancelled = false;
     setHistoryCheck(null);
     const timer = setTimeout(() => {
-      void apiGet(`/v1/autopilot/market-readiness?network=robinhood&pair=${encodeURIComponent(pair)}&timeframe=${encodeURIComponent(timeframe)}${checkOtherTimeframes ? "&alternatives=1" : ""}`)
+      void apiGet(`/v1/autopilot/market-readiness?network=${networkKey}&pair=${encodeURIComponent(pair)}&timeframe=${encodeURIComponent(timeframe)}${checkOtherTimeframes ? "&alternatives=1" : ""}`)
         .then(response => {
           if (cancelled) return;
           const data = response.data as { ready?: boolean; reason?: string; signalMarket?: string; alternatives?: Array<{ timeframe: string; ready: boolean; reason: string }> };
@@ -4178,7 +4179,7 @@ export function AutopilotWorkspace({
         }).catch(() => { if (!cancelled) setHistoryCheck({ scope: historyScope, ready: false, reason: "Market history check is temporarily unavailable. Retry before setup." }); });
     }, 400);
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [setupOpen, historyScope, historyAttempt, checkOtherTimeframes]);
+  }, [setupOpen, historyScope, historyAttempt, checkOtherTimeframes, requiresMarketHistory, networkKey, pair, timeframe]);
   const [maxTrade, setMaxTrade] = useState("50");
   const [dailyLoss, setDailyLoss] = useState("3");
   const [riskProfile, setRiskProfile] = useState<
@@ -4934,7 +4935,7 @@ export function AutopilotWorkspace({
       if (!preflight.ok)
         throw new Error(`${errorText(preflight.data)} No wallet transaction was sent.`);
       const signalMarket = (preflight.data as { signalMarket?: string }).signalMarket;
-      if (networkKey === "robinhood" && (!signalMarket || historyCheck?.scope !== historyScope || historyCheck.signalMarket !== signalMarket)) {
+      if (requiresMarketHistory && (!signalMarket || historyCheck?.scope !== historyScope || historyCheck.signalMarket !== signalMarket)) {
         setHistoryAttempt(value => value + 1);
         throw new Error("The strategy signal source changed. Review the refreshed history source before starting. No wallet transaction was sent.");
       }
@@ -4944,7 +4945,7 @@ export function AutopilotWorkspace({
         maxTradePct: Number(maxTrade),
         dailyLossPct: Number(dailyLoss),
         strategy,
-        ...(networkKey === "robinhood" ? { signalMarket } : {}),
+        ...(requiresMarketHistory ? { signalMarket } : {}),
       };
       const policyHash = keccak256(toHex(JSON.stringify(policy)));
       const provider = getInjectedProvider();
@@ -5731,7 +5732,7 @@ export function AutopilotWorkspace({
   const editNotReady = autopilotPage === "edit" && Boolean(activeStrategy) && editConfiguration?.scope !== editScope;
   const startDisabled =
     busy || unchangedEdit || editNotReady ||
-    (networkKey === "robinhood" && (historyCheck?.scope !== historyScope || !historyCheck.ready)) ||
+    (requiresMarketHistory && (historyCheck?.scope !== historyScope || !historyCheck.ready)) ||
     !wallet ||
     !capability?.autopilot.enabled ||
     !autopilotRouteAvailable ||
@@ -5750,9 +5751,9 @@ export function AutopilotWorkspace({
         ? "Autopilot execution unavailable"
         : !autopilotRouteAvailable
           ? "Choose a pair with a live route"
-          : networkKey === "robinhood" && historyCheck?.scope !== historyScope
+          : requiresMarketHistory && historyCheck?.scope !== historyScope
             ? "Checking strategy history…"
-          : networkKey === "robinhood" && !historyCheck?.ready
+          : requiresMarketHistory && !historyCheck?.ready
             ? "Choose a market/timeframe with sufficient history"
           : effectiveCapital <= 0n
             ? `Enter ${WEB_NETWORKS[networkKey].payment.symbol} capital to continue`
@@ -5857,7 +5858,7 @@ export function AutopilotWorkspace({
               />
             </div>
           </div>
-          {networkKey === "robinhood" && <section className="v6-message" role="status" aria-label="Autopilot market history">
+          {requiresMarketHistory && <section className="v6-message" role="status" aria-label="Autopilot market history">
             <strong>{historyCheck?.scope !== historyScope ? "Checking strategy history…" : historyCheck.ready ? "Strategy history available" : "This market/timeframe is not ready for Autopilot"}</strong>
             <p>{historyCheck?.scope === historyScope ? historyCheck.reason : "Checking completed candles before any funding, payment or wallet signature."}</p>
             {signalSourceChanged && <p>The existing strategy uses {activeStrategy?.policy?.signalMarket || activeStrategy?.pair}. Saving this change requires a new owner-signed policy; it does not change the asset traded.</p>}
@@ -7434,6 +7435,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-auto-rules", "Autopilot rules"],
     ["docs-auto-example", "Autopilot example"],
     ["docs-pay", "Payments"],
+    ["docs-arc", lang === "zh" ? "Arc 主网与 USDC" : "Arc mainnet & USDC"],
     ["docs-robinhood", "Robinhood & USDG"],
     ["docs-agents", "Agents & API"],
     ["docs-recover", "Report history"],
@@ -7467,6 +7469,38 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
         </aside>
         <div className="docs-content">
           <div hidden={article !== "docs-workflows"}><DocsWorkflowVisuals /></div>
+          <section id="docs-arc" className="docs-section" hidden={article !== "docs-arc"} data-no-localize>
+            <div className="docs-copy">
+              <span className="eyebrow">ARC MAINNET · 5042 · USDC</span>
+              <h3>{lang === "zh" ? "选择 Arc，核对资产与资金来源" : "Choose Arc, then review the asset and funding source"}</h3>
+              <ol>
+                <li>{lang === "zh" ? "在顶部“网络与支付”中选择 Arc Mainnet。钱包连接面板也支持 Arc；付款或签名交易前，请确认钱包网络为 5042。外观设置不改变网络。" : "Select Arc Mainnet in Network & payment. The wallet connection panel also includes Arc. Confirm wallet chain 5042 before payment or a transaction signature. Appearance settings do not change the network."}</li>
+                <li>{lang === "zh" ? "钱包 USDC 用于交易资金与网络费用。原生 18 位接口和代币 6 位接口读取同一笔余额；请勿相加。Circle Gateway 余额单独显示，用于研究服务与 Autopilot 通行证支付。" : "Wallet USDC funds trading and network fees. The native 18-decimal and ERC-20 6-decimal interfaces read the same wallet balance; do not add them together. Circle Gateway balance is separate and pays for research services and Autopilot passes."}</li>
+                <li>{lang === "zh" ? "在“钱包与资金”中查看 Gateway 余额，检查充值金额与授权后再签名。钱包有余额不代表 Gateway 已有余额。Arc 测试网资金不能支付主网服务。" : "Open Wallet & funding to check Gateway balance. Review the deposit amount and approval before signing. A funded wallet does not imply a funded Gateway balance. Arc testnet funds cannot pay for mainnet services."}</li>
+              </ol>
+              <h4>{lang === "zh" ? "交易与 Autopilot 的资金流程" : "Spot and Autopilot funding workflow"}</h4>
+              <ul>
+                <li>{lang === "zh" ? "Spot Market：选择合约与交易对 → 核对实时路由、金额及滑点 → 在钱包签署兑换 → 代币回到同一钱包。研究报告不会自动发起交易。" : "Spot Market: select the contract and pair → review the live route, amount and slippage → sign the swap in your wallet → receive tokens in that wallet. A research report does not place a trade automatically."}</li>
+                <li>{lang === "zh" ? "Limit / TP-SL / bracket：从钱包将资金转入自己的订单账户，审核并授权入场及保护条件。Keeper 只能按批准的条件执行；取消订单按其状态返还未使用的托管资金。" : "Limit / TP-SL / bracket: fund your owner order account from your wallet, review and authorize entry/protection conditions. Keepers execute within those conditions. Cancellation returns unused escrow according to the order state."}</li>
+                <li>{lang === "zh" ? "Autopilot：选择市场 → 检查买卖路由与 K 线 → 配置风险策略 → 从钱包充值自己的 vault → 授权策略 → 从 Gateway 购买通行证 → 启动。交易在 vault 内执行；Gateway 不提供交易本金。" : "Autopilot: select the market → verify entry/exit routes and candles → configure risk policy → fund your owner vault from your wallet → authorize the strategy → buy an Entry Pass from Gateway → start. Trades execute inside the vault; Gateway does not supply trading capital."}</li>
+              </ul>
+              <h4>{lang === "zh" ? "Gateway 充值与提取" : "Gateway deposit and withdrawal"}</h4>
+              <p>{lang === "zh" ? "打开“钱包与资金”。充值需审核 USDC 授权和 Gateway 存款两笔交易。选择“提取到钱包”，输入金额并查看实时最高费用；审核提取签名，再签署将 USDC 铸回同一 Arc 钱包的交易。Gateway 余额必须覆盖金额与费用，钱包须另有 USDC 支付手续费。正常提取无需七天等待。" : "Open Wallet & funding. Deposit requires USDC approval and a Gateway deposit transaction. Choose Withdraw to wallet, enter the amount and review the live maximum fee. Review the withdrawal signature, then sign the mint transaction back to the same Arc wallet. Gateway balance must cover the amount plus fee; keep wallet USDC for gas. Normal withdrawal has no seven-day waiting period."}</p>
+              <p>{lang === "zh" ? "若提取中断，请使用“继续提取”，并保留浏览器恢复记录；不会自动创建新的扣款授权。备用合约提取需明确发起、等待实际领取区块（通常约七天），再领取到钱包。已有备用提取等待期间不能追加金额，以免重置等待期。" : "If interrupted, use Resume withdrawal and keep browser recovery storage; a new debit is not authorized automatically. The contract fallback requires explicit initiation, a wait until the actual claim block (usually about seven days), then a claim to the wallet. Additional delayed withdrawals are blocked while one is pending to avoid resetting its delay."}</p>
+              <p>{lang === "zh" ? "Gateway 提取不等于从交易账户或 vault 提取资金，也不会停止策略。请分别使用账户的取消、暂停与提取控件。" : "Gateway withdrawal does not withdraw trading-account or vault capital and does not stop a strategy. Use the account's cancel, pause and withdrawal controls separately."}</p>
+              <h4>{lang === "zh" ? "Arc 原生代币、模因币与路由" : "Arc-native tokens, memecoins and routes"}</h4>
+              <p>{lang === "zh" ? "Global Market、Spot 与 Autopilot 使用 Arc 合约目录。Risk Guard 支持按名称、代码或地址搜索，也支持手动输入合约。目录包含官方部署与 RadarDex 经 Arcodex 提供的主网索引；收录不是安全结论。" : "Global Market, Spot and Autopilot use the Arc contract catalog. Risk Guard searches names, tickers and addresses and also accepts a manually entered contract. Discovery combines official deployments with the mainnet index from RadarDex via Arcodex. A listing is not a safety verdict."}</p>
+              <ul>
+                <li>{lang === "zh" ? "同名代币按完整合约地址区分。研究中的 ETH/BTC 仅映射到 Arc 官方 WETH/cirBTC 合约；模因币使用自身合约的 USDC 行情，不借用同名交易所币种价格。" : "Duplicate tickers remain distinct by full contract address. Exchange ETH/BTC research maps only to the published Arc WETH/cirBTC contracts. Memecoins use their own contract's USDC prices rather than an exchange asset with a similar ticker."}</li>
+                <li>{lang === "zh" ? "“Route available”默认开启，自动检查合约与买入、卖出路由。选择“All assets”可查看尚未确认路由的条目；报价故障会显示未知并重试。下单金额仍需重新报价。" : "Route available is selected by default and automatically checks the contract plus entry and exit routes. Choose All assets to browse entries whose routes have not been confirmed. Provider failures remain unknown and are retried. Your actual order amount is quoted again."}</li>
+                <li>{lang === "zh" ? "Autopilot 还需要所选合约与周期的至少 50 根连续、近期、已收盘 K 线。流动性或行情不足时，先更换市场或重试，再考虑充值或购买通行证。" : "Autopilot also needs at least 50 consecutive, recent completed candles for that contract and timeframe. If routes or history are unavailable, choose another market or retry before funding or purchasing a pass."}</li>
+              </ul>
+              <h4>{lang === "zh" ? "当前可用性与恢复" : "Current availability and recovery"}</h4>
+              <p>{lang === "zh" ? "Arc 交易合约已部署并公开验证，但 Spot 和 Autopilot 的生产激活仍暂停。研究服务按各自状态提供；连接 Arc 或持有 USDC 不会绕过交易可用性检查。Circle 邮箱钱包的生产配置仍在准备中，因此邮箱登录暂未开启。" : "Arc trading contracts are deployed and publicly verified, while production Spot and Autopilot activation remains paused. Research services follow their own availability. Connecting Arc or holding USDC does not override execution checks. Production Circle email-wallet setup is still pending, so email sign-in remains disabled."}</p>
+              <p>{lang === "zh" ? "账户读取失败时，请重试同步；无法确定已有账户不等于需要新建账户。已付报告可通过 Report history 恢复，无需再次付款。旧 Arc 测试网报告保留原网络标签与独立归档。" : "Retry synchronization when account discovery fails. An unknown existing-account state does not mean you need to create another account. Recover paid reports through Report history without another payment. Old Arc testnet reports retain their original network labels and separate archive."}</p>
+              <p><a href="https://explorer.arc.io" target="_blank" rel="noreferrer">{lang === "zh" ? "Arc 主网浏览器" : "Arc mainnet explorer"}</a> · <a href="https://www.arcodex.fun/tokens" target="_blank" rel="noreferrer">{lang === "zh" ? "Arc 代币数据来源" : "Arc token data source"}</a></p>
+            </div>
+          </section>
           <section id="docs-robinhood" className="docs-section" hidden={article !== "docs-robinhood"}>
             <div className="docs-copy">
               <span className="eyebrow">ROBINHOOD MAINNET</span>

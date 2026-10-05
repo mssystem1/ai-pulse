@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { fmtBal, USDT0_ADDRESS } from "./balances";
 import { apiGet, apiPost } from "./api";
-import { WEB_NETWORKS, depositArcGateway, type WebNetworkKey } from "./networks";
+import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { getInjectedProvider, shortAddr } from "./wallet";
+import { ArcGatewayFundingPanel } from "./ArcGatewayFundingPanel";
 import { RobinhoodFunding } from "./RobinhoodFundingPanel";
 
 type Props = {
@@ -58,9 +59,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
   const [swapBusy, setSwapBusy] = useState<"quote" | "swap" | null>(null);
   const [swapError, setSwapError] = useState<string | null>(null);
   const [txHash, setTxHash] = useState<string | null>(null);
-  const [gatewayAmount, setGatewayAmount] = useState("1");
   const [arcBalanceView, setArcBalanceView] = useState<"wallet" | "gateway">("wallet");
-  const [fundingBusy, setFundingBusy] = useState(false);
   const [cdpQuote, setCdpQuote] = useState<CdpQuote | null>(null);
   const [email, setEmail] = useState("");
   const [circleBusy, setCircleBusy] = useState(false);
@@ -186,23 +185,6 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
     }
   }
 
-  async function fundGateway() {
-    if (!address) return;
-    const provider = getInjectedProvider();
-    if (!provider) throw new Error(copy.disconnected);
-    setFundingBusy(true);
-    setSwapError(null);
-    try {
-      const tx = await depositArcGateway(provider, address, gatewayAmount);
-      setTxHash(tx.depositHash);
-      onRefresh();
-    } catch (error) {
-      setSwapError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setFundingBusy(false);
-    }
-  }
-
   async function loadCdpQuote() {
     if (!address || (networkKey !== "base" && networkKey !== "arbitrum")) return;
     setSwapBusy("quote"); setSwapError(null); setTxHash(null);
@@ -319,13 +301,7 @@ export function SwapPanel({ lang, open, address, walletName, networkKey, balance
           <div className="swap-title-row"><div><span className="eyebrow">{network.provider}</span><h3>{lang === "zh" ? `在 ${networkKey === "arc" ? "Arc 主网" : network.label} 充值 ${network.payment.symbol}` : `Fund ${network.payment.symbol} on ${network.label}`}</h3></div><a href={network.fundingUrl} target="_blank" rel="noreferrer">{lang === "zh" && networkKey === "arc" ? "向 Arc 主网钱包充值 USDC" : network.fundingLabel} ↗</a></div>
           <p>{lang === "zh" && networkKey === "arc" ? "Arc 主网钱包中的 USDC 用于交易与手续费。研究报告的支付余额需通过将 USDC 存入 Circle Gateway 来充值。" : network.fundingNote}</p>
           {networkKey === "robinhood" ? <RobinhoodFunding key={address || "disconnected"} address={address} balance={balances?.native ?? null} onRefresh={onRefresh} /> : networkKey === "arc" ? (
-            <div className="native-swap">
-              <div className="swap-asset-card"><div><span>{lang === "zh" ? "Gateway 充值" : "Gateway deposit"}</span><small>{lang === "zh" ? "钱包余额" : "Wallet balance"}: {balances ? fmtBal(balances.payment, 6) : "—"} USDC</small></div><div className="swap-input-row"><input inputMode="decimal" value={gatewayAmount} onChange={(event) => setGatewayAmount(event.target.value)} aria-label={lang === "zh" ? "Gateway 充值金额" : "Gateway deposit amount"} /><strong>USDC</strong></div></div>
-              <button type="button" className="btn btn-primary full" disabled={!address || fundingBusy} onClick={() => void fundGateway()}>{fundingBusy ? (lang === "zh" ? "正在授权并充值…" : "Approving and depositing…") : (lang === "zh" ? "存入 Circle Gateway" : "Deposit into Circle Gateway")}</button>
-              <p className="gas-note">{lang === "zh" ? "此操作需要明确签署两笔交易：先授权 ERC-20 USDC，再存入官方 Gateway Wallet。Gateway 可用余额" : "This signs two explicit transactions: ERC-20 approval, then the official Gateway Wallet deposit. Gateway available"}: {gatewayBalanceLabel} USDC.</p>
-              {swapError && <div className="swap-message error">{swapError}</div>}
-              {txHash && <div className="swap-message success">Gateway deposit confirmed · {shortAddr(txHash)}</div>}
-            </div>
+            <ArcGatewayFundingPanel key={address || "disconnected"} lang={lang} address={address} walletBalance={balances?.payment ?? null} gatewayBalance={gatewayBalance} onRefresh={onRefresh} />
           ) : (
             <div className="native-swap">
               <div className="swap-asset-card"><div><span>You pay</span><small>Balance: {fmtBal(balances?.native || 0, 6)} {network.native.symbol}</small></div><div className="swap-input-row"><input inputMode="decimal" value={amount} onChange={(event) => { setAmount(event.target.value); setCdpQuote(null); setSwapError(null); }} aria-label={`${network.native.symbol} swap amount`} /><strong>{network.native.symbol}</strong></div></div>

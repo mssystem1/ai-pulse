@@ -1,0 +1,42 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "withdrawal-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 92,
+      "hash": "0x2896ed840d0e74dc166039b87ce462aeeb29e236280be4ae10dc8bd975fe1f15",
+      "status": "success",
+      "maxGasUSDC": "0.00168650470271",
+      "gasUSDC": "0.00110828055414"
+    },
+    {
+      "step": "withdrawal-deposit",
+      "to": "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE",
+      "nonce": 93,
+      "hash": "0x540fa2781eeea50cae3e63e777023a63d2e42f6b02165f3d5f017b1a337181cf",
+      "status": "success",
+      "maxGasUSDC": "0.00281932917472",
+      "gasUSDC": "0.00175054087527"
+    },
+    {
+      "step": "withdrawal-mint",
+      "to": "0x2222222d7164433c4C09B0b0D809a9b52C04C205",
+      "nonce": 94,
+      "hash": "0x94fa886dab34db2044ae061fb701ba509d0706428e73c6c31d3cbdbe48b42907",
+      "status": "success",
+      "maxGasUSDC": "0.00387398561416",
+      "gasUSDC": "0.00253916126958"
+    }
+  ],
+  "data": {
+    "initialGatewayAtomic": "0",
+    "depositAtomic": "20000",
+    "completed": true,
+    "mintHash": "0x94fa886dab34db2044ae061fb701ba509d0706428e73c6c31d3cbdbe48b42907",
+    "withdrawnAtomic": "10000",
+    "observedGatewayAtomic": "6500",
+    "gatewayDebitAtomic": "13500"
+  }
+}

@@ -1,0 +1,180 @@
+{
+  "auditedAt": "2026-10-05T14:24:55.172Z",
+  "chainId": 5042,
+  "scope": "Local Arc catalog, API/SDK, browser funding workflow and bounded Gateway withdrawal qualification",
+  "catalog": {
+    "observedAt": "2026-10-05T12:26:46.625Z",
+    "provider": "RadarDex index via Arcodex",
+    "indexedContracts": 2000,
+    "riskGuardTokens": 2004,
+    "addressSpecificUSDCMarkets": 2003,
+    "executionCatalogEntries": 2005,
+    "globalInstruments": 3146,
+    "requestLimit": 5000,
+    "upstreamReturnedLimit": 2000,
+    "canonicalExchangeMappings": [
+      "ETH-USDT → Arc WETH",
+      "BTC-USDT → Arc cirBTC"
+    ],
+    "duplicateTickers": "Preserved by complete contract address; UI shows address hints and exact-address search",
+    "coverage": "Observed provider catalog only; inclusion is not safety, liquidity or production execution qualification"
+  },
+  "liveReadOnlyChecks": {
+    "transactionsSent": 0,
+    "spendUSDC": "0",
+    "sdkMethods": [
+      "tradingPairs",
+      "resolveTradeMarket",
+      "autopilotMarketReadiness"
+    ],
+    "selectedMarket": "COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC",
+    "token": "0xeb64987643db71c76b2a2be7e723decc995e5b37",
+    "settlementToken": "0x3600000000000000000000000000000000000000",
+    "entryAndExitRouteAvailable": true,
+    "historySource": "arc-indexed-dex",
+    "completedHistory": [
+      {
+        "timeframe": "15m",
+        "candles": 119,
+        "ready": true
+      },
+      {
+        "timeframe": "1H",
+        "candles": 119,
+        "ready": true
+      },
+      {
+        "timeframe": "4H",
+        "candles": 119,
+        "ready": true
+      },
+      {
+        "timeframe": "1D",
+        "candles": 58,
+        "ready": true
+      }
+    ],
+    "rpcMetadataCheckedTokens": [
+      "COOL",
+      "ARCT",
+      "DUKE",
+      "BUILDOG",
+      "LING"
+    ],
+    "existingAccounts": "Fresh RPC discovery found all three qualification Spot accounts and the paused vault; no new account created"
+  },
+  "gatewayWithdrawal": {
+    "proof": "../packages/contracts/deployments/5042-gateway-withdrawal-qualification.json",
+    "mode": "Same-owner Arc domain 26 Gateway transfer and mint",
+    "depositedUSDC": "0.02",
+    "receivedInWalletUSDC": "0.01",
+    "gatewayFeeUSDC": "0.0035",
+    "gasUSDC": "0.00539798269899",
+    "remainingGatewayUSDC": "0.0065",
+    "mintTransaction": "0x94fa886dab34db2044ae061fb701ba509d0706428e73c6c31d3cbdbe48b42907",
+    "confirmedReceipts": 3,
+    "signingHarness": "Bounded local qualification wallet; does not certify production extension or Circle email signing",
+    "recovery": "Persist signed intent before API submission; resume the same intent and mint transaction; validate exact attestation and used transfer-spec hash before clearing recovery",
+    "trustlessFallback": {
+      "delayBlocks": "1209600",
+      "initiated": false,
+      "qualification": "Read-only live state plus offline early-claim and pending-withdrawal guards; no delayed withdrawal broadcast"
+    }
+  },
+  "browser": {
+    "build": "Final production Vite artifact with public production settings; API requests redirected to the actual local read-only API, which uses live mainnet providers",
+    "wallet": "Read-only EIP-1193 QA provider; every signing and transaction method disabled",
+    "mobileWithdrawal": {
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "amountUSDC": "0.001",
+      "maximumGatewayFeeUSDC": "0.00385",
+      "maximumGatewayDebitUSDC": "0.00485",
+      "signingRequests": 0,
+      "feeReviewPassed": true,
+      "confirmationClicked": false,
+      "delayedInitiationDisabled": true,
+      "interactionLimit": "Chrome's mobile click coordinates were scaled incorrectly by host DPI; approved mode and unsigned fee-review handlers were exercised with DOM click after source and hit-box checks. Physical mobile wallet signing remains unqualified."
+    },
+    "chineseGuide": {
+      "path": "/docs#docs-arc",
+      "language": "zh-CN",
+      "visible": true,
+      "viewportWidth": 390,
+      "documentWidth": 390,
+      "signingRequests": 0,
+      "covers": [
+        "Wallet gas and capital",
+        "Market and escrow orders",
+        "Vault policy and Gateway pass",
+        "Gateway deposit, instant withdrawal and recovery",
+        "Delayed contract withdrawal",
+        "Native tokens, routes and completed history",
+        "Paused production execution and pending email setup"
+      ]
+    },
+    "desktopGlobal": {
+      "requestedViewportWidth": 1440,
+      "observedViewportWidth": 2160,
+      "documentWidth": 2137,
+      "selectedContractDisplayed": true,
+      "dataSourceDisplayed": "ARC DEX",
+      "priceCurrencyDisplayed": "USDC",
+      "livePriceDisplayed": true,
+      "signingRequests": 0,
+      "providerRecovery": "An initial ticker 502 retried successfully; contract-specific candles returned 200 and the live price/chart then displayed."
+    }
+  },
+  "validation": {
+    "api": {
+      "files": 66,
+      "tests": 334,
+      "passed": 333,
+      "skipped": 1,
+      "failed": 0,
+      "skip": "Optional Redis fixture",
+      "finalApplicationTestsPassed": 44
+    },
+    "web": {
+      "files": 38,
+      "tests": 154,
+      "passed": 154,
+      "failed": 0
+    },
+    "focusedArcAndSDKTestsPassed": 26,
+    "sdkTestsPassed": 6,
+    "builds": [
+      "API TypeScript",
+      "SDK TypeScript",
+      "Frontend TypeScript and production Vite build"
+    ],
+    "artifactScan": {
+      "proof": "ARC_MAINNET_BROWSER_ARTIFACT_AUDIT_2026-10-05.json",
+      "artifacts": 236,
+      "serverSecretValuesChecked": 28,
+      "leaks": 0
+    }
+  },
+  "budget": {
+    "approvedMaximumUSDC": "5",
+    "actualTotalSpendIncludingTradeLossesUSDC": "3.543574801611673849",
+    "conservativeAuthorizationUsedUSDC": "3.560074801611673849",
+    "remainingAuthorizedUSDC": "1.439925198388326151",
+    "proof": "ARC_MAINNET_ACCEPTANCE_BUDGET_2026-10-04.json"
+  },
+  "releaseState": {
+    "hostingDeployed": false,
+    "pushed": false,
+    "tradingEnabled": false,
+    "circleEmailWalletsEnabled": false,
+    "registryPaused": true,
+    "vaultPaused": true,
+    "goalComplete": false,
+    "remaining": [
+      "Production Circle app, subscription and email setup",
+      "Production wallet signed UI acceptance and dedicated executor qualification",
+      "Remaining live AI/risk-worker sell acceptance",
+      "Manual coordinated API/web release and approved activation"
+    ]
+  }
+}

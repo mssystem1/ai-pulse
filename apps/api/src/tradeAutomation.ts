@@ -16,6 +16,7 @@ import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, robinhoodOrderMarket } from "./robinhoodMarkets.js";
+import { assertArcExecutionBinding, arcOrderMarket } from "./arcMarkets.js";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
 import { recordV6Activity } from "./v6Store.js";
 import { executionPublicClient, executionRpcUrls, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
@@ -130,7 +131,7 @@ const schema = z.object({
   account: z.string().regex(address),
   orderId: z.string().regex(/^\d+$/),
   version: z.enum(["oco-v1", "limit-v2", "bracket-v1"]),
-  instId: z.string().regex(/^[A-Z0-9._-]{3,40}$/),
+  instId: z.string().regex(/^[A-Z0-9._-]{3,64}$/),
   sellToken: z.string().regex(address),
   buyToken: z.string().regex(address),
   txHash: z.string().regex(hash),
@@ -469,7 +470,12 @@ async function verifyRegistration(input: z.infer<typeof schema>, cfg: AppConfig)
     ? [pairBase, pairQuote]
     : [pairQuote, pairBase];
   const normalizeForChain = (symbol: string, name: string) => normaliseRouteSymbol(analysisSymbolForExecutionToken(symbol, String(networks[input.network].id), name));
-  if (input.network === "robinhood" && isRobinhoodMarket(input.instId)) {
+  if (input.network === "arc") {
+    const market = arcOrderMarket({ address: actualSell, symbol: sellSymbol }, { address: actualBuy, symbol: buySymbol });
+    assertArcExecutionBinding(input.instId, market.target, market.settlement);
+    if (input.version !== "oco-v1" && (String(record[2]).toLowerCase() !== market.target.toLowerCase() || String(record[3]).toLowerCase() !== market.settlement))
+      throw new Error("Arc order oracle must price the exact target contract in canonical USDC");
+  } else if (input.network === "robinhood" && isRobinhoodMarket(input.instId)) {
     const market = robinhoodOrderMarket({ address: actualSell, symbol: sellSymbol }, { address: actualBuy, symbol: buySymbol });
     await verifyRobinhoodMarketBinding(cfg, input.instId, market.target, market.settlement);
     if (input.version !== "oco-v1" && (String(record[2]).toLowerCase() !== market.target.toLowerCase() || String(record[3]).toLowerCase() !== market.settlement))
@@ -535,7 +541,8 @@ async function discoverOwnerOrdersUncached(owner: string, network: Network, exis
         const triggerAbove = configuration.version === "limit-v2" ? Boolean(record[9]) : configuration.version === "bracket-v1" ? Boolean(record[12]) : true;
         const baseSymbol = configuration.version === "oco-v1" || triggerAbove ? sellSymbol : buySymbol;
         const quoteSymbol = configuration.version === "oco-v1" || triggerAbove ? buySymbol : sellSymbol;
-        const robinhoodMarket = network === "robinhood" ? robinhoodOrderMarket({ address: sellToken, symbol: sellSymbol }, { address: buyToken, symbol: buySymbol }) : undefined;
+        const robinhoodMarket = network === "robinhood" ? robinhoodOrderMarket({ address: sellToken, symbol: sellSymbol }, { address: buyToken, symbol: buySymbol })
+          : network === "arc" ? arcOrderMarket({ address: sellToken, symbol: sellSymbol }, { address: buyToken, symbol: buySymbol }) : undefined;
         const key = `${network}:${account.toLowerCase()}:${id}`;
         const previous = existing.find((item) => item.id === key);
         const incomingState = Number(record.at(-1));
