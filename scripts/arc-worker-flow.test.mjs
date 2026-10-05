@@ -2,8 +2,11 @@
 // Real scheduler/policy/journal code; isolated storage, market data and chain clients.
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-test('Arc Autopilot buys, protects and closes a position with bounded USDC gas and one activity per fill', async () => {
+const nativeMarket = process.env.PULSE_ARC_WORKER_NATIVE === '1';
+test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot buys, protects and closes a position with bounded USDC gas and one activity per fill`, async () => {
   process.env.NODE_ENV = 'test';
   process.env.PULSE_SKIP_DOTENV = '1';
   process.env.FEATURE_ARC_TRADING = '1';
@@ -17,8 +20,8 @@ test('Arc Autopilot buys, protects and closes a position with bounded USDC gas a
   mock.module('../apps/api/src/arcExecutionReadiness.ts', { namedExports: { ...readiness, arcAutomationReadiness: async () => ({ready:true}) } });
   const owner = `0x${'1'.repeat(40)}`, vault = `0x${'2'.repeat(40)}`;
   const settlement = '0x3600000000000000000000000000000000000000';
-  const target = '0x128cc466b61f542da60c70e3aa11c10e19b84edb';
-  const pair = 'ETH-USDT';
+  const target = nativeMarket ? '0xeb64987643db71c76b2a2be7e723decc995e5b37' : '0x128cc466b61f542da60c70e3aa11c10e19b84edb';
+  const pair = nativeMarket ? 'COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC' : 'ETH-USDT';
   const signalMarket = pair;
   const analysisToSettlement = 1;
   let now = Date.now(), mark = 100 * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
@@ -63,13 +66,15 @@ test('Arc Autopilot buys, protects and closes a position with bounded USDC gas a
     open: 40 + i * .5, high: 41 + i * .5, low: 39 + i * .5, close: 40.5 + i * .5, volume: 100, volumeCcy: 10000, confirmed: true }));
   const market = { instId: signalMarket, timeframe: '1H', candles, ticker: { instId: signalMarket, last: 100, ts: String(lastCandle), change24hPct: 2 }, fetchedAt: new Date(now).toISOString() };
   mock.module('../apps/api/src/robinhoodMarkets.ts', { namedExports: { ...marketModule,
-    executionMarketContext: async () => market,
-    executionSettlementTicker: async () => ({ ...market.ticker, last: mark, usdPerSettlement: 1 }),
-    robinhoodAutopilotContext: async (_cfg, input) => {
-      assert.equal(input.signalMarket, signalMarket, 'the worker pins the owner-authorized signal source');
-      return { market, signalMarket, signalSource: 'token-dex', analysisToSettlement,
-        settlementTicker: { ...market.ticker, last: mark, usdPerSettlement: 1 } };
+    executionMarketContext: async (_cfg, input) => {
+      assert.equal(input.instId, pair, 'the worker uses the complete owner-authorized contract market');
+      return market;
     },
+    executionSettlementTicker: async (_cfg, input) => {
+      assert.equal(input, pair, 'protection must use the same contract market as entry');
+      return { ...market.ticker, last: mark, usdPerSettlement: 1 };
+    },
+    robinhoodAutopilotContext: async () => { throw Error('Arc cannot use a Robinhood signal mapping'); },
   } });
   const signal = { generatedAt: new Date(now).toISOString(), candleTs: lastCandle,
     signal: { bias: 'bullish', confidence: 90, regime: 'trend_up', support: [95], resistance: [110] } };
@@ -91,6 +96,9 @@ test('Arc Autopilot buys, protects and closes a position with bounded USDC gas a
           { fromToken: BigInt(input.fromTokenAddress), toToken: input.toTokenAddress, fromTokenAmount: BigInt(input.amount),
             minReturnAmount: quoteOutput * 995n / 1000n, deadLine: BigInt(Math.floor(now / 1000) + 600) }, []] }) } };
     }, getGenericOkxSwap: async (_cfg, input) => {
+    assert.equal(input.chainId, '5042');
+    assert.equal(input.userWalletAddress.toLowerCase(), contracts.executionAdapter.toLowerCase());
+    assert.deepEqual([input.fromTokenAddress.toLowerCase(), input.toTokenAddress.toLowerCase()].sort(), [settlement, target].sort());
     const buy = input.fromTokenAddress.toLowerCase() === settlement.toLowerCase();
     quoteOutput = buy ? BigInt(input.amount) * 10n ** 12n / BigInt(mark) : BigInt(input.amount) * BigInt(mark) / 10n ** 12n;
     if (buy && rejectEntryQuote) quoteOutput /= 2n;
@@ -155,6 +163,15 @@ test('Arc Autopilot buys, protects and closes a position with bounded USDC gas a
   const { runAutopilotCycle } = await import('../apps/api/src/autopilotAutomation.ts');
   const cfg = { AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${'1'.repeat(64)}`, AUTOPILOT_KILL_SWITCH: false, hasXaiKey: false };
   const stored = () => JSON.parse(hashes.get(strategyKey).get(strategy.id));
+  if (nativeMarket) {
+    const missing = candles.splice(80, 1)[0];
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    assert.match(stored().lastError, /50 recent, consecutive completed candles/);
+    assert.equal(pass.signalsUsed, 0, 'a native history gap cannot consume an AI confirmation');
+    assert.equal(submitted.length, 0, 'a native history gap prevents both oracle and execution writes');
+    candles.splice(80, 0, missing);
+    hashes.get(strategyKey).set(strategy.id, JSON.stringify({ ...stored(), lastDecision: 'hold_paused' }));
+  }
   await runAutopilotCycle(cfg, {network:'arc',vault});
   assert.equal(stored().entryQuoteRetryPending, true, JSON.stringify(stored()));
   assert.equal(targetBalance, 0n);
@@ -210,4 +227,21 @@ test('Arc Autopilot buys, protects and closes a position with bounded USDC gas a
   assert.equal(paused.lastDecision, 'hold_paused', JSON.stringify(paused));
   assert.equal(submitted.length, beforePause, 'a pause before submission prevents both oracle and execution writes');
   assert.equal(pass.signalsUsed, 1, 'the already-consumed cached signal must not be billed twice');
+});
+
+// Node module mocks are process-wide. Exercise the same actual worker with a
+// native contract market in a fresh, secret-free process instead of sharing mocks.
+if (!nativeMarket) test('Arc native contract worker integration', { timeout: 60_000 }, async () => {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+    /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
+  Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_NATIVE: '1' });
+  const child = spawn(process.execPath, ['--import', 'tsx', '--experimental-test-module-mocks', '--test', fileURLToPath(import.meta.url)], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  try {
+    const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+    assert.equal(code, 0, output);
+    assert.match(output, /Arc native contract Autopilot/);
+  } finally { child.kill(); }
 });

@@ -173,7 +173,7 @@
     "remaining": [
       "Production Circle app, subscription and email setup",
       "Production wallet signed UI acceptance and dedicated executor qualification",
-      "Remaining live AI/risk-worker sell acceptance",
+      "Remaining live deterministic risk-worker sell acceptance",
       "Manual coordinated API/web release and approved activation"
     ]
   }

@@ -16,6 +16,10 @@ test("chat input preserves market/contract identity and rejects malformed reques
   assert.throws(()=>parseBotResearchInput("global-quick","BTC-USDT tomorrow"));
   assert.throws(()=>parseBotResearchInput("risk-guard","base 0x123"));
   const address="0x"+"aB".repeat(20);assert.equal((parseBotResearchInput("risk-guard",`base ${address}`).input as {address:string}).address,address);
+  assert.deepEqual(parseBotResearchInput("risk-guard",`ARC ${address}`),{input:{address,lang:"en"},networkKey:"arc"});
+  const native = "COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC";
+  assert.deepEqual(parseBotResearchInput("global-pro",`${native.toLowerCase()} 1h`),{input:{instId:native,timeframe:"1H",lang:"en"},networkKey:"arc"});
+  assert.throws(()=>parseBotResearchInput("risk-guard",`arc-testnet ${address}`));
 });
 test("readable research export includes nested reasoning and omits internal delivery data",()=>{const text=formatTelegramResearch({analysis:{headline:"Evidence",scenarios:[{reason:"Alternative view"}]},_telegramDelivery:"secret",chartImageBase64:"encoded-image"});assert.match(text,/Evidence/);assert.match(text,/Alternative view/);assert.ok(!text.includes("secret"));assert.ok(!text.includes("encoded-image"));});
 

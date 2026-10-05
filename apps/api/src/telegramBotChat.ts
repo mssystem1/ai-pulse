@@ -3,6 +3,7 @@ import type { AppConfig } from "@pulse/config";
 import { TelegramCommerce, telegramServiceCatalog } from "./telegramCommerce.js";
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
 import { telegramResearchMessage, telegramHistoryLabel } from "./telegramResearch.js";
+import { isArcMarket } from "./arcMarkets.js";
 export { formatTelegramResearch } from "./telegramResearch.js";
 
 type Api = (method:string,payload:unknown)=>Promise<unknown>;
@@ -19,14 +20,15 @@ export function parseBotResearchInput(serviceId:string,text:string) {
     if(extra.length||!pair||!/^[-A-Za-z0-9_.:]{2,64}$/.test(pair))throw new Error("Send a supported pair and timeframe, for example BTC-USDT 4H.");
     const periods:Record<string,string>={"1m":"1m","3m":"3m","5m":"5m","15m":"15m","30m":"30m","1h":"1H","2h":"2H","4h":"4H","6h":"6H","12h":"12H","1d":"1D","1w":"1W","1dutc":"1Dutc","1wutc":"1Wutc"};
     if(!periods[timeframe.toLowerCase()])throw new Error("Supported timeframes: 1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W.");
-    return {input:{instId:pair.toUpperCase(),timeframe:periods[timeframe.toLowerCase()],lang:"en"},networkKey:"xlayer"};
+    const instId = pair.toUpperCase();
+    return {input:{instId,timeframe:periods[timeframe.toLowerCase()],lang:"en"},networkKey:isArcMarket(instId)?"arc":"xlayer"};
   }
   if(serviceId.startsWith("prediction")) {
     if(!/^[A-Za-z0-9_-]{1,256}$/.test(value))throw new Error("Send the exact supported prediction market ID, not a URL or market title.");
     return {input:{primaryMarketId:value,lang:"en"},networkKey:"xlayer"};
   }
   const [network,address,...extra]=value.split(/\s+/);
-  if(extra.length||!["xlayer","base","arbitrum","robinhood"].includes(network?.toLowerCase())||!/^0x[a-fA-F0-9]{40}$/.test(address||""))throw new Error("Send the network and exact token contract: xlayer 0x… . Supported networks: xlayer, base, arbitrum, robinhood.");
+  if(extra.length||!["xlayer","base","arbitrum","robinhood","arc"].includes(network?.toLowerCase())||!/^0x[a-fA-F0-9]{40}$/.test(address||""))throw new Error("Send the network and exact token contract: arc 0x… . Supported networks: xlayer, base, arbitrum, robinhood, arc (mainnet).");
   return {input:{address,lang:"en"},networkKey:network.toLowerCase()};
 }
 

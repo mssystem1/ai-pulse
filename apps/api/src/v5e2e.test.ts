@@ -6,6 +6,7 @@ import { PolymarketClient, type NormalizedPolymarketMarket } from "@pulse/market
 import { createApp } from "./app.js";
 import { MemoryJobStore, MemoryReportStore } from "./jobs.js";
 import { ArcBudgetExceededError } from "./arcBudget.js";
+import { isArcMarket } from "./arcMarkets.js";
 
 const market: NormalizedPolymarketMarket = Object.freeze({
   id: "pm:e2e-condition", gammaMarketId: "e2e-1", eventIds: Object.freeze(["event-1"]), conditionId: "e2e-condition",
@@ -56,8 +57,8 @@ const fakePolymarket = {
 } as unknown as PolymarketClient;
 
 const fakeSpotContext = async (input: { instId: string; timeframe?: string }) => ({
-  source: "okx-public-spot" as const, instId: input.instId, bar: input.timeframe || "1H",
-  ticker: { instId: input.instId, last: 100, open24h: 99, high24h: 101, low24h: 98, vol24h: 1000, volCcy24h: 100_000, change24hPct: 1.01, ts: String(Date.now()) },
+  source: isArcMarket(input.instId) ? "arc-indexed-dex" as const : "okx-public-spot" as const, instId: input.instId, bar: input.timeframe || "1H",
+  ticker: { instId: input.instId, ...(isArcMarket(input.instId) ? { priceCurrency: "USDC" } : {}), last: 100, open24h: 99, high24h: 101, low24h: 98, vol24h: 1000, volCcy24h: 100_000, change24hPct: 1.01, ts: String(Date.now()) },
   candles: [
     { ts: 1, open: 99, high: 100, low: 98, close: 99.5, volume: 10, volumeCcy: 995 },
     { ts: 2, open: 99.5, high: 101, low: 99, close: 100, volume: 12, volumeCcy: 1200 },
@@ -164,5 +165,57 @@ describe("V5 paid job E2E", () => {
     assert.equal(report.instId, "ETH-USDT");
     const forbidden = await call("job_report", { jobId: job.id, recoveryToken: "x".repeat(64) });
     assert.equal(forbidden.status, 403);
+  });
+
+  it("MCP advertises full-address Arc markets and forwards native research through chain 5042 jobs", async t => {
+    const nativeId = "MEME_SYMBOL_1234.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC";
+    const realFetch = globalThis.fetch;
+    t.mock.method(globalThis, "fetch", (async (input, init) => {
+      const url = new URL(String(input));
+      if (url.origin === "https://www.arcodex.fun" && url.pathname === "/api/radar/tokens") return Response.json({ tokens: [{ address: "0xeb64987643db71c76b2a2be7e723decc995e5b37", symbol: "MEME_SYMBOL_1234", name: "Isolated Arc fixture", decimals: 18, chainId: "5042" }] });
+      assert.equal(url.origin, origin, "Native MCP regression must not contact external providers");
+      return realFetch(input, init);
+    }) as typeof fetch);
+    const call = (prefix: string, name: string, args: Record<string, unknown>, pay = false) => fetch(`${origin}/${prefix}/mcp`, {
+      method: "POST", headers: { "Content-Type": "application/json", ...(pay ? { "PAYMENT-SIGNATURE": "mock-native-mcp-job" } : {}) },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 72, method: "tools/call", params: { name, arguments: args } }),
+    });
+    const list = await fetch(`${origin}/arc/mcp`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 73, method: "tools/list" }) });
+    const tools = (await list.json() as any).result.tools;
+    for (const name of ["spot_analysis_standard", "spot_analysis_premium"]) {
+      const idSchema = tools.find((tool: any) => tool.name === name).inputSchema.properties.instId;
+      assert.equal(idSchema.maxLength, 64);
+      assert.ok(new RegExp(idSchema.pattern).test(nativeId));
+      const malformed = await call("arc", name, { instId: nativeId.replace("-USDC", "-USDT"), timeframe: "1H", lang: "en" });
+      assert.equal(malformed.status, 400);
+      assert.equal(malformed.headers.get("PAYMENT-REQUIRED"), null);
+    }
+    const args = { instId: nativeId, timeframe: "1H", lang: "en" };
+    const wrongChain = await call("xlayer", "spot_analysis_standard", args, true);
+    assert.equal(wrongChain.status, 422);
+    assert.equal(wrongChain.headers.get("PAYMENT-RESPONSE"), null);
+    const unpaid = await call("arc", "spot_analysis_standard", args);
+    assert.equal(unpaid.status, 402);
+    const challenge = JSON.parse(Buffer.from(unpaid.headers.get("PAYMENT-REQUIRED")!, "base64").toString());
+    assert.equal(challenge.accepts[0].network, "eip155:5042");
+    const accepted = await call("arc", "spot_analysis_standard", args, true);
+    assert.equal(accepted.status, 202);
+    const delivery = (await accepted.json() as any).result.structuredContent;
+    let stage = "";
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const response = await call("arc", "job_status", { jobId: delivery.job.id, recoveryToken: delivery.recoveryToken });
+      stage = (await response.json() as any).result.structuredContent.job.stage;
+      if (["completed", "failed_terminal"].includes(stage)) break;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    assert.equal(stage, "completed");
+    const retrieved = await call("arc", "job_report", { jobId: delivery.job.id, recoveryToken: delivery.recoveryToken });
+    assert.equal(retrieved.headers.get("PAYMENT-REQUIRED"), null);
+    const report = (await retrieved.json() as any).result.structuredContent.report;
+    assert.equal(report.instId, nativeId);
+    assert.equal(report.market.source, "arc-indexed-dex");
+    assert.equal(report.market.ticker.priceCurrency, "USDC");
+    const replay = await call("arc", "spot_analysis_standard", args, true);
+    assert.equal((await replay.json() as any).result.structuredContent.job.id, delivery.job.id);
   });
 });

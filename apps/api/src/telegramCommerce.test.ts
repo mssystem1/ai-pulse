@@ -6,7 +6,7 @@ import { z } from "zod";
 import type { AppConfig } from "@pulse/config";
 import { MemoryJobStore, MemoryReportStore } from "./jobs.js";
 import { createTelegramRouter, telegramServiceMenu } from "./telegram.js";
-import { validateTelegramInitData, TELEGRAM_SERVICES } from "./telegramCommerce.js";
+import { validateTelegramInitData, TELEGRAM_SERVICES, TelegramCommerce } from "./telegramCommerce.js";
 
 function signedData(userId = 123, date = Math.floor(Date.now() / 1000), token = "test-token") {
   const params = new URLSearchParams({ auth_date: String(date), query_id: "fixture", user: JSON.stringify({ id: userId, first_name: "Alex" }) });
@@ -29,6 +29,37 @@ test("service menu exposes all five services and strips stale navigation secrets
   const urls = buttons.map(button => new URL(button.web_app!.url));
   assert.ok(urls.every(url => url.pathname === "/miniapp" && !url.hash && !url.searchParams.has("job") && !url.searchParams.has("recoveryToken")));
   assert.deepEqual(urls.map(url => url.searchParams.get("service")).filter(Boolean), TELEGRAM_SERVICES.map(service => service.id));
+});
+
+test("Arc Stars checkout pins Risk Guard chain 5042 and native Global market identity", async t => {
+  const env = { TELEGRAM_STARS_ENABLED: "1", TELEGRAM_STARS_RISK_GUARD: "25", TELEGRAM_STARS_GLOBAL_QUICK: "25" };
+  const before = Object.fromEntries(Object.keys(env).map(key => [key, process.env[key]]));
+  Object.assign(process.env, env);
+  t.after(() => { for (const key of Object.keys(env)) { if (before[key] === undefined) delete process.env[key]; else process.env[key] = before[key]; } });
+  const jobs = new MemoryJobStore(), reports = new MemoryReportStore();
+  let invoices = 0;
+  const commerce = new TelegramCommerce({ FEATURE_TELEGRAM: true, NODE_ENV: "test", PAID_REGENERATION_MAX_ATTEMPTS: 2 } as AppConfig,
+    { jobs, reports, wakeWorker: () => {}, validateGlobal: input => z.object({ instId: z.string().max(64), timeframe: z.string(), lang: z.literal("en") }).parse(input) },
+    "fixture-token", async method => { if (method === "createInvoiceLink") invoices++; return { result: method === "createInvoiceLink" ? "https://t.me/$fixture" : true }; }, () => "fixture-delivery",
+    { appUrl: "https://pulse.test", webhookSecret: "fixture-secret" });
+  const address = "0xeb64987643db71c76b2a2be7e723decc995e5b37";
+  const nativeId = "COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC";
+  await assert.rejects(commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "base"), /Arc Mainnet/);
+  assert.equal(invoices, 0, "a mismatched native market cannot create a checkout");
+  const paid = async (orderId: string, charge: string) => commerce.handleUpdate({ message: { chat: { id: 123, type: "private" }, from: { id: 123 }, successful_payment: { currency: "XTR", total_amount: 25, invoice_payload: orderId, telegram_payment_charge_id: charge } } });
+  const risk = await commerce.createInvoice(123, "risk-guard", { address, chainId: "196", lang: "en" }, "arc");
+  await paid(risk.orderId, "fixture-arc-risk");
+  await paid(risk.orderId, "fixture-arc-risk");
+  const global = await commerce.createInvoice(123, "global-quick", { instId: nativeId, timeframe: "1H", lang: "en" }, "arc");
+  await paid(global.orderId, "fixture-arc-global");
+  const owned = await jobs.listByPayer("telegram:123", "arc");
+  assert.equal(owned.length, 2, "duplicate payment delivery cannot enqueue another job");
+  const riskJob = owned.find(job => job.mode === "risk")!;
+  assert.equal((riskJob.input as { chainId: string }).chainId, "5042");
+  assert.equal((riskJob.input as { address: string }).address, address);
+  assert.equal((owned.find(job => job.mode === "spot")!.input as { instId: string }).instId, nativeId);
+  assert.ok(owned.every(job => job.receipt?.provider === "telegram_stars" && job.receipt.network === "telegram:stars"));
+  assert.equal((await jobs.listByPayer("telegram:123", "xlayer")).length, 0);
 });
 test("Stars invoice, checkout, duplicate payment, account isolation, full report and refund flow", async () => {
   const env = { TELEGRAM_BOT_TOKEN: "test-token", TELEGRAM_BOT_USERNAME: "test_bot", TELEGRAM_WEBHOOK_SECRET: "test-secret", TELEGRAM_MINI_APP_URL: "https://pulse.test", TELEGRAM_TON_MINI_APP_ENABLED:"1",TELEGRAM_TON_MINI_APP_URL:"https://pulse.test/ton-miniapp", TELEGRAM_STARS_ENABLED: "1", TELEGRAM_STARS_GLOBAL_QUICK: "25", TELEGRAM_STARS_GLOBAL_PRO: "50", TELEGRAM_STARS_RISK_GUARD: "25", TELEGRAM_STARS_PREDICTION_QUICK: "25", TELEGRAM_STARS_PREDICTION_PRO: "50" };

@@ -1,0 +1,132 @@
+{
+  "auditedAt": "2026-10-05T15:01:41.139Z",
+  "chainId": 5042,
+  "scope": "Native Arc market IDs across MCP, Telegram research and the actual Autopilot worker control flow",
+  "defectsFixed": [
+    {
+      "surface": "MCP Global Quick/Pro",
+      "before": "32-character exchange-only schema rejected full-address Arc market IDs before canonical REST routing",
+      "after": "64-character schema accepts exact Arc contract IDs; canonical REST retains chain and source validation before payment"
+    },
+    {
+      "surface": "MCP ticker",
+      "before": "Native ID was passed to the OKX exchange-only ticker",
+      "after": "Source dispatch follows the selected exact market, including Arc native DEX data"
+    },
+    {
+      "surface": "Telegram Risk Guard",
+      "before": "Chat rejected arc; invoice chain mapping omitted Arc, leaving chainId undefined",
+      "after": "Chat accepts arc; checkout pins chain 5042 and the exact contract"
+    },
+    {
+      "surface": "Telegram native Global",
+      "before": "Parser labelled all Global inputs xlayer",
+      "after": "Exact Arc contract markets preserve Arc identity through invoice, Stars receipt and queued job; wrong network is rejected before invoice"
+    }
+  ],
+  "validation": {
+    "fullAPI": {
+      "files": 66,
+      "tests": 336,
+      "passed": 335,
+      "skipped": 1,
+      "failed": 0,
+      "skip": "Optional Redis fixture"
+    },
+    "focusedAgentAndTelegramTests": {
+      "tests": 12,
+      "passed": 12,
+      "failed": 0,
+      "mode": "Loopback HTTP, memory stores, fixture reports, mock payments and Telegram responses; no paid external messages or real invoices"
+    },
+    "arcWorkerIntegration": {
+      "tests": 3,
+      "passed": 3,
+      "failed": 0,
+      "command": "npm run test:arc-workers",
+      "markets": [
+        "Published Arc WETH canonical exchange mapping",
+        "COOL full-address native contract USDC market"
+      ],
+      "checks": [
+        "Native history gap blocks oracle/execution writes and AI entitlement consumption",
+        "Owner-authorized full contract market remains pinned for entry and protection",
+        "Pre-submit entry and reverse-exit guards",
+        "Protection persisted before entry broadcast",
+        "Pending buy receipt recovery without duplicate entry",
+        "Partial and final deterministic exits after AI pass expiry",
+        "Bounded native USDC gas",
+        "One activity record per fill",
+        "Owner pause wins before execution"
+      ],
+      "mode": "Actual scheduler, policy, gas/calldata guards and persistence code with isolated chain/provider/storage clients; production readiness gate mocked separately",
+      "liveMainnetExecutionQualified": false
+    },
+    "builds": {
+      "apiTypeScript": true,
+      "frontendTypeScript": true,
+      "frontendProductionVite": true
+    },
+    "browser": {
+      "artifactScan": "ARC_MAINNET_BROWSER_ARTIFACT_AUDIT_2026-10-05.json",
+      "artifacts": 236,
+      "serverSecretValuesChecked": 28,
+      "leaks": 0,
+      "guides": [
+        {
+          "language": "en",
+          "width": 390,
+          "documentWidth": 390,
+          "visible": true,
+          "agentAndTelegramCopy": true,
+          "signingRequests": 0
+        },
+        {
+          "language": "zh-CN",
+          "width": 390,
+          "documentWidth": 390,
+          "visible": true,
+          "agentAndTelegramCopy": true,
+          "signingRequests": 0
+        }
+      ]
+    }
+  },
+  "hostedReadOnlyComparison": {
+    "observedAt": "2026-10-05T14:58:26.681Z",
+    "origin": "https://pulse-api-production-7aae.up.railway.app",
+    "operations": [
+      "GET /v1/meta?network=arc",
+      "POST /arc/mcp with JSON-RPC tools/list"
+    ],
+    "metadata": {
+      "status": 200,
+      "chainId": 5042,
+      "network": "eip155:5042",
+      "paymentProvider": "circle-gateway"
+    },
+    "mcp": {
+      "status": 200,
+      "maximumMarketIdLength": 32,
+      "nativeIdMatchesPattern": false,
+      "tools": [
+        "spot_analysis_standard",
+        "spot_analysis_premium"
+      ]
+    },
+    "implication": "Manual API release is still required to publish the corrected 64-character native market schema; no deployment performed"
+  },
+  "autonomyClarification": "AI confirms new entries. Existing positions use deterministic TP/SL and structure exits; a live AI sell decision is not a required behavior. Live mainnet deterministic risk-worker sell acceptance remains unqualified.",
+  "additionalSpendUSDC": "0",
+  "hostingDeployed": false,
+  "pushed": false,
+  "productionTradingEnabled": false,
+  "circleEmailWalletsEnabled": false,
+  "goalComplete": false,
+  "remaining": [
+    "Production Circle subscription/app/email setup",
+    "Production wallet signed UI acceptance and dedicated executor qualification",
+    "Live deterministic mainnet risk-worker sell acceptance",
+    "User's manual API/web release and approved activation"
+  ]
+}
