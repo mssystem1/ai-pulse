@@ -1,0 +1,112 @@
+{
+  "auditedAt": "2026-10-05T15:46:32.817Z",
+  "chainId": 5042,
+  "scope": "Arc Autopilot interrupted execution, durable recovery and user-facing recovery guidance",
+  "baselineCommit": "1589f7f",
+  "reproducedDefect": {
+    "trigger": "Activity insertion fails after the signed vault trade has been broadcast",
+    "before": "A later worker cycle sees no pending activity and can submit another trade before reconciling the original transaction",
+    "isolatedReproduction": {
+      "expectedExecutionCount": 1,
+      "observedExecutionCount": 2,
+      "mode": "Actual worker with isolated chain/provider/storage fixtures; no live mainnet transaction"
+    }
+  },
+  "changes": [
+    "Prepare and locally sign the Arc vault transaction; compute its canonical hash before broadcast",
+    "Persist an authenticated encrypted transaction record in private KV independently of activity insertion",
+    "Bind recovery to exact owner, vault, Arc chain 5042, execution calldata, policy version, action nonce, amount, evidence hash, signer and 0.10 USDC maximum transaction gas",
+    "Use a key derived from the executor signing key and exact owner/vault; never put signed payloads in strategy/UI telemetry",
+    "Give pending recovery priority over ordinary analysis/risk cooldowns; attempt recovery once per strategy per cycle under its execution lease",
+    "Recover a missing activity row and query the known transaction hash before permitting another trade",
+    "Resend only the identical signed bytes while the original quote and unchanged unpaused vault policy remain valid",
+    "Verify a confirmed receipt against the known hash, factory-owned vault and execution event",
+    "Persist confirmed/failed activity durably before removing the independent recovery record",
+    "Keep an expired, policy-invalid, corrupt or key-incompatible unresolved transaction on Hold for operator reconciliation",
+    "Document transaction recovery and executor-key retention in README and English/Chinese app guides"
+  ],
+  "validation": {
+    "fullAPI": {
+      "files": 67,
+      "tests": 341,
+      "passed": 340,
+      "skipped": 1,
+      "failed": 0,
+      "skip": "Optional Redis fixture"
+    },
+    "arcWorkers": {
+      "tests": 8,
+      "passed": 8,
+      "failed": 0,
+      "command": "npm run test:arc-workers",
+      "checks": [
+        "Arc Spot keeper limit, bracket and TP/SL phases",
+        "Canonical WETH and native full-address memecoin Autopilot control flow",
+        "Activity insertion failure before broadcast and recovery of the original signed trade",
+        "Lost broadcast response and identical-byte replay without a new signature",
+        "Confirmed execution followed by an interrupted activity confirmation",
+        "Durable confirmation write failure preserves recovery even though the memory mirror can advance",
+        "Owner pause and quote expiry prevent retry; a subsequent reverted receipt settles failed activity",
+        "Exactly one execution and one activity per recovered trade; no new AI entitlement consumed"
+      ],
+      "mode": "Actual scheduler, policy, calldata, fees, private recovery and activity code with isolated storage/chain/provider fixtures; production readiness gate mocked"
+    },
+    "outboxRegressionTests": {
+      "tests": 5,
+      "passed": 5,
+      "checks": [
+        "New outbox instance restores the original signed transaction from encrypted storage",
+        "Wrong chain, signer, destination, value, gas and execution identity are rejected",
+        "Unavailable or missing durable storage cannot authorize broadcast",
+        "Tampered ciphertext and incompatible executor key fail closed without deleting recovery",
+        "A different pending transaction cannot be overwritten or deleted by stale settlement"
+      ],
+      "mode": "Real local fixture signatures and authenticated encryption; in-memory private KV adapter"
+    },
+    "builds": {
+      "apiTypeScript": "passed",
+      "productionFrontendTypeScriptViteAndSocialAssets": "passed"
+    },
+    "browserArtifacts": {
+      "auditedAt": "2026-10-05T15:40:47.332Z",
+      "files": 236,
+      "serverValuesChecked": 28,
+      "leaks": 0
+    },
+    "appDocsBrowser": {
+      "origin": "http://127.0.0.1:5179/docs#docs-arc",
+      "languages": [
+        "en",
+        "zh"
+      ],
+      "observedViewportWidth": 390,
+      "observedDocumentWidth": 390,
+      "recoveryAndOperatorHoldVisible": true,
+      "walletVersusGatewayFundingAndWithdrawalGuidesVisible": true,
+      "signingOrBroadcastRequests": 0,
+      "mode": "Final production frontend with read-only local QA wallet; no production extension/email signing"
+    }
+  },
+  "operationalLimits": [
+    "The original Arc route freshness limit remains enforced; expiry is never extended for recovery",
+    "Missing receipt evidence does not prove failure or authorize a fresh trade",
+    "Resolve pending records before rotating/removing the executor key; preserve private KV across restarts",
+    "An expired or invalid unresolved original transaction requires operator receipt/replacement/cancellation reconciliation",
+    "These offline regressions do not qualify production wallet signing or live deterministic risk-worker execution"
+  ],
+  "releaseState": {
+    "hostingDeployment": "manual; none performed",
+    "pushPerformed": false,
+    "additionalMainnetSpendUSDC": "0",
+    "tradingActivation": "disabled",
+    "circleEmailWallets": "disabled at user request while production setup is pending",
+    "remainingAcceptance": [
+      "Production Circle app/subscription/email setup",
+      "Remaining signed UI acceptance using production wallets",
+      "Dedicated executor qualification",
+      "Live deterministic risk-worker sell qualification",
+      "User's manual API/web release and approved activation"
+    ],
+    "goalComplete": false
+  }
+}

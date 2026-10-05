@@ -761,6 +761,10 @@ wallet or worker broadcasts transaction
 
 If a report worker crashes after settlement, its lease expires and a replacement claims the same job. If it crashes after Blob upload but before job completion, the receipt-bound retry policy regenerates or reconciles the deliverable without charging again. If an automation worker crashes after broadcast, the next cycle uses the transaction hash, receipt, existing activity ledger, and contract nonce/state rather than blindly broadcasting again. KV is the fast operational projection; chain/provider evidence wins disagreements.
 
+Arc Autopilot persists an encrypted signed transaction in private KV **before broadcast**, independently of its activity row. Recovery checks its locally computed hash and can resend only those same bytes while the original quote is valid and the vault is unpaused with the same policy version and action nonce. Pending recovery runs before the normal analysis/risk cooldowns and consumes no new AI confirmation. A confirmed receipt must match the known hash, factory-owned vault and execution event; the activity outcome is durably written before the recovery record is removed. Reverted receipts become failed activity. An expired or policy-invalid unresolved transaction stays on Hold for operator reconciliation, including replacement/cancellation evidence where necessary; a missing receipt is not permission to create a fresh trade.
+
+The Arc recovery payload is authenticated and encrypted with a key derived from the configured executor private key and exact owner/vault. It is never returned in UI strategy telemetry. **Resolve all pending Arc transactions before rotating or removing that executor key**, and retain private KV recovery records through API restarts. Missing storage, tampered ciphertext or an incompatible key stops execution; recovery never falls back to an unprotected fresh transaction.
+
 ### Operational state and dashboard projections
 
 PULSE does not infer trading state from an unrelated account-creation receipt. It derives each lifecycle from its own contract/provider evidence:

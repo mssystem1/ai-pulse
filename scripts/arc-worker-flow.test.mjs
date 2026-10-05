@@ -6,13 +6,16 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const nativeMarket = process.env.PULSE_ARC_WORKER_NATIVE === '1';
-test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot buys, protects and closes a position with bounded USDC gas and one activity per fill`, async () => {
+const recoveryCase = process.env.PULSE_ARC_WORKER_RECOVERY || '';
+test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${recoveryCase || 'buys, protects and closes a position with bounded USDC gas and one activity per fill'}`, async () => {
   process.env.NODE_ENV = 'test';
   process.env.PULSE_SKIP_DOTENV = '1';
   process.env.FEATURE_ARC_TRADING = '1';
   delete process.env.BLOB_READ_WRITE_TOKEN;
   mock.method(globalThis, 'fetch', async () => { throw Error('Unexpected external request in isolated worker test'); });
   const viem = await import('viem');
+  const { privateKeyToAccount } = await import('viem/accounts');
+  const signer = privateKeyToAccount(`0x${'1'.repeat(64)}`);
   const deployment = await import('../apps/api/src/executionContracts.ts');
   const contracts = { ...deployment.executionContracts('arc'), okxRouter: deployment.executionContractAddress('arc', 'okxRouter') };
   const { OKX_DAG_ABI } = await import('../apps/api/src/okxDag.ts');
@@ -27,6 +30,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
   let now = Date.now(), mark = 100 * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
   mock.timers.enable({ apis: ['Date'], now });
   const strings = new Map(), hashes = new Map();
+  let failDurableConfirmationOnce = recoveryCase === 'storage_confirmation';
   const strategyKey = 'pulse:v6:autopilot:strategy-map';
   const strategy = { id: 'isolated-arc-worker', owner, network: 'arc', vault,
     settlementAsset: settlement, targetAsset: target, pair, timeframe: '1H', strategyType: 'trend_following',
@@ -38,6 +42,11 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
   const command = async ([op, key, ...args]) => {
     if (op === 'HGETALL') return Object.fromEntries(hashes.get(key) || []);
     if (op === 'HSET') {
+      if (failDurableConfirmationOnce && String(key).includes('activity-map')
+        && args.some((value, index) => index % 2 === 1 && JSON.parse(value).kind === 'buy_filled' && JSON.parse(value).status === 'confirmed')) {
+        failDurableConfirmationOnce = false;
+        throw Object.assign(Error('Durable activity storage temporarily unavailable'), { code: 'KV_TEMPORARILY_UNAVAILABLE' });
+      }
       const hash = hashes.get(key) || new Map();
       for (let i = 0; i < args.length; i += 2) hash.set(args[i], args[i + 1]);
       hashes.set(key, hash); return 1;
@@ -111,8 +120,31 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
             minReturnAmount: quoteOutput * 995n / 1000n, deadLine: BigInt(Math.floor(now / 1000) + 600) }, []] }) } };
   } } });
   const submitted = [];
-  let pendingBuyHash, timeoutBuyReceipt = true;
-  const wallet = { account: { address: owner }, writeContract: async request => {
+  let pendingBuyHash, timeoutBuyReceipt = !['confirmation', 'storage_confirmation'].includes(recoveryCase);
+  let deferBroadcast = ['lost_broadcast', 'pause_expiry'].includes(recoveryCase);
+  let loseBroadcastResponse = recoveryCase === 'lost_broadcast';
+  let failActivityOnce = recoveryCase === 'activity';
+  let failConfirmationOnce = recoveryCase === 'confirmation';
+  let signatures = 0, receiptStatus = 'success';
+  const broadcasts = [];
+  const signedRequests = new Map();
+  const executionAbi = viem.parseAbi(['function execute(bytes32,uint64,uint64,address,address,address,uint256,uint256,bytes,bytes32)']);
+  const wallet = { account: signer,
+    prepareTransactionRequest: async request => ({ ...request, chainId: 5042, nonce: submitted.length, type: 'eip1559' }),
+    signTransaction: async request => { signatures++; return signer.signTransaction(request); },
+    sendRawTransaction: async ({ serializedTransaction }) => {
+      broadcasts.push(serializedTransaction);
+      const hash = viem.keccak256(serializedTransaction);
+      const tx = viem.parseTransaction(serializedTransaction);
+      const decoded = viem.decodeFunctionData({ abi: executionAbi, data: tx.data });
+      if (decoded.args[4].toLowerCase() === settlement.toLowerCase()) pendingBuyHash = hash;
+      if (loseBroadcastResponse) { loseBroadcastResponse = false; throw Error('Broadcast response lost while the signed trade may be pending'); }
+      if (deferBroadcast || signedRequests.has(hash)) return hash;
+      signedRequests.set(hash, serializedTransaction);
+      await wallet.writeContract({ ...tx, functionName: decoded.functionName, args: decoded.args });
+      if (decoded.args[4].toLowerCase() === settlement.toLowerCase()) pendingBuyHash = hash;
+      return hash;
+    }, writeContract: async request => {
     assert.equal(request.gas, 125000n, 'Arc pins estimated gas with its buffer');
     assert.ok(request.gas * request.maxFeePerGas <= viem.parseEther('0.10'), 'Arc transaction gas is capped in USDC');
     submitted.push(request);
@@ -123,6 +155,9 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
         const persisted = JSON.parse(hashes.get(strategyKey).get(strategy.id));
         assert.ok(persisted.activeTakeProfit > mark, 'TP is durable before buy submission');
         assert.ok(persisted.activeStopLoss > 0 && persisted.activeStopLoss < mark, 'SL is durable before buy submission');
+        const outboxKey = `pulse:v6:arc:execution-outbox:${owner.toLowerCase()}:${vault.toLowerCase()}`;
+        assert.ok(strings.has(outboxKey), 'the recoverable signed transaction is durable before broadcasting');
+        assert.ok(!strings.get(outboxKey).includes('serializedTransaction'), 'signed payload metadata is encrypted');
       }
       if (buy) { settlementBalance -= request.args[6]; targetBalance += quoteOutput; }
       else { targetBalance -= request.args[6]; settlementBalance += quoteOutput; }
@@ -141,12 +176,22 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
       estimateFeesPerGas: async () => ({ maxFeePerGas:100000000000n, maxPriorityFeePerGas:1n }),
       getBalance: async () => viem.parseEther('5'),
       multicall: async () => [++runtimeReads >= pauseOnRead, 1n, nonce, 50n, 100000n, 0n, 0n, targetBalance, 18, 6, settlementBalance],
-      readContract: async request => { assert.equal(request.functionName, 'exposureCap'); return 1_000_000n; },
+      readContract: async request => {
+        if (request.functionName === 'vaultsOf') return [vault];
+        assert.equal(request.functionName, 'exposureCap'); return 1_000_000n;
+      },
       simulateContract: async request => ({ request }),
+      getTransactionReceipt: async request => {
+        if (!signedRequests.has(request.hash) && receiptStatus !== 'reverted') {
+          const error = Error('Original transaction receipt is not available'); error.name = 'TransactionReceiptNotFoundError'; throw error;
+        }
+        return { status: receiptStatus, transactionHash: request.hash, to: vault,
+          logs: receiptStatus === 'success' ? [{ address: vault, topics: [viem.keccak256(viem.toHex('Executed(bytes32,address,uint256,address,address,uint256,uint256,bytes32)'))] }] : [] };
+      },
       waitForTransactionReceipt: async request => {
         if (request.hash === pendingBuyHash && timeoutBuyReceipt) {
           timeoutBuyReceipt = false;
-          throw Error('Receipt request timed out after the buy landed');
+          throw Error('Receipt request timed out after buy broadcast');
         }
         return { status: 'success' };
       },
@@ -154,6 +199,14 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
   } });
   const activityStore = await import('../apps/api/src/v6Store.ts');
   mock.module('../apps/api/src/v6Store.ts', { namedExports: { ...activityStore,
+    recordV6Activity: async (input, options) => {
+      if (input.kind === 'buy_filled' && failActivityOnce) { failActivityOnce = false; throw Error('Activity insertion interrupted before its durable write'); }
+      return activityStore.recordV6Activity(input, options);
+    },
+    confirmV6Activity: async (input, options) => {
+      if (input.kind === 'buy_filled' && failConfirmationOnce) { failConfirmationOnce = false; throw Error('Confirmed trade journal write interrupted'); }
+      return activityStore.confirmV6Activity(input, options);
+    },
     reconcileV6Activity: async (walletOwner, network) => {
       for (const row of await activityStore.listV6Activity(walletOwner, network))
         if (row.status === 'pending' && row.txHash === pendingBuyHash) await activityStore.confirmV6Activity(row);
@@ -189,6 +242,59 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
   rejectExitQuote = false;
   hashes.get(strategyKey).set(strategy.id, JSON.stringify({ ...stored(), lastDecision: 'hold_paused' }));
   await runAutopilotCycle(cfg, {network:'arc',vault});
+  if (recoveryCase) {
+    const outboxKey = `pulse:v6:arc:execution-outbox:${owner.toLowerCase()}:${vault.toLowerCase()}`;
+    const savedTransaction = strings.get(outboxKey);
+    assert.ok(savedTransaction, 'an interruption retains the independent durable transaction record');
+    assert.equal(signatures, 1);
+    assert.equal(pass.signalsUsed, 1);
+    assert.equal(stored().lastDecision, ['confirmation', 'storage_confirmation'].includes(recoveryCase) ? 'hold_execution_recovery'
+      : recoveryCase === 'activity' ? 'hold_failed_closed' : 'hold_receipt_pending');
+    if (recoveryCase === 'activity') {
+      assert.equal(broadcasts.length, 0, 'failed activity insertion cannot authorize broadcasting');
+      assert.equal(targetBalance, 0n);
+    }
+    if (recoveryCase === 'pause_expiry') {
+      const beforePause = broadcasts.length;
+      pauseOnRead = 1; now += 500; mock.timers.setTime(now);
+      await runAutopilotCycle(cfg, {network:'arc',vault});
+      assert.equal(stored().lastDecision, 'hold_receipt_pending');
+      assert.equal(broadcasts.length, beforePause, 'a paused owner vault cannot resend a stored trade');
+      pauseOnRead = Infinity; now += 700000; mock.timers.setTime(now);
+      await runAutopilotCycle(cfg, {network:'arc',vault});
+      assert.equal(broadcasts.length, beforePause, 'an expired original quote cannot create a fresh transaction');
+      assert.match(stored().lastError, /Operator reconciliation/);
+      assert.equal(strings.get(outboxKey), savedTransaction);
+      receiptStatus = 'reverted'; now += 60000; mock.timers.setTime(now);
+      await runAutopilotCycle(cfg, {network:'arc',vault});
+      assert.equal(stored().lastDecision, 'hold_execution_reverted');
+      assert.equal(strings.has(outboxKey), false);
+      assert.equal(targetBalance, 0n);
+      const rows = (await activityStore.listV6Activity(owner, 'arc')).filter(row => row.kind === 'buy_filled');
+      assert.equal(rows.length, 1); assert.equal(rows[0].status, 'failed');
+      assert.equal(signatures, 1); assert.equal(pass.signalsUsed, 1);
+      return;
+    }
+    // A fresh process/recovery tick must not wait for another AI or risk period
+    // while the original 30-second route is still valid.
+    deferBroadcast = false; now += 500; mock.timers.setTime(now);
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    if (!['confirmation', 'storage_confirmation'].includes(recoveryCase)) {
+      assert.equal(stored().lastDecision, 'hold_receipt_pending');
+      assert.ok(broadcasts.every(bytes => bytes === broadcasts[0]), 'recovery sends the exact original signed bytes');
+      now += 500; mock.timers.setTime(now);
+      await runAutopilotCycle(cfg, {network:'arc',vault});
+    }
+    assert.equal(stored().lastDecision, 'hold_receipt_reconciled', JSON.stringify(stored()));
+    assert.equal(strings.has(outboxKey), false);
+    assert.equal(submitted.filter(request => request.functionName === 'execute').length, 1);
+    assert.equal(signatures, 1, 'a recovered trade never requests a new signature');
+    assert.equal(pass.signalsUsed, 1, 'recovery never buys another AI confirmation');
+    const rows = (await activityStore.listV6Activity(owner, 'arc')).filter(row => row.kind === 'buy_filled');
+    assert.equal(rows.length, 1); assert.equal(rows[0].status, 'confirmed');
+    assert.ok(stored().activeTakeProfit > mark && stored().activeStopLoss < mark);
+    return;
+  }
   assert.equal(stored().lastDecision, 'hold_receipt_pending', JSON.stringify(stored()));
   assert.ok(targetBalance > 0n);
   assert.ok(stored().activeTakeProfit > mark && stored().activeStopLoss > 0 && stored().activeStopLoss < mark);
@@ -231,7 +337,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot bu
 
 // Node module mocks are process-wide. Exercise the same actual worker with a
 // native contract market in a fresh, secret-free process instead of sharing mocks.
-if (!nativeMarket) test('Arc native contract worker integration', { timeout: 60_000 }, async () => {
+if (!nativeMarket && !recoveryCase) test('Arc native contract worker integration', { timeout: 60_000 }, async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
   Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_NATIVE: '1' });
@@ -245,3 +351,18 @@ if (!nativeMarket) test('Arc native contract worker integration', { timeout: 60_
     assert.match(output, /Arc native contract Autopilot/);
   } finally { child.kill(); }
 });
+
+if (!nativeMarket && !recoveryCase) for (const scenario of ['activity', 'lost_broadcast', 'confirmation', 'storage_confirmation', 'pause_expiry'])
+  test(`Arc Autopilot durable recovery: ${scenario}`, { timeout: 60_000 }, async () => {
+    const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+      /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
+    Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_RECOVERY: scenario });
+    const child = spawn(process.execPath, ['--import', 'tsx', '--experimental-test-module-mocks', '--test', fileURLToPath(import.meta.url)], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    let output = '';
+    child.stdout.on('data', chunk => { output += chunk; });
+    child.stderr.on('data', chunk => { output += chunk; });
+    try {
+      const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+      assert.equal(code, 0, output);
+    } finally { child.kill(); }
+  });

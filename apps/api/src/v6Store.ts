@@ -222,7 +222,8 @@ export async function listV6Activity(owner: string, network: string): Promise<Ac
   }
 }
 
-export async function recordV6Activity(input: Omit<Activity, "id" | "createdAt" | "updatedAt">): Promise<Activity> {
+export async function recordV6Activity(input: Omit<Activity, "id" | "createdAt" | "updatedAt">, options: { requireDurable?: boolean } = {}): Promise<Activity> {
+  if (options.requireDurable && !kvConfigured()) throw new Error("Durable trading activity storage is required");
   const now = new Date().toISOString();
   const item: Activity = { ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now };
   const storageKey = key(input.owner, input.network);
@@ -230,24 +231,34 @@ export async function recordV6Activity(input: Omit<Activity, "id" | "createdAt" 
   memory.set(storageKey, items);
   if (kvConfigured()) {
     try { await writeActivityHash(input.owner, input.network, [item]); }
-    catch (error) { if (!isKvUnavailableError(error)) throw error; }
+    catch (error) { if (options.requireDurable || !isKvUnavailableError(error)) throw error; }
   }
   return item;
 }
 
 /** Confirm a worker-submitted activity in place after verifying its receipt. */
-export async function confirmV6Activity(submitted: Activity): Promise<Activity> {
+export async function confirmV6Activity(submitted: Activity, options: { requireDurable?: boolean } = {}): Promise<Activity> {
+  return settleV6Activity(submitted, "confirmed", options);
+}
+
+export async function failV6Activity(submitted: Activity, options: { requireDurable?: boolean } = {}): Promise<Activity> {
+  return settleV6Activity(submitted, "failed", options);
+}
+
+async function settleV6Activity(submitted: Activity, status: "confirmed" | "failed", options: { requireDurable?: boolean }): Promise<Activity> {
+  if (options.requireDurable && !kvConfigured()) throw new Error("Durable trading activity storage is required");
   const items = await listV6Activity(submitted.owner, submitted.network);
   const current = items.find(item => item.id === submitted.id);
   if (!current || current.txHash !== submitted.txHash || current.account !== submitted.account
     || current.source !== submitted.source || current.kind !== submitted.kind)
     throw new Error("Submitted activity is unavailable or its execution identity changed");
-  if (current.status === "confirmed") return current;
-  const confirmed: Activity = { ...current, status: "confirmed", updatedAt: new Date().toISOString() };
+  if (current.status !== "pending" && current.status !== status) throw new Error("Settled activity cannot change its execution outcome");
+  if (current.status === status && !options.requireDurable) return current;
+  const confirmed: Activity = current.status === status ? current : { ...current, status, updatedAt: new Date().toISOString() };
   memory.set(key(submitted.owner, submitted.network), items.map(item => item.id === confirmed.id ? confirmed : item));
   if (kvConfigured()) {
     try { await writeActivityHash(submitted.owner, submitted.network, [confirmed]); }
-    catch (error) { if (!isKvUnavailableError(error)) throw error; }
+    catch (error) { if (options.requireDurable || !isKvUnavailableError(error)) throw error; }
   }
   return confirmed;
 }

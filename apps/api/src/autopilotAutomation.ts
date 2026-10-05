@@ -8,6 +8,7 @@ import {
   http,
   keccak256,
   parseUnits,
+  parseAbi,
   toHex,
   verifyMessage,
 } from "viem";
@@ -24,8 +25,9 @@ import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } fro
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
 import { analysisSymbolForExecutionToken, getOkxTradeTokens, getGenericOkxQuote, getGenericOkxSwap, betterGenericOkxExitSwap } from "./okxDex.js";
-import { listV6Activity, recordV6Activity, confirmV6Activity, reconcileV6Activity } from "./v6Store.js";
-import { autopilotExecutionFailure, pendingAutopilotTrade, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
+import { listV6Activity, recordV6Activity, confirmV6Activity, failV6Activity, reconcileV6Activity } from "./v6Store.js";
+import { autopilotExecutionFailure, pendingAutopilotTrade, verifiedAutopilotReceipt, type AutopilotExecutionPhase } from "./autopilotExecutionRecovery.js";
+import { ArcAutopilotOutbox, type PendingArcAutopilotTrade } from "./arcAutopilotOutbox.js";
 import { cashFlowCoverage, readCashFlowCheckpoint, runCashFlowRecoveryCycle } from "./autopilotCashFlows.js";
 import { normaliseRouteSymbol } from "./tradeAutomation.js";
 import { executionPublicClient, executionRpcUrls } from "./onchainDiscovery.js";
@@ -1056,6 +1058,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
       ...activeItems.map((strategy) => ({ strategy, mode: "risk" as const })),
       ...activeItems.map((strategy) => ({ strategy, mode: "analysis" as const })),
     ];
+    const recoveryAttempted = new Set<string>();
     for (const { strategy: s, mode } of scheduled) {
       const leaseScope = mode === "risk" ? "execution" as const : "analysis" as const;
       const lease = await acquireStrategyLease(s.id, leaseScope);
@@ -1072,6 +1075,9 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         }
         assertExecutionMarketIdentity(s.network, s.pair);
         if (s.network === "arc") assertArcExecutionBinding(s.pair, s.targetAsset, s.settlementAsset);
+        if (recoveryAttempted.has(s.id)) continue;
+        const outbox = s.network === "arc" ? new ArcAutopilotOutbox(key) : undefined;
+        const recoveringTrade = outbox ? await outbox.read(s.owner, s.vault) : null;
         const now = Date.now();
         const lastAnalysis = Date.parse(s.lastRunAt || "");
         const lastRiskCheck = Date.parse(s.lastRiskCheckAt || "");
@@ -1079,7 +1085,8 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         // immediately; closed-candle dedupe and paid-AI cooldowns still apply.
         const analysisDue = s.lastDecision === "hold_paused" || !Number.isFinite(lastAnalysis) || now - lastAnalysis >= analysisInterval;
         const riskDue = !Number.isFinite(lastRiskCheck) || now - lastRiskCheck >= riskInterval;
-        if ((mode === "risk" && !riskDue) || (mode === "analysis" && !analysisDue)) continue;
+        if (!recoveringTrade && ((mode === "risk" && !riskDue) || (mode === "analysis" && !analysisDue))) continue;
+        if (recoveringTrade) recoveryAttempted.add(s.id);
         if (mode === "risk") s.riskCheckCount = (s.riskCheckCount || 0) + 1;
         const c = configs[s.network];
         const oracle = c.oracle(),
@@ -1140,6 +1147,68 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
               await saveAutopilotPass(aiPass);
             }
           }
+        }
+        if (recoveringTrade && outbox) {
+          executionPhase = "submitted";
+          executionHash = recoveringTrade.txHash as `0x${string}`;
+          const recoveryLease = mode === "analysis" ? await acquireStrategyLease(s.id, "execution") : null;
+          if (mode === "analysis" && !recoveryLease) { s.lastDecision = "hold_receipt_pending"; continue; }
+          try {
+            let activity = (await listV6Activity(s.owner, s.network)).find(row => row.txHash?.toLowerCase() === recoveringTrade.txHash.toLowerCase()
+              && row.source === "autopilot" && row.account?.toLowerCase() === s.vault.toLowerCase() && row.kind === recoveringTrade.kind);
+            activity ??= await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot", account: s.vault,
+              pair: recoveringTrade.pair, kind: recoveringTrade.kind, amount: recoveringTrade.amount,
+              txHash: recoveringTrade.txHash, status: "pending" }, { requireDurable: true });
+            let receipt;
+            try { receipt = await publicClient.getTransactionReceipt({ hash: executionHash }); }
+            catch (error) { if ((error as { name?: string }).name !== "TransactionReceiptNotFoundError") throw error; }
+            if (receipt) {
+              if (receipt.transactionHash.toLowerCase() !== recoveringTrade.txHash.toLowerCase()) throw new Error("Arc Autopilot recovered receipt hash does not match the signed transaction");
+              if (receipt.status === "reverted") {
+                await failV6Activity(activity, { requireDurable: true });
+                executionPhase = "reverted";
+                s.lastDecision = "hold_execution_reverted";
+              } else {
+                const factory = c.factory();
+                if (!factory || !ADDRESS.test(factory)) throw new Error("Arc Autopilot recovery factory is unavailable");
+                const owned = await publicClient.readContract({ address: factory as `0x${string}`,
+                  abi: parseAbi(["function vaultsOf(address) view returns(address[])"]), functionName: "vaultsOf", args: [s.owner as `0x${string}`] });
+                if (!verifiedAutopilotReceipt(receipt, s.vault, owned)) throw new Error("Arc Autopilot recovered execution ownership or event cannot be verified");
+                await confirmV6Activity(activity, { requireDurable: true });
+                executionPhase = "confirmed";
+                s.exitPending = recoveringTrade.kind === "sell_partial_filled";
+                if (recoveringTrade.kind === "sell_filled") { s.activeTakeProfit = undefined; s.activeStopLoss = undefined; }
+                s.lastDecision = "hold_receipt_reconciled";
+              }
+              s.lastTxHash = recoveringTrade.txHash;
+              s.evidenceHash = recoveringTrade.evidenceHash;
+              s.evidenceUrl = recoveringTrade.evidenceUrl;
+              s.lastError = undefined;
+              s.updatedAt = new Date().toISOString();
+              await save([s], "runtime");
+              await outbox.clear(recoveringTrade);
+            } else {
+              // Only the original bytes can be resent. Owner controls and quote
+              // expiry still prevent broadcasting a stale signed intent.
+              const canRetry = !paused && String(version) === recoveringTrade.policyVersion
+                && String(nonce) === recoveringTrade.actionNonce && Date.now() + 3000 < recoveringTrade.expiresAt;
+              if (canRetry) {
+                try {
+                  const hash = await walletClient.sendRawTransaction({ serializedTransaction: recoveringTrade.serializedTransaction as `0x${string}` });
+                  if (hash.toLowerCase() !== recoveringTrade.txHash.toLowerCase()) throw new Error("Arc Autopilot broadcast returned a different transaction hash");
+                } catch (error) { if (!/already known|known transaction|nonce too low/i.test(error instanceof Error ? error.message : String(error))) throw error; }
+              }
+              s.lastDecision = "hold_receipt_pending";
+              s.lastTxHash = recoveringTrade.txHash;
+              s.lastError = canRetry ? undefined : "The original transaction is unresolved and cannot be resent under the current vault policy or quote expiry. Operator reconciliation is required.";
+            }
+            await appendEvaluation(s, { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(),
+              strategyType: s.strategyType || identifyAutopilotStrategy(s.policy.strategy), action: "hold", status: "held",
+              reason: receipt ? "The original Arc vault transaction was reconciled. The next cycle will read fresh balances."
+                : "The original Arc vault transaction remains unresolved. No new trade or AI confirmation was created.",
+              txHash: recoveringTrade.txHash, bias: "unknown", confidence: 0, metrics: {}, rules: [] });
+          } finally { if (recoveryLease) await releaseStrategyLease(s.id, "execution", recoveryLease).catch(() => undefined); }
+          continue;
         }
         if (paused) {
           s.lastDecision = "hold_paused";
@@ -1674,14 +1743,36 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         const executionFees = s.network === "arc" ? await arcExecutionFees(publicClient, { account: walletClient.account!, to: vault,
           data: encodeFunctionData({ abi: vaultReadAbi, functionName: "execute", args: simulation.request.args }) }) : {};
         if (arcExpiresAt && Date.now() + 3000 >= arcExpiresAt) throw new Error("Arc execution quote expired before signing; refresh the route");
-        executionPhase = "submitted";
-        const txHash = await walletClient.writeContract({ ...simulation.request, ...executionFees });
-        executionHash = txHash;
-        s.lastTxHash = txHash;
         const partialExit = decision.action === "sell" && valuedPositionBalance(targetBalance - amount, price, Number(targetDecimals), Number(settlementDecimals)) > 0n;
-        const submittedActivity = await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
+        let pendingArcTrade: PendingArcAutopilotTrade | undefined;
+        let submittedActivity;
+        let txHash: `0x${string}`;
+        if (outbox) {
+          const data = encodeFunctionData({ abi: vaultReadAbi, functionName: "execute", args: simulation.request.args });
+          const request = await walletClient.prepareTransactionRequest({ account: walletClient.account, to: vault, data, value: 0n, ...executionFees });
+          const serializedTransaction = await walletClient.signTransaction(request);
+          pendingArcTrade = await outbox.stage({ owner: s.owner, vault: s.vault, pair: s.pair,
+            kind: partialExit ? "sell_partial_filled" : `${decision.action}_filled`, amount: String(amount),
+            policyVersion: String(version), actionNonce: String(nonce), data, serializedTransaction,
+            evidenceHash: proof.hash, evidenceUrl: proof.url, expiresAt: arcExpiresAt! });
+          txHash = pendingArcTrade.txHash as `0x${string}`;
+          executionHash = txHash;
+          s.lastTxHash = txHash;
+          submittedActivity = await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
+            kind: pendingArcTrade.kind, status: "pending", txHash, account: s.vault, pair: s.pair, amount: String(amount) }, { requireDurable: true });
+          if (Date.now() + 3000 >= pendingArcTrade.expiresAt) throw new Error("Arc Autopilot persisted quote expired before broadcasting; retain the original transaction for reconciliation");
+          executionPhase = "submitted";
+          const broadcastHash = await walletClient.sendRawTransaction({ serializedTransaction });
+          if (broadcastHash.toLowerCase() !== txHash.toLowerCase()) throw new Error("Arc Autopilot broadcast returned a different transaction hash");
+        } else {
+          executionPhase = "submitted";
+          txHash = await walletClient.writeContract({ ...simulation.request, ...executionFees });
+          executionHash = txHash;
+          s.lastTxHash = txHash;
+          submittedActivity = await recordV6Activity({ owner: s.owner, network: s.network, source: "autopilot",
           kind: partialExit ? "sell_partial_filled" : `${decision.action}_filled`, status: "pending",
           txHash, account: s.vault, pair: s.pair, amount: String(amount) });
+        }
         const receipt = await publicClient.waitForTransactionReceipt({
           hash: txHash,
         });
@@ -1708,8 +1799,13 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
             s.activeStopLoss = undefined;
           }
         }
-        await confirmV6Activity(submittedActivity);
+        await confirmV6Activity(submittedActivity, { requireDurable: Boolean(outbox) });
         await appendEvaluation(s, { ...evaluationBase, status: "filled", evidenceHash: proof.hash, txHash });
+        if (outbox && pendingArcTrade) {
+          s.updatedAt = new Date().toISOString();
+          await save([s], "runtime");
+          await outbox.clear(pendingArcTrade);
+        }
         } finally {
           if (actionLease) await releaseStrategyLease(s.id, "execution", actionLease).catch(() => undefined);
         }
