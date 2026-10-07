@@ -1,0 +1,61 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "approve-order",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 103,
+      "hash": "0x0aec75b5ff5228f109b8d20bf592760061d1f928449a98e1aac11d13274abffc",
+      "status": "success",
+      "maxGasUSDC": "0.001687224093008223",
+      "gasUSDC": "0.001108760073344474"
+    },
+    {
+      "step": "create-order",
+      "to": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "nonce": 104,
+      "hash": "0x1cba5e6ccb7cda059a6f7ef2cd1727c099302837f1e8983d33b4ba5f18f8f902",
+      "status": "success",
+      "maxGasUSDC": "0.006905808380682666",
+      "gasUSDC": "0.004400660291103659"
+    },
+    {
+      "step": "approve-output",
+      "to": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "nonce": 107,
+      "hash": "0xbf3bf1ce6d4d46efa7bd34662faca0061924a8d655ae3c1c61f9a5da81231aba",
+      "status": "success",
+      "maxGasUSDC": "0.00168648014131297",
+      "gasUSDC": "0.001108260111435543"
+    },
+    {
+      "step": "sell-only-test-output",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 108,
+      "hash": "0x3c56a778cff4180ed7e0ce60c93710ce9e23d50fe6b931889f519b9f9e49da0b",
+      "status": "success",
+      "maxGasUSDC": "0.005982408576305304",
+      "gasUSDC": "0.003675920424936352"
+    }
+  ],
+  "data": {
+    "registryPauseChanged": false,
+    "store": "isolated process memory; production Redis untouched",
+    "pair": "BTC-USDT",
+    "orderId": "3",
+    "creationHash": "0x1cba5e6ccb7cda059a6f7ef2cd1727c099302837f1e8983d33b4ba5f18f8f902",
+    "schedulerAttempted": true,
+    "workerGasUSDC": "0.008028140788388533",
+    "oraclePriceHash": "0x0705a0181c70f5c799e85e2520b1998739b4c7f369380a9257059c5452f2a3cd",
+    "workerStartNonce": "105",
+    "workerEndNonce": "107",
+    "executionHash": "0x857200a3d50c0096e2cef7410657d440a2edc6a0cbaf4b810e074e03e004496f",
+    "ownerReceivedTarget": "0.00000119",
+    "saleHash": "0x3c56a778cff4180ed7e0ce60c93710ce9e23d50fe6b931889f519b9f9e49da0b",
+    "sdkRegistrationVerified": true,
+    "scopedKeeperVerified": true,
+    "workflowCompleted": true,
+    "completed": true
+  }
+}

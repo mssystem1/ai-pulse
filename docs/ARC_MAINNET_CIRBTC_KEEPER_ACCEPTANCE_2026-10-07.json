@@ -1,0 +1,173 @@
+{
+  "asOf": "2026-10-07T19:19:25.952Z",
+  "chainId": 5042,
+  "blockNumber": "24779002",
+  "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+  "pair": "BTC-USDT",
+  "executionPair": "cirBTC/USDC",
+  "mode": "Live mainnet contract keeper and SDK/local REST acceptance with isolated process memory; production Redis untouched",
+  "spendingApproval": "Existing user-approved maximum 5 USDC total deployment and acceptance spend",
+  "account": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+  "orderId": "3",
+  "onchainOrderState": "filled",
+  "minimumOutputAtomic": "118",
+  "inputUSDC": "0.10",
+  "ownerReceivedCirBTC": "0.00000119",
+  "ownerReceivedAtomic": "119",
+  "returnedUSDC": "0.098384",
+  "tradeLossAndRoundingUSDC": "0.001616",
+  "transactionGasUSDC": "0.018321741689208561",
+  "totalPhaseWalletReductionUSDC": "0.019937741689208561",
+  "receiptCount": 6,
+  "receipts": [
+    {
+      "step": "approve-order",
+      "hash": "0x0aec75b5ff5228f109b8d20bf592760061d1f928449a98e1aac11d13274abffc",
+      "nonce": 103,
+      "to": "0x3600000000000000000000000000000000000000",
+      "status": "success",
+      "blockNumber": "24778447",
+      "gasUSDC": "0.001108760073344474",
+      "transfers": []
+    },
+    {
+      "step": "create-order",
+      "hash": "0x1cba5e6ccb7cda059a6f7ef2cd1727c099302837f1e8983d33b4ba5f18f8f902",
+      "nonce": 104,
+      "to": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+      "status": "success",
+      "blockNumber": "24778464",
+      "gasUSDC": "0.004400660291103659",
+      "transfers": [
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "to": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+          "atomic": "100000"
+        }
+      ]
+    },
+    {
+      "step": "keeper-oracle-price",
+      "hash": "0x0705a0181c70f5c799e85e2520b1998739b4c7f369380a9257059c5452f2a3cd",
+      "nonce": 105,
+      "to": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "status": "success",
+      "blockNumber": "24778500",
+      "gasUSDC": "0.001438240125774088",
+      "transfers": []
+    },
+    {
+      "step": "keeper-limit-fill",
+      "hash": "0x857200a3d50c0096e2cef7410657d440a2edc6a0cbaf4b810e074e03e004496f",
+      "nonce": 106,
+      "to": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+      "status": "success",
+      "blockNumber": "24778512",
+      "gasUSDC": "0.006589900662614445",
+      "transfers": [
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+          "to": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+          "atomic": "100000"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "atomic": "119"
+        },
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+          "to": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "atomic": "100000"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "to": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+          "atomic": "119"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+          "to": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+          "atomic": "119"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+          "to": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "atomic": "119"
+        }
+      ]
+    },
+    {
+      "step": "approve-output",
+      "hash": "0xbf3bf1ce6d4d46efa7bd34662faca0061924a8d655ae3c1c61f9a5da81231aba",
+      "nonce": 107,
+      "to": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "status": "success",
+      "blockNumber": "24778563",
+      "gasUSDC": "0.001108260111435543",
+      "transfers": []
+    },
+    {
+      "step": "sell-only-test-output",
+      "hash": "0x3c56a778cff4180ed7e0ce60c93710ce9e23d50fe6b931889f519b9f9e49da0b",
+      "nonce": 108,
+      "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+      "status": "success",
+      "blockNumber": "24778583",
+      "gasUSDC": "0.003675920424936352",
+      "transfers": [
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "atomic": "98384"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "to": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "atomic": "119"
+        },
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "to": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "atomic": "98384"
+        }
+      ]
+    }
+  ],
+  "sdkRegistrationVerified": true,
+  "scopedKeeperVerified": true,
+  "existingHoldingsSold": false,
+  "finalWalletUSDC": "0.880612235566070166",
+  "finalBuyerGatewayUSDC": "0.106500",
+  "finalCirBTCAtomic": "0",
+  "accountEscrowCleared": true,
+  "approvalsCleared": true,
+  "registryPaused": false,
+  "registryPauseChanged": false,
+  "seller": {
+    "address": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+    "walletUSDC": "0",
+    "gatewayUSDC": "3.900000",
+    "qualificationTransfersToSeller": 0
+  },
+  "conservativeTotalSpendUSDC": "4.378958764433929834",
+  "maximumTotalSpendUSDC": "5",
+  "remainingAuthorizedSpendUSDC": "0.621041235566070166",
+  "proof": "packages/contracts/deployments/5042-cirbtc-keeper-qualification.json",
+  "acceptanceLimits": [
+    "Production extension/mobile UI signing is still unqualified.",
+    "This checks the real scoped limit keeper, not production Redis scheduling.",
+    "Live cirBTC bracket/protection and Autopilot vault/risk-worker workflows remain separate acceptance checks.",
+    "Circle email wallets remain disabled pending owner setup."
+  ]
+}

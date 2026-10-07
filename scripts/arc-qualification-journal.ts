@@ -3,7 +3,7 @@ import { open, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { createPublicClient, createWalletClient, formatEther, http, keccak256, parseEther, type Address, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-export async function qualificationJournal(input: { path: string; rpcUrl: string; privateKey: Hex; owner: string; budgetUSDC: string; targets: Address[]; broadcast: boolean }) {
+export async function qualificationJournal(input: { path: string; rpcUrl: string; privateKey: Hex; owner: string; budgetUSDC: string; targets: Address[]; broadcast: boolean; expectedNonce?: () => number }) {
   const account = privateKeyToAccount(input.privateKey);
   if (account.address.toLowerCase() !== input.owner.toLowerCase()) throw new Error("Qualification signer mismatch");
   const chain = { id: 5042, name: "Arc Mainnet", nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: [input.rpcUrl] } } };
@@ -43,6 +43,7 @@ export async function qualificationJournal(input: { path: string; rpcUrl: string
       if (await client.getBalance({ address: account.address }) < cost + spendUSDCAtomic * 1_000_000_000_000n + parseEther("0.05")) throw new Error("Qualification gas reserve insufficient");
       const nonce = await client.getTransactionCount({ address: account.address, blockTag: "pending" });
       if (nonce !== await client.getTransactionCount({ address: account.address, blockTag: "latest" })) throw new Error("Qualification wallet has pending transactions");
+      if (input.expectedNonce && nonce !== input.expectedNonce()) throw new Error("Qualification wallet changed between test steps; reconcile spending before continuing");
       if (expiresAt && Date.now() + 3000 >= expiresAt) throw new Error("Qualification quote expired before signing");
       const signed = await wallet.signTransaction({ ...tx, chain, nonce, gas, ...fees, type: "eip1559" });
       const entry: Entry = { step, to, nonce, hash: keccak256(signed), status: "pending", maxGasUSDC: formatEther(cost) };
