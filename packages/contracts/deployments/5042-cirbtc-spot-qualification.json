@@ -1,0 +1,56 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "pair": "BTC-USDT",
+  "target": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+  "inputUSDC": "0.1",
+  "entries": [
+    {
+      "step": "buy-approve",
+      "to": "0x3600000000000000000000000000000000000000",
+      "nonce": 99,
+      "hash": "0xc2fee6f827895fa4452e1332a39d021edba35866dca2f6a5cfee20df2f6d53b7",
+      "status": "success",
+      "maxGasUSDC": "0.001687224093008223",
+      "gasUSDC": "0.001108760073344474"
+    },
+    {
+      "inputToken": "0x3600000000000000000000000000000000000000",
+      "outputToken": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "inputAmount": "100000",
+      "minimumOutput": "118",
+      "step": "buy",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 100,
+      "hash": "0xd7ea9480d5593b5aad8c6da75a68372d85781c39bab8852cdf5672ab39b9c430",
+      "status": "success",
+      "maxGasUSDC": "0.007067544515047269",
+      "gasUSDC": "0.004083340357088083",
+      "outputAmount": "119"
+    },
+    {
+      "step": "sell-approve",
+      "to": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "nonce": 101,
+      "hash": "0x559b35a6484839febf98854505b3584ff88e7f443af6e3b0d8369842a55e87bc",
+      "status": "success",
+      "maxGasUSDC": "0.00168648012290223",
+      "gasUSDC": "0.001108260096917337"
+    },
+    {
+      "inputToken": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "outputToken": "0x3600000000000000000000000000000000000000",
+      "inputAmount": "119",
+      "minimumOutput": "97874",
+      "step": "sell",
+      "to": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "nonce": 102,
+      "hash": "0xb3eaa167c7f66396a66e5730f1307c59a0f34659e57946c0e270cd7060f4e12c",
+      "status": "success",
+      "maxGasUSDC": "0.005981688501215607",
+      "gasUSDC": "0.003675440369565492",
+      "outputAmount": "98366"
+    }
+  ],
+  "completed": true
+}

@@ -61,16 +61,22 @@ async function main() {
     for (const entry of journal.entries) await reconcile(entry);
     if (journal.completed) { console.log("Spot qualification already complete; no transactions repeated."); return; }
     await verifyArcToken(token);
+    let expectedNextNonce = journal.entries.length
+      ? journal.entries.at(-1)!.nonce + 1
+      : await client.getTransactionCount({ address: account.address, blockTag: "latest" });
     if (pair === "BTC-USDT" && process.argv.includes("--broadcast")) {
       const budget = JSON.parse(await readFile(".tmp/arc-mainnet-current-budget.json", "utf8"));
+      const auditAge = Date.now() - Date.parse(budget.auditedAt);
       const reserved = journal.entries.reduce((sum, entry) => sum + parseEther(entry.maxGasUSDC), 0n);
       const spentInput = journal.entries.some(entry => entry.step === "buy") ? 0n : parseEther("0.1");
       if (budget.chainId !== 5042 || budget.owner.toLowerCase() !== account.address.toLowerCase()
-        || !budget.receiptAccountingComplete || budget.maximumTotalSpendUSDC !== "5"
-        || Date.now() - Date.parse(budget.auditedAt) > 3600_000
+        || budget.receiptAccountingComplete !== true || budget.maximumTotalSpendUSDC !== "5"
+        || !Number.isSafeInteger(budget.latestNonce) || budget.latestNonce < 0
+        || !Number.isFinite(auditAge) || auditAge < 0 || auditAge > 3600_000
         || parseEther(budget.remainingAuthorizedSpendUSDC) < spentInput + parseEther("0.15") - reserved
         || await client.getTransactionCount({address:account.address,blockTag:"latest"}) !== budget.latestNonce)
         throw new Error("Spot qualification requires fresh reconciled 5 USDC spending evidence");
+      if (!journal.entries.length) expectedNextNonce = budget.latestNonce;
     }
     const balance = async (token: Address) => client.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
     const send = async (step: string, to: Address, data: Hex, details: Partial<Entry> = {}, expiresAt?: number) => {
@@ -84,12 +90,14 @@ async function main() {
       if (await client.getBalance({ address: account.address }) < cost + (details.inputToken?.toLowerCase() === usdc.toLowerCase() ? BigInt(details.inputAmount || "0") * 1_000_000_000_000n : 0n) + parseEther("0.05")) throw new Error("Spot qualification gas reserve would be consumed");
       const nonce = await client.getTransactionCount({ address: account.address, blockTag: "pending" });
       if (nonce !== await client.getTransactionCount({ address: account.address, blockTag: "latest" })) throw new Error("Spot qualification wallet has pending transactions");
+      if (nonce !== expectedNextNonce) throw new Error("Spot qualification wallet changed between test steps; reconcile spending before continuing");
       if (expiresAt && Date.now() + 3000 >= expiresAt) throw new Error("Spot qualification quote expired before signing");
       const signed = await wallet.signTransaction({ ...tx, chain, nonce, gas, ...fees, type: "eip1559" });
       const entry: Entry = { ...details, step, to, nonce, hash: keccak256(signed), status: "pending", maxGasUSDC: formatEther(cost) };
       journal.entries.push(entry); await save();
       if (await client.sendRawTransaction({ serializedTransaction: signed }) !== entry.hash) throw new Error("Spot qualification broadcast hash mismatch");
       await reconcile(entry);
+      expectedNextNonce = nonce + 1;
     };
     const prepare = async (from: Address, to: Address, amount: bigint) => {
       await arcOkxMarketContext({ instId: pair, timeframe: "1H", candleLimit: 60 });

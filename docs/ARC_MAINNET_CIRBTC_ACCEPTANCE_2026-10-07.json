@@ -1,0 +1,126 @@
+{
+  "asOf": "2026-10-07T18:50:53.327Z",
+  "chainId": 5042,
+  "blockNumber": "24775626",
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "mode": "confirmed live mainnet wallet round trip; no hosting deployment or paid reports",
+  "pair": "BTC-USDT",
+  "executionPair": "cirBTC/USDC",
+  "target": {
+    "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+    "symbol": "cirBTC",
+    "decimals": 8
+  },
+  "spentUSDC": "0.10",
+  "acquiredCirBTC": "0.00000119",
+  "acquiredAtomic": "119",
+  "returnedUSDC": "0.098366",
+  "tradeLossAndRoundingUSDC": "0.001634",
+  "transactionGasUSDC": "0.009975800896915386",
+  "totalPhaseBalanceReductionUSDC": "0.011609800896915386",
+  "receiptCount": 4,
+  "receipts": [
+    {
+      "step": "buy-approve",
+      "hash": "0xc2fee6f827895fa4452e1332a39d021edba35866dca2f6a5cfee20df2f6d53b7",
+      "nonce": 99,
+      "to": "0x3600000000000000000000000000000000000000",
+      "status": "success",
+      "blockNumber": "24775315",
+      "gasUSDC": "0.001108760073344474",
+      "transfers": []
+    },
+    {
+      "step": "buy",
+      "hash": "0xd7ea9480d5593b5aad8c6da75a68372d85781c39bab8852cdf5672ab39b9c430",
+      "nonce": 100,
+      "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+      "status": "success",
+      "blockNumber": "24775336",
+      "gasUSDC": "0.004083340357088083",
+      "transfers": [
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "atomic": "119"
+        },
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "to": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "atomic": "100000"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "to": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "atomic": "119"
+        }
+      ]
+    },
+    {
+      "step": "sell-approve",
+      "hash": "0x559b35a6484839febf98854505b3584ff88e7f443af6e3b0d8369842a55e87bc",
+      "nonce": 101,
+      "to": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+      "status": "success",
+      "blockNumber": "24775359",
+      "gasUSDC": "0.001108260096917337",
+      "transfers": []
+    },
+    {
+      "step": "sell",
+      "hash": "0xb3eaa167c7f66396a66e5730f1307c59a0f34659e57946c0e270cd7060f4e12c",
+      "nonce": 102,
+      "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+      "status": "success",
+      "blockNumber": "24775381",
+      "gasUSDC": "0.003675440369565492",
+      "transfers": [
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "to": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "atomic": "98366"
+        },
+        {
+          "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+          "from": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "to": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+          "atomic": "119"
+        },
+        {
+          "token": "0x3600000000000000000000000000000000000000",
+          "from": "0x4e3bcce28caf98a143fd8bd9e4875ccab3e7bbe0",
+          "to": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "atomic": "98366"
+        }
+      ]
+    }
+  ],
+  "finalWalletUSDC": "0.900549977255278727",
+  "finalBuyerGatewayUSDC": "0.106500",
+  "finalCirBtcBalanceAtomic": "0",
+  "approvalsCleared": true,
+  "registryPaused": false,
+  "seller": {
+    "address": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+    "walletUSDC": "0",
+    "gatewayUSDC": "3.900000",
+    "qualificationTransfersToSeller": 0
+  },
+  "conservativeTotalSpendUSDC": "4.359021022744721273",
+  "maximumTotalSpendUSDC": "5",
+  "remainingAuthorizedSpendUSDC": "0.640978977255278727",
+  "noExistingHoldingsSold": true,
+  "noDuplicateSpending": true,
+  "proof": "packages/contracts/deployments/5042-cirbtc-spot-qualification.json",
+  "acceptanceLimits": [
+    "Signed production extension/mobile UI workflows remain unqualified.",
+    "This is a wallet market round trip, not a live cirBTC limit/bracket or Autopilot vault trade.",
+    "Dedicated production executor and live deterministic risk-worker sell acceptance remain pending.",
+    "Circle email wallets remain disabled pending owner production setup."
+  ],
+  "spendingApproval": "Existing user-approved 5 USDC total deployment and live acceptance budget"
+}
