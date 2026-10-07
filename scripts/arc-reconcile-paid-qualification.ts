@@ -22,7 +22,7 @@ async function main() {
   const decipher = createDecipheriv("aes-256-gcm", createHash("sha256").update(`pulse-arc-mainnet-qualification:${cfg.TEST_WALLET_PRIVATE_KEY}`).digest(), Buffer.from(envelope.iv, "base64"));
   decipher.setAuthTag(Buffer.from(envelope.tag, "base64"));
   const saved = JSON.parse(Buffer.concat([decipher.update(Buffer.from(envelope.ciphertext, "base64")), decipher.final()]).toString());
-  if (saved.url !== "http://127.0.0.1:8789/arc/v1/preflight" || saved.payTo.toLowerCase() !== cfg.CIRCLE_GATEWAY_SELLER_ADDRESS.toLowerCase()) throw new Error();
+  if (saved.url !== "http://127.0.0.1:8789/arc/v1/preflight" || saved.payTo.toLowerCase() !== cfg.PAY_TO_ADDRESS.toLowerCase()) throw new Error();
   const jobs = await createPersistence(cfg).jobs.listByPayer(buyer.address, "arc");
   const normalizedBody = PreflightRequestSchema.parse(JSON.parse(saved.body));
   const matches = jobs.filter(job => job.mode === "risk" && job.receipt?.authorizationId === requestHash(saved.header)

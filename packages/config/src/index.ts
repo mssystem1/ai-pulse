@@ -195,6 +195,7 @@ const EnvSchema = z.object({
   CIRCLE_GATEWAY_ENABLED: z.string().optional().transform((v) => v === "1" || v === "true"),
   CIRCLE_GATEWAY_MAINNET_URL: z.string().url().default("https://gateway-api.circle.com"),
   CIRCLE_GATEWAY_ACCEPTED_NETWORKS: z.string().default("eip155:5042"),
+  // Deprecated compatibility field; every payment uses PAY_TO_ADDRESS.
   CIRCLE_GATEWAY_SELLER_ADDRESS: z.string().optional().default(""),
   CDP_FACILITATOR_URL: z.string().url().default("https://api.cdp.coinbase.com/platform/v2/x402"),
   CDP_API_KEY_ID: z.string().optional().default(""),
@@ -277,8 +278,8 @@ export function loadConfig(): AppConfig {
   if (parsed.STORAGE_PROVIDER === "vercel_blob" && parsed.BLOB_ACCESS === "public" && !/^[A-Za-z0-9_-]{43}=$|^[A-Za-z0-9_-]{43}$/.test(parsed.REPORT_ENCRYPTION_KEY)) {
     throw new Error("BLOB_ACCESS=public requires REPORT_ENCRYPTION_KEY containing a base64url-encoded 32-byte key");
   }
-  if (parsed.FEATURE_ARC_PAYMENTS && parsed.CIRCLE_GATEWAY_ENABLED && !/^0x[a-fA-F0-9]{40}$/.test(parsed.CIRCLE_GATEWAY_SELLER_ADDRESS)) {
-    throw new Error("Arc payments require a valid CIRCLE_GATEWAY_SELLER_ADDRESS");
+  if (parsed.FEATURE_ARC_PAYMENTS && parsed.CIRCLE_GATEWAY_ENABLED && (!/^0x[a-fA-F0-9]{40}$/.test(parsed.PAY_TO_ADDRESS) || /^0x0{40}$/i.test(parsed.PAY_TO_ADDRESS))) {
+    throw new Error("Arc payments require a valid nonzero PAY_TO_ADDRESS");
   }
   if ((parsed.FEATURE_BASE_PAYMENTS || parsed.FEATURE_ARBITRUM_PAYMENTS) && (!parsed.CDP_API_KEY_ID || !parsed.CDP_API_KEY_SECRET)) {
     throw new Error("Base/Arbitrum payments require CDP_API_KEY_ID and CDP_API_KEY_SECRET");
@@ -610,7 +611,7 @@ export function buildAspMetadata(cfg: AppConfig) {
         priceUsd: info.priceUsd, price: priceLabel(info.priceUsd), free: false,
         description: info.description, networkKey: key, network: network.caip2,
         asset: network.paymentAsset.address, assetSymbol: network.paymentAsset.symbol,
-        payTo: key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+        payTo: cfg.PAY_TO_ADDRESS,
         paymentProvider: network.paymentProvider, scheme: "exact",
       };
     });

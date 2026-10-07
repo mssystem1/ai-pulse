@@ -1,6 +1,9 @@
-# Arc mainnet migration audit — updated 2026-10-05
+# Arc mainnet migration audit — updated 2026-10-07
 
 PULSE's active Arc network is now **`arc`, chain 5042, `eip155:5042`, wallet ID `0x13b2`**. Testnet is retired from routing, discovery, wallet connections and execution workers. Seven PULSE core contracts and four factory-created qualification accounts/vaults are deployed and source-verified with exact creation/runtime matches on Sourcify. Router/spender and execution/oracle roles are configured. Live acceptance remains in progress.
+
+
+**Current operation (October 7):** the owner explicitly requested resuming automated execution. Registry `pauseAutomation(false)` is confirmed in [the public resume journal](../packages/contracts/deployments/5042-user-resume.json); the hosted API now advertises Market, Limit, bracket/protection and Autopilot as enabled. This does not change individual vault pause states or complete the remaining acceptance work. Circle email wallets remain disabled. Every payment uses `PAY_TO_ADDRESS` / `VITE_PAY_TO_ADDRESS`; Arc proceeds accrue in that address’s Circle Gateway balance and require an owner withdrawal to reach the ordinary wallet. Gateway funding now provides gas-reserving Deposit Max and fee-aware Withdrawal Max, with mobile error decoding and a clear mint-gas check.
 
 ## Goal and completion criteria
 
@@ -67,11 +70,12 @@ ARC_RPC_URL=https://rpc.mainnet.arc.io
 ARC_RPC_FALLBACK_URL=https://rpc.quicknode.mainnet.arc.io
 CIRCLE_GATEWAY_MAINNET_URL=https://gateway-api.circle.com
 CIRCLE_GATEWAY_ACCEPTED_NETWORKS=eip155:5042
-CIRCLE_GATEWAY_SELLER_ADDRESS=<seller EVM address>
+PAY_TO_ADDRESS=<payment recipient EVM address>
+VITE_PAY_TO_ADDRESS=<same payment recipient EVM address>
 CIRCLE_API_KEY_MAINNET=<production server secret>
 VITE_CIRCLE_APP_ID=<public App ID from the same production Circle project>
 FEATURE_CIRCLE_MAINNET_WALLETS=0
-FEATURE_ARC_TRADING=0
+FEATURE_ARC_TRADING=1
 ```
 
 `CIRCLE_API_KEY_MAINNET` takes precedence over legacy `CIRCLE_API_KEY`. Test keys are rejected for mainnet email wallets. A production key and UUID App ID are present locally, but the user confirmed that production setup is still pending and explicitly requested that email wallets stay disabled. Keep `FEATURE_CIRCLE_MAINNET_WALLETS=0` until the matching production app, subscription and email setup are ready. Obtain or check the App ID from Circle Console → Mainnet → Wallets → User Controlled → Configurator and configure Email/SMTP there. Once setup is complete, enable the flag, restart the API and rebuild the frontend. Set the server key on Railway and the public App ID on Vercel before deployment; secrets never belong in `VITE_*`.
@@ -181,3 +185,10 @@ The earlier catalog and native-market experiment described above is superseded f
 The API requires live OKX ticker/history and two-way Arc quotes before marking a reviewed mapping available. Autopilot checks recent consecutive completed OKX history before setup and AI usage. Legacy native market requests fail before checkout and transaction preparation. README and English/Chinese app Docs describe the corrected workflow and cirBTC search. An Arc-specific executor setting is available without changing signers on other networks. Production trading and Circle email-wallet activation remain disabled. No hosting deployment or new chain transaction is part of this correction.
 
 The [market policy and workflow audit](ARC_MAINNET_OKX_MARKET_POLICY_AUDIT_2026-10-05.json) records 341 passing API tests, 154 web tests, eight Arc worker checks, six SDK checks and seven cloud-environment checks, with one optional Redis test skipped. Live read-only checks confirmed both reviewed mappings, fresh OKX ticker/history, two-way routes and guarded 0.11 USDC preflight. Mobile browser checks covered Global market/timeframe changes, Spot, Autopilot, exact-address Risk Guard selection and live free contract inspection, plus English/Chinese Docs. These checks do not qualify a new live cirBTC trade or remove the remaining production acceptance gates.
+
+
+## October 7 execution resume, proceeds and Gateway controls
+
+The owner explicitly requested unpausing Arc automation. The [confirmed public resume journal](../packages/contracts/deployments/5042-user-resume.json) records pauseAutomation(false), after role/router and budget reconciliation. The hosted API now enables Market, Limit, bracket/protection and Autopilot, resolves BTC to cirBTC/USDC and confirms live OKX history. Individual vault policy/pause states were preserved. The separate Circle email-wallet setup remains pending.
+
+The [Gateway/USDC audit](ARC_MAINNET_GATEWAY_AUDIT_2026-10-07.md) records 99 owner receipts, exact balance accounting, the existing payment recipient’s 3.9 USDC Gateway proceeds, readable mobile errors, zero mint-gas handling, Deposit/Withdrawal Max and eight-decimal cirBTC minimums. PAY_TO_ADDRESS / VITE_PAY_TO_ADDRESS are now canonical on every network. The only agent-submitted transaction in this continuation was the explicitly authorized resume; no new paid tests, trades, seller withdrawals, hosting deployment or push occurred. Local builds and the complete relevant test suites passed; the isolated browser fixture does not certify physical mobile signing.

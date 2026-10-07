@@ -1,10 +1,9 @@
-/** One bounded USDC/WETH round trip. Durable hash journal; no duplicate sends on rerun. */
+/** One bounded reviewed Arc token round trip. Separate journals; no duplicate sends on rerun. */
 import { config } from "dotenv";
 import { readFile, writeFile, rename, open, unlink } from "node:fs/promises";
 import { createPublicClient, createWalletClient, decodeEventLog, encodeFunctionData, erc20Abi, formatEther, formatUnits, http, keccak256, parseEther, parseUnits, type Address, type Hex, type TransactionReceipt } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 
-const path = "packages/contracts/deployments/5042-spot-qualification.json";
 const input = parseUnits("0.10", 6);
 type Entry = { step: string; hash: Hex; nonce: number; to: Address; status: string; maxGasUSDC: string; gasUSDC?: string; inputToken?: Address; outputToken?: Address; inputAmount?: string; minimumOutput?: string; outputAmount?: string };
 async function main() {
@@ -12,15 +11,19 @@ async function main() {
   const { loadConfig } = await import("../packages/config/src/index.js");
   const { getGenericOkxSwap } = await import("../apps/api/src/okxDex.js");
   const { validateArcSwap } = await import("../apps/api/src/arcSwap.js");
+  const { ARC_OKX_MARKETS, arcOkxMarketContext, verifyArcToken } = await import("../apps/api/src/arcMarkets.js");
   const ARC_USDC = "0x3600000000000000000000000000000000000000" as Address;
-  const ARC_WETH = "0x128cC466B61f542da60c70e3aA11c10e19B84EDB" as Address;
+  const pair = process.argv.find(arg => arg.startsWith("--pair="))?.slice(7) || "ETH-USDT";
+  const token = ARC_OKX_MARKETS.find(market => market.pair === pair);
+  if (!token) throw new Error("Spot qualification requires a reviewed Arc OKX market");
+  const path = pair === "BTC-USDT" ? "packages/contracts/deployments/5042-cirbtc-spot-qualification.json" : "packages/contracts/deployments/5042-spot-qualification.json";
   const { executionContractAddress } = await import("../apps/api/src/executionContracts.js");
   const cfg = loadConfig(), account = privateKeyToAccount(cfg.TEST_WALLET_PRIVATE_KEY as Hex);
   if (account.address.toLowerCase() !== cfg.TEST_WALLET_ADDRESS.toLowerCase()) throw new Error("Spot qualification wallet mismatch");
   const chain = { id: 5042, name: "Arc Mainnet", nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 18 }, rpcUrls: { default: { http: [cfg.ARC_RPC_URL] } } };
   const client = createPublicClient({ chain, transport: http(cfg.ARC_RPC_URL, { timeout: 15_000, retryCount: 0 }) });
   const wallet = createWalletClient({ chain, account, transport: http(cfg.ARC_RPC_URL, { retryCount: 0 }) });
-  const usdc = ARC_USDC, weth = ARC_WETH as Address, spender = executionContractAddress("arc", "okxApproval");
+  const usdc = ARC_USDC, weth = token.address as Address, spender = executionContractAddress("arc", "okxApproval");
   if (await client.getChainId() !== 5042) throw new Error("Spot qualification wrong network");
   for (const address of [usdc, weth, spender, executionContractAddress("arc", "okxRouter")]) {
     const code = await client.getCode({ address });
@@ -28,10 +31,11 @@ async function main() {
   }
   const lock = await open(`${path}.lock`, "wx");
   try {
-    let journal: { chainId: number; owner: Address; inputUSDC: string; entries: Entry[]; completed?: boolean };
+    let journal: { chainId: number; owner: Address; pair?: string; target?: Address; inputUSDC: string; entries: Entry[]; completed?: boolean };
     try { journal = JSON.parse(await readFile(path, "utf8")); }
-    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; journal = { chainId: 5042, owner: account.address, inputUSDC: "0.1", entries: [] }; }
-    if (journal.chainId !== 5042 || journal.owner.toLowerCase() !== account.address.toLowerCase() || journal.inputUSDC !== "0.1") throw new Error("Spot qualification journal mismatch");
+    catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; journal = { chainId: 5042, owner: account.address, pair, target: weth, inputUSDC: "0.1", entries: [] }; }
+    if (journal.chainId !== 5042 || journal.owner.toLowerCase() !== account.address.toLowerCase() || journal.inputUSDC !== "0.1"
+      || (journal.pair || "ETH-USDT") !== pair || (journal.target && journal.target.toLowerCase() !== weth.toLowerCase())) throw new Error("Spot qualification journal mismatch");
     const save = async () => { await writeFile(`${path}.tmp`, JSON.stringify(journal, null, 2)); await rename(`${path}.tmp`, path); };
     const delta = (receipt: TransactionReceipt, token: Address) => receipt.logs.reduce((total, log) => {
       if (log.address.toLowerCase() !== token.toLowerCase()) return total;
@@ -56,6 +60,18 @@ async function main() {
     };
     for (const entry of journal.entries) await reconcile(entry);
     if (journal.completed) { console.log("Spot qualification already complete; no transactions repeated."); return; }
+    await verifyArcToken(token);
+    if (pair === "BTC-USDT" && process.argv.includes("--broadcast")) {
+      const budget = JSON.parse(await readFile(".tmp/arc-mainnet-current-budget.json", "utf8"));
+      const reserved = journal.entries.reduce((sum, entry) => sum + parseEther(entry.maxGasUSDC), 0n);
+      const spentInput = journal.entries.some(entry => entry.step === "buy") ? 0n : parseEther("0.1");
+      if (budget.chainId !== 5042 || budget.owner.toLowerCase() !== account.address.toLowerCase()
+        || !budget.receiptAccountingComplete || budget.maximumTotalSpendUSDC !== "5"
+        || Date.now() - Date.parse(budget.auditedAt) > 3600_000
+        || parseEther(budget.remainingAuthorizedSpendUSDC) < spentInput + parseEther("0.15") - reserved
+        || await client.getTransactionCount({address:account.address,blockTag:"latest"}) !== budget.latestNonce)
+        throw new Error("Spot qualification requires fresh reconciled 5 USDC spending evidence");
+    }
     const balance = async (token: Address) => client.readContract({ address: token, abi: erc20Abi, functionName: "balanceOf", args: [account.address] });
     const send = async (step: string, to: Address, data: Hex, details: Partial<Entry> = {}, expiresAt?: number) => {
       if (journal.entries.some(entry => entry.step === step)) return;
@@ -76,6 +92,7 @@ async function main() {
       await reconcile(entry);
     };
     const prepare = async (from: Address, to: Address, amount: bigint) => {
+      await arcOkxMarketContext({ instId: pair, timeframe: "1H", candleLimit: 60 });
       const swap = await getGenericOkxSwap(cfg, { chainId: "5042", fromTokenAddress: from.toLowerCase(), toTokenAddress: to.toLowerCase(), amount: amount.toString(), userWalletAddress: account.address, slippagePercent: "0.5" });
       const checked = await validateArcSwap(swap, { from, to, amount: amount.toString(), receiver: account.address, slippageBps: 50 });
       if (!Number.isFinite(Number(swap.quote!.priceImpactPercent)) || Math.abs(Number(swap.quote!.priceImpactPercent)) > 1) throw new Error("Spot qualification price impact exceeds 1%");
@@ -83,7 +100,7 @@ async function main() {
     };
     if (!process.argv.includes("--broadcast")) {
       const { swap } = await prepare(usdc, weth, input);
-      console.log(JSON.stringify({ mode: "read-only", inputUSDC: "0.1", expectedWETH: formatUnits(BigInt(swap.quote!.toTokenAmount), 18), USDC: formatUnits(await balance(usdc), 6) }));
+      console.log(JSON.stringify({ mode: "read-only", pair, targetSymbol: token.symbol, inputUSDC: "0.1", expectedTarget: formatUnits(BigInt(swap.quote!.toTokenAmount), token.decimals), USDC: formatUnits(await balance(usdc), 6) }));
       return;
     }
     for (const step of ["buy", "sell"] as const) {
@@ -98,12 +115,12 @@ async function main() {
       if (step === "sell" && checked.minimum < input * 95n / 100n) throw new Error("Spot qualification round-trip loss would exceed 5%; position retained for review");
       await send(step, swap.tx.to as Address, swap.tx.data as Hex, { inputToken: from, outputToken: to, inputAmount: amount.toString(), minimumOutput: checked.minimum.toString() }, checked.expiresAt);
     }
-    for (const [name, token] of [["USDC", usdc], ["WETH", weth]] as const) {
-      const allowance = await client.readContract({ address: token, abi: erc20Abi, functionName: "allowance", args: [account.address, spender] });
-      if (allowance > 0n) await send(`revoke-${name}`, token, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [spender, 0n] }));
+    for (const [name, tokenAddress] of [["USDC", usdc], [token.symbol, weth]] as const) {
+      const allowance = await client.readContract({ address: tokenAddress, abi: erc20Abi, functionName: "allowance", args: [account.address, spender] });
+      if (allowance > 0n) await send(`revoke-${name}`, tokenAddress, encodeFunctionData({ abi: erc20Abi, functionName: "approve", args: [spender, 0n] }));
     }
     journal.completed = true; await save();
-    console.log(JSON.stringify({ completed: true, inputUSDC: "0.1", returnedUSDC: formatUnits(BigInt(journal.entries.find(entry => entry.step === "sell")!.outputAmount!), 6), existingHoldingsSold: false }));
+    console.log(JSON.stringify({ completed: true, pair, targetSymbol: token.symbol, inputUSDC: "0.1", returnedUSDC: formatUnits(BigInt(journal.entries.find(entry => entry.step === "sell")!.outputAmount!), 6), existingHoldingsSold: false }));
   } finally { await lock.close(); await unlink(`${path}.lock`); }
 }
 main().catch(error => { console.error(error instanceof Error && error.message.startsWith("Spot qualification ") ? error.message : "Spot qualification stopped. Inspect the public transaction journal before retrying; no automatic duplicate spending."); process.exitCode = 1; });

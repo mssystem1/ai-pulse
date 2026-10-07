@@ -1,5 +1,5 @@
-import { createPublicClient, defineChain, encodeFunctionData, fallback, http, keccak256, pad, recoverTypedDataAddress, toHex, type Hex } from "viem";
-import { ARC_GATEWAY_WALLET, WEB_NETWORKS, assertArcUsdcGasReserve, fetchArcGatewayBalanceAtomic, parseGatewayDepositAmount, switchWalletNetwork } from "./networks";
+import { createPublicClient, defineChain, encodeFunctionData, fallback, formatUnits, http, keccak256, pad, recoverTypedDataAddress, toHex, type Hex } from "viem";
+import { ARC_GATEWAY_WALLET, WEB_NETWORKS, assertArcGatewayWallet, fetchArcGatewayBalanceAtomic, parseGatewayDepositAmount } from "./networks";
 import type { InjectedProvider } from "./wallet";
 
 export const ARC_GATEWAY_MINTER = "0x2222222d7164433c4C09B0b0D809a9b52C04C205";
@@ -74,12 +74,47 @@ export function parseWithdrawalQuote(raw: unknown, owner: string, amount: string
   assertWithdrawalSpec(intent.spec, spec);
   return { owner: owner.toLowerCase(), amount, spec, maxFee: uint(intent.maxFee), maxBlockHeight: uint(intent.maxBlockHeight), reviewedAt: Date.now() };
 }
-export async function prepareArcGatewayWithdrawal(owner: string, amount: string): Promise<WithdrawalQuote> {
+async function estimateArcGatewayWithdrawal(owner: string, amount: string): Promise<WithdrawalQuote> {
   const salt = toHex(crypto.getRandomValues(new Uint8Array(32)));
   const spec = withdrawalSpec(owner, amount, salt);
-  const quote = parseWithdrawalQuote(await gateway("estimate", [{ spec }]), owner, amount, spec);
+  return parseWithdrawalQuote(await gateway("estimate", [{ spec }]), owner, amount, spec);
+}
+export async function prepareArcGatewayWithdrawal(owner: string, amount: string): Promise<WithdrawalQuote> {
+  const quote = await estimateArcGatewayWithdrawal(owner, amount);
+  const spec = quote.spec;
   if (await fetchArcGatewayBalanceAtomic(owner) < BigInt(spec.value) + BigInt(quote.maxFee)) throw new Error("Gateway available USDC must cover the withdrawal plus its maximum fee; reduce the amount");
   return quote;
+}
+
+/** Fee estimates are unsigned. Max never authorizes a transfer or starts the delayed fallback. */
+export async function prepareMaxArcGatewayWithdrawal(owner: string): Promise<WithdrawalQuote> {
+  const available = await fetchArcGatewayBalanceAtomic(owner);
+  if (available <= 0n) throw new Error("No available Gateway USDC to withdraw");
+  let amount = available;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const quote = await estimateArcGatewayWithdrawal(owner, formatUnits(amount, 6));
+    const next = available - BigInt(quote.maxFee);
+    if (next <= 0n) throw new Error("Gateway balance does not cover the withdrawal fee");
+    if (amount <= next) {
+      if (await fetchArcGatewayBalanceAtomic(owner) < amount + BigInt(quote.maxFee)) throw new Error("Gateway balance changed; refresh Max before reviewing withdrawal");
+      return quote;
+    }
+    amount = next;
+  }
+  throw new Error("Gateway fee changed repeatedly; review a smaller withdrawal amount");
+}
+export function maxArcGatewayDepositAtomic(nativeBalance: bigint, gasPrice: bigint): bigint {
+  if (nativeBalance < 0n || gasPrice <= 0n) throw new Error("Arc deposit balance or gas estimate is unavailable");
+  const reserved = 470_000n * gasPrice * 2n;
+  return nativeBalance > reserved ? (nativeBalance - reserved) / 1_000_000_000_000n : 0n;
+}
+export async function prepareMaxArcGatewayDeposit(owner: string): Promise<string> {
+  address(owner);
+  const rpc = await checkedClient();
+  const [balance, gasPrice] = await Promise.all([rpc.getBalance({ address: owner as Hex }), rpc.getGasPrice()]);
+  const maximum = maxArcGatewayDepositAtomic(balance, gasPrice);
+  if (maximum <= 0n) throw new Error("Add wallet USDC on Arc Mainnet; the available balance does not cover approval and deposit gas");
+  return formatUnits(maximum, 6);
 }
 export function readPendingWithdrawal(store: Store, owner: string): PendingWithdrawal | null {
   const raw = store.getItem(key(owner));
@@ -97,9 +132,7 @@ function save(store: Store, pending: PendingWithdrawal) {
   if (!readPendingWithdrawal(store, pending.owner)) throw new Error("Gateway withdrawal recovery storage is unavailable");
 }
 export async function assertGatewayWallet(provider: InjectedProvider, owner: string) {
-  await switchWalletNetwork(provider, "arc");
-  const accounts = await provider.request({ method: "eth_accounts" });
-  if (!Array.isArray(accounts) || String(accounts[0]).toLowerCase() !== owner.toLowerCase()) throw new Error("Wallet account changed; reconnect the Gateway depositor before signing");
+  await assertArcGatewayWallet(provider, owner);
 }
 
 /** Match the exact packed TransferSpec, including recipient, caller, amount and empty hooks. */
@@ -125,6 +158,16 @@ async function checkedClient() {
   if (await rpc.getChainId() !== 5042) throw new Error("Gateway RPC returned the wrong chain");
   return rpc;
 }
+async function assertGatewayGasReserve(rpc: Awaited<ReturnType<typeof checkedClient>>, owner: string, gasLimit: bigint) {
+  // Public RPC reads work in wallet browsers that restrict eth_gasPrice/eth_getBalance.
+  const [balance, price] = await Promise.all([rpc.getBalance({ address: owner as Hex }), rpc.getGasPrice()]);
+  if (price <= 0n) throw new Error("Arc gas estimate is unavailable; refresh before authorizing a withdrawal");
+  const required = gasLimit * price * 2n;
+  if (balance < required) {
+    const reserve = formatUnits((required + 999_999_999_999n) / 1_000_000_000_000n, 6);
+    throw new Error(`Add at least ${reserve} wallet USDC on Arc Mainnet for transaction gas. Gateway USDC cannot pay the mint fee. Refresh balances after funding this same wallet.`);
+  }
+}
 export async function withdrawArcGateway(provider: InjectedProvider, quote: WithdrawalQuote, store: Store) {
   const existing = readPendingWithdrawal(store, quote.owner);
   if (existing) throw new Error("Resume the existing Gateway withdrawal before starting another");
@@ -134,7 +177,7 @@ export async function withdrawArcGateway(provider: InjectedProvider, quote: With
   const rpc = await checkedClient();
   if (await rpc.getBlockNumber() >= BigInt(quote.maxBlockHeight)) throw new Error("Withdrawal block expiry reached; request a new estimate");
   if (await fetchArcGatewayBalanceAtomic(quote.owner) < BigInt(quote.spec.value) + BigInt(quote.maxFee)) throw new Error("Gateway balance changed; review a smaller withdrawal");
-  await assertArcUsdcGasReserve(provider, quote.owner, 0n, 350_000n);
+  await assertGatewayGasReserve(rpc, quote.owner, 350_000n);
   // Gateway EIP-712 intentionally omits chainId/verifyingContract; the signed spec binds domain 26 and both contracts.
   const data = typed(quote);
   const json = JSON.stringify({ ...data, types: { EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }], ...types } }, (_, v) => typeof v === "bigint" ? v.toString() : v);
@@ -170,7 +213,7 @@ export async function resumeArcGatewayWithdrawal(provider: InjectedProvider, own
   const validated = validateWithdrawalAttestation({ attestation: pending.attestation, signature: pending.attestationSignature }, pending.spec);
   if (await rpc.getBlockNumber() >= validated.expiry) throw new Error("Mint attestation expired; recovery retained. Contact Circle support before creating another withdrawal.");
   await assertGatewayWallet(provider, owner);
-  await assertArcUsdcGasReserve(provider, owner, 0n, 350_000n);
+  await assertGatewayGasReserve(rpc, owner, 350_000n);
   const data = encodeFunctionData({ abi: minterAbi, functionName: "gatewayMint", args: [validated.attestation, validated.signature] });
   await rpc.call({ account: owner as Hex, to: ARC_GATEWAY_MINTER, data });
   const hash = await provider.request({ method: "eth_sendTransaction", params: [{ from: owner, to: ARC_GATEWAY_MINTER, data, value: "0x0", gas: "0x55730" }] });
@@ -195,9 +238,10 @@ export async function trustlessArcGatewayWithdrawal(provider: InjectedProvider, 
   if (value <= 0n) throw new Error("No Gateway USDC is ready to claim");
   if (amount !== null && status.withdrawing > 0n) throw new Error("An existing contract withdrawal is pending; adding funds would reset its waiting period");
   if (amount !== null && value > status.available) throw new Error("Insufficient onchain Gateway USDC for a contract withdrawal");
-  await assertArcUsdcGasReserve(provider, owner, 0n, 200_000n);
+  const rpc = await checkedClient();
+  await assertGatewayGasReserve(rpc, owner, 200_000n);
   const data = amount === null ? encodeFunctionData({ abi: walletAbi, functionName: "withdraw", args: [usdc] }) : encodeFunctionData({ abi: walletAbi, functionName: "initiateWithdrawal", args: [usdc, value] });
-  const rpc = await checkedClient(); await rpc.call({ account: owner as Hex, to: ARC_GATEWAY_WALLET, data });
+  await rpc.call({ account: owner as Hex, to: ARC_GATEWAY_WALLET, data });
   await assertGatewayWallet(provider, owner);
   const hash = await provider.request({ method: "eth_sendTransaction", params: [{ from: owner, to: ARC_GATEWAY_WALLET, data, value: "0x0", gas: "0x30d40" }] });
   if (typeof hash !== "string" || !/^0x[\da-f]{64}$/i.test(hash)) throw new Error("Wallet returned no Gateway withdrawal hash");

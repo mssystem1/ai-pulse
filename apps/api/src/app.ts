@@ -305,7 +305,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       asset: network.paymentAsset.symbol,
       paymentProvider: network.paymentProvider,
       paymentMode: cfg.X402_MOCK || cfg.paymentMode === "mock" ? "mock" : network.paymentProvider,
-      payTo: selected === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+      payTo: cfg.PAY_TO_ADDRESS,
       grokModel: cfg.GROK_MODEL,
       hasXaiKey: cfg.hasXaiKey,
       languages: ["en", "zh"],
@@ -1401,7 +1401,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     const payer = paymentPayer(authorization) || `payment:${authorizationId}`;
     const bodyHash = requestHash(req.body);
     const network = getNetwork((req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey || "xlayer");
-    const payee = network.key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
+    const payee = cfg.PAY_TO_ADDRESS;
     // Canonical V5 analysis uses server-fetched evidence only. Never persist a
     // deprecated browser screenshot in Redis merely because an old client sent it.
     const { chartImageBase64: _chart, chartImageMime: _chartMime, ...durableBody } =
@@ -1459,7 +1459,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     return Object.freeze({
       id: requestHash(settlement), provider: cfg.X402_MOCK ? "mock" : inline?.provider || network.paymentProvider,
       network: network.caip2, chainId: network.chainId, asset: network.paymentAsset.address || cfg.X402_ASSET, amountAtomic,
-      payer, payee: network.key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+      payer, payee: cfg.PAY_TO_ADDRESS,
       authorizationId, resourceUrl: req.originalUrl.split("?")[0], requestHash: requestHash(req.body),
       verificationResult: "accepted_by_middleware", settlementResult: "settled",
       settlementMode, finality,

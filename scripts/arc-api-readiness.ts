@@ -46,7 +46,7 @@ async function main() {
       const requirement = body?.accepts?.[0];
       const ready = response.status === 402 && body.x402Version === 2 && body.accepts.length === 1 && requirement.network === "eip155:5042"
         && requirement.asset.toLowerCase() === "0x3600000000000000000000000000000000000000" && requirement.amount === service.amount
-        && requirement.payTo.toLowerCase() === cfg.CIRCLE_GATEWAY_SELLER_ADDRESS.toLowerCase()
+        && requirement.payTo.toLowerCase() === cfg.PAY_TO_ADDRESS.toLowerCase()
         && requirement.extra?.name === "GatewayWalletBatched" && String(requirement.extra?.version) === "1"
         && requirement.extra?.verifyingContract?.toLowerCase() === "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee" && body.resource?.url === url;
       checks.push({ name: service.name, ready, status: response.status, amountUSDC: Number(service.amount) / 1_000_000, ...(requirement ? {

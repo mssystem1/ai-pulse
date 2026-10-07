@@ -17,7 +17,7 @@ import { executionSignerKey, hasExecutionSigner } from "./executionSigner.js";
 import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, robinhoodOrderMarket } from "./robinhoodMarkets.js";
-import { assertArcExecutionBinding, arcOrderMarket } from "./arcMarkets.js";
+import { assertArcExecutionBinding, arcOrderMarket, assertArcOkxTicker } from "./arcMarkets.js";
 import { analysisSymbolForExecutionToken, getGenericOkxSwap } from "./okxDex.js";
 import { recordV6Activity } from "./v6Store.js";
 import { executionPublicClient, executionRpcUrls, getOnchainAccountSnapshot } from "./onchainDiscovery.js";
@@ -890,7 +890,16 @@ export async function runTradeAutomationCycle(cfg: AppConfig, scope?: { network:
           item.updatedAt = new Date().toISOString();
         }
         item.lastError = undefined;
+        if (item.network === "arc") {
+          assertArcExecutionBinding(item.instId,
+            String(item.version === "oco-v1" ? record[0] : record[2]),
+            String(item.version === "oco-v1" ? record[1] : record[3]));
+          if (item.sellToken.toLowerCase() !== String(record[0]).toLowerCase()
+            || item.buyToken.toLowerCase() !== String(record[1]).toLowerCase())
+            throw new Error("Arc order tokens do not match the owner-authorized on-chain order");
+        }
         const ticker = await executionSettlementTicker(cfg, item.instId);
+        if (item.network === "arc") assertArcOkxTicker(ticker, item.instId);
         const price = parseUnits(ticker.last.toFixed(18), 18);
         const triggered =
           item.version === "oco-v1"

@@ -43,6 +43,7 @@ import { formatRuleEvidence } from "./evidenceDisplay";
 import {
   DEFAULT_AUTOPILOT_CAPITAL,
   DEFAULT_TRADE_AMOUNT,
+  arcLimitMinimum,
   positiveTokenAmount,
 } from "./tradeAmounts";
 
@@ -1529,6 +1530,12 @@ export function SpotWorkspace({
   ]);
 
   useEffect(() => {
+    if (networkKey === "arc") {
+      const input = side === "buy" ? quoteToken : baseToken;
+      const output = side === "buy" ? baseToken : quoteToken;
+      setLimitMinOutHuman(input && output ? arcLimitMinimum(amountHuman, limitTrigger, slippage || "0", side, input.decimals, output.decimals) : "");
+      return;
+    }
     const trigger = Number(limitTrigger);
     const spend = Number(amountHuman);
     const slip = Math.min(Math.max(Number(slippage) || 0, 0), 50) / 100;
@@ -1549,7 +1556,7 @@ export function SpotWorkspace({
         maximumSignificantDigits: 12,
       }),
     );
-  }, [amountHuman, limitTrigger, side, slippage]);
+  }, [amountHuman, limitTrigger, side, slippage, networkKey, baseToken, quoteToken]);
 
   useEffect(() => {
     if (!initialTrade) return;
@@ -7493,6 +7500,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <li>{lang === "zh" ? "Autopilot：选择市场 → 检查买卖路由与 K 线 → 配置风险策略 → 从钱包充值自己的 vault → 授权策略 → 从 Gateway 购买通行证 → 启动。交易在 vault 内执行；Gateway 不提供交易本金。" : "Autopilot: select the market → verify entry/exit routes and candles → configure risk policy → fund your owner vault from your wallet → authorize the strategy → buy an Entry Pass from Gateway → start. Trades execute inside the vault; Gateway does not supply trading capital."}</li>
               </ul>
               <h4>{lang === "zh" ? "Gateway 充值与提取" : "Gateway deposit and withdrawal"}</h4>
+              <p>{lang === "zh" ? "充值 Max 会预留授权和存款两笔交易的手续费；提取 Max 会扣除实时最高 Gateway 费用。Max 只填写待审核金额，不会签名。卖家的服务款项记入 PAY_TO_ADDRESS 对应钱包的 Gateway 余额；连接该钱包后使用同一提取流程。即使 Gateway 有余额，该钱包也须持有少量 Arc USDC 支付铸币交易手续费。" : "Deposit Max reserves approval and deposit gas; Withdrawal Max subtracts the live maximum Gateway fee. Max fills a reviewed amount without signing. Seller service proceeds accrue in the Gateway balance belonging to the PAY_TO_ADDRESS wallet; connect that wallet to use the same withdrawal flow. Even with Gateway funds, that wallet needs separate Arc USDC for mint transaction gas."}</p>
               <p>{lang === "zh" ? "打开“钱包与资金”。充值需审核 USDC 授权和 Gateway 存款两笔交易。选择“提取到钱包”，输入金额并查看实时最高费用；审核提取签名，再签署将 USDC 铸回同一 Arc 钱包的交易。Gateway 余额必须覆盖金额与费用，钱包须另有 USDC 支付手续费。正常提取无需七天等待。" : "Open Wallet & funding. Deposit requires USDC approval and a Gateway deposit transaction. Choose Withdraw to wallet, enter the amount and review the live maximum fee. Review the withdrawal signature, then sign the mint transaction back to the same Arc wallet. Gateway balance must cover the amount plus fee; keep wallet USDC for gas. Normal withdrawal has no seven-day waiting period."}</p>
               <p>{lang === "zh" ? "若提取中断，请使用“继续提取”，并保留浏览器恢复记录；不会自动创建新的扣款授权。备用合约提取需明确发起、等待实际领取区块（通常约七天），再领取到钱包。已有备用提取等待期间不能追加金额，以免重置等待期。" : "If interrupted, use Resume withdrawal and keep browser recovery storage; a new debit is not authorized automatically. The contract fallback requires explicit initiation, a wait until the actual claim block (usually about seven days), then a claim to the wallet. Additional delayed withdrawals are blocked while one is pending to avoid resetting its delay."}</p>
               <p>{lang === "zh" ? "Gateway 提取不等于从交易账户或 vault 提取资金，也不会停止策略。请分别使用账户的取消、暂停与提取控件。" : "Gateway withdrawal does not withdraw trading-account or vault capital and does not stop a strategy. Use the account's cancel, pause and withdrawal controls separately."}</p>
@@ -7505,7 +7513,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               </ul>
               <h4>{lang === "zh" ? "当前可用性与恢复" : "Current availability and recovery"}</h4>
               <p>{lang === "zh" ? "Agent 与 SDK 使用 BTC-USDT 等 OKX 市场 ID，并选择 Arc 网络。Telegram 聊天中的 Global 输入 BTC-USDT 加周期；Risk Guard 输入 arc 加完整代币合约地址。聊天报告使用 Telegram Stars 结算，不会充值钱包或 Gateway，也不会授权交易。TON Mini App 仍提供其独立的 TON 研究服务。" : "Agents and SDK clients use OKX instrument IDs such as BTC-USDT and select Arc. In Telegram chat, Global accepts BTC-USDT plus a timeframe; Risk Guard accepts arc followed by the full token contract address. Chat reports are paid with Telegram Stars and do not fund a wallet or Gateway or authorize trading. The TON Mini App retains its separate TON research services."}</p>
-              <p>{lang === "zh" ? "Arc 交易合约已部署并公开验证，但 Spot 和 Autopilot 的生产激活仍暂停。研究服务按各自状态提供；连接 Arc 或持有 USDC 不会绕过交易可用性检查。Circle 邮箱钱包的生产配置仍在准备中，因此邮箱登录暂未开启。" : "Arc trading contracts are deployed and publicly verified, while production Spot and Autopilot activation remains paused. Research services follow their own availability. Connecting Arc or holding USDC does not override execution checks. Production Circle email-wallet setup is still pending, so email sign-in remains disabled."}</p>
+              <p>{lang === "zh" ? "Arc 主网的交易合约已部署并公开验证；全局自动执行已于 2026 年 10 月 7 日恢复。各订单和 vault 仍须满足所有者授权、独立暂停状态、实时 OKX 数据、路由和风险限制。以当前 API 可用性为准。Circle 邮箱钱包的生产配置仍在准备中，因此邮箱登录暂未开启。" : "Arc mainnet trading contracts are deployed and publicly verified; global automation resumed on October 7, 2026. Each order and vault still requires its owner authorization, individual pause state, live OKX data, routes and risk limits. Follow the current API availability. Production Circle email-wallet setup is still pending, so email sign-in remains disabled."}</p>
               <p>{lang === "zh" ? "账户读取失败时，请重试同步；无法确定已有账户不等于需要新建账户。已付报告可通过 Report history 恢复，无需再次付款。旧 Arc 测试网报告保留原网络标签与独立归档。" : "Retry synchronization when account discovery fails. An unknown existing-account state does not mean you need to create another account. Recover paid reports through Report history without another payment. Old Arc testnet reports retain their original network labels and separate archive."}</p>
               <p>{lang === "zh" ? "Autopilot 交易超时后会核对原交易回执，期间不会创建新交易或消耗新的 AI 确认。恢复只会重发同一笔已签名交易，并继续检查暂停状态、策略与报价有效期。若报价过期或策略改变且原交易仍未确定，保持 Hold，由运营人员核对原交易；超时不代表交易失败。" : "After an Autopilot trade times out, PULSE checks the original receipt before creating another trade or consuming another AI confirmation. Recovery can resend only that same signed transaction while the vault is unpaused and its policy and quote remain valid. If the quote expires or the policy changes while the transaction remains unresolved, the strategy stays on Hold for operator reconciliation. A timeout does not prove that a trade failed."}</p>
               <p><a href="https://explorer.arc.io" target="_blank" rel="noreferrer">{lang === "zh" ? "Arc 主网浏览器" : "Arc mainnet explorer"}</a> · <a href="https://www.arcodex.fun/tokens" target="_blank" rel="noreferrer">{lang === "zh" ? "Arc 代币数据来源" : "Arc token data source"}</a></p>

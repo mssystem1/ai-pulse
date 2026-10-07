@@ -6,7 +6,7 @@
   "guardian": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
   "oracleUpdater": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
   "deployedAt": "2026-10-04T19:46:51.797Z",
-  "status": "deployed_verified_paused",
+  "status": "deployed_verified_automation_unpaused",
   "contracts": {
     "registry": {
       "address": "0x67e14b9545b069afbd78e195ec37914466e1807f",
@@ -214,7 +214,7 @@
     "setAdapter": "0x6a72fcbf5efffe2d384665edaf2864755429c8a3b3fba1ecfa70b32aec943d8b"
   },
   "productionReady": false,
-  "tradingEnabled": false,
+  "tradingEnabled": true,
   "budgetUSDC": "0.50",
   "feeCeilingUSDC": "0.25442720201129",
   "compilerVersion": "0.8.26+commit.8a97fa7a",
@@ -496,5 +496,12 @@
       }
     },
     "verifiedAt": "2026-10-04T19:56:06.091Z"
+  },
+  "operationalActivation": {
+    "confirmedAt": "2026-10-07T17:22:55.218Z",
+    "automationPaused": false,
+    "proof": "5042-user-resume.json",
+    "transactionHash": "0x64a753bbaefb3de358199296920c889760039efe670305fc574377ca815c4944",
+    "authority": "Explicit owner request to unpause; full production acceptance remains separate"
   }
 }

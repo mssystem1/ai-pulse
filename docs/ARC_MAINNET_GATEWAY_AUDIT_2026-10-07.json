@@ -1,0 +1,416 @@
+{
+  "auditedAt": "2026-10-07T18:15:41.059Z",
+  "chainId": 5042,
+  "scope": "Public receipt and Gateway accounting; user HAR inspection; local Max/mobile fixes; no hosting deployment or push",
+  "activation": {
+    "registryPaused": false,
+    "registry": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+    "executorRolesAndRouterPermissionsVerified": true,
+    "resumeReceipt": {
+      "step": "user-resume-1",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 98,
+      "hash": "0x64a753bbaefb3de358199296920c889760039efe670305fc574377ca815c4944",
+      "status": "success",
+      "maxGasUSDC": "0.00083928003500497",
+      "gasUSDC": "0.00055260002765763"
+    },
+    "confirmedAt": "2026-10-07T17:22:55.218Z"
+  },
+  "funds": {
+    "snapshotAt": "2026-10-07T17:48:49.184Z",
+    "blockNumber": "24768280",
+    "openingBlock": "24271910",
+    "openingWalletUSDC": "5.366071",
+    "balances": [
+      {
+        "location": "Buyer wallet",
+        "address": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+        "balanceUSDC": "0.912159778152194113"
+      },
+      {
+        "location": "Buyer Gateway domain 26",
+        "address": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+        "balanceUSDC": "0.106500"
+      },
+      {
+        "location": "PULSE recipient Gateway domain 26",
+        "address": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+        "balanceUSDC": "3.900000"
+      }
+    ],
+    "recipientOrdinaryWalletUSDC": "0",
+    "confirmedOwnerTransactionReceipts": 99,
+    "confirmedGasUSDC": "0.44117018185679908",
+    "confirmedQualificationServiceChargesUSDC": "3.10",
+    "instantGatewayWithdrawalFeeUSDC": "0.0035",
+    "withdrawalFeeProof": "packages/contracts/deployments/5042-gateway-withdrawal-qualification.json",
+    "remainingNetTradeAndUSDCPrecisionAdjustmentUSDC": "0.002741039991006807",
+    "adjustmentMethod": "Calculated residual after exact historical native balance, current buyer/seller balances, confirmed gas and the documented Gateway withdrawal fee. ERC-20 transfers use six decimals; native balances and gas use eighteen.",
+    "conservativeBuyerSpendUSDC": "4.347411221847805887",
+    "remainingConservativeFiveUSDCBudget": "0.652588778152194113",
+    "nativeAndErc20BalancesNotAdded": true,
+    "accountingNote": "Seller proceeds remain available in Gateway and are not an ordinary wallet transfer. 3.10 USDC qualification charges predate this HAR; the HAR directly shows successful 0.30 and 0.20 USDC payments. The audit does not replay HAR credentials or assign an uncaptured payment to a private job."
+  },
+  "har": {
+    "entryCount": 252,
+    "start": "2026-10-07T17:06:24.851Z",
+    "end": "2026-10-07T17:11:00.413Z",
+    "responseBodiesPresent": false,
+    "paymentEvidence": [
+      {
+        "startedAt": "2026-10-07T17:09:20.303Z",
+        "path": "/arc/v1/analysis/prediction/premium",
+        "status": 402,
+        "challenge": [
+          {
+            "network": "eip155:5042",
+            "amount": "300000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "asset": "0x3600000000000000000000000000000000000000"
+          }
+        ]
+      },
+      {
+        "startedAt": "2026-10-07T17:09:24.310Z",
+        "path": "/arc/v1/analysis/prediction/premium",
+        "status": 202,
+        "receipt": {
+          "success": true,
+          "network": "eip155:5042",
+          "payer": "0xa7d827622c4f9c884ca8f751b2060dd767f18683"
+        },
+        "acceptedPayment": [
+          {
+            "network": "eip155:5042",
+            "amount": "300000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "asset": "0x3600000000000000000000000000000000000000"
+          }
+        ]
+      },
+      {
+        "startedAt": "2026-10-07T17:09:58.063Z",
+        "path": "/arc/v1/preflight",
+        "status": 402,
+        "challenge": [
+          {
+            "network": "eip155:5042",
+            "amount": "200000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "asset": "0x3600000000000000000000000000000000000000"
+          }
+        ]
+      },
+      {
+        "startedAt": "2026-10-07T17:10:02.333Z",
+        "path": "/arc/v1/preflight",
+        "status": 200,
+        "receipt": {
+          "success": true,
+          "network": "eip155:5042",
+          "payer": "0xa7d827622c4f9c884ca8f751b2060dd767f18683"
+        },
+        "acceptedPayment": [
+          {
+            "network": "eip155:5042",
+            "amount": "200000",
+            "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+            "asset": "0x3600000000000000000000000000000000000000"
+          }
+        ]
+      }
+    ],
+    "canceledRequests": [
+      {
+        "method": "GET",
+        "endpoint": "https://pulse-api-production-7aae.up.railway.app/v1/opportunities",
+        "status": 0,
+        "timeMs": 1103,
+        "startedAt": "2026-10-07T17:07:34.257Z"
+      }
+    ],
+    "missingTokenLogoRequests": [
+      {
+        "status": 404,
+        "endpoint": "https://cdn.discordapp.com/attachments/1483861483472421048/1542857874924118136/1080x360.png",
+        "timeMs": 9570
+      },
+      {
+        "status": 404,
+        "endpoint": "https://cdn.phototourl.com/free/2026-09-04-30dbb277-52e4-41cb-be86-3b1afcdb1193.jpg",
+        "timeMs": 12796
+      },
+      {
+        "status": 404,
+        "endpoint": "https://cdn.phototourl.com/free/2026-09-10-d857216e-995b-42c4-ba23-97feda065b51.jpg",
+        "timeMs": 12877
+      }
+    ],
+    "maximumRiskRequestMs": 17083,
+    "server5xx": 0,
+    "privateJobCredentialReplayPerformed": false
+  },
+  "hostedReadOnlyChecks": {
+    "checkedAt": "2026-10-07T18:01:24.321Z",
+    "checks": [
+      {
+        "path": "/v1/trading/capabilities?network=arc",
+        "status": 200,
+        "body": {
+          "product": "PULSE",
+          "network": "arc",
+          "chainId": 5042,
+          "analysis": {
+            "base": true,
+            "premium": true
+          },
+          "payment": {
+            "x402": true
+          },
+          "spot": {
+            "visible": true,
+            "enabled": true,
+            "market": true,
+            "limit": true,
+            "bracket": true,
+            "protectedOrders": true
+          },
+          "autopilot": {
+            "visible": true,
+            "enabled": true
+          },
+          "contracts": {
+            "registry": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+            "oracleRouter": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+            "executionAdapter": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+            "spotFactory": "0xa4546529b1174765d4d8e256c951365359c853fa",
+            "spotLimitFactory": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+            "spotBracketFactory": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+            "autopilotFactory": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07"
+          },
+          "contractAddressSource": "published_release_with_environment_override",
+          "persistence": "redis",
+          "persistenceHealth": {
+            "provider": "redis",
+            "configured": true,
+            "state": "online",
+            "retryAfterSeconds": 0,
+            "lastError": null,
+            "lastFailureAt": null,
+            "lastSuccessAt": "2026-10-07T18:01:23.392Z"
+          },
+          "reasons": {}
+        }
+      },
+      {
+        "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT&custody=erc20",
+        "status": 200,
+        "body": {
+          "network": "arc",
+          "pair": "BTC-USDT",
+          "available": true,
+          "base": {
+            "symbol": "cirBTC",
+            "name": "Circle Wrapped Bitcoin",
+            "address": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+            "decimals": 8,
+            "logoUrl": null,
+            "chainId": "5042",
+            "priceUsd": null,
+            "change24h": null,
+            "liquidityUsd": null,
+            "marketCapUsd": null,
+            "holders": null,
+            "provider": "Arc official mainnet deployment"
+          },
+          "quote": {
+            "symbol": "USDC",
+            "name": "USD Coin",
+            "address": "0x3600000000000000000000000000000000000000",
+            "decimals": 6,
+            "logoUrl": null,
+            "chainId": "5042",
+            "priceUsd": null,
+            "change24h": null,
+            "liquidityUsd": null,
+            "marketCapUsd": null,
+            "holders": null,
+            "provider": "Arc official mainnet deployment"
+          },
+          "aliasesChecked": [
+            "CIRBTC",
+            "BTC"
+          ],
+          "custody": "erc20",
+          "representationsChecked": [
+            {
+              "symbol": "cirBTC",
+              "address": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0"
+            }
+          ],
+          "mapping": "verified-wrapper",
+          "explanation": "BTC-USDT analysis executes as cirBTC/USDC on arc."
+        }
+      },
+      {
+        "path": "/v1/autopilot/market-readiness?network=arc&pair=BTC-USDT&timeframe=1H",
+        "status": 200,
+        "body": {
+          "pair": "BTC-USDT",
+          "timeframe": "1H",
+          "ready": true,
+          "signalMarket": "BTC-USDT",
+          "signalSource": "okx-public-spot",
+          "reason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup.",
+          "alternatives": [],
+          "walletTransactionsSent": false
+        }
+      },
+      {
+        "path": "/v1/meta",
+        "status": 200,
+        "body": {
+          "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973"
+        }
+      }
+    ]
+  },
+  "qualificationAccounts": [
+    {
+      "address": "0x2cc3e96f5a95822e45af82bd795ce5506dc3a4ee",
+      "nativeUSDC": "0",
+      "erc20USDC": "0",
+      "WETH": "0",
+      "cirBTC": "0"
+    },
+    {
+      "address": "0x45d097b05e7f6fa95432aec8213cff6c30340c3b",
+      "nativeUSDC": "0",
+      "erc20USDC": "0",
+      "WETH": "0",
+      "cirBTC": "0"
+    },
+    {
+      "address": "0x63df1de362a58a439f92ff2b52ddaa1399907b2a",
+      "nativeUSDC": "0",
+      "erc20USDC": "0",
+      "WETH": "0",
+      "cirBTC": "0"
+    },
+    {
+      "address": "0x1d0d24679a9157e4eead472300b77220ec62545c",
+      "nativeUSDC": "0",
+      "erc20USDC": "0",
+      "WETH": "0",
+      "cirBTC": "0"
+    }
+  ],
+  "unsignedLiveMaxEstimate": {
+    "owner": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+    "availableUSDC": "3.9",
+    "receiveUSDC": "3.89615",
+    "maximumFeeUSDC": "0.00385",
+    "maximumDebitUSDC": "3.9",
+    "signed": false,
+    "submitted": false
+  },
+  "fixes": [
+    "PAY_TO_ADDRESS / VITE_PAY_TO_ADDRESS are canonical for all payment networks; legacy Circle aliases do not choose a recipient",
+    "Deposit Max reserves approval and deposit gas; fresh gas/balance checks also run after approval",
+    "Withdrawal Max includes the live maximum Gateway fee, with fresh balance confirmation and no debit authorization",
+    "Gateway mobile flows avoid unnecessary custom-chain switching and use public RPC gas reads",
+    "Object-valued mobile wallet errors display a readable message",
+    "Zero wallet USDC blocks withdrawal before signing/submission and explains mint gas",
+    "Arc cirBTC limit estimate floors to eight-decimal whole token units",
+    "Arc Spot keeper binds stored orders to reviewed on-chain assets before oracle writes; stale OKX prices block worker writes"
+  ],
+  "liveAdditionalSpending": {
+    "transactionCount": 1,
+    "purpose": "Explicitly requested registry unpause",
+    "gasUSDC": "0.00055260002765763",
+    "trades": 0,
+    "newPaidServices": 0,
+    "sellerWithdrawalPerformed": false
+  },
+  "sources": {
+    "gateway": "https://gateway-api.circle.com/v1/balances",
+    "rpc": "https://rpc.quicknode.mainnet.arc.io",
+    "sellerFlow": "https://www.circle.com/fr/blog/turn-your-api-into-a-storefront-for-agents"
+  },
+  "localValidation": {
+    "fixture": "Isolated local Gateway funding component; public RPC and Circle calls intercepted. Fake mobile provider rejects signing; no real withdrawal or deposit.",
+    "mobileZeroGas": {
+      "width": 390,
+      "scrollWidth": 390,
+      "amount": "3.89615",
+      "withdrawDisabled": true,
+      "zeroGasWarning": true,
+      "maxButtonHeight": 44,
+      "state": {
+        "requests": [],
+        "signatures": 0,
+        "transfers": 0,
+        "funded": false
+      }
+    },
+    "mobileReadableError": {
+      "width": 390,
+      "scrollWidth": 390,
+      "normalizedError": "Mobile wallet signing request declined in this local fixture",
+      "objectObjectShown": false,
+      "state": {
+        "requests": [
+          "eth_chainId",
+          "eth_accounts",
+          "eth_signTypedData_v4"
+        ],
+        "signatures": 1,
+        "transfers": 0,
+        "funded": true
+      }
+    },
+    "mobileDepositMax": {
+      "width": 390,
+      "scrollWidth": 390,
+      "amount": "0.9812",
+      "state": {
+        "requests": [
+          "eth_chainId",
+          "eth_accounts",
+          "eth_signTypedData_v4"
+        ],
+        "signatures": 1,
+        "transfers": 0,
+        "funded": true
+      }
+    },
+    "chinese": {
+      "width": 390,
+      "scrollWidth": 390,
+      "maxControlHeight": 44
+    },
+    "desktop": {
+      "requestedViewport": 1440,
+      "actualCssWidth": 2160,
+      "scrollWidth": 2160,
+      "withdrawalAmount": "3.89615",
+      "note": "Windows DPI affected tool viewport sizing; actual CSS dimensions recorded."
+    },
+    "realWalletSignatures": 0,
+    "realTransactions": 0,
+    "validation": {
+      "apiPassed": 341,
+      "apiOptionalRedisSkipped": 1,
+      "webPassed": 160,
+      "paymentsPassed": 38,
+      "configPassed": 10,
+      "arcWorkerPassed": 8,
+      "cloudEnvPassed": 7,
+      "apiBuild": "passed",
+      "webBuild": "passed",
+      "qualificationTypecheck": "passed"
+    }
+  },
+  "browserArtifactAudit": "docs/ARC_MAINNET_BROWSER_ARTIFACT_AUDIT_2026-10-07.json"
+}

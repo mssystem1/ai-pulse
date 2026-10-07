@@ -79,7 +79,7 @@ async function main() {
       for (let attempt = 0; await balance() < 200000n; attempt++) { if (attempt >= 30) throw new Error("Qualification Gateway credit pending"); await new Promise(resolve => setTimeout(resolve, 2000)); }
     }
     const buyerCfg = { privateKey: cfg.TEST_WALLET_PRIVATE_KEY, network: "eip155:5042", rpcUrl: cfg.ARC_RPC_URL, maxPaymentUsd: .20,
-      expectedPayTo: cfg.CIRCLE_GATEWAY_SELLER_ADDRESS, paymentRecoveryStore: recovery,
+      expectedPayTo: cfg.PAY_TO_ADDRESS, paymentRecoveryStore: recovery,
       fetchImpl: (async (input: Parameters<typeof fetch>[0], options?: RequestInit) => {
         const request = new Request(input, { ...options, signal: AbortSignal.timeout(240_000) });
         const result = await fetch(request);

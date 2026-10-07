@@ -1,0 +1,20 @@
+{
+  "chainId": 5042,
+  "owner": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "entries": [
+    {
+      "step": "user-resume-1",
+      "to": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "nonce": 98,
+      "hash": "0x64a753bbaefb3de358199296920c889760039efe670305fc574377ca815c4944",
+      "status": "success",
+      "maxGasUSDC": "0.00083928003500497",
+      "gasUSDC": "0.00055260002765763"
+    }
+  ],
+  "data": {
+    "automationPaused": false,
+    "authorizedBy": "User explicitly requested immediate unpause on 2026-10-07",
+    "confirmedAt": "2026-10-07T17:22:55.218Z"
+  }
+}

@@ -21,7 +21,7 @@ export function createCircleGatewayPaymentMiddleware(cfg: AppConfig, journal?: C
   const networks = cfg.CIRCLE_GATEWAY_ACCEPTED_NETWORKS.split(",").map((item) => item.trim()).filter(Boolean);
   if (networks.length !== 1 || networks[0] !== "eip155:5042") throw new Error("Circle Gateway must accept only Arc mainnet eip155:5042");
   const gateway = createGatewayMiddleware({
-    sellerAddress: cfg.CIRCLE_GATEWAY_SELLER_ADDRESS,
+    sellerAddress: cfg.PAY_TO_ADDRESS,
     networks,
     facilitatorUrl: cfg.CIRCLE_GATEWAY_MAINNET_URL,
     arcPrivateMainnet: false,

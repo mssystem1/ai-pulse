@@ -229,7 +229,13 @@ If the API, wallet or receipt step is interrupted, **Resume withdrawal** retries
 
 The expandable **Contract withdrawal fallback** reads pending amounts and the actual claim block. If Circle's instant service is unavailable, explicitly initiate a contract withdrawal, wait its configured block delay (normally about seven days), then select **Claim to wallet**. PULSE blocks adding another delayed withdrawal while one is pending because it would reset the waiting period. This is a separate two-transaction procedure described in [Circle's contract reference](https://developers.circle.com/gateway/references/contract-interfaces-and-events).
 
-Withdrawing from Gateway does not stop a strategy or withdraw capital from a Spot account or Autopilot vault. Those owner-account controls remain separate. Arc production trading is still gated off pending final activation acceptance; Circle email wallets remain disabled while production setup is pending.
+The [October 7 execution/Gateway audit](docs/ARC_MAINNET_GATEWAY_AUDIT_2026-10-07.md) records the resume transaction, exact USDC locations and Max/mobile validation.
+
+**Recipient and seller proceeds:** every network uses `PAY_TO_ADDRESS` on the API and matching `VITE_PAY_TO_ADDRESS` in the browser. Arc uses Circle Gateway batching: payment proceeds are credited to that same address’s **Gateway balance**, rather than its ordinary on-chain wallet balance. Connect the payment-recipient wallet and use **Wallet & funding → Withdraw to wallet** to withdraw seller proceeds. Withdrawal needs a small separate wallet USDC balance for mint gas. The deprecated Circle seller-address variables no longer select a recipient. [Circle’s seller flow](https://www.circle.com/fr/blog/turn-your-api-into-a-storefront-for-agents) explains batch credits and withdrawal.
+
+**Max:** Deposit Max reads the live Arc wallet balance and reserves gas for approval plus deposit before filling a six-decimal amount. Withdrawal Max obtains an unsigned live fee estimate and subtracts its maximum fee from available Gateway USDC; you still review and sign. Both flows recheck balances before execution. Mobile wallet errors display the provider’s actual message, and an empty wallet shows the mint-gas requirement before withdrawal.
+
+Withdrawing from Gateway does not stop a strategy or withdraw capital from a Spot account or Autopilot vault. Those owner-account controls remain separate. Arc global automation was unpaused on October 7, 2026 at the owner’s request; the hosted API confirms Market, Limit, bracket/protection and Autopilot are enabled. Individual orders and vaults retain their owner permissions, pause state, live-market and risk gates. Circle email wallets remain disabled while production setup is pending.
 
 ## Services and prices
 
@@ -248,7 +254,7 @@ The web UI uses the familiar **Base** and **Premium** tier labels. Public agent 
 
 ### Public Autopilot start services
 
-These three services guide the same six-step setup as the web product. The caller's Agentic Wallet creates/selects the owner vault, configures policy, deposits capital, registers the strategy and confirms start; the duration-specific x402 endpoint is the final AI-runtime activation step. They are published on X Layer, Base and Arbitrum. Arc contracts are deployed and verified, with bounded live acceptance evidence recorded, but Arc passes stay unpublished until qualified production execution is activated with `FEATURE_ARC_TRADING=1` and the live registry/runtime gates pass.
+These three services guide the same six-step setup as the web product. The caller's Agentic Wallet creates/selects the owner vault, configures policy, deposits capital, registers the strategy and confirms start; the duration-specific x402 endpoint is the final AI-runtime activation step. They are published on X Layer, Base and Arbitrum. Arc contracts are deployed and verified, with bounded live acceptance evidence recorded. Arc passes are published when `FEATURE_ARC_TRADING=1` and the live registry/runtime gates pass; global automation is now unpaused and remaining production acceptance is recorded separately.
 
 | AI Entry Pass | Price |
 | --- | ---: |
@@ -805,7 +811,7 @@ The browser also maintains a latest-request epoch. Starting Premium supersedes a
 
 ## On-chain execution architecture
 
-One separately configured contract suite exists on each supported execution mainnet. The UI reads factory state before suggesting account creation. Arc's seven core contracts are deployed on chain 5042 and have exact source verification on Sourcify; the four qualification accounts are also verified. The [deployment manifest](packages/contracts/deployments/5042.json) and [migration/acceptance record](docs/ARC_MAINNET_MIGRATION.md) contain addresses, receipts, verification links and remaining release gates. The seven PULSE addresses plus the separately checked third-party OKX router and approval spender are populated in the local environment and all environment examples. Registry automation remains paused and `FEATURE_ARC_TRADING=0`; contract deployment does not imply an activated production worker.
+One separately configured contract suite exists on each supported execution mainnet. The UI reads factory state before suggesting account creation. Arc's seven core contracts are deployed on chain 5042 and have exact source verification on Sourcify; the four qualification accounts are also verified. The [deployment manifest](packages/contracts/deployments/5042.json) and [migration/acceptance record](docs/ARC_MAINNET_MIGRATION.md) contain addresses, receipts, verification links and remaining release gates. The seven PULSE addresses plus the separately checked third-party OKX router and approval spender are populated in the local environment and all environment examples. Registry automation was unpaused on October 7, 2026; `FEATURE_ARC_TRADING=1` enables the API’s live readiness checks. Remaining live acceptance is recorded separately from operational activation.
 
 Failed or malformed factory reads never mean “no existing account.” Display reads may retain a labelled stale snapshot during an outage; `fresh=1` confirmation fails explicitly and cannot accept stale state after a creation transaction. Discovery checks the RPC chain ID and keeps Arc and other-chain owner caches separate.
 
@@ -963,7 +969,7 @@ FEATURE_BASE_PAYMENTS=1
 FEATURE_ARBITRUM_PAYMENTS=1
 FEATURE_ARC_PAYMENTS=1
 CIRCLE_GATEWAY_ENABLED=1
-FEATURE_ARC_TRADING=0
+FEATURE_ARC_TRADING=1
 FEATURE_CIRCLE_MAINNET_WALLETS=0
 ARC_RPC_URL=https://rpc.mainnet.arc.io
 ARC_RPC_FALLBACK_URL=https://rpc.quicknode.mainnet.arc.io
@@ -1107,7 +1113,7 @@ The exact Autopilot strategies, entry/exit rules, risk profiles, contract author
 | --- | --- |
 | Original X Layer web, REST, MCP, safety, wallet and funding | Preserved and extended |
 | Base / Arbitrum native-USDC payment and in-app funding | Implemented; production certification remains an operator gate |
-| Arc mainnet | Seven core contracts and four qualification accounts deployed/verified; live research payments and bounded execution checks recorded. Mainnet selector, wallet kit, catalog, routes and APIs are wired. Production trading remains paused; Circle email setup, remaining acceptance and the owner's manual hosting release are pending. See [migration evidence](docs/ARC_MAINNET_MIGRATION.md) |
+| Arc mainnet | Seven core contracts and four qualification accounts deployed/verified; live research payments and bounded execution checks recorded. Mainnet selector, wallet kit, catalog, routes and APIs are wired. Global automation is unpaused and the hosted API advertises execution availability; Circle email setup and remaining signed-workflow acceptance are pending. See [migration evidence](docs/ARC_MAINNET_MIGRATION.md) |
 | Polymarket discovery and read-only analysis | Implemented |
 | Prediction Market Quick and Pro services | Implemented |
 | Receipt-bound durable jobs and private recovery | Implemented |

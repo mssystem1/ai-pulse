@@ -17,7 +17,7 @@ import { put } from "@vercel/blob";
 import { opportunityUniverse } from "./opportunityUniverse.js";
 import { buildMarketContext, listSpotInstruments } from "@pulse/market";
 import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarketBinding, executionSettlementTicker, executionMarketContext, robinhoodAutopilotContext, resolveRobinhoodMarket } from "./robinhoodMarkets.js";
-import { assertArcExecutionBinding, arcOkxMarketContext, assertArcAutomationHistory, assertArcOkxMarketData } from "./arcMarkets.js";
+import { assertArcExecutionBinding, arcOkxMarketContext, assertArcAutomationHistory, assertArcOkxMarketData, assertArcOkxTicker } from "./arcMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
@@ -1244,6 +1244,7 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
           continue;
         }
         const positionTicker = targetBalance > 0n ? await executionSettlementTicker(cfg, s.pair) : undefined;
+        if (s.network === "arc" && positionTicker) assertArcOkxTicker(positionTicker, s.pair);
         const policyBalance = valuedPositionBalance(targetBalance, positionTicker ? parseUnits(positionTicker.last.toFixed(18), 18) : 0n, Number(targetDecimals), Number(settlementDecimals));
         if (policyBalance === 0n && s.lastTxHash && s.lastDecision !== "sell_filled") {
           Object.assign(s, reconcileStrategyExecution(s, await listV6Activity(s.owner, s.network), policyBalance));

@@ -86,7 +86,7 @@ export function createX402Middleware(cfg: AppConfig): RequestHandler {
     const effectiveCfg = {
       ...cfg, X402_NETWORK: network.caip2,
       X402_ASSET: network.paymentAsset.address || cfg.X402_ASSET,
-      PAY_TO_ADDRESS: networkKey === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS,
+      PAY_TO_ADDRESS: cfg.PAY_TO_ADDRESS,
     };
     const publicPath = req.originalUrl.split("?")[0] || path;
     const challenge = buildChallenge(effectiveCfg, publicPath, route.priceUsd, route.description, path);
@@ -137,7 +137,7 @@ function normalizePath(path: string): string {
  */
 export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler; circle?: RequestHandler } = {}): RequestHandler {
   const mock = createX402Middleware(cfg);
-  const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.CIRCLE_GATEWAY_SELLER_ADDRESS
+  const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.PAY_TO_ADDRESS
     ? adapters.circle || createCircleGatewayPaymentMiddleware(cfg) : null;
   const cdp = (cfg.FEATURE_BASE_PAYMENTS || cfg.FEATURE_ARBITRUM_PAYMENTS) && cfg.CDP_API_KEY_ID && cfg.CDP_API_KEY_SECRET
     ? createCdpPaymentMiddleware(cfg) : null;

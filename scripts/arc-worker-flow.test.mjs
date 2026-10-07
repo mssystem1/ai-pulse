@@ -322,10 +322,17 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   pass = { ...pass, expiresAt: new Date(now - 1).toISOString() };
   mark = 130 * analysisToSettlement; now += 120000;
   mock.timers.setTime(now);
+  market.ticker.ts = String(now - 181000);
+  const beforeStaleExit = submitted.length;
+  await runAutopilotCycle(cfg, {network:'arc',vault});
+  assert.match(stored().lastError,/Live OKX market data/);
+  assert.equal(submitted.length,beforeStaleExit,'stale protection prices cannot update the oracle or sell');
+  market.ticker.ts = String(now);
   await runAutopilotCycle(cfg, {network:'arc',vault});
   assert.equal(stored().lastDecision, 'sell_partial_filled', JSON.stringify(stored()));
   now += 120000;
   mock.timers.setTime(now);
+  market.ticker.ts = String(now);
   await runAutopilotCycle(cfg, {network:'arc',vault});
   assert.equal(stored().lastDecision, 'sell_filled', JSON.stringify(stored()));
   assert.equal(targetBalance, 0n);

@@ -35,10 +35,11 @@ function request(payload = payment()) {
 
 describe("inline x402 settlement", () => {
   it("binds Arc payments to mainnet Gateway and rejects testnet domain reuse", () => {
-    const payload = { ...payment({ network: "eip155:5042", asset: "0x3600000000000000000000000000000000000000", payTo: cfg.CIRCLE_GATEWAY_SELLER_ADDRESS,
+    const payload = { ...payment({ network: "eip155:5042", asset: "0x3600000000000000000000000000000000000000", payTo: cfg.PAY_TO_ADDRESS,
       extra: { name: "GatewayWalletBatched", version: "1", verifyingContract: "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE" } }), resource: { url: "https://pulse.example/arc/v1/analysis/prediction/standard" } };
     const req = { ...request(payload), pulseNetworkKey: "arc", originalUrl: "/arc/v1/analysis/prediction/standard" } as SettlementRequest;
     assert.doesNotThrow(() => validateSignedPayment(cfg, req, payload));
+    assert.throws(() => validateSignedPayment(cfg, req, { ...payload, accepted: { ...payload.accepted, payTo: cfg.CIRCLE_GATEWAY_SELLER_ADDRESS } }), /payee mismatch/);
     for (const extra of [{ name: "USD Coin", version: "2" }, { name: "GatewayWalletBatched", version: "1", verifyingContract: "0x0077777d7EBA4688BDeF3E311b846F25870A19B9" }]) assert.throws(() => validateSignedPayment(cfg, req, { ...payload, accepted: { ...payload.accepted, extra } }), /Gateway/);
   });
   it("reproduces the HAR localhost rejection and binds new challenges to the configured origin", () => {

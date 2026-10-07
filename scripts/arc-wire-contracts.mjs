@@ -24,7 +24,9 @@ for (const [key, name] of [["router", "ARC_OKX_ROUTER_ADDRESS"], ["spender", "AR
   if (!code || code === "0x" || keccak256(code) !== route[`${key}RuntimeCodeHash`]) throw new Error("Arc route bytecode changed since qualification");
   values[name] = address;
 }
-values.FEATURE_ARC_TRADING = manifest.productionReady && manifest.tradingEnabled ? "1" : "0";
+// Operational activation is explicit; the API still checks live on-chain readiness.
+// Full acceptance may remain incomplete after the owner has resumed execution.
+values.FEATURE_ARC_TRADING = manifest.tradingEnabled ? "1" : "0";
 console.log(JSON.stringify({ chainId: 5042, source: "verified deployment manifest", environment: values, api: "network=arc; /v1/trading/capabilities", ui: "Arc Mainnet; reads contract capabilities from API", sdk: "network arc; eip155:5042" }, null, 2));
 const targets = [
   ...(process.argv.includes("--write-env") ? [".env"] : []),

@@ -64,7 +64,7 @@ async function main() {
     const requirement = challenge.accepts?.[0];
     if (challenge.x402Version !== 2 || challenge.accepts.length !== 1 || requirement.network !== "eip155:5042" || requirement.scheme !== "exact"
       || requirement.amount !== service.amount || requirement.asset.toLowerCase() !== "0x3600000000000000000000000000000000000000"
-      || requirement.payTo.toLowerCase() !== cfg.CIRCLE_GATEWAY_SELLER_ADDRESS.toLowerCase() || requirement.extra?.name !== "GatewayWalletBatched"
+      || requirement.payTo.toLowerCase() !== cfg.PAY_TO_ADDRESS.toLowerCase() || requirement.extra?.name !== "GatewayWalletBatched"
       || requirement.extra?.version !== "1" || requirement.extra?.verifyingContract?.toLowerCase() !== "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee"
       || challenge.resource?.url !== url) throw new Error();
     output(stage, { service: serviceName, chainId: 5042, amountUSDC: Number(service.amount) / 1e6, payTo: requirement.payTo });

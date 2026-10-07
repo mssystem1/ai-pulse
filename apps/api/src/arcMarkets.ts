@@ -119,12 +119,16 @@ export function assertArcOkxMarketData(market: {
   source?: string; instId: string; ticker: { instId: string; last: number; ts: string };
   candles: readonly Pick<Candle, "close">[];
 }, instId: string, now = Date.now()) {
-  assertArcOkxMarket(instId);
-  const timestamp = Number(market.ticker.ts);
-  if (market.source !== "okx-public-spot" || market.instId !== instId || market.ticker.instId !== instId
-    || !Number.isFinite(market.ticker.last) || market.ticker.last <= 0 || !Number.isSafeInteger(timestamp)
-    || now - timestamp > 180_000 || timestamp > now + 30_000
+  assertArcOkxTicker(market.ticker, instId, now);
+  if (market.source !== "okx-public-spot" || market.instId !== instId
     || market.candles.length < 2 || market.candles.some(c => !Number.isFinite(c.close) || c.close <= 0))
+    throw new Error("Live OKX market data is unavailable; no Arc trading can be prepared");
+}
+export function assertArcOkxTicker(ticker: { instId: string; last: number; ts: string }, instId: string, now = Date.now()) {
+  assertArcOkxMarket(instId);
+  const timestamp = Number(ticker.ts);
+  if (ticker.instId !== instId || !Number.isFinite(ticker.last) || ticker.last <= 0
+    || !Number.isSafeInteger(timestamp) || now - timestamp > 180_000 || timestamp > now + 30_000)
     throw new Error("Live OKX market data is unavailable; no Arc trading can be prepared");
 }
 export function assertArcAutomationHistory(candles: Candle[], timeframe: string, now = Date.now()) {

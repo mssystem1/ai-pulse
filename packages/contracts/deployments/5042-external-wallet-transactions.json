@@ -1,0 +1,45 @@
+{
+  "chainId": 5042,
+  "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+  "auditedAt": "2026-10-07T17:12:31.657Z",
+  "source": "https://rpc.quicknode.mainnet.arc.io",
+  "entries": [
+    {
+      "hash": "0xf27788f5e72a0ba98108b8b690fb3d6b789a863feeecfbac0b5d964117006302",
+      "nonce": 95,
+      "to": "0x3600000000000000000000000000000000000000",
+      "valueUSDC": "0",
+      "status": "success",
+      "gasUSDC": "0.001108520059638376",
+      "selector": "0x095ea7b3",
+      "timestamp": "2026-10-07T17:05:15.000Z",
+      "blockNumber": "24763145",
+      "provenance": "Observed newer owner transaction; not sent by this qualification continuation"
+    },
+    {
+      "hash": "0xd99234f84c11c8e40ef997b577454cbd82cc08c698f1ac2cd7d882f78c3fd582",
+      "nonce": 96,
+      "to": "0x3600000000000000000000000000000000000000",
+      "valueUSDC": "0",
+      "status": "success",
+      "gasUSDC": "0.000766520054729528",
+      "selector": "0x095ea7b3",
+      "timestamp": "2026-10-07T17:05:40.000Z",
+      "blockNumber": "24763194",
+      "provenance": "Observed newer owner transaction; not sent by this qualification continuation"
+    },
+    {
+      "hash": "0xc2202831f5d36fadb01bc3b46dd4eeeb5a1368d2e140f49985cb12e6193ddbdb",
+      "nonce": 97,
+      "to": "0x77777777dcc4d5a8b6e418fd04d8997ef11000ee",
+      "valueUSDC": "0",
+      "status": "success",
+      "gasUSDC": "0.001408780094106504",
+      "selector": "0x47e7ef24",
+      "timestamp": "2026-10-07T17:05:45.000Z",
+      "blockNumber": "24763203",
+      "provenance": "Observed newer owner transaction; not sent by this qualification continuation"
+    }
+  ],
+  "missing": []
+}

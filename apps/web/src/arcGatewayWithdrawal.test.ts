@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { encodeFunctionData, parseAbi, toHex, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { assertGatewayWallet, assertWithdrawalSpec, encodedWithdrawalSpec, parseWithdrawalQuote, prepareArcGatewayWithdrawal, readPendingWithdrawal, resumeArcGatewayWithdrawal, trustlessArcGatewayWithdrawal, validateWithdrawalAttestation, withdrawalSpec, withdrawArcGateway } from "./arcGatewayWithdrawal";
+import { assertGatewayWallet, assertWithdrawalSpec, encodedWithdrawalSpec, maxArcGatewayDepositAtomic, parseWithdrawalQuote, prepareArcGatewayWithdrawal, prepareMaxArcGatewayWithdrawal, readPendingWithdrawal, resumeArcGatewayWithdrawal, trustlessArcGatewayWithdrawal, validateWithdrawalAttestation, withdrawalSpec, withdrawArcGateway } from "./arcGatewayWithdrawal";
 const owner = `0x${"1".repeat(40)}` as Hex;
 const salt = `0x${"2".repeat(64)}` as Hex;
 const signature = `0x${"3".repeat(130)}` as Hex;
@@ -11,6 +11,54 @@ const store = () => {
   return { getItem: (key: string) => data.get(key) || null, setItem: (key: string, value: string) => { data.set(key, value); }, removeItem: (key: string) => { data.delete(key); } };
 };
 const attestation = (spec: ReturnType<typeof withdrawalSpec>) => `0x1e12db7100000001ff6fb334${toHex(200n, { size: 32 }).slice(2)}00000154${encodedWithdrawalSpec(spec).slice(2)}`;
+
+test("deposit Max floors to six decimals and retains approval plus deposit gas", () => {
+  const gasPrice = 20_000_000_000n;
+  const reserve = 470_000n * gasPrice * 2n;
+  assert.equal(maxArcGatewayDepositAtomic(10n ** 18n, gasPrice), 981_200n);
+  assert.equal(maxArcGatewayDepositAtomic(reserve + 999_999_999_999n, gasPrice), 0n);
+  assert.equal(maxArcGatewayDepositAtomic(reserve + 1_000_000_000_000n, gasPrice), 1n);
+  assert.throws(() => maxArcGatewayDepositAtomic(10n ** 18n, 0n), /unavailable/);
+});
+
+test("withdrawal Max fits the live 3.9 USDC balance including changing fees without signing", async t => {
+  let estimates = 0, balance = "3.9";
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input), body = JSON.parse(String(init?.body));
+    if (url.endsWith("/balances")) return Response.json({ balances: [{ domain: 26, balance }] });
+    assert.ok(url.endsWith("/estimate"), "Max must not submit a signed transfer");
+    estimates++;
+    const maxFee = estimates === 1 ? "3850" : "4000";
+    return Response.json([{ burnIntent: { spec: body[0].spec, maxFee, maxBlockHeight: "200" } }]);
+  });
+  const quote = await prepareMaxArcGatewayWithdrawal(owner);
+  assert.equal(quote.amount, "3.896");
+  assert.equal(BigInt(quote.spec.value) + BigInt(quote.maxFee), 3_900_000n);
+  assert.equal(estimates, 3);
+  balance = "0.003";
+  await assert.rejects(() => prepareMaxArcGatewayWithdrawal(owner), /does not cover/);
+});
+
+test("zero wallet USDC blocks withdrawal before a mobile signature or Gateway debit", async t => {
+  const requests: string[] = [];
+  t.mock.method(globalThis, "fetch", async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input), body = JSON.parse(String(init?.body));
+    if (url.endsWith("/estimate")) return Response.json([{ burnIntent: { spec: body[0].spec, maxFee: "3850", maxBlockHeight: "200" } }]);
+    if (url.endsWith("/balances")) return Response.json({ balances: [{ domain: 26, balance: "3.9" }] });
+    assert.ok(!url.endsWith("/transfer"));
+    const result = body.method === "eth_chainId" ? "0x13b2" : body.method === "eth_blockNumber" ? "0x64" : body.method === "eth_gasPrice" ? "0x1" : "0x0";
+    return Response.json({ jsonrpc: "2.0", id: body.id, result });
+  });
+  const provider = { async request({ method }: { method: string }) {
+    requests.push(method);
+    if (method === "eth_chainId") return "0x13b2";
+    if (method === "eth_accounts") return [owner];
+    throw { message: { message: "Unsupported mobile request" } };
+  } };
+  const quote = await prepareArcGatewayWithdrawal(owner, "3.8");
+  await assert.rejects(() => withdrawArcGateway(provider, quote, store()), /Gateway USDC cannot pay the mint fee/);
+  assert.deepEqual(requests, ["eth_chainId", "eth_accounts"]);
+});
 
 test("Gateway withdrawal quote binds mainnet domains, contracts, wallet, exact six-decimal amount and maximum fee", () => {
   const spec = withdrawalSpec(owner, "0.100001", salt);
@@ -63,14 +111,13 @@ test("Gateway API uncertainty keeps the signed request; recovery retries its sal
     }
     assert.match(url, /rpc\.(?:mainnet|quicknode\.mainnet)\.arc\.io/);
     const req = request;
-    const result = req.method === "eth_getTransactionReceipt" ? { transactionHash: req.params[0], transactionIndex: "0x0", blockHash: `0x${"9".repeat(64)}`, blockNumber: "0x64", from: account.address, to: `0x${"8".repeat(40)}`, cumulativeGasUsed: "0x1", gasUsed: "0x1", effectiveGasPrice: "0x1", logs: [], logsBloom: `0x${"0".repeat(512)}`, status: "0x1", type: "0x2" } : req.method === "eth_chainId" ? "0x13b2" : req.method === "eth_blockNumber" ? "0x64" : req.method === "eth_call" ? `0x${(used ? "1" : "0").padStart(64, "0")}` : "0x0";
+    const result = req.method === "eth_getTransactionReceipt" ? { transactionHash: req.params[0], transactionIndex: "0x0", blockHash: `0x${"9".repeat(64)}`, blockNumber: "0x64", from: account.address, to: `0x${"8".repeat(40)}`, cumulativeGasUsed: "0x1", gasUsed: "0x1", effectiveGasPrice: "0x1", logs: [], logsBloom: `0x${"0".repeat(512)}`, status: "0x1", type: "0x2" } : req.method === "eth_chainId" ? "0x13b2" : req.method === "eth_blockNumber" ? "0x64" : req.method === "eth_getBalance" ? toHex(10n ** 18n) : req.method === "eth_gasPrice" ? "0x1" : req.method === "eth_call" ? `0x${(used ? "1" : "0").padStart(64, "0")}` : "0x0";
     return Response.json({ jsonrpc: "2.0", id: req.id, result });
   });
   const provider = { async request({ method, params }: { method: string; params?: unknown[] }): Promise<unknown> {
     if (method === "eth_chainId") return "0x13b2";
     if (method === "eth_accounts") return [account.address];
-    if (method === "eth_getBalance") return toHex(1_000_000_000_000_000_000n);
-    if (method === "eth_gasPrice") return "0x1";
+    if (["eth_getBalance", "eth_gasPrice", "wallet_switchEthereumChain"].includes(method)) throw { message: { message: "Mobile bridge does not support this method" } };
     if (method === "eth_signTypedData_v4") { signatures++; return account.signTypedData(JSON.parse(String(params![1]))); }
     if (method === "eth_sendTransaction") { sends++; throw new Error("User declined mint"); }
     return null;

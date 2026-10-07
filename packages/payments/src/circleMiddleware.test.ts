@@ -26,7 +26,8 @@ test("Circle advertises the public Arc URL and preserves Express routing and ver
   });
   const cfg = { BASE_URL: "https://pulse.example", CIRCLE_GATEWAY_ENABLED: true, FEATURE_ARC_PAYMENTS: true,
     CIRCLE_GATEWAY_ACCEPTED_NETWORKS: "eip155:5042", CIRCLE_GATEWAY_MAINNET_URL: "https://gateway.example",
-    CIRCLE_GATEWAY_SELLER_ADDRESS: "0x2222222222222222222222222222222222222222",
+    PAY_TO_ADDRESS: "0x2222222222222222222222222222222222222222",
+    CIRCLE_GATEWAY_SELLER_ADDRESS: "0x3333333333333333333333333333333333333333",
     routes: { "POST /v1/preflight": { priceUsd: 0.2 } } } as unknown as AppConfig;
   const app = express();
   app.use(express.json());
@@ -43,6 +44,7 @@ test("Circle advertises the public Arc URL and preserves Express routing and ver
   assert.equal(challengeResponse.status, 402);
   const challenge = JSON.parse(Buffer.from(challengeResponse.headers.get("PAYMENT-REQUIRED")!, "base64").toString());
   assert.equal(challenge.resource.url, "https://pulse.example/arc/v1/preflight?lang=en");
+  assert.equal(challenge.accepts[0].payTo.toLowerCase(), cfg.PAY_TO_ADDRESS.toLowerCase());
   const payment = { x402Version: 2, resource: challenge.resource, accepted: challenge.accepts[0], payload: {} };
   const paid = await realFetch(url, { method: "POST", headers: { "PAYMENT-SIGNATURE": Buffer.from(JSON.stringify(payment)).toString("base64") } });
   assert.equal(paid.status, 200);

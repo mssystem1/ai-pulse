@@ -29,9 +29,9 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   const readiness=await import('../apps/api/src/arcExecutionReadiness.ts');
   mock.module('../apps/api/src/arcExecutionReadiness.ts',{namedExports:{...readiness,arcAutomationReadiness:async()=>({ready:true})}});
   const market=await import('../apps/api/src/robinhoodMarkets.ts');
-  let mark=100,now=Date.now(),expire=false;
+  let mark=100,now=Date.now(),expire=false,tickerOffset=0;
   mock.timers.enable({apis:['Date'],now});
-  mock.module('../apps/api/src/robinhoodMarkets.ts',{namedExports:{...market,executionSettlementTicker:async()=>({last:mark,ts:String(now)})}});
+  mock.module('../apps/api/src/robinhoodMarkets.ts',{namedExports:{...market,executionSettlementTicker:async()=>({instId:'ETH-USDT',last:mark,ts:String(now+tickerOffset)})}});
   const dex=await import('../apps/api/src/okxDex.ts');
   let output=0n;
   mock.module('../apps/api/src/okxDex.ts',{namedExports:{...dex,getGenericOkxSwap:async(_cfg,input)=>{
@@ -74,6 +74,15 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   const {runTradeAutomationCycle}=await import('../apps/api/src/tradeAutomation.ts');
   const cfg={ARC_AUTOMATION_EXECUTOR_PRIVATE_KEY:`0x${'1'.repeat(64)}`};
   const run=i=>runTradeAutomationCycle(cfg,{network:'arc',account:addresses[i],orderId:'1'});
+  tickerOffset=-181000;
+  await run(0);assert.match(items[0].lastError,/Live OKX market data/);
+  assert.equal(submitted.length,0,'a stale ticker cannot update the oracle or execute escrow');
+  tickerOffset=0;
+  const correctBase=records.get(addresses[0])[2];
+  records.get(addresses[0])[2]='0xeb64987643db71c76b2a2be7e723decc995e5b37';
+  await run(0);assert.match(items[0].lastError,/exact published wrapper/);
+  assert.equal(submitted.length,0,'mismatched on-chain order tokens cannot update the oracle or execute');
+  records.get(addresses[0])[2]=correctBase;
   await run(0);assert.equal(items[0].status,'filled');assert.equal(submitted.length,2);
   await run(0);assert.equal(submitted.length,2,'a confirmed limit fill cannot repeat');
   assert.ok(items.slice(1).every(x=>x.status==='active'),'the scope excludes other owner orders');

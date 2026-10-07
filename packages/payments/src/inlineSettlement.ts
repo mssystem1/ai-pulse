@@ -48,7 +48,7 @@ export function validateSignedPayment(cfg: AppConfig, req: SettlementRequest, pa
   const route = cfg.routes[`${req.method.toUpperCase()} ${req.path}`];
   if (!route || route.free || route.priceUsd <= 0) throw new Error("No paid route configuration");
   const accepted = payload.accepted!;
-  const expectedPayee = key === "arc" ? cfg.CIRCLE_GATEWAY_SELLER_ADDRESS : cfg.PAY_TO_ADDRESS;
+  const expectedPayee = cfg.PAY_TO_ADDRESS;
   const expectedAsset = network.paymentAsset.address || cfg.X402_ASSET;
   if (accepted.scheme !== "exact") throw new Error("Payment scheme mismatch");
   if (accepted.network !== network.caip2) throw new Error("Payment network mismatch");

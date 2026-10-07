@@ -91,7 +91,7 @@ export function validatePaymentChallenge(required: PaymentRequiredLike, input: R
   const expectedAmount = approvedAmount || EXPECTED_ROUTE_AMOUNTS[expectedPath];
   if (!expectedAmount) throw new Error(`PULSE has no approved browser price for ${expectedPath}`);
   const browserEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env || {};
-  const expectedPayee = selected === "arc" ? String(browserEnv.VITE_CIRCLE_GATEWAY_SELLER_ADDRESS || "") : String(browserEnv.VITE_PAY_TO_ADDRESS || "");
+  const expectedPayee = String(browserEnv.VITE_PAY_TO_ADDRESS || "");
   if (browserEnv.PROD === true && !expectedPayee) throw new Error("Production payment recipient is not configured in the web deployment");
   const acceptable = required.accepts.some((entry) =>
     entry.scheme === "exact" && entry.network === network.caip2

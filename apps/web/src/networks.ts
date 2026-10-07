@@ -98,6 +98,13 @@ export async function fetchArcGatewayBalance(address: string): Promise<number> {
 
 export const ARC_GATEWAY_WALLET = "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE" as const;
 
+/** Mobile wallets need no unsupported custom-chain switch when Arc is already active. */
+export async function assertArcGatewayWallet(provider: { request(args: { method: string; params?: unknown[] }): Promise<unknown> }, owner: string) {
+  if (networkKeyForChainId(await provider.request({ method: "eth_chainId" })) !== "arc") await switchWalletNetwork(provider, "arc");
+  const accounts = await provider.request({ method: "eth_accounts" });
+  if (!Array.isArray(accounts) || String(accounts[0]).toLowerCase() !== owner.toLowerCase()) throw new Error("Wallet account changed; reconnect the Gateway depositor before signing");
+}
+
 /** Native gas and ERC-20 USDC spend consume the same Arc wallet balance. */
 export async function assertArcUsdcGasReserve(provider: { request(args: { method: string; params?: unknown[] }): Promise<unknown> }, owner: string, spendAtomic: bigint, gasLimit: bigint, nativeValue = 0n) {
   const [balance, gasPrice] = await Promise.all([
@@ -119,9 +126,7 @@ export function parseGatewayDepositAmount(amount: string): bigint {
 
 export async function depositArcGateway(provider: { request(args: { method: string; params?: unknown[] }): Promise<unknown> }, address: string, amount: string) {
   const value = parseGatewayDepositAmount(amount);
-  await switchWalletNetwork(provider, "arc");
-  const accounts = await provider.request({ method: "eth_accounts" });
-  if (!Array.isArray(accounts) || String(accounts[0]).toLowerCase() !== address.toLowerCase()) throw new Error("Wallet account changed; reconnect the Gateway depositor before signing");
+  await assertArcGatewayWallet(provider, address);
   const { createWalletClient, createPublicClient, custom, http, erc20Abi, defineChain } = await import("viem");
   const arc = defineChain({ id: WEB_NETWORKS.arc.chainId, name: WEB_NETWORKS.arc.label, nativeCurrency: WEB_NETWORKS.arc.native, rpcUrls: { default: { http: [WEB_NETWORKS.arc.rpc] } } });
   const account = address as `0x${string}`;
@@ -133,9 +138,10 @@ export async function depositArcGateway(provider: { request(args: { method: stri
   const approvalHash = await wallet.writeContract({ account, address: WEB_NETWORKS["arc"].payment.address, abi: erc20Abi, functionName: "approve", args: [ARC_GATEWAY_WALLET, value], gas: 120_000n });
   const approvalReceipt = await publicClient.waitForTransactionReceipt({ hash: approvalHash });
   if (approvalReceipt.status !== "success") throw new Error("Gateway USDC approval reverted; no deposit submitted");
-  await switchWalletNetwork(provider, "arc");
-  const depositor = await provider.request({ method: "eth_accounts" });
-  if (!Array.isArray(depositor) || String(depositor[0]).toLowerCase() !== address.toLowerCase()) throw new Error("Wallet account changed after approval; no Gateway deposit submitted");
+  await assertArcGatewayWallet(provider, address);
+  const [remainingBalance, depositGasPrice] = await Promise.all([publicClient.getBalance({ address: account }), publicClient.getGasPrice()]);
+  if (remainingBalance < value * 1_000_000_000_000n + 350_000n * depositGasPrice * 2n)
+    throw new Error("USDC approval is confirmed, but wallet USDC no longer covers the deposit and gas. Refresh the amount or add USDC; no deposit was submitted.");
   const depositHash = await wallet.writeContract({ account, address: ARC_GATEWAY_WALLET, abi: gatewayAbi, functionName: "deposit", args: [WEB_NETWORKS["arc"].payment.address, value], gas: 350_000n });
   const depositReceipt = await publicClient.waitForTransactionReceipt({ hash: depositHash });
   if (depositReceipt.status !== "success") throw new Error("Gateway deposit reverted");
