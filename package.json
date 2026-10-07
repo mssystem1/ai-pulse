@@ -33,7 +33,7 @@
     "readiness:arc": "node scripts/arc-mainnet-readiness.mjs",
     "plan:arc": "node packages/contracts/scripts/arc-deployment-plan.mjs",
     "deploy:arc": "npm run deploy:arc -w @pulse/contracts --",
-    "verify:arc": "npm run verify:arc -w @pulse/contracts",
+    "verify:arc": "npm run verify:arc -w @pulse/contracts --",
     "wire:arc": "node scripts/arc-wire-contracts.mjs",
     "configure:arc": "tsx scripts/arc-configure-execution.ts"
   },

@@ -153,6 +153,8 @@ await check("pulse-arc-release", async () => {
 checks.push({ name: "circle-email-wallet", ready: Boolean(env.CIRCLE_API_KEY && env.VITE_CIRCLE_APP_ID && !/TEST_API_KEY/i.test(env.CIRCLE_API_KEY) && /^(1|true)$/.test(env.FEATURE_CIRCLE_MAINNET_WALLETS || "")),
   detail: /TEST_API_KEY/i.test(env.CIRCLE_API_KEY || "") ? "Test API key cannot initialize ARC mainnet wallets" : "Production app/subscription setup and email OTP acceptance are pending until explicitly enabled" });
 await check("circle-mainnet-key-authentication", async () => {
+  if (!/^(1|true)$/.test(env.FEATURE_CIRCLE_MAINNET_WALLETS || ""))
+    return { ready: false, skipped: true, detail: "Email wallets are explicitly disabled; production setup must be completed before authentication acceptance" };
   if (!env.CIRCLE_API_KEY || /^TEST_API_KEY/i.test(env.CIRCLE_API_KEY)) return { ready: false, detail: "Production Circle key missing" };
   await json("https://api.circle.com/v1/w3s/users?pageSize=1", { headers: { Authorization: `Bearer ${env.CIRCLE_API_KEY}` } });
   return { ready: true, detail: "Production key authenticated; user data omitted" };

@@ -1044,9 +1044,13 @@ npm run readiness:okx
 npm run readiness:upstash
 npm run readiness:blob
 npm run validate:alerts
+npm run test:arc-workers
+npm run readiness:arc
 ```
 
 `readiness:*` commands are release diagnostics, not requirements for ordinary `npm run dev` usage. Live settlement certification is separate from mocked automated tests and must be reported by exact network, service, transaction, receipt, and terminal job state.
+
+`test:arc-workers` exercises the actual keeper and Autopilot control flow with isolated providers, storage and chain clients, including eight-decimal cirBTC limit/protection fills and bounded position exits. It makes no live transactions. The [current Arc completion audit](docs/ARC_MAINNET_COMPLETION_AUDIT_2026-10-07.md) distinguishes source verification, operational availability and remaining production acceptance. `npm run verify:arc -- --existing-only` checks already published exact source matches without submitting sources and preserves recorded activation state; it does not pause automation. `readiness:arc` skips private Circle authentication while email wallets are explicitly disabled.
 
 ## Trading troubleshooting
 

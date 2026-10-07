@@ -1,0 +1,317 @@
+{
+  "asOf": "2026-10-07T18:33:47.909Z",
+  "mode": "public read-only; no signatures or spending",
+  "chainId": 5042,
+  "hostedApi": "https://pulse-api-production-7aae.up.railway.app",
+  "contracts": [
+    {
+      "scope": "core",
+      "name": "registry",
+      "address": "0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x67e14b9545b069afbd78e195ec37914466e1807f",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x51d794a75bad9d0a60e4a33294f7eb26cb7482ba6ac3fd3a77ebf700fbc6f696",
+      "expectedRuntimeCodeHash": "0x51d794a75bad9d0a60e4a33294f7eb26cb7482ba6ac3fd3a77ebf700fbc6f696",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "oracleRouter",
+      "address": "0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x8cf94c9fabb4a740cf50ebd438b4896101d665a5",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x6eddf11a1884984a36b91ee28f491f1683f4da92efc5bea47cff8ef8f9cae23f",
+      "expectedRuntimeCodeHash": "0x6eddf11a1884984a36b91ee28f491f1683f4da92efc5bea47cff8ef8f9cae23f",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "executionAdapter",
+      "address": "0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0xa61bea98e42a943874dc80d958b157173b9f5a6e",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0xca9ed0afc2b687795ef902436b50a2ed5ba168834b0155d9fd847e3fb30c947f",
+      "expectedRuntimeCodeHash": "0xca9ed0afc2b687795ef902436b50a2ed5ba168834b0155d9fd847e3fb30c947f",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "spotFactory",
+      "address": "0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x3189d82c8abeb35e8ca80d079781fc5096eca289",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x9fb13f9edb03319c10533e77ef3bcc49181ad1ca352d5e7c15e54769887f0b30",
+      "expectedRuntimeCodeHash": "0x9fb13f9edb03319c10533e77ef3bcc49181ad1ca352d5e7c15e54769887f0b30",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "autopilotFactory",
+      "address": "0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0xe54dc99228463dad2c4f2762c9e1baf2d6f2ee07",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x0616e87850e899780369947fd16c88634b3936450e8148ad9d2c8adbbcbd572a",
+      "expectedRuntimeCodeHash": "0x0616e87850e899780369947fd16c88634b3936450e8148ad9d2c8adbbcbd572a",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "spotBracketFactory",
+      "address": "0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0xc2cf8dd0ba67142c539053c51fc1da9cc52e1af3",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0xed4015d4cecaad1cd157836c2ff593d021adaf11d84747d36e1008e20e62fde3",
+      "expectedRuntimeCodeHash": "0xed4015d4cecaad1cd157836c2ff593d021adaf11d84747d36e1008e20e62fde3",
+      "ready": true
+    },
+    {
+      "scope": "core",
+      "name": "spotProtectionFactory",
+      "address": "0xa4546529b1174765d4d8e256c951365359c853fa",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0xa4546529b1174765d4d8e256c951365359c853fa",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x15099a8f235847b98942c2d9b5ef60cbd2dbcc49bd140b6d3ecf6c19e5f91651",
+      "expectedRuntimeCodeHash": "0x15099a8f235847b98942c2d9b5ef60cbd2dbcc49bd140b6d3ecf6c19e5f91651",
+      "ready": true
+    },
+    {
+      "scope": "qualification-instance",
+      "name": "autopilot",
+      "address": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x0a295bbccb1395812e0d18c6168a6c162d0c4d6d691aefc126c5072379c9e853",
+      "expectedRuntimeCodeHash": null,
+      "ready": true
+    },
+    {
+      "scope": "qualification-instance",
+      "name": "spot-limit",
+      "address": "0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x45D097b05e7f6fA95432AEc8213cfF6C30340c3B",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x8f96efe43a009a436e46b909f2b63e3c43419b2a9387e72ea4dbb66ed0694e65",
+      "expectedRuntimeCodeHash": null,
+      "ready": true
+    },
+    {
+      "scope": "qualification-instance",
+      "name": "spot-protection",
+      "address": "0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x1d0d24679a9157E4EeAd472300b77220EC62545c",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x2205fcaf73fc1fc17b516af9ed264589397f87f5119b488ff819706b581f4bfc",
+      "expectedRuntimeCodeHash": null,
+      "ready": true
+    },
+    {
+      "scope": "qualification-instance",
+      "name": "spot-bracket",
+      "address": "0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "verificationUrl": "https://sourcify.dev/server/v2/contract/5042/0x63DF1De362a58a439F92fF2b52DdAa1399907b2a",
+      "verificationHttpStatus": 200,
+      "creationMatch": "exact_match",
+      "runtimeMatch": "exact_match",
+      "currentRuntimeCodeHash": "0x4b24f0b6c8410e770c8a34ae4e450e7fece3bd1d4d2445c6090d25ee7d37e257",
+      "expectedRuntimeCodeHash": null,
+      "ready": true
+    }
+  ],
+  "workflows": [
+    {
+      "name": "arc-metadata",
+      "path": "/v1/meta?network=arc",
+      "status": 200,
+      "ready": true,
+      "chainId": 5042,
+      "network": "eip155:5042",
+      "payTo": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+      "paymentProvider": "circle-gateway"
+    },
+    {
+      "name": "execution-capabilities",
+      "path": "/v1/trading/capabilities?network=arc",
+      "observedAt": "2026-10-07T18:35:32.328Z",
+      "elapsedMs": 2395,
+      "status": 200,
+      "ready": true,
+      "spot": {
+        "visible": true,
+        "enabled": true,
+        "market": true,
+        "limit": true,
+        "bracket": true,
+        "protectedOrders": true
+      },
+      "autopilot": {
+        "visible": true,
+        "enabled": true
+      },
+      "persistence": "redis",
+      "reasons": {},
+      "observations": [
+        {
+          "observedDuringInitialSweep": true,
+          "ready": false,
+          "error": "Public read-only request unavailable"
+        }
+      ]
+    },
+    {
+      "name": "email-wallet-disabled",
+      "path": "/v1/circle/wallet/status",
+      "status": 200,
+      "ready": true,
+      "enabled": false,
+      "reason": "Arc mainnet email login is waiting for the production Circle app and subscription setup"
+    },
+    {
+      "name": "reviewed-execution-catalog",
+      "path": "/v1/trading/pairs?network=arc&limit=5000",
+      "status": 200,
+      "ready": true,
+      "count": 2,
+      "pairs": [
+        {
+          "pair": "BTC-USDT",
+          "executionPair": "cirBTC/USDC"
+        },
+        {
+          "pair": "ETH-USDT",
+          "executionPair": "WETH/USDC"
+        }
+      ]
+    },
+    {
+      "name": "global-catalog",
+      "path": "/v1/market/instruments?network=arc&limit=5000",
+      "status": 200,
+      "ready": true,
+      "count": 1143
+    },
+    {
+      "name": "BTC-USDT-route",
+      "path": "/v1/trading/resolve-pair?network=arc&pair=BTC-USDT&custody=erc20",
+      "status": 200,
+      "ready": true,
+      "available": true,
+      "base": {
+        "address": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+        "decimals": 8,
+        "symbol": "cirBTC"
+      }
+    },
+    {
+      "name": "BTC-USDT-ticker",
+      "path": "/v1/market/ticker?instId=BTC-USDT",
+      "status": 200,
+      "ready": true,
+      "ticker": {
+        "instId": "BTC-USDT",
+        "last": 83315.1,
+        "open24h": 85611.6,
+        "high24h": 85693.2,
+        "low24h": 82753,
+        "vol24h": 6273.55717504,
+        "volCcy24h": 526596968.27472657,
+        "change24hPct": -2.68,
+        "ts": "1791398062268"
+      }
+    },
+    {
+      "name": "BTC-USDT-autopilot-history",
+      "path": "/v1/autopilot/market-readiness?network=arc&pair=BTC-USDT&timeframe=1H",
+      "status": 200,
+      "ready": true,
+      "signalSource": "okx-public-spot",
+      "reason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+    },
+    {
+      "name": "ETH-USDT-route",
+      "path": "/v1/trading/resolve-pair?network=arc&pair=ETH-USDT&custody=erc20",
+      "status": 200,
+      "ready": true,
+      "available": true,
+      "base": {
+        "address": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+        "decimals": 18,
+        "symbol": "WETH"
+      }
+    },
+    {
+      "name": "ETH-USDT-ticker",
+      "path": "/v1/market/ticker?instId=ETH-USDT",
+      "status": 200,
+      "ready": true,
+      "ticker": {
+        "instId": "ETH-USDT",
+        "last": 2556.14,
+        "open24h": 2696.11,
+        "high24h": 2700.44,
+        "low24h": 2536,
+        "vol24h": 201814.982143,
+        "volCcy24h": 525798032.13737506,
+        "change24hPct": -5.19,
+        "ts": "1791398064369"
+      }
+    },
+    {
+      "name": "ETH-USDT-autopilot-history",
+      "path": "/v1/autopilot/market-readiness?network=arc&pair=ETH-USDT&timeframe=1H",
+      "status": 200,
+      "ready": true,
+      "signalSource": "okx-public-spot",
+      "reason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+    },
+    {
+      "name": "memecoin-research-rejected",
+      "path": "/v1/market/ticker?instId=COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC",
+      "status": 422,
+      "ready": true,
+      "code": "spot_instrument_unavailable",
+      "reason": "Indexed Arc tokens are available in Risk Guard only. Choose a live OKX research pair."
+    },
+    {
+      "name": "risk-guard-discovery",
+      "path": "/arc/v1/tokens?limit=5000",
+      "status": 200,
+      "ready": true,
+      "count": 2004,
+      "officialCirBtcPresent": true
+    }
+  ],
+  "transactionsSent": 0,
+  "spendUSDC": "0",
+  "blockNumber": "24773618",
+  "registryPaused": false,
+  "finishedAt": "2026-10-07T18:35:32.330Z",
+  "publicChecksReady": true,
+  "fullMigrationQualified": false,
+  "remainingAcceptance": [
+    "Production Circle App ID/subscription/SMTP and real email-wallet login/signing; explicitly disabled by owner.",
+    "Manual hosting release of the latest committed UI/API fixes, followed by hosted checks.",
+    "Production extension and physical mobile signed Spot/Autopilot/Gateway workflows.",
+    "Dedicated production executor deployment/role/funding acceptance and live deterministic risk-worker sell acceptance.",
+    "Live cirBTC funded execution acceptance; worker and amount evidence in this continuation is isolated only."
+  ]
+}

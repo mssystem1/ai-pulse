@@ -1,0 +1,92 @@
+{
+  "asOf": "2026-10-07T18:32:25.818Z",
+  "mode": "read-only",
+  "chainId": 5042,
+  "checks": [
+    {
+      "name": "arc-mainnet-rpc",
+      "ready": true,
+      "chainId": 5042,
+      "latestBlock": "24773425"
+    },
+    {
+      "name": "arc-usdc-decimals",
+      "ready": true,
+      "decimals": 6,
+      "nativeDecimals": 18
+    },
+    {
+      "name": "gateway-wallet",
+      "ready": true,
+      "address": "0x77777777Dcc4d5A8B6E418Fd04D8997ef11000eE"
+    },
+    {
+      "name": "WETH",
+      "ready": true,
+      "address": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB"
+    },
+    {
+      "name": "cirBTC",
+      "ready": true,
+      "address": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0"
+    },
+    {
+      "name": "gateway-mainnet-nanopayments",
+      "ready": true,
+      "network": "eip155:5042"
+    },
+    {
+      "name": "okx-arc-swap-provider",
+      "ready": true,
+      "detail": "Provider advertises Arc mainnet"
+    },
+    {
+      "name": "okx-arc-live-route",
+      "ready": true,
+      "mode": "prepared-only; no signature or broadcast",
+      "from": "0x3600000000000000000000000000000000000000",
+      "to": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+      "inputUSDC": "1",
+      "outputAtomic": "390504096190181",
+      "minimumOutputAtomic": "388551575709230",
+      "router": "0x4E3bcCE28cAf98A143Fd8BD9e4875ccAb3E7bBE0",
+      "spender": "0x2B9899bC46Bf0eE094225995f4bD496d42f261Af",
+      "selector": "0x0d5f0e3b",
+      "calldataFunction": "uniswapV3SwapTo",
+      "routerRuntimeCodeHash": "0x82d1c684f6a86e8483129bc69aaaede0acfbfb7e33ff872409b16365dff7b981",
+      "spenderRuntimeCodeHash": "0x1476ca6fbc543940263d713e7e8f1497e79856ddd65e5caaea17423f2a50f56f",
+      "detail": "Prepared route and decoded calldata match chain, assets, amount, recipient and 0.5% minimum output; this read-only check alone does not qualify funded execution"
+    },
+    {
+      "name": "arc-source-verifier",
+      "ready": true,
+      "provider": "Sourcify"
+    },
+    {
+      "name": "pulse-arc-deployment",
+      "ready": true,
+      "contractCount": 7,
+      "runtimeMatches": 7,
+      "detail": "Deployed runtime hashes checked against the source-verified mainnet manifest; release activation is a separate gate"
+    },
+    {
+      "name": "pulse-arc-release",
+      "ready": false,
+      "registryPaused": false,
+      "detail": "Production release requires completed wallet/UI/hosted acceptance and explicit trading activation"
+    },
+    {
+      "name": "circle-email-wallet",
+      "ready": false,
+      "detail": "Production app/subscription setup and email OTP acceptance are pending until explicitly enabled"
+    },
+    {
+      "name": "circle-mainnet-key-authentication",
+      "ready": false,
+      "skipped": true,
+      "detail": "Email wallets are explicitly disabled; production setup must be completed before authentication acceptance"
+    }
+  ],
+  "researchInfrastructureReady": true,
+  "fullExecutionReady": false
+}

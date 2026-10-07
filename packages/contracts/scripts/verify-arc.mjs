@@ -2,6 +2,7 @@
 import { readFile, writeFile, rename } from "node:fs/promises";
 import { resolve } from "node:path";
 const instances = process.argv.includes("--instances");
+const existingOnly = process.argv.includes("--existing-only");
 const manifestPath = resolve(import.meta.dirname, instances ? "../deployments/5042-instance-verification.json" : "../deployments/5042.json");
 async function request(url, init = {}) {
   const response = await fetch(url, { ...init, redirect: "error", signal: AbortSignal.timeout(30_000) });
@@ -33,6 +34,7 @@ async function main() {
       manifest.verification.results[key] = { status: "verified", address: contract.address, creationMatch: match.creationMatch, runtimeMatch: match.runtimeMatch };
       await save(); console.log(`${key}: verified exact creation/runtime match`); continue;
     }
+    if (existingOnly) throw new Error(`${key}: existing exact source match unavailable; no sources submitted`);
     const submission = await request(`https://sourcify.dev/server/v2/verify/5042/${contract.address}`, {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ stdJsonInput: manifest.standardInput, compilerVersion: manifest.compilerVersion,
@@ -55,7 +57,12 @@ async function main() {
     console.log(`${key}: verified exact creation/runtime match`);
   }
   manifest.verification.verifiedAt = new Date().toISOString();
-  manifest.status = "deployed_verified_paused"; await save();
-  console.log(instances ? "All four owner account/vault instances verified." : "All seven contracts verified. Trading remains disabled pending integration and route/oracle checks.");
+  // Verification neither changes nor inspects the live automation pause. Keep
+  // operational activation evidence when re-verifying an already active suite.
+  if (instances) manifest.status = "instances_source_verified";
+  else if (manifest.status === "deployed_paused_verification_pending") manifest.status = "deployed_verified_paused";
+  else if (!manifest.status?.startsWith("deployed_verified")) manifest.status = "deployed_verified";
+  await save();
+  console.log(instances ? "All four owner account/vault instances verified." : "All seven contracts verified. Execution flags and on-chain automation state are unchanged.");
 }
 main().catch((error) => { console.error("Arc verification stopped:", error.name === "Error" ? error.message : error.name); process.exitCode = 1; });

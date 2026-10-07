@@ -1,8 +1,12 @@
 // Real keeper control flow with isolated chain, provider and storage clients.
 import test, {mock} from 'node:test';
 import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
-test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and rejects expired routes', async () => {
+const cirBtcMarket = process.env.PULSE_ARC_KEEPER_CIRBTC === '1';
+
+test(`Arc ${cirBtcMarket ? 'cirBTC eight-decimal ' : ''}keeper executes limit, bracket and TP/SL phases, respects scope, and rejects expired routes`, async () => {
   process.env.NODE_ENV='test'; process.env.PULSE_SKIP_DOTENV='1'; process.env.FEATURE_ARC_TRADING='1';
   mock.method(globalThis,'fetch',async()=>{throw Error('Unexpected external request');});
   const viem=await import('viem');
@@ -10,17 +14,24 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   const contracts=deployment.executionContracts('arc');
   const router=deployment.executionContractAddress('arc','okxRouter');
   const {OKX_DAG_ABI}=await import('../apps/api/src/okxDag.ts');
-  const owner=`0x${'1'.repeat(40)}`, usdc='0x3600000000000000000000000000000000000000', weth='0x128cc466b61f542da60c70e3aa11c10e19b84edb';
+  const owner=`0x${'1'.repeat(40)}`, usdc='0x3600000000000000000000000000000000000000';
+  const target = cirBtcMarket ? '0x171a4217b86a807a64eb94757db6849fb4bdbaa0' : '0x128cc466b61f542da60c70e3aa11c10e19b84edb';
+  const pair = cirBtcMarket ? 'BTC-USDT' : 'ETH-USDT';
+  const targetDecimals = cirBtcMarket ? 8 : 18;
+  const atomicScale = 10n ** BigInt(targetDecimals - 6);
+  const priceScale = cirBtcMarket ? 830 : 1;
+  const targetAmount = 100000n * atomicScale / BigInt(100 * priceScale);
+  const minimumReceived = targetAmount * 995n / 1000n;
   const addresses=['2','3','4','5','6'].map(x=>`0x${x.repeat(40)}`);
   const versions=['limit-v2','bracket-v1','oco-v1','limit-v2','limit-v2'];
-  const p=x=>viem.parseUnits(String(x),18);
+  const p=x=>viem.parseUnits(String(x * priceScale),18);
   const records=new Map(addresses.map((address,i)=>[address, versions[i]==='oco-v1'
-    ? [weth,usdc,1000000000000000n,p(110),p(90),0n,1n,1]
+    ? [target,usdc,targetAmount,p(110),p(90),0n,1n,1]
     : versions[i]==='bracket-v1'
-      ? [usdc,weth,weth,usdc,100000n,0n,p(110),p(110),p(90),995000000000000n,0n,1n,false,true,1]
-      : [usdc,weth,weth,usdc,100000n,p(110),995000000000000n,0n,1n,false,1]]));
+      ? [usdc,target,target,usdc,100000n,0n,p(110),p(110),p(90),minimumReceived,0n,1n,false,true,1]
+      : [usdc,target,target,usdc,100000n,p(110),minimumReceived,0n,1n,false,1]]));
   let items=addresses.map((account,i)=>({id:`arc:${account}:1`,owner,network:'arc',account,orderId:'1',version:versions[i],
-    instId:'ETH-USDT',sellToken:i===2?weth:usdc,buyToken:i===2?usdc:weth,status:'active',phase:i===2?'protected':'entry',onchainState:1}));
+    instId:pair,sellToken:i===2?target:usdc,buyToken:i===2?usdc:target,status:'active',phase:i===2?'protected':'entry',onchainState:1}));
   const kv=await import('../apps/api/src/resilientKv.ts');
   mock.module('../apps/api/src/resilientKv.ts',{namedExports:{...kv,kvConfigured:()=>true,runKvCommand:async([op,key,value])=>{
     assert.equal(key,'pulse:v6:automation:orders');
@@ -29,15 +40,15 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   const readiness=await import('../apps/api/src/arcExecutionReadiness.ts');
   mock.module('../apps/api/src/arcExecutionReadiness.ts',{namedExports:{...readiness,arcAutomationReadiness:async()=>({ready:true})}});
   const market=await import('../apps/api/src/robinhoodMarkets.ts');
-  let mark=100,now=Date.now(),expire=false,tickerOffset=0;
+  let mark=100*priceScale,now=Date.now(),expire=false,tickerOffset=0;
   mock.timers.enable({apis:['Date'],now});
-  mock.module('../apps/api/src/robinhoodMarkets.ts',{namedExports:{...market,executionSettlementTicker:async()=>({instId:'ETH-USDT',last:mark,ts:String(now+tickerOffset)})}});
+  mock.module('../apps/api/src/robinhoodMarkets.ts',{namedExports:{...market,executionSettlementTicker:async()=>({instId:pair,last:mark,ts:String(now+tickerOffset)})}});
   const dex=await import('../apps/api/src/okxDex.ts');
   let output=0n;
   mock.module('../apps/api/src/okxDex.ts',{namedExports:{...dex,getGenericOkxSwap:async(_cfg,input)=>{
     assert.equal(input.chainId,'5042'); assert.equal(input.userWalletAddress.toLowerCase(),contracts.executionAdapter.toLowerCase());
     const buy=input.fromTokenAddress.toLowerCase()===usdc;
-    output=buy?BigInt(input.amount)*10n**12n/BigInt(mark):BigInt(input.amount)*BigInt(mark)/10n**12n;
+    output=buy?BigInt(input.amount)*atomicScale/BigInt(mark):BigInt(input.amount)*BigInt(mark)/atomicScale;
     return {quote:{chainId:'5042',fromTokenAmount:input.amount,toTokenAmount:String(output),fromToken:{address:input.fromTokenAddress},toToken:{address:input.toTokenAddress}},
       tx:{to:router,from:contracts.executionAdapter,value:'0',data:viem.encodeFunctionData({abi:OKX_DAG_ABI,functionName:'dagSwapTo',args:[1n,contracts.executionAdapter,
         {fromToken:BigInt(input.fromTokenAddress),toToken:input.toTokenAddress,fromTokenAmount:BigInt(input.amount),minReturnAmount:output*995n/1000n,deadLine:BigInt(Math.floor(now/1000)+600)},[]]})}};
@@ -64,7 +75,7 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   mock.module('viem',{namedExports:{...viem,createWalletClient:()=>wallet}});
   const discovery=await import('../apps/api/src/onchainDiscovery.ts');
   mock.module('../apps/api/src/onchainDiscovery.ts',{namedExports:{...discovery,executionPublicClient:()=>({
-    readContract:async request=>request.functionName==='decimals'?(request.address.toLowerCase()===usdc?6:18):records.get(request.address),
+    readContract:async request=>request.functionName==='decimals'?(request.address.toLowerCase()===usdc?6:targetDecimals):records.get(request.address),
     simulateContract:async request=>({request}),waitForTransactionReceipt:async({hash})=>receipts.get(hash),getTransactionReceipt:async({hash})=>receipts.get(hash),
     estimateFeesPerGas:async()=>({maxFeePerGas:100000000000n,maxPriorityFeePerGas:1n}),getBalance:async()=>viem.parseEther('5'),
     estimateGas:async()=>{if(expire){now+=31000;mock.timers.setTime(now);}return 100000n;},
@@ -84,16 +95,37 @@ test('Arc keeper executes limit, bracket and TP/SL phases, respects scope, and r
   assert.equal(submitted.length,0,'mismatched on-chain order tokens cannot update the oracle or execute');
   records.get(addresses[0])[2]=correctBase;
   await run(0);assert.equal(items[0].status,'filled');assert.equal(submitted.length,2);
+  if (cirBtcMarket) {
+    assert.equal(output,120n,'a 0.10 USDC limit fill uses cirBTC atomic units');
+    const adapterAbi=viem.parseAbi(['function execute(address,address,address,address,uint256,uint256,bytes)']);
+    const adapterCall=viem.decodeFunctionData({abi:adapterAbi,data:submitted[1].args[2]});
+    assert.equal(adapterCall.args[5],119n,'the signed eight-decimal minimum is carried unchanged to the adapter');
+  }
   await run(0);assert.equal(submitted.length,2,'a confirmed limit fill cannot repeat');
   assert.ok(items.slice(1).every(x=>x.status==='active'),'the scope excludes other owner orders');
   await run(1);assert.equal(items[1].phase,'protected');assert.equal(items[1].status,'active');
-  mark=120;await run(1);assert.equal(items[1].status,'filled');assert.equal(items[1].lastAction,'take_profit');assert.equal(items[1].exitPrice,120);
+  mark=120*priceScale;await run(1);assert.equal(items[1].status,'filled');assert.equal(items[1].lastAction,'take_profit');assert.equal(items[1].exitPrice,120*priceScale);
   await run(2);assert.equal(items[2].status,'filled');assert.equal(items[2].lastAction,'take_profit');
   assert.deepEqual(activities.map(x=>x.kind),['automatic_fill','automatic_entry_protected','automatic_take_profit','automatic_take_profit']);
-  mark=100;records.get(addresses[3])[10]=2;const beforePause=submitted.length;
+  mark=100*priceScale;records.get(addresses[3])[10]=2;const beforePause=submitted.length;
   await run(3);assert.equal(submitted.length,beforePause,'an owner-paused order cannot execute');
   expire=true;const beforeExpire=submitted.filter(x=>x.functionName!=='setPrice').length;
   await run(4);assert.match(items[4].lastError,/quote expired/);assert.equal(submitted.filter(x=>x.functionName!=='setPrice').length,beforeExpire,'an expired quote cannot move escrow');
   process.env.FEATURE_ARC_TRADING='0';const beforeDisabled=submitted.length;
   await runTradeAutomationCycle(cfg);assert.equal(submitted.length,beforeDisabled,'the release flag gates every Arc order');
+});
+
+if (!cirBtcMarket) test('Arc cirBTC keeper fills limits and bracket/TP-SL exits with eight-decimal accounting', { timeout: 60_000 }, async () => {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+    /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
+  Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_KEEPER_CIRBTC: '1' });
+  const child = spawn(process.execPath, ['--import', 'tsx', '--experimental-test-module-mocks', '--test', fileURLToPath(import.meta.url)], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  try {
+    const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+    assert.equal(code, 0, output);
+    assert.match(output, /Arc cirBTC eight-decimal keeper/);
+  } finally { child.kill(); }
 });

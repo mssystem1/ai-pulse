@@ -6,8 +6,9 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const nativeMarket = process.env.PULSE_ARC_WORKER_NATIVE === '1';
+const cirBtcMarket = process.env.PULSE_ARC_WORKER_CIRBTC === '1';
 const recoveryCase = process.env.PULSE_ARC_WORKER_RECOVERY || '';
-test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${recoveryCase || 'buys, protects and closes a position with bounded USDC gas and one activity per fill'}`, async () => {
+test(`Arc ${nativeMarket ? 'native contract' : cirBtcMarket ? 'cirBTC eight-decimal' : 'canonical wrapper'} Autopilot ${recoveryCase || 'buys, protects and closes a position with bounded USDC gas and one activity per fill'}`, async () => {
   process.env.NODE_ENV = 'test';
   process.env.PULSE_SKIP_DOTENV = '1';
   process.env.FEATURE_ARC_TRADING = '1';
@@ -23,13 +24,17 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   mock.module('../apps/api/src/arcExecutionReadiness.ts', { namedExports: { ...readiness, arcAutomationReadiness: async () => ({ready:true}) } });
   const owner = `0x${'1'.repeat(40)}`, vault = `0x${'2'.repeat(40)}`;
   const settlement = '0x3600000000000000000000000000000000000000';
-  const target = nativeMarket ? '0xeb64987643db71c76b2a2be7e723decc995e5b37' : '0x128cc466b61f542da60c70e3aa11c10e19b84edb';
-  const pair = nativeMarket ? 'COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC' : 'ETH-USDT';
+  const target = nativeMarket ? '0xeb64987643db71c76b2a2be7e723decc995e5b37'
+    : cirBtcMarket ? '0x171a4217b86a807a64eb94757db6849fb4bdbaa0' : '0x128cc466b61f542da60c70e3aa11c10e19b84edb';
+  const pair = nativeMarket ? 'COOL.EB64987643DB71C76B2A2BE7E723DECC995E5B37-USDC' : cirBtcMarket ? 'BTC-USDT' : 'ETH-USDT';
+  const targetDecimals = cirBtcMarket ? 8 : 18;
+  const atomicScale = 10n ** BigInt(targetDecimals - 6);
+  const priceScale = cirBtcMarket ? 830 : 1;
   const signalMarket = pair;
   const analysisToSettlement = 1;
   // Keep the simulated five-minute cycle inside one candle window.
   let now = Math.floor(Date.now() / 3600000) * 3600000 + 900000,
-    mark = 100 * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
+    mark = 100 * priceScale * analysisToSettlement, nonce = 0n, targetBalance = 0n, settlementBalance = 1_000_000n;
   mock.timers.enable({ apis: ['Date'], now });
   const strings = new Map(), hashes = new Map();
   let failDurableConfirmationOnce = recoveryCase === 'storage_confirmation';
@@ -74,8 +79,9 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   const marketModule = await import('../apps/api/src/robinhoodMarkets.ts');
   const lastCandle = Math.floor(now / 3600000) * 3600000 - 3600000;
   const candles = Array.from({ length: 120 }, (_, i) => ({ ts: lastCandle - (119 - i) * 3600000,
-    open: 40 + i * .5, high: 41 + i * .5, low: 39 + i * .5, close: 40.5 + i * .5, volume: 100, volumeCcy: 10000, confirmed: true }));
-  const market = { instId: signalMarket, source: 'okx-public-spot', timeframe: '1H', candles, ticker: { instId: signalMarket, last: 100, ts: String(now), change24hPct: 2 }, fetchedAt: new Date(now).toISOString() };
+    open: (40 + i * .5) * priceScale, high: (41 + i * .5) * priceScale,
+    low: (39 + i * .5) * priceScale, close: (40.5 + i * .5) * priceScale, volume: 100, volumeCcy: 10000, confirmed: true }));
+  const market = { instId: signalMarket, source: 'okx-public-spot', timeframe: '1H', candles, ticker: { instId: signalMarket, last: 100 * priceScale, ts: String(now), change24hPct: 2 }, fetchedAt: new Date(now).toISOString() };
   mock.module('../apps/api/src/robinhoodMarkets.ts', { namedExports: { ...marketModule,
     executionMarketContext: async (_cfg, input) => {
       assert.equal(input.instId, pair, 'the worker uses the complete owner-authorized contract market');
@@ -88,7 +94,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
     robinhoodAutopilotContext: async () => { throw Error('Arc cannot use a Robinhood signal mapping'); },
   } });
   const signal = { generatedAt: new Date(now).toISOString(), candleTs: lastCandle,
-    signal: { bias: 'bullish', confidence: 90, regime: 'trend_up', support: [95], resistance: [110] } };
+    signal: { bias: 'bullish', confidence: 90, regime: 'trend_up', support: [95 * priceScale], resistance: [110 * priceScale] } };
   strings.set(`pulse:v6:autopilot:signal:${pair}:1H`, JSON.stringify({ expiresAt: now + 3600000, value: signal }));
   let quoteOutput = 0n, rejectEntryQuote = true, rejectExitQuote = true, alternativeExitCalls = 0;
   const dex = await import('../apps/api/src/okxDex.ts');
@@ -96,12 +102,12 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
     getGenericOkxQuote: async (_cfg, input) => {
       assert.equal(input.fromTokenAddress.toLowerCase(), target.toLowerCase());
       assert.equal(input.toTokenAddress.toLowerCase(), settlement.toLowerCase());
-      const output = BigInt(input.amount) * BigInt(mark) / 10n ** 12n;
+      const output = BigInt(input.amount) * BigInt(mark) / atomicScale;
       return { fromTokenAmount: input.amount, toTokenAmount: String(rejectExitQuote ? output / 2n : output) };
     }, betterGenericOkxExitSwap: async (_cfg, input, original) => {
       alternativeExitCalls++;
       assert.equal(input.slippagePercent, '0.5', 'alternative routing cannot enlarge tolerance');
-      quoteOutput = BigInt(input.amount) * BigInt(mark) / 10n ** 12n;
+      quoteOutput = BigInt(input.amount) * BigInt(mark) / atomicScale;
       return { ...original, quote: { ...original.quote, toTokenAmount: String(quoteOutput) }, tx: { ...original.tx,
         data: viem.encodeFunctionData({ abi: OKX_DAG_ABI, functionName: 'dagSwapTo', args: [1n, contracts.executionAdapter,
           { fromToken: BigInt(input.fromTokenAddress), toToken: input.toTokenAddress, fromTokenAmount: BigInt(input.amount),
@@ -111,11 +117,11 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
     assert.equal(input.userWalletAddress.toLowerCase(), contracts.executionAdapter.toLowerCase());
     assert.deepEqual([input.fromTokenAddress.toLowerCase(), input.toTokenAddress.toLowerCase()].sort(), [settlement, target].sort());
     const buy = input.fromTokenAddress.toLowerCase() === settlement.toLowerCase();
-    quoteOutput = buy ? BigInt(input.amount) * 10n ** 12n / BigInt(mark) : BigInt(input.amount) * BigInt(mark) / 10n ** 12n;
+    quoteOutput = buy ? BigInt(input.amount) * atomicScale / BigInt(mark) : BigInt(input.amount) * BigInt(mark) / atomicScale;
     if (buy && rejectEntryQuote) quoteOutput /= 2n;
     if (!buy) quoteOutput /= 2n; // Default source fails; a better source must still pass the original guard.
     return { quote: { chainId: '5042', fromTokenAmount: input.amount, toTokenAmount: String(quoteOutput),
-      fromToken: { address: input.fromTokenAddress, decimals: buy ? 6 : 18 }, toToken: { address: input.toTokenAddress, decimals: buy ? 18 : 6 }, priceImpactPercent: '0' },
+      fromToken: { address: input.fromTokenAddress, decimals: buy ? 6 : targetDecimals }, toToken: { address: input.toTokenAddress, decimals: buy ? targetDecimals : 6 }, priceImpactPercent: '0' },
       tx: { to: contracts.okxRouter, from: contracts.executionAdapter, value: '0', data: viem.encodeFunctionData({
         abi: OKX_DAG_ABI, functionName: 'dagSwapTo', args: [1n, contracts.executionAdapter,
           { fromToken: BigInt(input.fromTokenAddress), toToken: input.toTokenAddress, fromTokenAmount: BigInt(input.amount),
@@ -181,7 +187,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
       estimateGas: async () => 100000n,
       estimateFeesPerGas: async () => ({ maxFeePerGas:100000000000n, maxPriorityFeePerGas:1n }),
       getBalance: async () => viem.parseEther('5'),
-      multicall: async () => [++runtimeReads >= pauseOnRead, 1n, nonce, 50n, 100000n, 0n, 0n, targetBalance, 18, 6, settlementBalance],
+      multicall: async () => [++runtimeReads >= pauseOnRead, 1n, nonce, 50n, 100000n, 0n, 0n, targetBalance, targetDecimals, 6, settlementBalance],
       readContract: async request => {
         if (request.functionName === 'vaultsOf') return [vault];
         assert.equal(request.functionName, 'exposureCap'); return 1_000_000n;
@@ -312,6 +318,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   }
   assert.equal(stored().lastDecision, 'hold_receipt_pending', JSON.stringify(stored()));
   assert.ok(targetBalance > 0n);
+  if (cirBtcMarket) assert.equal(targetBalance, 120n, '0.10 USDC buys 120 cirBTC atomic units at the fixture price, without an 18-decimal scale');
   assert.ok(stored().activeTakeProfit > mark && stored().activeStopLoss > 0 && stored().activeStopLoss < mark);
   assert.equal(pass.signalsUsed, 1);
   now += 60000;
@@ -320,7 +327,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   assert.equal(stored().lastDecision, 'hold_receipt_reconciled', JSON.stringify(stored()));
   assert.equal(submitted.filter(request => request.functionName === 'execute').length, 1, 'receipt recovery cannot repeat the buy');
   pass = { ...pass, expiresAt: new Date(now - 1).toISOString() };
-  mark = 130 * analysisToSettlement; now += 120000;
+  mark = 130 * priceScale * analysisToSettlement; now += 120000;
   mock.timers.setTime(now);
   market.ticker.ts = String(now - 181000);
   const beforeStaleExit = submitted.length;
@@ -349,7 +356,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
   market.ticker.ts = String(now);
   pass = { ...pass, expiresAt: new Date(now + 86400000).toISOString() };
   hashes.set(strategyKey, new Map([[raceStrategy.id, JSON.stringify(raceStrategy)]]));
-  runtimeReads = 0; pauseOnRead = 3; mark = 100 * analysisToSettlement;
+  runtimeReads = 0; pauseOnRead = 3; mark = 100 * priceScale * analysisToSettlement;
   const beforePause = submitted.length;
   await runAutopilotCycle(cfg, {network:'arc',vault});
   const paused = JSON.parse(hashes.get(strategyKey).get(raceStrategy.id));
@@ -360,7 +367,7 @@ test(`Arc ${nativeMarket ? 'native contract' : 'canonical wrapper'} Autopilot ${
 
 // Node module mocks are process-wide. Exercise the same actual worker with a
 // native contract market in a fresh, secret-free process instead of sharing mocks.
-if (!nativeMarket && !recoveryCase) test('Arc worker rejects indexed memecoins before AI or execution', { timeout: 60_000 }, async () => {
+if (!nativeMarket && !cirBtcMarket && !recoveryCase) test('Arc worker rejects indexed memecoins before AI or execution', { timeout: 60_000 }, async () => {
   const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
     /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
   Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_NATIVE: '1' });
@@ -375,7 +382,7 @@ if (!nativeMarket && !recoveryCase) test('Arc worker rejects indexed memecoins b
   } finally { child.kill(); }
 });
 
-if (!nativeMarket && !recoveryCase) for (const scenario of ['activity', 'lost_broadcast', 'confirmation', 'storage_confirmation', 'pause_expiry'])
+if (!nativeMarket && !cirBtcMarket && !recoveryCase) for (const scenario of ['activity', 'lost_broadcast', 'confirmation', 'storage_confirmation', 'pause_expiry'])
   test(`Arc Autopilot durable recovery: ${scenario}`, { timeout: 60_000 }, async () => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
       /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
@@ -389,3 +396,18 @@ if (!nativeMarket && !recoveryCase) for (const scenario of ['activity', 'lost_br
       assert.equal(code, 0, output);
     } finally { child.kill(); }
   });
+
+if (!nativeMarket && !cirBtcMarket && !recoveryCase) test('Arc cirBTC worker buys, recovers receipts and closes eight-decimal positions', { timeout: 60_000 }, async () => {
+  const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
+    /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));
+  Object.assign(env, { NODE_ENV: 'test', PULSE_SKIP_DOTENV: '1', PULSE_ARC_WORKER_CIRBTC: '1' });
+  const child = spawn(process.execPath, ['--import', 'tsx', '--experimental-test-module-mocks', '--test', fileURLToPath(import.meta.url)], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  let output = '';
+  child.stdout.on('data', chunk => { output += chunk; });
+  child.stderr.on('data', chunk => { output += chunk; });
+  try {
+    const code = await new Promise((resolve, reject) => { child.once('error', reject); child.once('close', resolve); });
+    assert.equal(code, 0, output);
+    assert.match(output, /Arc cirBTC eight-decimal Autopilot/);
+  } finally { child.kill(); }
+});
