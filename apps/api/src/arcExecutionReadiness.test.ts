@@ -22,7 +22,11 @@ test("Arc execution uses its verified mainnet deployment and rejects an old test
   for (const name of names) delete process.env[name];
   const cfg = { enabledNetworks: ["arc"], FEATURE_ARC_MAINNET: true, hasOkxCredentials: true, ARC_RPC_URL: "https://arc-fixture.test", AUTOMATION_EXECUTOR_PRIVATE_KEY: `0x${"1".repeat(64)}`, TEST_WALLET_PRIVATE_KEY: "" } as AppConfig;
   let calls = 0;
-  t.mock.method(globalThis, "fetch", async () => { calls++; return Response.json({ jsonrpc: "2.0", id: 1, result: "0x4cef52" }); });
+  t.mock.method(globalThis, "fetch", async (_input, init) => {
+    calls++; const body = JSON.parse(String(init?.body));
+    const response = (request: { id: number }) => ({ jsonrpc: "2.0", id: request.id, result: "0x4cef52" });
+    return Response.json(Array.isArray(body) ? body.map(response) : response(body));
+  });
   assert.equal((await arcAutomationReadiness(cfg)).ready, false);
   assert.equal(calls, 0);
   assert.equal(executionContracts("arc").registry.toLowerCase(), "0x67e14b9545b069afbd78e195ec37914466e1807f");
@@ -54,48 +58,59 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
     negativePrimaryOnly?: boolean; partialFailure?: boolean; codeFailure?: boolean; malformed?: "empty" | "truncated" };
   const run = async (options: Options = {}, config = cfg, concurrent = false) => {
     const reads: Array<{ provider: string; method: string; functionName?: string }> = [];
+    const httpCalls: Array<{ provider: string; methods: string[] }> = [];
     const fetchMock = t.mock.method(globalThis, "fetch", async (input, init) => {
       const provider = String(input).includes("primary") ? "primary" : "fallback";
-      const request = JSON.parse(String(init?.body));
-      reads.push({ provider, method: request.method, functionName: undefined });
-      if (options.allUnavailable || (provider === "primary" && (options.primaryFailure === "early"
-        || (options.primaryFailure === "late" && request.method === "eth_call")
-        || (options.codeFailure && request.method === "eth_getCode" && request.params[0].toLowerCase() === contracts.oracleRouter.toLowerCase())))) return new Response("unavailable", { status: 503 });
-      const negative = !options.negativePrimaryOnly || provider === "primary";
-      let result: string;
-      if (request.method === "eth_chainId") result = `0x${(provider === "primary" ? options.primaryChain ?? 5042 : options.fallbackChain ?? 5042).toString(16)}`;
-      else if (request.method === "eth_getCode") result = options.missingCode && negative ? "0x" : "0x6000";
-      else if (request.method === "eth_gasPrice") result = "0x1";
-      else if (request.method === "eth_getBalance") {
-        assert.equal(request.params[0].toLowerCase(), arcSigner.toLowerCase(), "gas evidence must belong to the Arc-specific signer");
-        result = options.insufficientGas ? "0x1" : "0x989680";
+      const payload = JSON.parse(String(init?.body));
+      const requests = Array.isArray(payload) ? payload : [payload];
+      httpCalls.push({ provider, methods: requests.map(request => request.method) });
+      const unavailable = options.allUnavailable || (provider === "primary" && (options.primaryFailure === "early"
+        || (options.primaryFailure === "late" && requests.some(request => request.method === "eth_call"))));
+      if (unavailable) {
+        reads.push(...requests.map(request => ({ provider, method: request.method })));
+        return new Response("unavailable", { status: 503 });
       }
-      else if (request.method === "eth_call") {
-        // Decode the actual viem deployless constructor and nested aggregate3.
-        assert.equal(request.params[0].to, undefined);
-        const [, data] = decodeAbiParameters([{ type: "bytes" }, { type: "bytes" }],
-          `0x${request.params[0].data.slice(deploylessCallViaBytecodeBytecode.length)}`);
-        const { args } = decodeFunctionData({ abi: multicall3Abi, data });
-        const responses = args[0].map(call => {
-          const { functionName, args: callArgs } = decodeFunctionData({ abi: evidenceAbi, data: call.callData });
-          if (["spotKeepers", "autopilotExecutors", "updaters"].includes(functionName))
-            assert.equal(String(callArgs?.[0]).toLowerCase(), arcSigner.toLowerCase(), "on-chain roles must be checked for the Arc-specific signer");
-          reads.push({ provider, method: "multicall", functionName });
-          if (options.partialFailure && provider === "primary" && functionName === "updaters") return { success: false, returnData: "0x" };
-          const value = functionName === "registry" || functionName === "oracle"
-            ? options.incorrectFactory && negative ? `0x${"2".repeat(40)}` : functionName === "registry" ? contracts.registry : contracts.oracleRouter
-            : functionName === "automationPaused" ? Boolean(options.paused && negative) : !(options.deniedRole && negative && functionName === "spotKeepers");
-          return { success: true, returnData: encodeFunctionResult({ abi: evidenceAbi, functionName, result: value }) };
-        });
-        result = encodeFunctionResult({ abi: multicall3Abi, functionName: "aggregate3", result: options.malformed && negative
-          ? options.malformed === "empty" ? [] : responses.slice(0, -1) : responses });
-      }
-      else throw new Error(`Unexpected read-only RPC method: ${request.method}`);
-      return Response.json({ jsonrpc: "2.0", id: request.id, result });
+      const response = (request: { id: number; method: string; params: any[] }) => {
+        reads.push({ provider, method: request.method, functionName: undefined });
+        if (provider === "primary" && options.codeFailure && request.method === "eth_getCode" && request.params[0].toLowerCase() === contracts.oracleRouter.toLowerCase())
+          return { jsonrpc: "2.0", id: request.id, error: { code: -32000, message: "fixture code read unavailable" } };
+        const negative = !options.negativePrimaryOnly || provider === "primary";
+        let result: string;
+        if (request.method === "eth_chainId") result = `0x${(provider === "primary" ? options.primaryChain ?? 5042 : options.fallbackChain ?? 5042).toString(16)}`;
+        else if (request.method === "eth_getCode") result = options.missingCode && negative ? "0x" : "0x6000";
+        else if (request.method === "eth_gasPrice") result = "0x1";
+        else if (request.method === "eth_getBalance") {
+          assert.equal(request.params[0].toLowerCase(), arcSigner.toLowerCase(), "gas evidence must belong to the Arc-specific signer");
+          result = options.insufficientGas ? "0x1" : "0x989680";
+        }
+        else if (request.method === "eth_call") {
+          // Decode the actual viem deployless constructor and nested aggregate3.
+          assert.equal(request.params[0].to, undefined);
+          const [, data] = decodeAbiParameters([{ type: "bytes" }, { type: "bytes" }],
+            `0x${request.params[0].data.slice(deploylessCallViaBytecodeBytecode.length)}`);
+          const { args } = decodeFunctionData({ abi: multicall3Abi, data });
+          const responses = args[0].map(call => {
+            const { functionName, args: callArgs } = decodeFunctionData({ abi: evidenceAbi, data: call.callData });
+            if (["spotKeepers", "autopilotExecutors", "updaters"].includes(functionName))
+              assert.equal(String(callArgs?.[0]).toLowerCase(), arcSigner.toLowerCase(), "on-chain roles must be checked for the Arc-specific signer");
+            reads.push({ provider, method: "multicall", functionName });
+            if (options.partialFailure && provider === "primary" && functionName === "updaters") return { success: false, returnData: "0x" };
+            const value = functionName === "registry" || functionName === "oracle"
+              ? options.incorrectFactory && negative ? `0x${"2".repeat(40)}` : functionName === "registry" ? contracts.registry : contracts.oracleRouter
+              : functionName === "automationPaused" ? Boolean(options.paused && negative) : !(options.deniedRole && negative && functionName === "spotKeepers");
+            return { success: true, returnData: encodeFunctionResult({ abi: evidenceAbi, functionName, result: value }) };
+          });
+          result = encodeFunctionResult({ abi: multicall3Abi, functionName: "aggregate3", result: options.malformed && negative
+            ? options.malformed === "empty" ? [] : responses.slice(0, -1) : responses });
+        }
+        else throw new Error(`Unexpected read-only RPC method: ${request.method}`);
+        return { jsonrpc: "2.0", id: request.id, result };
+      };
+      return Response.json(Array.isArray(payload) ? requests.map(response) : response(payload));
     });
     try {
       const checks = concurrent ? await Promise.all([arcAutomationReadiness(config), arcAutomationReadiness({ ...config })]) : [await arcAutomationReadiness(config)];
-      return { readiness: checks[0], checks, reads };
+      return { readiness: checks[0], checks, reads, httpCalls };
     }
     finally { fetchMock.mock.restore(); }
   };
@@ -112,10 +127,13 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
     assert.equal(fallback.filter(read => read.method === "eth_call").length, 1, "fifteen contract reads share one eth_call");
   };
   await t.test("healthy primary needs no fallback", async () => {
-    const { readiness, reads } = await run();
+    const { readiness, reads, httpCalls } = await run();
     assert.deepEqual(readiness, { ready: true });
     assert.ok(reads.every(read => read.provider === "primary"));
     assert.equal(reads.filter(read => read.method !== "multicall").length, 13);
+    assert.equal(httpCalls.length, 4, "thirteen fresh RPC methods require only four HTTP requests");
+    assert.equal(httpCalls[1].methods.length, 9, "all contract bytecode reads share a batch");
+    assert.deepEqual(httpCalls[3].methods, ["eth_gasPrice", "eth_getBalance"]);
   });
   await t.test("concurrent callers share reads but completed pause state is not cached", async () => {
     const shared = await run({}, cfg, true);
@@ -127,6 +145,11 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
   });
   for (const primaryFailure of ["early", "late"] as const) await t.test(`${primaryFailure} primary outage restarts all checks on fallback`, async () => {
     const { readiness, reads } = await run({ primaryFailure });
+    assert.deepEqual(readiness, { ready: true });
+    assertCompleteFallback(reads);
+  });
+  await t.test("an empty fallback setting uses the same mainnet backup as execution clients", async () => {
+    const { readiness, reads } = await run({ primaryFailure: "early" }, { ...cfg, ARC_RPC_FALLBACK_URL: "" });
     assert.deepEqual(readiness, { ready: true });
     assertCompleteFallback(reads);
   });
@@ -151,6 +174,9 @@ test("Arc execution fallback rechecks complete mainnet evidence and preserves ev
   await t.test("unavailable providers and duplicate URLs fail closed", async () => {
     const unavailable = await run({ allUnavailable: true });
     assert.match(unavailable.readiness.reason!, /temporarily unavailable/);
+    assert.match(unavailable.readiness.reason!, /Primary: network identity: RPC HTTP 503/);
+    assert.match(unavailable.readiness.reason!, /Fallback: network identity: RPC HTTP 503/);
+    assert.doesNotMatch(unavailable.readiness.reason!, /https?:\/\/|PRIVATE_KEY/);
     assert.equal(unavailable.reads.length, 2);
     const duplicate = await run({ allUnavailable: true }, { ...cfg, ARC_RPC_FALLBACK_URL: ` ${cfg.ARC_RPC_URL} ` });
     assert.equal(duplicate.readiness.ready, false);

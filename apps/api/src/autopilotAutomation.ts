@@ -20,7 +20,7 @@ import { isRobinhoodMarket, assertExecutionMarketIdentity, verifyRobinhoodMarket
 import { assertArcExecutionBinding, arcOkxMarketContext, assertArcAutomationHistory, assertArcOkxMarketData, assertArcOkxTicker } from "./arcMarkets.js";
 import { buildSpotExecutionPlan, buildTechnicalStructure, runPreparedAutopilotSignal, type AutopilotSignalResult } from "@pulse/analysis";
 import type { AppConfig } from "@pulse/config";
-import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
+import { arcAutomationReadiness, isArcEvidenceUnavailable } from "./arcExecutionReadiness.js";
 import { isKvUnavailableError, kvCircuitStatus, kvConfigured, runKvCommand } from "./resilientKv.js";
 import { persistJournalRow, readJournal } from "./autopilotJournal.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -1077,10 +1077,6 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
       let executionHash: `0x${string}` | undefined;
       let evaluatedDecision: ReturnType<typeof evaluateAutopilotPolicy> | ReturnType<typeof evaluateAutopilotRiskExit> | undefined;
       try {
-        if (s.network === "arc") {
-          const readiness = await arcAutomationReadiness(cfg);
-          if (!readiness.ready) throw new Error(readiness.reason);
-        }
         assertExecutionMarketIdentity(s.network, s.pair);
         if (s.network === "arc") assertArcExecutionBinding(s.pair, s.targetAsset, s.settlementAsset);
         if (recoveryAttempted.has(s.id)) continue;
@@ -1094,6 +1090,10 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         const analysisDue = s.lastDecision === "hold_paused" || !Number.isFinite(lastAnalysis) || now - lastAnalysis >= analysisInterval;
         const riskDue = !Number.isFinite(lastRiskCheck) || now - lastRiskCheck >= riskInterval;
         if (!recoveringTrade && ((mode === "risk" && !riskDue) || (mode === "analysis" && !analysisDue))) continue;
+        if (s.network === "arc") {
+          const readiness = await arcAutomationReadiness(cfg);
+          if (!readiness.ready) throw new Error(readiness.reason);
+        }
         if (recoveringTrade) recoveryAttempted.add(s.id);
         if (mode === "risk") s.riskCheckCount = (s.riskCheckCount || 0) + 1;
         const c = configs[s.network];
@@ -1227,6 +1227,13 @@ export async function runAutopilotCycle(cfg: AppConfig, scope?: { network: Netwo
         }
         const strategyType = s.strategyType || identifyAutopilotStrategy(s.policy.strategy);
         s.strategyType = strategyType;
+        if (s.network === "arc" && s.lastDecision === "hold_dependency_retry" && isArcEvidenceUnavailable(s.lastError)) {
+          s.lastError = undefined;
+          s.lastDecision = "hold_dependency_recovered";
+          await appendEvaluation(s, { id: crypto.randomUUID(), evaluatedAt: new Date().toISOString(), strategyType,
+            action: "hold", status: "held", reason: "Arc contract and executor checks recovered. No vault trade was submitted. Scheduled market and policy checks continue.",
+            bias: "not_evaluated", confidence: 0, metrics: {}, rules: [] });
+        }
         if (pendingAutopilotTrade(await listV6Activity(s.owner, s.network), s)) {
           const pending = pendingAutopilotTrade(await reconcileV6Activity(s.owner, s.network, c.rpc()), s);
           if (pending) {

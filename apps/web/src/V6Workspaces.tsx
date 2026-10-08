@@ -36,7 +36,7 @@ import { confirmedTradeMarkers, isArcMarketPair } from "./marketPreview";
 import { AutopilotDecisionJournal, type DecisionEntry } from "./AutopilotDecisionJournal";
 import { decisionAuditColumns, serializeAuditCsv } from "./autopilotExport";
 import { renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
-import { autopilotControlState, autopilotFundingState } from "./autopilotControls";
+import { autopilotControlState, autopilotFundingState, autopilotDependencyKind } from "./autopilotControls";
 import { reviewedAutopilotSignalMarket } from "./autopilotPreflight";
 import { walletErrorMessage } from "./walletErrors";
 import { DocsWorkflowVisuals } from "./DocsWorkflowVisuals";
@@ -6774,7 +6774,9 @@ export function AutopilotWorkspace({
                 )}
                 {(item.lastError || item.telemetryError) && (
                   <small className="runtime-error">
-                    {/\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(item.lastError || item.telemetryError || "")
+                    {autopilotDependencyKind(item.lastError || item.telemetryError || "") === "arc_execution"
+                      ? "Arc contract checks are temporarily unavailable. The scheduler will retry automatically. Open the Strategy journal for details."
+                      : autopilotDependencyKind(item.lastError || item.telemetryError || "") === "ai_provider"
                       ? `AI provider unavailable. New entry checks are backed off${item.aiRetryAt ? ` until ${new Date(item.aiRetryAt).toLocaleString()}` : ""}; no assets moved.`
                       : "A dependency check failed closed. Open the Strategy journal for details."}
                   </small>
@@ -6817,7 +6819,7 @@ export function AutopilotWorkspace({
                   && Date.parse(entry.evaluatedAt) - Date.parse(previous.evaluatedAt) < 6 * 60 * 60_000;
                 return count + (sameBurst ? 0 : 1);
               }, 0);
-              const providerBlocked = /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(latest?.error || "");
+              const providerBlocked = autopilotDependencyKind(latest?.error || "") === "ai_provider";
               return (
                 <details key={`${item.id}-report`} id={`autopilot-journal-${item.vault.toLowerCase()}`}>
                   <summary>

@@ -1,0 +1,1205 @@
+{
+  "auditedAt": "2026-10-08T17:45:10.784Z",
+  "scope": "Arc Autopilot #2 dependency investigation and local correction",
+  "hostedIncident": {
+    "asOf": "2026-10-08T17:01:43.143Z",
+    "mode": "Public incident GETs; no signatures, paid calls, workers, broadcasts or configuration changes",
+    "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "checks": [
+      {
+        "name": "strategies",
+        "status": 200,
+        "persistence": {
+          "state": "online",
+          "provider": "redis",
+          "configured": true
+        },
+        "strategies": [
+          {
+            "id": "arc:0xee9f3626e81c2ca019be87c4e5536106dac7adc8",
+            "network": "arc",
+            "vault": "0xEE9F3626e81c2cA019bE87C4E5536106Dac7AdC8",
+            "pair": "BTC-USDT",
+            "timeframe": "1H",
+            "status": "active",
+            "runtimeState": "running",
+            "paused": false,
+            "createdAt": "2026-10-08T16:23:51.827Z",
+            "lastRunAt": "2026-10-08T16:56:49.865Z",
+            "lastRiskCheckAt": "2026-10-08T17:00:47.276Z",
+            "lastDecision": "hold_dependency_retry",
+            "lastError": "Arc mainnet execution evidence is temporarily unavailable",
+            "settlementBalance": "1000000",
+            "targetBalance": "0",
+            "riskCheckCount": 19,
+            "journalStorage": "synced",
+            "policy": {
+              "signalMarket": "BTC-USDT"
+            },
+            "pass": {
+              "expiresAt": "2026-10-09T16:24:07.000Z"
+            },
+            "evaluations": [
+              {
+                "id": "20d9fce7-0227-4a0a-add2-6a9fa7606534",
+                "evaluatedAt": "2026-10-08T16:24:50.311Z",
+                "action": "hold",
+                "status": "held",
+                "reason": "Hold: Compact AI bullish bias, Mean-reversion regime.",
+                "technicalRules": []
+              },
+              {
+                "id": "4194051d-dbda-4c6d-9767-36bae5e8efe1",
+                "evaluatedAt": "2026-10-08T16:39:45.745Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "1c6ab7d6-abef-42af-a5f0-bd1bc0a4c044",
+                "evaluatedAt": "2026-10-08T16:45:46.728Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "39decd42-6a2a-48e1-a206-197d956fd5e2",
+                "evaluatedAt": "2026-10-08T16:46:49.756Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "2953cde7-bb9f-4ae9-aa0e-9daf09d33819",
+                "evaluatedAt": "2026-10-08T16:53:45.922Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              }
+            ]
+          },
+          {
+            "id": "arc:0x2cc3e96f5a95822e45af82bd795ce5506dc3a4ee",
+            "network": "arc",
+            "vault": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+            "pair": "ETH-USDT",
+            "timeframe": "1H",
+            "status": "active",
+            "runtimeState": "paused",
+            "paused": true,
+            "createdAt": "2026-10-04T20:29:55.643Z",
+            "lastRunAt": "2026-10-08T17:00:48.910Z",
+            "lastRiskCheckAt": "2026-10-08T17:00:47.853Z",
+            "lastDecision": "hold_paused",
+            "settlementBalance": "0",
+            "targetBalance": "0",
+            "riskCheckCount": 714,
+            "journalStorage": "synced",
+            "policy": {},
+            "pass": {
+              "expiresAt": "2026-10-06T04:29:01.000Z"
+            },
+            "evaluations": [
+              {
+                "id": "3a491640-a628-4901-a59a-d5e018bf3b31",
+                "evaluatedAt": "2026-10-07T17:22:18.219Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "The evaluation or protected execution failed before vault trade submission.",
+                "technicalRules": []
+              },
+              {
+                "id": "8f835c5c-9d4b-44a9-9b9a-b0d91ddd39cf",
+                "evaluatedAt": "2026-10-07T18:35:23.823Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "97a632e0-2514-4493-a92f-e5af938fa8ef",
+                "evaluatedAt": "2026-10-07T23:27:09.875Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "8c690b26-10e3-49cf-901a-b7e0c7913d77",
+                "evaluatedAt": "2026-10-08T09:47:12.882Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "276e8f94-d385-4178-834e-fd3ef97bf9d7",
+                "evaluatedAt": "2026-10-08T09:47:14.027Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "ced579a9-5448-43a9-9fae-2778399f644c",
+                "evaluatedAt": "2026-10-08T15:26:48.687Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "938f4773-584e-4e9f-a6b4-adfc16ca9460",
+                "evaluatedAt": "2026-10-08T16:39:45.929Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "3d2bb34f-93f1-47b9-903a-96f7ada53a93",
+                "evaluatedAt": "2026-10-08T16:45:46.963Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "78bce189-bff5-461c-8530-8345a21f008b",
+                "evaluatedAt": "2026-10-08T16:46:49.933Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              },
+              {
+                "id": "eb9a789e-e993-46c6-a277-5778414eecc1",
+                "evaluatedAt": "2026-10-08T16:53:47.055Z",
+                "action": "hold",
+                "status": "failed",
+                "reason": "A temporary dependency was unavailable before vault trade submission. The scheduler will retry automatically.",
+                "technicalRules": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "accounts",
+        "status": 200,
+        "source": "factory_contract_multicall",
+        "vaults": [
+          {
+            "address": "0x2cC3E96F5a95822e45AF82BD795cE5506dC3a4eE",
+            "paused": true,
+            "settlementAsset": "0x3600000000000000000000000000000000000000"
+          },
+          {
+            "address": "0xEE9F3626e81c2cA019bE87C4E5536106Dac7AdC8",
+            "paused": false,
+            "settlementAsset": "0x3600000000000000000000000000000000000000"
+          }
+        ]
+      },
+      {
+        "name": "capabilities",
+        "status": 200,
+        "spot": {
+          "visible": true,
+          "enabled": true,
+          "market": true,
+          "limit": true,
+          "bracket": true,
+          "protectedOrders": true
+        },
+        "autopilot": {
+          "visible": true,
+          "enabled": true
+        },
+        "reasons": {}
+      }
+    ]
+  },
+  "readOnlyReadiness": {
+    "before": {
+      "asOf": "2026-10-08T17:03:30.708Z",
+      "mode": "Configured readiness gate only; RPC methods restricted to reads",
+      "runs": [
+        {
+          "index": 0,
+          "at": "2026-10-08T17:03:26.862Z",
+          "durationMs": 4116,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 1990,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1035,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1189,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1030,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1039,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1048,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1035,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1046,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1027,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 1041,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 516,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice"
+              ],
+              "status": 200,
+              "durationMs": 303,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 314,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "at": "2026-10-08T17:03:28.124Z",
+          "durationMs": 1259,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 300,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 307,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 322,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 306,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 317,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 320,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 314,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 318,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 305,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 313,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 309,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice"
+              ],
+              "status": 200,
+              "durationMs": 308,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 301,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "at": "2026-10-08T17:03:29.444Z",
+          "durationMs": 1320,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 299,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 301,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 306,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 310,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 312,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 310,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 311,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 316,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 328,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 318,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 340,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice"
+              ],
+              "status": 200,
+              "durationMs": 300,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 305,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "at": "2026-10-08T17:03:30.708Z",
+          "durationMs": 1264,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 297,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 306,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 310,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 305,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 340,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 317,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 308,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 316,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 309,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 310,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 308,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice"
+              ],
+              "status": 200,
+              "durationMs": 306,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 307,
+              "rpcErrors": []
+            }
+          ]
+        }
+      ],
+      "transactionsSent": 0,
+      "paidRequests": 0
+    },
+    "after": {
+      "asOf": "2026-10-08T17:15:34.643Z",
+      "mode": "Configured readiness gate only; RPC methods restricted to reads",
+      "runs": [
+        {
+          "index": 0,
+          "at": "2026-10-08T17:15:25.873Z",
+          "durationMs": 3261,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 1577,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 388,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 527,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 309,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 1,
+          "at": "2026-10-08T17:15:27.386Z",
+          "durationMs": 1496,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 308,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 387,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 347,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 313,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 2,
+          "at": "2026-10-08T17:15:28.879Z",
+          "durationMs": 1493,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 311,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 380,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 349,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 313,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 3,
+          "at": "2026-10-08T17:15:30.342Z",
+          "durationMs": 1462,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 308,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 415,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 333,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 309,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 4,
+          "at": "2026-10-08T17:15:33.212Z",
+          "durationMs": 2870,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 1338,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 420,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 523,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 310,
+              "rpcErrors": []
+            }
+          ]
+        },
+        {
+          "index": 5,
+          "at": "2026-10-08T17:15:34.642Z",
+          "durationMs": 1429,
+          "readiness": {
+            "ready": true
+          },
+          "requests": [
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_chainId"
+              ],
+              "status": 200,
+              "durationMs": 307,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode",
+                "eth_getCode"
+              ],
+              "status": 200,
+              "durationMs": 374,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_call"
+              ],
+              "status": 200,
+              "durationMs": 314,
+              "rpcErrors": []
+            },
+            {
+              "provider": "rpc.quicknode.mainnet.arc.io",
+              "methods": [
+                "eth_gasPrice",
+                "eth_getBalance"
+              ],
+              "status": 200,
+              "durationMs": 303,
+              "rpcErrors": []
+            }
+          ]
+        }
+      ],
+      "transactionsSent": 0,
+      "paidRequests": 0
+    }
+  },
+  "findings": {
+    "historicRpcStageAndStatus": "Not retained by the original readiness handler; fresh original-gate checks succeeded",
+    "staleWarning": "Healthy risk and same-candle returns preserved an old Arc readiness error",
+    "requestsPerHealthyCheck": {
+      "rpcMethodsBefore": 13,
+      "rpcMethodsAfter": 13,
+      "httpBefore": 13,
+      "httpAfter": 4
+    },
+    "fallback": "Blank setting now uses the same official mainnet Quicknode backup as execution clients",
+    "freshness": "Concurrent checks share only in-flight reads; no completed permission or pause cache",
+    "recovery": "Clear only obsolete Arc evidence errors after fresh readiness and vault state; retain failed journal and add one held event",
+    "controlsPreserved": [
+      "wrong network",
+      "missing deployed bytecode",
+      "incorrect factory references",
+      "denied roles",
+      "global pause",
+      "insufficient executor gas",
+      "reviewed cirBTC/WETH market bindings",
+      "pending transaction recovery"
+    ],
+    "ui": "Arc RPC HTTP 403 is not classified as an AI billing failure"
+  },
+  "validation": {
+    "api": {
+      "total": 344,
+      "passed": 343,
+      "failed": 0,
+      "skipped": 1,
+      "skip": "Optional external Redis fixture"
+    },
+    "web": {
+      "passed": 173,
+      "failed": 0
+    },
+    "arcWorker": {
+      "passed": 11,
+      "failed": 0
+    },
+    "focusedReadiness": {
+      "passed": 23
+    },
+    "apiTypeScript": "passed",
+    "webTypeScriptAndProductionBuild": "passed",
+    "browser": {
+      "asOf": "2026-10-08T17:42:45.980Z",
+      "mode": "Isolated production-build fixtures; all non-local traffic intercepted",
+      "results": [
+        {
+          "mode": "unavailable",
+          "width": 390,
+          "arcRPCErrorIdentified": true,
+          "historicalFailureRetained": true,
+          "recoveryShown": false,
+          "walletRequests": 0,
+          "financialWrites": 0,
+          "renderErrors": [],
+          "overflow": false
+        },
+        {
+          "mode": "unavailable",
+          "width": 1440,
+          "arcRPCErrorIdentified": true,
+          "historicalFailureRetained": true,
+          "recoveryShown": false,
+          "walletRequests": 0,
+          "financialWrites": 0,
+          "renderErrors": [],
+          "overflow": false
+        },
+        {
+          "mode": "recovered",
+          "width": 390,
+          "arcRPCErrorIdentified": true,
+          "historicalFailureRetained": true,
+          "recoveryShown": true,
+          "walletRequests": 0,
+          "financialWrites": 0,
+          "renderErrors": [],
+          "overflow": false
+        },
+        {
+          "mode": "recovered",
+          "width": 1440,
+          "arcRPCErrorIdentified": true,
+          "historicalFailureRetained": true,
+          "recoveryShown": true,
+          "walletRequests": 0,
+          "financialWrites": 0,
+          "renderErrors": [],
+          "overflow": false
+        }
+      ]
+    },
+    "artifact": {
+      "auditedAt": "2026-10-08T17:32:29.384Z",
+      "browserArtifacts": 236,
+      "serverSecretValuesChecked": 28,
+      "leaks": 0,
+      "matches": []
+    }
+  },
+  "actions": {
+    "transactionsSent": 0,
+    "paidRequests": 0,
+    "withdrawals": 0,
+    "liveWorkersStarted": 0,
+    "registryWrites": 0,
+    "hostedConfigurationChanges": 0,
+    "deployment": false,
+    "push": false
+  },
+  "release": {
+    "required": "User manual API and frontend release",
+    "expected": "Next successful due scheduler check clears obsolete Arc warning; reuse the existing vault and pass",
+    "limits": [
+      "No new live funded Autopilot trade qualified",
+      "Physical mobile signing remains pending",
+      "Circle production email-wallet setup remains pending"
+    ]
+  }
+}

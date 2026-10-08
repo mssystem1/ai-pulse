@@ -246,6 +246,7 @@ const ZH_EXACT: Record<string, string> = {
   "Request declined in your wallet. Review setup before retrying.": "钱包请求已取消。重试前请检查设置。",
   "Autopilot setup could not be completed. Refresh its account state before retrying.": "无法完成 Autopilot 设置。重试前请刷新账户状态。",
   "Refresh Arc balances before activation": "激活前请刷新 Arc 余额",
+  "Arc contract checks are temporarily unavailable. The scheduler will retry automatically. Open the Strategy journal for details.": "Arc 合约检查暂时不可用。调度器会自动重试。请打开策略日志查看详情。",
   "Fund Gateway for the AI Entry Pass": "向 Gateway 充值以购买 AI 入场通行证",
   "Deposit USDC into Circle Gateway in Wallet & funding before starting. The AI Entry Pass uses Gateway funds; vault capital uses wallet funds.": "启动前请在“钱包与资金”中向 Circle Gateway 存入 USDC。AI 入场通行证使用 Gateway 资金；金库本金使用钱包资金。",
   "PULSE cannot verify the Arc wallet capital or Gateway payment balance. Refresh before any vault transaction is prepared.": "PULSE 无法验证 Arc 钱包本金或 Gateway 支付余额。准备金库交易前请刷新。",

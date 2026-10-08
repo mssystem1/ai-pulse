@@ -21,7 +21,11 @@ test(`Arc ${nativeMarket ? 'native contract' : cirBtcMarket ? 'cirBTC eight-deci
   const contracts = { ...deployment.executionContracts('arc'), okxRouter: deployment.executionContractAddress('arc', 'okxRouter') };
   const { OKX_DAG_ABI } = await import('../apps/api/src/okxDag.ts');
   const readiness = await import('../apps/api/src/arcExecutionReadiness.ts');
-  mock.module('../apps/api/src/arcExecutionReadiness.ts', { namedExports: { ...readiness, arcAutomationReadiness: async () => ({ready:true}) } });
+  let readinessAvailable = true, readinessChecks = 0;
+  mock.module('../apps/api/src/arcExecutionReadiness.ts', { namedExports: { ...readiness, arcAutomationReadiness: async () => {
+    readinessChecks++; return readinessAvailable ? { ready: true } : { ready: false,
+      reason: readiness.ARC_EVIDENCE_UNAVAILABLE + '. Primary: contract bytecode: RPC HTTP 503; Fallback: contract bytecode: request timed out.' };
+  } } });
   const owner = `0x${'1'.repeat(40)}`, vault = `0x${'2'.repeat(40)}`;
   const settlement = '0x3600000000000000000000000000000000000000';
   const target = nativeMarket ? '0xeb64987643db71c76b2a2be7e723decc995e5b37'
@@ -239,6 +243,39 @@ test(`Arc ${nativeMarket ? 'native contract' : cirBtcMarket ? 'cirBTC eight-deci
     assert.equal(submitted.length, 0, 'an indexed meme cannot write oracle or execution transactions');
     return;
   }
+  if (recoveryCase === 'readiness_recovery') {
+    const previous = { ...strategy, lastDecision: 'hold_same_candle', lastEvaluatedCandleTs: lastCandle,
+      lastRunAt: new Date(now - 900000).toISOString(), lastRiskCheckAt: new Date(now - 120000).toISOString() };
+    hashes.set(strategyKey, new Map([[strategy.id, JSON.stringify(previous)]]));
+    readinessAvailable = false;
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    assert.equal(stored().lastDecision, 'hold_dependency_retry');
+    assert.match(stored().lastError, /contract bytecode/);
+    assert.equal(pass.signalsUsed, 0); assert.equal(submitted.length, 0);
+    const failedRows = stored().evaluations.filter(e => e.status === 'failed');
+    assert.ok(failedRows.length > 0);
+    readinessAvailable = true;
+    now += 60000; mock.timers.setTime(now); market.ticker.ts = String(now);
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    assert.equal(stored().lastError, undefined, 'healthy risk and same-candle checks must clear the obsolete Arc outage');
+    assert.equal(stored().lastDecision, 'hold_same_candle');
+    const recoveries = stored().evaluations.filter(e => e.reason.includes('Arc contract and executor checks recovered'));
+    assert.equal(recoveries.length, 1); assert.equal(recoveries[0].status, 'held');
+    assert.equal(stored().evaluations.filter(e => e.status === 'failed').length, failedRows.length, 'incident history is retained');
+    const callsAfterRecovery = readinessChecks;
+    now += 1000; mock.timers.setTime(now);
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    assert.equal(readinessChecks, callsAfterRecovery, 'a tick with neither due work nor pending execution needs no readiness RPC');
+    assert.equal(stored().evaluations.filter(e => e.reason.includes('checks recovered')).length, 1, 'recovery is not fabricated repeatedly');
+    const providerError = 'Grok API 403: provider credits exhausted';
+    hashes.get(strategyKey).set(strategy.id, JSON.stringify({ ...stored(), lastError: providerError, lastDecision: 'hold_dependency_retry',
+      lastRunAt: new Date(now - 900000).toISOString(), lastRiskCheckAt: new Date(now - 120000).toISOString() }));
+    market.ticker.ts = String(now);
+    await runAutopilotCycle(cfg, {network:'arc',vault});
+    assert.equal(stored().lastError, providerError, 'Arc readiness does not certify an unrelated AI dependency');
+    assert.equal(pass.signalsUsed, 0); assert.equal(signatures, 0); assert.equal(broadcasts.length, 0); assert.equal(submitted.length, 0);
+    return;
+  }
   market.ticker.ts = String(now - 181_000);
   await runAutopilotCycle(cfg, {network:'arc',vault});
   assert.match(stored().lastError, /Live OKX market data is unavailable/);
@@ -382,7 +419,7 @@ if (!nativeMarket && !cirBtcMarket && !recoveryCase) test('Arc worker rejects in
   } finally { child.kill(); }
 });
 
-if (!nativeMarket && !cirBtcMarket && !recoveryCase) for (const scenario of ['activity', 'lost_broadcast', 'confirmation', 'storage_confirmation', 'pause_expiry'])
+if (!nativeMarket && !cirBtcMarket && !recoveryCase) for (const scenario of ['activity', 'lost_broadcast', 'confirmation', 'storage_confirmation', 'pause_expiry', 'readiness_recovery'])
   test(`Arc Autopilot durable recovery: ${scenario}`, { timeout: 60_000 }, async () => {
     const env = Object.fromEntries(Object.entries(process.env).filter(([key]) =>
       /^(PATH|SystemRoot|WINDIR|TEMP|TMP|USERPROFILE|APPDATA|LOCALAPPDATA|ComSpec)$/i.test(key)));

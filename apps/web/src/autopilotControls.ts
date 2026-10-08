@@ -27,3 +27,9 @@ export function autopilotFundingState(input: {
     passFundingInsufficient: paymentBalance !== null && paymentBalance + 1e-9 < requiredPaymentFunds,
   };
 }
+
+/** An RPC authorization failure is not an AI billing failure. */
+export function autopilotDependencyKind(detail: string): "arc_execution" | "ai_provider" | "other" {
+  if (detail.startsWith("Arc mainnet execution evidence is temporarily unavailable")) return "arc_execution";
+  return /\b401\b|\b402\b|\b403\b|permission[- ]denied|credits|spending limit|billing|quota/i.test(detail) ? "ai_provider" : "other";
+}

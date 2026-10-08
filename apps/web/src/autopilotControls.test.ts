@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { autopilotControlState, autopilotFundingState } from "./autopilotControls.js";
+import { autopilotControlState, autopilotFundingState, autopilotDependencyKind } from "./autopilotControls.js";
 
 const ready = { registered: true, storageReady: true, paused: true, funded: true, passRemainingMs: 3600000, signalsRemaining: 3, hasPosition: false };
 test("only funded, registered, paused vaults with an entry pass can resume entries", () => {
@@ -32,4 +32,10 @@ test("Base and Arbitrum continue reserving the pass and deposit in the wallet ba
     assert.deepEqual(autopilotFundingState(input), { requiredWalletFunds: 2.5, passFundingUnavailable: false, passFundingInsufficient: false });
     assert.equal(autopilotFundingState({ ...input, walletBalance: 1.1 }).passFundingInsufficient, true);
   }
+});
+test("Arc RPC 403 evidence errors are distinct from AI billing failures", () => {
+  assert.equal(autopilotDependencyKind("Arc mainnet execution evidence is temporarily unavailable. Primary: contract bytecode: RPC HTTP 403."), "arc_execution");
+  assert.equal(autopilotDependencyKind("Arc mainnet execution evidence is temporarily unavailable"), "arc_execution");
+  assert.equal(autopilotDependencyKind("Grok API 403: provider credits exhausted"), "ai_provider");
+  assert.equal(autopilotDependencyKind("Market RPC timeout"), "other");
 });
