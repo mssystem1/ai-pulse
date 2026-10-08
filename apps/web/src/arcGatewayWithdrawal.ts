@@ -1,6 +1,8 @@
-import { createPublicClient, defineChain, encodeFunctionData, fallback, formatUnits, http, keccak256, pad, recoverTypedDataAddress, toHex, type Hex } from "viem";
+import { createPublicClient, defineChain, encodeFunctionData, fallback, formatUnits, hashTypedData, http, keccak256, pad, recoverTypedDataAddress, toHex } from "viem";
+import type { Hex } from "viem";
 import { ARC_GATEWAY_WALLET, WEB_NETWORKS, assertArcGatewayWallet, fetchArcGatewayBalanceAtomic, parseGatewayDepositAmount } from "./networks";
 import type { InjectedProvider } from "./wallet";
+import { walletErrorMessage } from "./walletErrors";
 
 export const ARC_GATEWAY_MINTER = "0x2222222d7164433c4C09B0b0D809a9b52C04C205";
 const API = "https://gateway-api.circle.com/v1";
@@ -168,6 +170,41 @@ async function assertGatewayGasReserve(rpc: Awaited<ReturnType<typeof checkedCli
     throw new Error(`Add at least ${reserve} wallet USDC on Arc Mainnet for transaction gas. Gateway USDC cannot pay the mint fee. Refresh balances after funding this same wallet.`);
   }
 }
+function signingDeclined(error: unknown, depth = 0, seen = new Set<unknown>()): boolean {
+  if (!error || typeof error !== "object" || depth > 5 || seen.has(error)) return false;
+  seen.add(error);
+  const value = error as Record<string, unknown>;
+  return [4001,4100].includes(Number(value.code)) || ["message","originalError","error","cause","data"].some(key => signingDeclined(value[key],depth+1,seen));
+}
+export async function signArcGatewayWithdrawal(provider: InjectedProvider, quote: WithdrawalQuote): Promise<Hex> {
+  await assertGatewayWallet(provider, quote.owner);
+  const data = typed(quote);
+  // Circle signs only name/version in EIP712Domain. Keep that explicit type
+  // even when a mobile bridge needs the active chain as request metadata.
+  const payload = { ...data, types: { EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }] as const, ...types } };
+  const serialize = (value: unknown) => JSON.stringify(value, (_, v) => typeof v === "bigint" ? v.toString() : v);
+  let signature: unknown;
+  try {
+    signature = await provider.request({ method: "eth_signTypedData_v4", params: [quote.owner, serialize(payload)] });
+  } catch (error) {
+    // Some OKX mobile bridges parse an omitted domain.chainId as NaN before
+    // signing. Retry only this pre-signing validation error, never rejection,
+    // an unknown signing outcome, or a real chain/account mismatch.
+    const message = walletErrorMessage(error);
+    if (signingDeclined(error) || !/provided chainId\s+["']?NaN["']?\s+must match the active chainId\s+["']?5042["']?/i.test(message)) throw error;
+    await assertGatewayWallet(provider, quote.owner);
+    if (Date.now() - quote.reviewedAt > 120_000) throw new Error("Withdrawal estimate expired; review a fresh fee estimate");
+    const compatible = { ...payload, domain: { ...payload.domain, chainId: 5042 } };
+    // chainId is NOT added to the declared EIP712Domain fields. The digest must
+    // remain identical to Circle's chain-independent intent before prompting.
+    if (hashTypedData(compatible) !== hashTypedData(payload)) throw new Error("Gateway wallet compatibility changed the signed withdrawal intent");
+    signature = await provider.request({ method: "eth_signTypedData_v4", params: [quote.owner, serialize(compatible)] });
+  }
+  if (typeof signature !== "string" || !/^0x[\da-f]{130}$/i.test(signature)
+    || (await recoverTypedDataAddress({ ...data, signature: signature as Hex })).toLowerCase() !== quote.owner.toLowerCase())
+    throw new Error("Wallet did not sign Circle's original Gateway intent. Update or reconnect the wallet before retrying; no withdrawal was submitted.");
+  return signature as Hex;
+}
 export async function withdrawArcGateway(provider: InjectedProvider, quote: WithdrawalQuote, store: Store) {
   const existing = readPendingWithdrawal(store, quote.owner);
   if (existing) throw new Error("Resume the existing Gateway withdrawal before starting another");
@@ -179,10 +216,7 @@ export async function withdrawArcGateway(provider: InjectedProvider, quote: With
   if (await fetchArcGatewayBalanceAtomic(quote.owner) < BigInt(quote.spec.value) + BigInt(quote.maxFee)) throw new Error("Gateway balance changed; review a smaller withdrawal");
   await assertGatewayGasReserve(rpc, quote.owner, 350_000n);
   // Gateway EIP-712 intentionally omits chainId/verifyingContract; the signed spec binds domain 26 and both contracts.
-  const data = typed(quote);
-  const json = JSON.stringify({ ...data, types: { EIP712Domain: [{ name: "name", type: "string" }, { name: "version", type: "string" }], ...types } }, (_, v) => typeof v === "bigint" ? v.toString() : v);
-  const signature = await provider.request({ method: "eth_signTypedData_v4", params: [quote.owner, json] });
-  if (typeof signature !== "string" || !/^0x[\da-f]{130}$/i.test(signature) || (await recoverTypedDataAddress({ ...data, signature: signature as Hex })).toLowerCase() !== quote.owner) throw new Error("Gateway withdrawal signature wallet mismatch");
+  const signature = await signArcGatewayWithdrawal(provider, quote);
   save(store, { ...quote, signature: signature as Hex });
   return resumeArcGatewayWithdrawal(provider, quote.owner, store);
 }

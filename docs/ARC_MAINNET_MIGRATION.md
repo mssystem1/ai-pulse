@@ -1,4 +1,4 @@
-# Arc mainnet migration audit — updated 2026-10-07
+# Arc mainnet migration audit — updated 2026-10-08
 
 PULSE's active Arc network is now **`arc`, chain 5042, `eip155:5042`, wallet ID `0x13b2`**. Testnet is retired from routing, discovery, wallet connections and execution workers. Seven PULSE core contracts and four factory-created qualification accounts/vaults are deployed and source-verified with exact creation/runtime matches on Sourcify. Router/spender and execution/oracle roles are configured. Live acceptance remains in progress.
 
@@ -17,6 +17,7 @@ The user's expanded UI/UX completion requirements are part of this same goal:
 - Make Arc mainnet selectable in the app's network/RPC selector and actual Reown wallet kit, with chain **5042**, RPC `https://rpc.mainnet.arc.io`, explorer `https://explorer.arc.io` and **18-decimal native USDC**. The research/trading ERC-20 USDC interface remains six decimals.
 - Keep app selection, wallet-kit selection, connected wallet chain and saved preference consistent. Verify add/switch, rejected or ineffective switching and reload behavior.
 - Audit the rendered landing page, wallet/funding controls, network selector and existing research/Spot/Autopilot/history/docs flows on desktop and mobile, including Chinese copy, accessible controls and unavailable-feature states.
+- Correct the reported OKX mobile Gateway signing error, make amount-specific Market quoting and wallet review explicit, and show both Wallet and Gateway USDC balances in the Arc header on desktop and mobile.
 - Record direct browser evidence and distinguish local UI wiring from remaining production Circle and hosted acceptance. Deployment and pushing remain reserved for the user's manual execution.
 
 ## Verified network identity
@@ -200,3 +201,7 @@ The later [funded cirBTC acceptance](ARC_MAINNET_CIRBTC_ACCEPTANCE_2026-10-07.js
 At 19:19 UTC, the [cirBTC contract keeper acceptance](ARC_MAINNET_CIRBTC_KEEPER_ACCEPTANCE_2026-10-07.json) independently reconciled six further confirmed transactions, nonces 103–108. The SDK registered order 3 through the local API; the real scoped Spot worker submitted its fresh OKX oracle update and filled the existing V2 limit account, returning 119 atomic cirBTC units to its owner. Only those units were sold back for 0.098384 USDC. Gas was 0.018321741689208561 USDC and trading loss/rounding was 0.001616 USDC; the exact wallet decrease was 0.019937741689208561 USDC. Total conservative spend is 4.378958764433929834 USDC, leaving 0.621041235566070166 USDC under the same 5-USDC cap.
 
 This check used isolated process-memory order storage so hosted workers could not race its local registration. Its RPC, OKX quotes, signer, SDK, API, keeper and contracts were real. The script does not target the registry in cirBTC mode, checks account/factory bindings and unexpected nonces, and verifies both worker transaction receipts and gas before accepting the fill. Final order state is Filled, account escrow and test allowances are zero, and global automation remains unpaused. Seller Gateway remains 3.9 USDC with no seller transfers. A completed read-only rerun returned without another order or trade. This qualifies scoped cirBTC limit execution; production Redis scheduling, extension/mobile UI, cirBTC protection/Autopilot and the live risk-worker sell remain separate acceptance work. No hosting deployment or push occurred.
+
+## October 8 mobile and Market corrections
+
+The [mobile and Market audit](ARC_MAINNET_UI_FIXES_2026-10-08.md) records a guarded response to the OKX mobile `NaN` chain validation error that preserves Circle's original signed intent, explicit entered-amount quote/review actions and separate Wallet/Gateway header balances. All 163 web tests and the production build passed; isolated production-build browser checks at 320, 390 and 1440 pixels confirmed the Market steps, blocked zero-output quotes and visible balance rows without overflow. Fresh public reads confirmed unpaused automation, a positive 0.1-USDC cirBTC quote and the seller's separate 0.1-USDC wallet / 3.9-USDC Gateway balances. These are dated observations, not new transactions or a promise of later balances. No funds were moved or hosting release performed; physical OKX mobile withdrawal acceptance remains pending.

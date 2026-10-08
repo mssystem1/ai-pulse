@@ -106,6 +106,10 @@ body.picker-open { overflow: hidden; }
 .wallet-action-copy small { color: var(--muted); font-size: .56rem; }
 .wallet-ident { display: flex; align-items: center; gap: .4rem; font-size: .69rem; }
 .wallet-balance { margin-left: auto; color: var(--mint); font-size: .7rem; font-weight: 700; }
+.wallet-balances { display: grid; gap: .25rem; margin-left: auto; font-size: .65rem; font-variant-numeric: tabular-nums; }
+.wallet-balances > span { display: grid; grid-template-columns: auto auto; align-items: center; gap: .65rem; }
+.wallet-balances small { color: var(--muted); font-size: .6rem; }
+.wallet-balances b { color: var(--mint); text-align: right; white-space: nowrap; }
 .chevron { color: var(--muted); }
 @media (max-width: 700px) {
   .nav { display: grid; grid-template-columns: minmax(0, 1fr); align-items: stretch; gap: .55rem; }

@@ -55,6 +55,9 @@ html[data-pulse-theme="robinhood"] ::selection { color: #111600; background: #cc
   .app .nav-right .network-picker-state { display:none; }
   .appearance-menu { position:fixed; top:66px; right:12px; left:auto; width:min(320px,calc(100vw - 24px)); box-sizing:border-box; }
   .app .nav-right .wallet-trigger,.app .nav-right .connect-button { grid-column:2/4; grid-row:2; min-height:48px; width:100%; min-width:0; padding:8px; gap:5px; }
+  .app .nav-right .wallet-trigger.has-arc-balances { grid-column:1/-1; grid-row:3; }
+  .wallet-trigger.has-arc-balances .wallet-action-copy { min-width:0; }
+  .wallet-trigger.has-arc-balances .wallet-action-copy strong { overflow:hidden; text-overflow:ellipsis; }
   .app .nav-right .wallet-glyph { display:none; }
   .app .nav-right .wallet-action-copy strong { font-size:.65rem; }
   .nav-right .network-status { display:none; }

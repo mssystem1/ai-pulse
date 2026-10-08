@@ -1,0 +1,180 @@
+{
+  "recordedAt": "2026-10-08T09:08:55.816Z",
+  "network": "arc",
+  "chainId": 5042,
+  "scope": "Gateway mobile signing compatibility, Spot Market quote/review and dual wallet/Gateway balances",
+  "actions": {
+    "hostingDeployment": false,
+    "push": false,
+    "realPayments": false,
+    "realSignatures": false,
+    "realTransactionBroadcasts": false,
+    "withdrawals": false,
+    "pauseChanges": false
+  },
+  "har": {
+    "entries": 63,
+    "responseBodiesIncluded": false,
+    "httpFailures": [],
+    "backgroundRouteQuote": {
+      "network": "arc",
+      "fromTokenAddress": "0x3600000000000000000000000000000000000000",
+      "toTokenAddress": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+      "amount": "1000000",
+      "slippagePercent": 1
+    },
+    "ticketQuoteRequests": 0,
+    "prepareSwapRequests": 0,
+    "withdrawalEstimateOrTransferRequests": 0,
+    "limitations": "No response bodies; mobile signing screenshot is separate from this HAR; no credentials, headers or private job data retained"
+  },
+  "signingRegression": {
+    "gatewayTestsPassed": 11,
+    "simulatedMobileError": "Provided chainId \"NaN\" must match the active chainId \"5042\"",
+    "compatibilityMetadataChainId": 5042,
+    "declaredDomainFields": [
+      "name",
+      "version"
+    ],
+    "identicalOriginalIntentHash": true,
+    "originalIntentSignatureRecovered": true,
+    "simulatedTransfers": 1,
+    "simulatedMintRequests": 1,
+    "changedSignedDomainRejected": true,
+    "nestedUserRejectionNotRetried": true,
+    "physicalMobileAcceptance": false
+  },
+  "validation": {
+    "frontendTests": {
+      "passed": 163,
+      "failed": 0,
+      "skipped": 0
+    },
+    "typescript": "passed",
+    "productionBuild": "passed",
+    "browser": {
+      "mode": "Production build; isolated browser fixtures, all non-local requests intercepted",
+      "asOf": "2026-10-08T09:06:00.419Z",
+      "results": [
+        {
+          "width": 320,
+          "balances": "Wallet\n1 USDC\nGateway\n0.1065 USDC",
+          "firstAction": "quote only",
+          "quoteAmountAtomic": "100000",
+          "quoteOutputCirBTC": "0.00000119",
+          "secondAction": "fresh preparation and fixture wallet review",
+          "zeroOutputBlocked": true,
+          "noRealSignatures": true,
+          "overflow": false,
+          "renderErrors": []
+        },
+        {
+          "width": 390,
+          "balances": "Wallet\n1 USDC\nGateway\n0.1065 USDC",
+          "firstAction": "quote only",
+          "quoteAmountAtomic": "100000",
+          "quoteOutputCirBTC": "0.00000119",
+          "secondAction": "fresh preparation and fixture wallet review",
+          "noRealSignatures": true,
+          "overflow": false,
+          "renderErrors": []
+        },
+        {
+          "width": 1440,
+          "balances": "Wallet\n1 USDC\nGateway\n0.1065 USDC",
+          "firstAction": "quote only",
+          "quoteAmountAtomic": "100000",
+          "quoteOutputCirBTC": "0.00000119",
+          "secondAction": "fresh preparation and fixture wallet review",
+          "noRealSignatures": true,
+          "overflow": false,
+          "renderErrors": []
+        }
+      ]
+    }
+  },
+  "publicReads": {
+    "asOf": "2026-10-08T08:57:53.567Z",
+    "mode": "Public reads only; no payments, signatures, transfer requests or transaction broadcasts",
+    "checks": {
+      "capabilities": {
+        "status": 200,
+        "network": "arc",
+        "spot": {
+          "visible": true,
+          "enabled": true,
+          "market": true,
+          "limit": true,
+          "bracket": true,
+          "protectedOrders": true
+        },
+        "autopilot": {
+          "visible": true,
+          "enabled": true
+        },
+        "reasons": {}
+      },
+      "marketQuote": {
+        "status": 200,
+        "amountUSDC": "0.1",
+        "outputAtomic": "120",
+        "provider": "OKX Onchain OS",
+        "expiresAt": "2026-10-08T08:58:25.105Z"
+      },
+      "resolveBTC": {
+        "status": 200,
+        "available": true,
+        "base": {
+          "symbol": "cirBTC",
+          "name": "Circle Wrapped Bitcoin",
+          "address": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+          "decimals": 8,
+          "logoUrl": null,
+          "chainId": "5042",
+          "priceUsd": null,
+          "change24h": null,
+          "liquidityUsd": null,
+          "marketCapUsd": null,
+          "holders": null,
+          "provider": "Arc official mainnet deployment"
+        },
+        "quote": {
+          "symbol": "USDC",
+          "name": "USD Coin",
+          "address": "0x3600000000000000000000000000000000000000",
+          "decimals": 6,
+          "logoUrl": null,
+          "chainId": "5042",
+          "priceUsd": null,
+          "change24h": null,
+          "liquidityUsd": null,
+          "marketCapUsd": null,
+          "holders": null,
+          "provider": "Arc official mainnet deployment"
+        }
+      },
+      "buyerBalances": {
+        "address": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+        "walletUSDC": "0.772916205755614475",
+        "gatewayStatus": 200,
+        "gatewayUSDC": [
+          "0.106500"
+        ]
+      },
+      "sellerBalances": {
+        "address": "0xa05b83c9a2228b1f4e32952a71e5b189df4f3973",
+        "walletUSDC": "0.1",
+        "gatewayStatus": 200,
+        "gatewayUSDC": [
+          "3.900000"
+        ]
+      },
+      "automationPaused": {
+        "chainId": 5042,
+        "value": false
+      }
+    }
+  },
+  "browserArtifactAudit": "ARC_MAINNET_BROWSER_ARTIFACT_AUDIT_2026-10-08.json",
+  "remaining": "Manual release and physical OKX mobile withdrawal acceptance; remaining migration gates are recorded in the October 7 completion audit"
+}

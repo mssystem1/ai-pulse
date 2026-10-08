@@ -876,7 +876,7 @@ export function App() {
           {wallet ? (
             <button
               type="button"
-              className={`wallet-trigger ${needUsdt ? "warn" : ""}`}
+              className={`wallet-trigger ${needUsdt ? "warn" : ""} ${networkKey === "arc" ? "has-arc-balances" : ""}`}
               onClick={() => setWalletOpen(true)}
               aria-haspopup="dialog"
               aria-label={d.openWallet}
@@ -884,7 +884,10 @@ export function App() {
             >
               <span className="wallet-glyph" aria-hidden>↗</span>
               <span className="wallet-action-copy"><strong>{d.walletFunding}</strong><small>{shortAddr(wallet)}</small></span>
-              <span className="wallet-balance">{balances ? `${formatTokenBalance(networkKey === "arc" ? gatewayBalance ?? NaN : balances.payment, lang)} ${network.payment.symbol}` : "…"}</span>
+              {networkKey === "arc" ? <span className="wallet-balances" aria-label={lang === "zh" ? "Arc USDC 余额" : "Arc USDC balances"}>
+                <span title={lang === "zh" ? "交易资金与网络手续费" : "Trading capital and network gas"}><small>{lang === "zh" ? "钱包" : "Wallet"}</small><b>{formatTokenBalance(balances?.payment ?? NaN, lang)} USDC</b></span>
+                <span title={lang === "zh" ? "研究付款与 Autopilot 通行证" : "Research payments and Autopilot passes"}><small>Gateway</small><b>{formatTokenBalance(gatewayBalance ?? NaN, lang)} USDC</b></span>
+              </span> : <span className="wallet-balance">{balances ? `${formatTokenBalance(balances.payment, lang)} ${network.payment.symbol}` : "…"}</span>}
               <span className="chevron">›</span>
             </button>
           ) : (

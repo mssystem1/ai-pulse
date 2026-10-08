@@ -8,7 +8,7 @@ const workflows = [
     steps: [
       ["Explore", "Choose a market", "Route available is selected by default. Filter by asset class or choose All assets for the broader catalog. Market data and the compact chart load automatically."],
       ["Optional research", "Global Quick or Pro", "Buy a report for evidence, scenarios and invalidation, or go directly to Spot without purchasing research."],
-      ["Prepare", "Market or Limit ticket", "Load a report plan or configure a pair directly. Check amount, route and protection."],
+      ["Prepare", "Market or Limit ticket", "Load a report plan or configure a pair directly. For Market, enter an amount and get its live quote; inspect expected output before wallet review. Check route and protection."],
       ["Authorize", "Review & sign", "Your wallet authorizes execution. Track confirmations and fills in the dashboard."],
     ],
     note: "Prediction Quick/Pro research prediction markets. Risk Guard assesses token evidence. These are separate paid services, not steps required to start Autopilot.",

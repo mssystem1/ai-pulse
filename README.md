@@ -127,7 +127,7 @@ Prediction reports use the same readable presentation standard as Global Market 
 
 Spot Trading works with or without a loaded report. The network-specific pair picker lists supported execution candidates directly; loading a Global report additionally prefills its pair, timeframe, entry, take-profit, and stop-loss. PULSE resolves the analysis ticker to an identity-safe chain token, checks the selected settlement asset and connected-wallet balance, and verifies a fresh OKX Onchain OS route before enabling either order button.
 
-- Market orders expose Auto or Manual maximum slippage and can attach TP/SL after the confirmed fill.
+- Market orders expose Auto or Manual maximum slippage and can attach TP/SL after the confirmed fill. Enter the amount, then choose **Get quote to review buy/sell** (or **Get live quote**). This first action only fetches an amount-specific quote. Inspect the expected output, then choose **Review buy/sell in wallet** for fresh transaction preparation and wallet approval. The background route check does not quote your ticket amount; an empty or zero-output response cannot enable review.
 - Limit orders carry the trigger, minimum received amount, and optional OTOCO protection in one ticket.
 - Factory state is read from chain before account creation is offered; tab changes cannot erase an existing owner account.
 - The shared dashboard separates Pending, Active, Executed, Cancelled, and Activity, displays trigger, actual entry/exit, OKX mark and P&L when provable, and supports selected or all-position closure.
@@ -166,7 +166,7 @@ Catalog presence, price, liquidity, and market probability are evidence—not en
 - X Layer prepares OKB → USD₮0 through OKX Exchange OS.
 - Base and Arbitrum prepare native ETH → native USDC inside PULSE; Arbitrum explicitly rejects USDC.e as the payment asset.
 - Arc Mainnet exposes wallet USDC, Circle Gateway balance, deposit and withdrawal; native gas uses the same USDC balance through its 18-decimal interface.
-- Arc displays wallet USDC and Circle Gateway USDC in separate tabs so onchain funds are not confused with spendable Gateway funds.
+- With Arc selected and a wallet connected, the header shows separate **Wallet** and **Gateway** USDC balances on desktop and mobile. Wallet funds trading and gas; Gateway pays for research and Autopilot passes. Unavailable balances show a dash instead of zero. The funding drawer also keeps these balances separate.
 - When Robinhood is enabled, its funding drawer prepares ETH → canonical USDG through OKX DEX. PULSE validates the deployed router's calldata, recipient, minimum received and expiry, checks gas reserves and simulates before the connected wallet signs. Funding never requires the facilitator key or an ERC-20 approval.
 - Before browser signing, PULSE switches to the selected chain and refreshes the exact payment-asset balance.
 
@@ -230,6 +230,8 @@ If the API, wallet or receipt step is interrupted, **Resume withdrawal** retries
 The expandable **Contract withdrawal fallback** reads pending amounts and the actual claim block. If Circle's instant service is unavailable, explicitly initiate a contract withdrawal, wait its configured block delay (normally about seven days), then select **Claim to wallet**. PULSE blocks adding another delayed withdrawal while one is pending because it would reset the waiting period. This is a separate two-transaction procedure described in [Circle's contract reference](https://developers.circle.com/gateway/references/contract-interfaces-and-events).
 
 The [October 7 execution/Gateway audit](docs/ARC_MAINNET_GATEWAY_AUDIT_2026-10-07.md) records the resume transaction, exact USDC locations and Max/mobile validation.
+
+The [October 8 mobile and Market audit](docs/ARC_MAINNET_UI_FIXES_2026-10-08.md) records the OKX `NaN` signing compatibility fix, explicit amount-quote/wallet-review steps, both header balances and production-build browser checks. Physical OKX mobile signing still needs retesting after the manual release.
 
 **Recipient and seller proceeds:** every network uses `PAY_TO_ADDRESS` on the API and matching `VITE_PAY_TO_ADDRESS` in the browser. Arc uses Circle Gateway batching: payment proceeds are credited to that same address’s **Gateway balance**, rather than its ordinary on-chain wallet balance. Connect the payment-recipient wallet and use **Wallet & funding → Withdraw to wallet** to withdraw seller proceeds. Withdrawal needs a small separate wallet USDC balance for mint gas. The deprecated Circle seller-address variables no longer select a recipient. [Circle’s seller flow](https://www.circle.com/fr/blog/turn-your-api-into-a-storefront-for-agents) explains batch credits and withdrawal.
 

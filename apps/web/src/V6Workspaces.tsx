@@ -1802,6 +1802,9 @@ export function SpotWorkspace({
       });
       if (!isCurrentQuote()) return;
       if (!response.ok) throw new Error(errorText(response.data));
+      const result = response.data as { quote?: { toTokenAmount?: unknown } } | null;
+      if (!result?.quote || !/^[1-9]\d*$/.test(String(result.quote.toTokenAmount)))
+        throw new Error("No positive output returned for this amount. Change the amount or refresh the live quote before reviewing a trade.");
       setQuote(response.data as Record<string, unknown>);
       setRouteAvailable(true);
       setRouteError("");
@@ -3270,20 +3273,31 @@ export function SpotWorkspace({
                   className={`btn ${side === "buy" ? "btn-primary" : "btn-danger"}`}
                   disabled={
                     busy !== "" ||
-                    !quote ||
+                    !mappingReady ||
+                    !amountReady ||
                     !wallet ||
                     insufficientBalance ||
                     (protectAfterFill && spotAccountStatus === "error")
                   }
-                  onClick={() => void execute()}
+                  onClick={() => void (quote ? execute() : requestQuote())}
+                  aria-describedby="spot-market-review-help"
                 >
                   {busy === "swap"
                     ? "Open wallet…"
+                    : busy === "quote"
+                      ? "Finding route…"
                     : insufficientBalance
                       ? `Use ${sellAsset?.symbol || "wallet"} balance first`
-                      : `Review ${side} in wallet`}
+                      : quote ? `Review ${side} in wallet` : `Get quote to review ${side}`}
                 </button>
               </div>
+              <p id="spot-market-review-help" className="setup-note" role="status">
+                {!wallet ? "Connect the wallet you want to trade with."
+                  : !amountReady ? "Enter a positive amount before requesting a trade quote."
+                  : protectAfterFill && spotAccountStatus === "error" ? "Refresh status to check your protection setup before trading with TP/SL."
+                  : quote ? "Review the expected output above, then continue in your wallet. The execution route is refreshed before signing."
+                  : "Get a live quote for your entered amount first. Then review the output and continue in your wallet. Getting a quote sends no wallet transaction."}
+              </p>
               {side === "buy" &&
                 initialTrade?.takeProfit &&
                 !protectAfterFill && (
@@ -7490,12 +7504,12 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <h3>{lang === "zh" ? "选择 Arc，核对资产与资金来源" : "Choose Arc, then review the asset and funding source"}</h3>
               <ol>
                 <li>{lang === "zh" ? "在顶部“网络与支付”中选择 Arc Mainnet。钱包连接面板也支持 Arc；付款或签名交易前，请确认钱包网络为 5042。外观设置不改变网络。" : "Select Arc Mainnet in Network & payment. The wallet connection panel also includes Arc. Confirm wallet chain 5042 before payment or a transaction signature. Appearance settings do not change the network."}</li>
-                <li>{lang === "zh" ? "钱包 USDC 用于交易资金与网络费用。原生 18 位接口和代币 6 位接口读取同一笔余额；请勿相加。Circle Gateway 余额单独显示，用于研究服务与 Autopilot 通行证支付。" : "Wallet USDC funds trading and network fees. The native 18-decimal and ERC-20 6-decimal interfaces read the same wallet balance; do not add them together. Circle Gateway balance is separate and pays for research services and Autopilot passes."}</li>
+                <li>{lang === "zh" ? "连接钱包后，桌面和手机顶部均显示独立的 Wallet 与 Gateway USDC 余额。钱包 USDC 用于交易资金与网络费用；Gateway 用于研究服务与 Autopilot 通行证。余额读取失败时显示破折号，而非零。原生 18 位接口和代币 6 位接口读取同一笔钱包余额；请勿相加。" : "Once connected, the desktop and mobile header shows separate Wallet and Gateway USDC balances. Wallet USDC funds trading and gas; Gateway pays for research and Autopilot passes. An unavailable balance shows a dash instead of zero. The native 18-decimal and ERC-20 6-decimal interfaces read the same wallet balance; do not add them together."}</li>
                 <li>{lang === "zh" ? "在“钱包与资金”中查看 Gateway 余额，检查充值金额与授权后再签名。钱包有余额不代表 Gateway 已有余额。Arc 测试网资金不能支付主网服务。" : "Open Wallet & funding to check Gateway balance. Review the deposit amount and approval before signing. A funded wallet does not imply a funded Gateway balance. Arc testnet funds cannot pay for mainnet services."}</li>
               </ol>
               <h4>{lang === "zh" ? "交易与 Autopilot 的资金流程" : "Spot and Autopilot funding workflow"}</h4>
               <ul>
-                <li>{lang === "zh" ? "Spot Market：选择合约与交易对 → 核对实时路由、金额及滑点 → 在钱包签署兑换 → 代币回到同一钱包。研究报告不会自动发起交易。" : "Spot Market: select the contract and pair → review the live route, amount and slippage → sign the swap in your wallet → receive tokens in that wallet. A research report does not place a trade automatically."}</li>
+                <li>{lang === "zh" ? "Spot Market：选择交易对并输入金额 → 点击“获取报价以审核买入/卖出” → 检查预期收到数量与滑点 → 点击“在钱包中审核买入/卖出”并签署 → 代币回到同一钱包。第一步报价不会签名；执行前会刷新路由。后台路由检查不等于你的下单金额报价。研究报告不会自动发起交易。" : "Spot Market: select a pair and enter the amount → Get quote to review buy/sell → inspect expected output and slippage → Review buy/sell in wallet and sign → receive tokens in that wallet. Getting a quote requests no signature; execution refreshes the route. The background route check is separate from your entered-amount quote. A research report does not place a trade automatically."}</li>
                 <li>{lang === "zh" ? "Limit / TP-SL / bracket：从钱包将资金转入自己的订单账户，审核并授权入场及保护条件。Keeper 只能按批准的条件执行；取消订单按其状态返还未使用的托管资金。" : "Limit / TP-SL / bracket: fund your owner order account from your wallet, review and authorize entry/protection conditions. Keepers execute within those conditions. Cancellation returns unused escrow according to the order state."}</li>
                 <li>{lang === "zh" ? "Autopilot：选择市场 → 检查买卖路由与 K 线 → 配置风险策略 → 从钱包充值自己的 vault → 授权策略 → 从 Gateway 购买通行证 → 启动。交易在 vault 内执行；Gateway 不提供交易本金。" : "Autopilot: select the market → verify entry/exit routes and candles → configure risk policy → fund your owner vault from your wallet → authorize the strategy → buy an Entry Pass from Gateway → start. Trades execute inside the vault; Gateway does not supply trading capital."}</li>
               </ul>
@@ -7922,8 +7936,10 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   or enter any smaller human-readable amount.
                 </li>
                 <li>
-                  For Market, get a live quote, inspect output, price impact and
-                  slippage, then review in the wallet.
+                  For Market, choose Get quote to review buy/sell or Get live
+                  quote. This first action only quotes your entered amount.
+                  Inspect output, price impact and slippage, then choose Review
+                  buy/sell in wallet. PULSE refreshes the route before approval.
                 </li>
                 <li>
                   For Limit, confirm the buy trigger and minimum received.
