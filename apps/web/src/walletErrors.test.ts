@@ -9,3 +9,8 @@ test("mobile wallet object errors disclose the message instead of object Object"
   const circular: Record<string, unknown> = {}; circular.message = circular;
   assert.equal(walletErrorMessage(circular, "Reconnect wallet"), "Reconnect wallet");
 });
+test("Autopilot rejection can describe setup without claiming a Gateway withdrawal", () => {
+  const message = walletErrorMessage({ data: { originalError: { code: 4001 } } }, "Setup failed", { declinedMessage: "Request declined in your wallet. Review setup before retrying." });
+  assert.equal(message, "Request declined in your wallet. Review setup before retrying.");
+  assert.doesNotMatch(message, /withdrawal|\[object Object\]/);
+});

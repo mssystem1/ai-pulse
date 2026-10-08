@@ -21,6 +21,8 @@ import { hasRecoverablePayment } from "./paymentRecovery";
 import {
   switchWalletNetwork,
   assertArcUsdcGasReserve,
+  assertPaymentBalance,
+  fetchArcGatewayBalance,
   fetchTokenBalance,
   WEB_NETWORKS,
   type WebNetworkKey,
@@ -34,7 +36,9 @@ import { confirmedTradeMarkers, isArcMarketPair } from "./marketPreview";
 import { AutopilotDecisionJournal, type DecisionEntry } from "./AutopilotDecisionJournal";
 import { decisionAuditColumns, serializeAuditCsv } from "./autopilotExport";
 import { renewAndResumeAutopilot, autopilotSetupFailureState } from "./autopilotRenewal";
-import { autopilotControlState } from "./autopilotControls";
+import { autopilotControlState, autopilotFundingState } from "./autopilotControls";
+import { reviewedAutopilotSignalMarket } from "./autopilotPreflight";
+import { walletErrorMessage } from "./walletErrors";
 import { DocsWorkflowVisuals } from "./DocsWorkflowVisuals";
 import { ExecutionPairPicker, TimeframePicker } from "./Pickers";
 import { aggregateAutopilotMetrics, assessBalanceAmount, confirmedAutopilotExecutionCounts, countExecutedAutopilotFills, hasProtectedAutopilotPosition, selectedAutopilotStrategy } from "./dashboardMetrics";
@@ -4267,7 +4271,8 @@ export function AutopilotWorkspace({
   const [autopilotBalances, setAutopilotBalances] = useState<{
     settlement: number | null;
     target: number | null;
-  }>({ settlement: null, target: null });
+    gateway: number | null;
+  }>({ settlement: null, target: null, gateway: null });
   const [vaultWalletBalance, setVaultWalletBalance] = useState<number | null>(null);
   const vaultBalanceScopeRef = useRef("");
   const setupBalanceScopeRef = useRef({ settlement: "", target: "" });
@@ -4689,14 +4694,14 @@ export function AutopilotWorkspace({
   useEffect(() => {
     if (!wallet || !ADDRESS.test(settlement)) {
       setupBalanceScopeRef.current = { settlement: "", target: "" };
-      setAutopilotBalances({ settlement: null, target: null });
+      setAutopilotBalances({ settlement: null, target: null, gateway: null });
       return;
     }
     let cancelled = false;
     const scopes = { settlement: `${networkKey}:${wallet.toLowerCase()}:${settlement.toLowerCase()}`, target: `${networkKey}:${wallet.toLowerCase()}:${targetToken?.address.toLowerCase() || ""}` };
     const previousScopes = setupBalanceScopeRef.current;
     setupBalanceScopeRef.current = scopes;
-    setAutopilotBalances((previous) => ({ settlement: previousScopes.settlement === scopes.settlement ? previous.settlement : null, target: previousScopes.target === scopes.target ? previous.target : null }));
+    setAutopilotBalances((previous) => ({ settlement: previousScopes.settlement === scopes.settlement ? previous.settlement : null, target: previousScopes.target === scopes.target ? previous.target : null, gateway: previousScopes.settlement === scopes.settlement ? previous.gateway : null }));
     void Promise.allSettled([
       fetchTokenBalance(
         wallet,
@@ -4707,12 +4712,14 @@ export function AutopilotWorkspace({
       targetToken
         ? fetchTokenBalance(wallet, targetToken.address, targetToken.decimals, networkKey)
         : Promise.resolve(null),
+      networkKey === "arc" ? fetchArcGatewayBalance(wallet) : Promise.resolve(null),
     ])
-      .then(([settlementResult, targetResult]) => {
+      .then(([settlementResult, targetResult, gatewayResult]) => {
         if (cancelled) return;
         setAutopilotBalances({
           settlement: settlementResult.status === "fulfilled" ? settlementResult.value : null,
           target: targetResult.status === "fulfilled" ? targetResult.value : null,
+          gateway: gatewayResult.status === "fulfilled" ? gatewayResult.value : null,
         });
       });
     return () => {
@@ -4947,6 +4954,8 @@ export function AutopilotWorkspace({
     let safelyPaused = false;
     let passPurchased = false;
     let resumeConfirmed = false;
+    let setupStarted = false;
+    let vaultAvailable = Boolean(selectedVault);
     try {
       setMessage("Checking token contracts and the live route before any wallet transaction...");
       const readiness = await apiPost("/v1/autopilot/readiness", {});
@@ -4963,11 +4972,17 @@ export function AutopilotWorkspace({
       });
       if (!preflight.ok)
         throw new Error(`${errorText(preflight.data)} No wallet transaction was sent.`);
-      const signalMarket = (preflight.data as { signalMarket?: string }).signalMarket;
-      if (requiresMarketHistory && (!signalMarket || historyCheck?.scope !== historyScope || historyCheck.signalMarket !== signalMarket)) {
-        setHistoryAttempt(value => value + 1);
-        throw new Error("The strategy signal source changed. Review the refreshed history source before starting. No wallet transaction was sent.");
+      let signalMarket: string | undefined;
+      if (networkKey === "arc" || networkKey === "robinhood") {
+        try {
+          signalMarket = reviewedAutopilotSignalMarket({ network: networkKey, pair, historyScope, history: historyCheck, preflight: preflight.data });
+        } catch (error) {
+          setHistoryAttempt(value => value + 1);
+          throw error;
+        }
       }
+      if (networkKey === "arc" && needsActivationPass)
+        assertPaymentBalance(await fetchArcGatewayBalance(wallet), passPrice, "Gateway USDC", "Arc Mainnet");
       const policy = {
         pair,
         timeframe,
@@ -5010,6 +5025,7 @@ export function AutopilotWorkspace({
         if (activeStrategy?.targetAsset && activeStrategy.targetAsset.toLowerCase() !== targetAsset.toLowerCase() && BigInt(currentConfiguration.targetBalance || "0") > 0n) throw new Error("Close or withdraw the existing invested asset in Dashboard before changing this Autopilot's trading pair.");
       }
       safelyPaused = !wasExisting || currentConfiguration?.paused === true;
+      setupStarted = true;
       if (!wasExisting) {
         setMessage(
           "Wallet confirmation · Confirm the owner-controlled strategy wallet.",
@@ -5054,6 +5070,7 @@ export function AutopilotWorkspace({
           throw new Error(
             "The strategy wallet was confirmed but has not appeared on the RPC yet. Retry after the network updates.",
           );
+        vaultAvailable = true;
         setVaults(found);
         setVaultDetails(accountSnapshot.vaults);
         createNewVaultRef.current = false;
@@ -5267,7 +5284,7 @@ export function AutopilotWorkspace({
       setLaunchState(resumeConfirmed ? "complete" : "interrupted");
       if (resumeConfirmed) setAutopilotPage("dashboard");
       setMessage(
-        `${error instanceof Error ? error.message : String(error)} ${autopilotSetupFailureState({ resumed: resumeConfirmed, paid: passPurchased, safelyPaused })}`,
+        `${walletErrorMessage(error, "Autopilot setup could not be completed. Refresh its account state before retrying.", { declinedMessage: "Request declined in your wallet. Review setup before retrying." })} ${autopilotSetupFailureState({ resumed: resumeConfirmed, paid: passPurchased, safelyPaused, setupStarted, vaultAvailable })}`,
       );
       await refresh().catch(() => undefined);
     } finally {
@@ -5487,9 +5504,10 @@ export function AutopilotWorkspace({
     const paidUrl = `${API_BASE}/${prefix}/v1/autopilot/pass/${plan}`;
     const paidBody = JSON.stringify({ owner: wallet, vault, ...(telegramDelivery ? { telegramDelivery } : {}) });
     const recovering = await hasRecoverablePayment(networkKey, wallet, paidUrl, { method: "POST", body: paidBody }, localStorage);
-    const available = fundingWalletBalance;
+    const available = networkKey === "arc" && !recovering ? await fetchArcGatewayBalance(wallet) : fundingWalletBalance;
+    const paymentSource = networkKey === "arc" ? "Gateway" : "connected wallet";
     if (!recovering && available === null) throw new Error(`PULSE could not verify your ${activeSettlementSymbol} payment balance. Refresh before purchasing the pass.`);
-    if (!recovering && available !== null && available < prices[plan]) throw new Error(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the connected wallet has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
+    if (!recovering && available !== null && available < prices[plan]) throw new Error(`You need ${prices[plan].toFixed(2)} ${activeSettlementSymbol}; the ${paymentSource} has ${available.toLocaleString("en-US", { maximumFractionDigits: 6 })}.`);
     const paidFetch = await createWalletPaidFetch(wallet, networkKey);
     const response = await paidFetch(paidUrl, {
       method: "POST",
@@ -5755,9 +5773,10 @@ export function AutopilotWorkspace({
   const passPrices = { "24h": aiPolicy?.commercialPass?.price24hUsd || 1.5, "7d": aiPolicy?.commercialPass?.price7dUsd || 10.5, "30d": aiPolicy?.commercialPass?.price30dUsd || 45 };
   const passPrice = passPrices[selectedPassPlan];
   const needsActivationPass = !selectedVault || !passActive;
-  const requiredWalletFunds = (reusingFundedVault ? 0 : capitalNumber) + (needsActivationPass ? passPrice : 0);
-  const passFundingUnavailable = needsActivationPass && fundingWalletBalance === null;
-  const passFundingInsufficient = fundingWalletBalance !== null && fundingWalletBalance + 1e-9 < requiredWalletFunds;
+  const { requiredWalletFunds, passFundingUnavailable, passFundingInsufficient } = autopilotFundingState({
+    network: networkKey, depositRequired: reusingFundedVault ? 0 : capitalNumber,
+    walletBalance: fundingWalletBalance, needsPass: needsActivationPass, passPrice, gatewayBalance: autopilotBalances.gateway,
+  });
   const editNotReady = autopilotPage === "edit" && Boolean(activeStrategy) && editConfiguration?.scope !== editScope;
   const startDisabled =
     busy || unchangedEdit || editNotReady ||
@@ -5789,9 +5808,9 @@ export function AutopilotWorkspace({
       : autopilotInsufficientCapital
         ? `Use available ${WEB_NETWORKS[networkKey].payment.symbol} balance first`
         : passFundingUnavailable
-          ? `Refresh ${activeSettlementSymbol} balance before activation`
+          ? networkKey === "arc" ? "Refresh Arc balances before activation" : `Refresh ${activeSettlementSymbol} balance before activation`
         : passFundingInsufficient
-          ? `Keep ${passPrice.toFixed(2)} ${activeSettlementSymbol} for the AI Entry Pass`
+          ? networkKey === "arc" ? "Fund Gateway for the AI Entry Pass" : `Keep ${passPrice.toFixed(2)} ${activeSettlementSymbol} for the AI Entry Pass`
         : vaultStatus === "checking"
           ? "Checking existing Autopilot…"
           : activeStrategy
@@ -6221,8 +6240,9 @@ export function AutopilotWorkspace({
               <span>This is Autopilot runtime—not a Global Quick or Pro report. Only compact AI checks for candidates that pass the free technical gate use the pass. Pausing freezes the time remaining. TP/SL, exits and withdrawals never require a pass.</span>
               <small>{selectedVault && passActive ? "The existing pass remains bound to this vault." : "PULSE creates and registers a new vault first when needed, requests this payment in step 6, then starts it. Renew later from the dashboard."}</small>
             </div>
-            {passFundingInsufficient && <div className="capital-inline-warning">The connected wallet needs {requiredWalletFunds.toFixed(2)} {activeSettlementSymbol} for {reusingFundedVault ? "this pass" : "the initial deposit plus this pass"}; available {fundingWalletBalance?.toLocaleString("en-US", { maximumFractionDigits: 6 })}.</div>}
-            {passFundingUnavailable && <div className="capital-inline-warning">PULSE cannot verify the connected-wallet payment balance. Refresh before any vault transaction is prepared.</div>}
+            {networkKey === "arc" && <p className="setup-note" data-no-localize>{lang === "zh" ? "AI 通行证的 Gateway 余额" : "Gateway balance for the AI Entry Pass"}: {autopilotBalances.gateway === null ? "—" : autopilotBalances.gateway.toLocaleString("en-US", { maximumFractionDigits: 6 })} USDC. {lang === "zh" ? "交易本金和手续费使用独立的钱包余额。" : "Trading capital and gas use the separate wallet balance."}</p>}
+            {passFundingInsufficient && <div className="capital-inline-warning">{networkKey === "arc" ? "Deposit USDC into Circle Gateway in Wallet & funding before starting. The AI Entry Pass uses Gateway funds; vault capital uses wallet funds." : <>The connected wallet needs {requiredWalletFunds.toFixed(2)} {activeSettlementSymbol} for {reusingFundedVault ? "this pass" : "the initial deposit plus this pass"}; available {fundingWalletBalance?.toLocaleString("en-US", { maximumFractionDigits: 6 })}.</>}</div>}
+            {passFundingUnavailable && <div className="capital-inline-warning">{networkKey === "arc" ? "PULSE cannot verify the Arc wallet capital or Gateway payment balance. Refresh before any vault transaction is prepared." : "PULSE cannot verify the connected-wallet payment balance. Refresh before any vault transaction is prepared."}</div>}
           </div>
 
           <div id="autopilot-review-target" className="autopilot-step-head">
@@ -7514,6 +7534,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                 <li>{lang === "zh" ? "Autopilot：选择市场 → 检查买卖路由与 K 线 → 配置风险策略 → 从钱包充值自己的 vault → 授权策略 → 从 Gateway 购买通行证 → 启动。交易在 vault 内执行；Gateway 不提供交易本金。" : "Autopilot: select the market → verify entry/exit routes and candles → configure risk policy → fund your owner vault from your wallet → authorize the strategy → buy an Entry Pass from Gateway → start. Trades execute inside the vault; Gateway does not supply trading capital."}</li>
               </ul>
               <h4>{lang === "zh" ? "Gateway 充值与提取" : "Gateway deposit and withdrawal"}</h4>
+              <p>{lang === "zh" ? "启动新的 Autopilot 前，设置分别检查钱包本金与所选 AI 通行证的 Gateway 余额。钱包余额不能代替 Gateway 付款资金；请先在“钱包与资金”中充值 Gateway。已有充足本金的 vault 和有效通行证可复用。市场历史检查和预检必须确认同一个 OKX 信号市场；检查失败不会创建金库或自动购买通行证。" : "Before starting a new Autopilot, setup separately checks wallet capital and Gateway funds for the selected AI Entry Pass. Wallet funds cannot replace Gateway payment funds; deposit into Gateway in Wallet & funding first. Existing funded vaults and valid passes can be reused. History readiness and preflight must confirm the same OKX signal market; failing these checks does not create a vault or buy a pass."}</p>
               <p>{lang === "zh" ? "充值 Max 会预留授权和存款两笔交易的手续费；提取 Max 会扣除实时最高 Gateway 费用。Max 只填写待审核金额，不会签名。卖家的服务款项记入 PAY_TO_ADDRESS 对应钱包的 Gateway 余额；连接该钱包后使用同一提取流程。即使 Gateway 有余额，该钱包也须持有少量 Arc USDC 支付铸币交易手续费。" : "Deposit Max reserves approval and deposit gas; Withdrawal Max subtracts the live maximum Gateway fee. Max fills a reviewed amount without signing. Seller service proceeds accrue in the Gateway balance belonging to the PAY_TO_ADDRESS wallet; connect that wallet to use the same withdrawal flow. Even with Gateway funds, that wallet needs separate Arc USDC for mint transaction gas."}</p>
               <p>{lang === "zh" ? "打开“钱包与资金”。充值需审核 USDC 授权和 Gateway 存款两笔交易。选择“提取到钱包”，输入金额并查看实时最高费用；审核提取签名，再签署将 USDC 铸回同一 Arc 钱包的交易。Gateway 余额必须覆盖金额与费用，钱包须另有 USDC 支付手续费。正常提取无需七天等待。" : "Open Wallet & funding. Deposit requires USDC approval and a Gateway deposit transaction. Choose Withdraw to wallet, enter the amount and review the live maximum fee. Review the withdrawal signature, then sign the mint transaction back to the same Arc wallet. Gateway balance must cover the amount plus fee; keep wallet USDC for gas. Normal withdrawal has no seven-day waiting period."}</p>
               <p>{lang === "zh" ? "若提取中断，请使用“继续提取”，并保留浏览器恢复记录；不会自动创建新的扣款授权。备用合约提取需明确发起、等待实际领取区块（通常约七天），再领取到钱包。已有备用提取等待期间不能追加金额，以免重置等待期。" : "If interrupted, use Resume withdrawal and keep browser recovery storage; a new debit is not authorized automatically. The contract fallback requires explicit initiation, a wait until the actual claim block (usually about seven days), then a claim to the wallet. Additional delayed withdrawals are blocked while one is pending to avoid resetting its delay."}</p>

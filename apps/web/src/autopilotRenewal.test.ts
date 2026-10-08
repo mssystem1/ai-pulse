@@ -16,6 +16,19 @@ test("setup preserves paid/resumed outcomes when later synchronization fails", (
   assert.match(autopilotSetupFailureState({resumed:false,paid:true,safelyPaused:true}), /do not purchase another pass/);
   assert.match(autopilotSetupFailureState({resumed:false,paid:false,safelyPaused:true}), /remains paused/);
 });
+
+test("a preflight failure does not invent an existing running or paused vault", () => {
+  const message = autopilotSetupFailureState({ resumed: false, paid: false, safelyPaused: false, setupStarted: false });
+  assert.match(message, /Setup stopped during checks/);
+  assert.doesNotMatch(message, /Pause the existing|remains paused/);
+  assert.match(autopilotSetupFailureState({ resumed: false, paid: false, safelyPaused: false, setupStarted: true }), /Pause the existing/);
+});
+test("an interrupted vault-creation prompt does not invent a paused vault or advise duplicate creation", () => {
+  const message = autopilotSetupFailureState({ resumed: false, paid: false, safelyPaused: true, setupStarted: true, vaultAvailable: false });
+  assert.match(message, /Refresh the wallet transactions and account list/);
+  assert.match(message, /reuse any account that was created/);
+  assert.doesNotMatch(message, /Pause the existing|remains paused/);
+});
 test("failed payment never resumes, failed resume never repeats payment", async () => {
   await assert.rejects(renewAndResumeAutopilot({ pay: async () => { throw new Error("declined"); }, isPaused: async () => assert.fail("must not read"), resume: async () => assert.fail("must not resume") }), /declined/);
   let paid = 0;

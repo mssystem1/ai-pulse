@@ -1,5 +1,5 @@
 /** Wallet bridges can reject with objects, including an object-valued message. */
-export function walletErrorMessage(error: unknown, fallback = "The wallet request failed. Reopen your wallet and try again."): string {
+export function walletErrorMessage(error: unknown, fallback = "The wallet request failed. Reopen your wallet and try again.", options: { declinedMessage?: string } = {}): string {
   const seen = new Set<unknown>();
   function read(value: unknown, depth = 0): string | null {
     if (depth > 5 || value == null || seen.has(value)) return null;
@@ -10,7 +10,7 @@ export function walletErrorMessage(error: unknown, fallback = "The wallet reques
     if (typeof value !== "object") return null;
     seen.add(value);
     const e = value as Record<string, unknown>;
-    if (Number(e.code) === 4001) return "Request declined in your wallet. No new withdrawal was authorized; resume any existing pending withdrawal.";
+    if (Number(e.code) === 4001) return options.declinedMessage || "Request declined in your wallet. No new withdrawal was authorized; resume any existing pending withdrawal.";
     for (const key of ["shortMessage", "message", "originalError", "error", "cause", "data"]) {
       const message = read(e[key], depth + 1);
       if (message) return message;

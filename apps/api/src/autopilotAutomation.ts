@@ -810,6 +810,7 @@ export function createAutopilotAutomationRouter(cfg: AppConfig) {
       if (network === "arc") {
         if (!parsed.data.timeframe) throw new Error("Choose the Arc Autopilot timeframe before setup");
         const market = await arcOkxMarketContext({ instId: pair, timeframe: parsed.data.timeframe, candleLimit: 120, completedOnly: true });
+        signalMarket = market.instId;
         settlementMark = market.ticker.last;
       }
       if (network === "robinhood" && isRobinhoodMarket(pair)) {

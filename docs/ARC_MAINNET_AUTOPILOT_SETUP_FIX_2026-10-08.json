@@ -1,0 +1,523 @@
+{
+  "auditedAt": "2026-10-08T10:42:43.295Z",
+  "chainId": 5042,
+  "scope": "Reported Autopilot setup interruption and additional WETH/USDC checks",
+  "har": {
+    "entryCount": 58,
+    "owner": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+    "endpoints": [
+      {
+        "endpoint": "POST rpc.mainnet.arc.io/",
+        "requests": 14,
+        "statuses": {
+          "200": 14
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "POST gateway-api.circle.com/v1/balances",
+        "requests": 5,
+        "statuses": {
+          "200": 5
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "OPTIONS gateway-api.circle.com/v1/balances",
+        "requests": 5,
+        "statuses": {
+          "204": 5
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "OPTIONS pulse-api-production-7aae.up.railway.app/v1/autopilot/readiness",
+        "requests": 2,
+        "statuses": {
+          "204": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "POST pulse-api-production-7aae.up.railway.app/v1/autopilot/readiness",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "POST pulse-api-production-7aae.up.railway.app/v1/autopilot/preflight",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "OPTIONS pulse-api-production-7aae.up.railway.app/v1/autopilot/preflight",
+        "requests": 2,
+        "statuses": {
+          "204": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/trading/capabilities",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/autopilot/market-readiness",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/trading/activity",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/healthz",
+        "requests": 11,
+        "statuses": {
+          "200": 5,
+          "304": 6
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/autopilot/strategies",
+        "requests": 2,
+        "statuses": {
+          "200": 2
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/trading/accounts",
+        "requests": 2,
+        "statuses": {
+          "200": 1,
+          "304": 1
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/market/ticker",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/market/candles",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "GET pulse-api-production-7aae.up.railway.app/v1/opportunities",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "POST cca-lite.coinbase.com/amp",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "responseBodies": 0
+      },
+      {
+        "endpoint": "POST cca-lite.coinbase.com/metrics",
+        "requests": 1,
+        "statuses": {
+          "200": 1
+        },
+        "responseBodies": 0
+      }
+    ],
+    "responseBodiesAvailable": false,
+    "limitation": "Status-only HAR cannot establish response content or capture a separate wallet broadcast. No headers, authorization, signatures or recovery capabilities are retained."
+  },
+  "rootCause": "The hosted Arc preflight returns ready:true without signalMarket for both reviewed tokens. History readiness reports the OKX signal, so the frontend misclassified missing metadata as a changed source and stopped before wallet setup.",
+  "changes": [
+    "Return the verified Arc OKX market in signalMarket after fresh ticker and completed-history validation.",
+    "Require matching selected pair, ready preflight and current reviewed history; distinguish absent metadata from a changed source.",
+    "Separate wallet capital from Gateway pass funding, recheck Gateway before creation and a new pass purchase.",
+    "Describe check failures without inventing an existing vault; describe unconfirmed creation and OKX object rejections accurately.",
+    "Keep Base/Arbitrum mappings, live market gates, payment recipient and actual payment recovery unchanged."
+  ],
+  "hostedBTC": {
+    "asOf": "2026-10-08T09:59:36.409Z",
+    "mode": "Public market/history and unsigned preflight only; no signatures, payments or transaction broadcasts",
+    "request": {
+      "network": "arc",
+      "settlementAsset": "0x3600000000000000000000000000000000000000",
+      "targetAsset": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+      "pair": "BTC-USDT",
+      "timeframe": "15m",
+      "amountAtomic": "1000000",
+      "maxTradeValueAtomic": "1000000",
+      "maxSlippageBps": 150
+    },
+    "checks": {
+      "marketReadiness": {
+        "status": 200,
+        "hasSignalMarket": true,
+        "ready": true,
+        "pair": "BTC-USDT",
+        "timeframe": "15m",
+        "signalMarket": "BTC-USDT",
+        "signalSource": "okx-public-spot",
+        "reason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+      },
+      "preflight": {
+        "status": 200,
+        "hasSignalMarket": false,
+        "ready": true,
+        "pair": "BTC-USDT",
+        "targetAsset": "0x171A4217b86A807A64eB94757Db6849fb4bDbAA0",
+        "settlementAsset": "0x3600000000000000000000000000000000000000",
+        "executionPair": "cirBTC/USDC"
+      }
+    }
+  },
+  "hostedWETH": {
+    "asOf": "2026-10-08T10:30:35.319Z",
+    "chainId": 5042,
+    "mode": "Public market reads and unsigned route/preflight checks. No wallet signing, transaction broadcasts or paid requests.",
+    "analysisPair": "ETH-USDT",
+    "executionPair": "WETH/USDC",
+    "transactionsSent": 0,
+    "spendUSDC": 0,
+    "checks": [
+      {
+        "name": "executionCatalog",
+        "status": 200,
+        "total": 2,
+        "pairs": [
+          {
+            "pair": "BTC-USDT",
+            "executionPair": "cirBTC/USDC",
+            "address": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+            "symbol": "cirBTC",
+            "decimals": 8
+          },
+          {
+            "pair": "ETH-USDT",
+            "executionPair": "WETH/USDC",
+            "address": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+            "symbol": "WETH",
+            "decimals": 18
+          }
+        ]
+      },
+      {
+        "name": "globalTicker",
+        "status": 200,
+        "ticker": {
+          "instId": "ETH-USDT",
+          "last": 2558.57,
+          "ts": "1791455430972"
+        }
+      },
+      {
+        "name": "globalCandles",
+        "status": 200,
+        "candleCount": 120
+      },
+      {
+        "name": "resolvePair",
+        "status": 200,
+        "available": true,
+        "pair": "ETH-USDT",
+        "base": {
+          "address": "0x128cC466B61f542da60c70e3aA11c10e19B84EDB",
+          "symbol": "WETH",
+          "decimals": 18
+        },
+        "quote": {},
+        "settlement": {
+          "address": "0x3600000000000000000000000000000000000000",
+          "symbol": "USDC",
+          "decimals": 6
+        }
+      },
+      {
+        "name": "autopilotHistory",
+        "status": 200,
+        "ready": true,
+        "pair": "ETH-USDT",
+        "timeframe": "15m",
+        "signalMarket": "ETH-USDT",
+        "signalSource": "okx-public-spot",
+        "reason": "Live OKX reference data and completed history are available. Live entry, exit and wallet checks still run before setup."
+      },
+      {
+        "name": "autopilotPreflight",
+        "status": 200,
+        "ready": true,
+        "pair": "ETH-USDT",
+        "targetAsset": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+        "settlementAsset": "0x3600000000000000000000000000000000000000",
+        "executionPair": "WETH/USDC",
+        "hasSignalMarket": false
+      },
+      {
+        "name": "spotEntryQuote",
+        "status": 200,
+        "quote": {
+          "fromTokenAmount": "1000000",
+          "toTokenAmount": "391044359352776"
+        }
+      },
+      {
+        "name": "spotExitQuote",
+        "status": 200,
+        "fromTokenAmount": "391044359352776",
+        "toTokenAmount": "998314"
+      }
+    ]
+  },
+  "localPreflight": {
+    "asOf": "2026-10-08T10:36:50.050Z",
+    "mode": "Local built preflight router with live OKX market data, public RPC metadata and unsigned entry/exit quotes. No execution workers or signed requests.",
+    "checks": [
+      {
+        "pair": "BTC-USDT",
+        "status": 200,
+        "ready": true,
+        "signalMarket": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "targetAsset": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+        "settlementAsset": "0x3600000000000000000000000000000000000000"
+      },
+      {
+        "pair": "ETH-USDT",
+        "status": 200,
+        "ready": true,
+        "signalMarket": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "targetAsset": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+        "settlementAsset": "0x3600000000000000000000000000000000000000"
+      }
+    ],
+    "transactionsSent": 0,
+    "spendUSDC": 0,
+    "broadcastsBlocked": 0
+  },
+  "autopilotBrowser": {
+    "asOf": "2026-10-08T10:39:28.117Z",
+    "mode": "Production build with isolated API/RPC/wallet fixtures; wallet rejects at the first creation prompt",
+    "fixtureWalletUSDC": "1.1",
+    "fixtureGatewayUSDC": "1.5",
+    "fixtureCapitalUSDC": "1",
+    "fixturePassUSDC": "1.5",
+    "results": [
+      {
+        "mode": "matching",
+        "width": 1440,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 1,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "matching",
+        "width": 390,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 1,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "matching-weth",
+        "width": 1440,
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 1,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "matching-weth",
+        "width": 390,
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 1,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "missing",
+        "width": 1440,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 0,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "changed",
+        "width": 390,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 0,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "gateway-low",
+        "width": 390,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 0,
+        "walletReviewRequests": 0,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "gateway-unavailable",
+        "width": 1440,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 0,
+        "walletReviewRequests": 0,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      },
+      {
+        "mode": "gateway-changed",
+        "width": 390,
+        "pair": "BTC-USDT",
+        "executionPair": "cirBTC/USDC",
+        "preflightRequests": 1,
+        "walletReviewRequests": 0,
+        "strategyOrActivityWrites": 0,
+        "passPurchases": 0,
+        "noRealSignaturesOrTransactions": true,
+        "renderErrors": [],
+        "overflow": false
+      }
+    ]
+  },
+  "spotBrowser": {
+    "mode": "Production build; isolated browser fixtures, all non-local requests intercepted",
+    "asOf": "2026-10-08T10:38:47.439Z",
+    "results": [
+      {
+        "width": 390,
+        "balances": "Wallet\n1 USDC\nGateway\n0.1065 USDC",
+        "firstAction": "quote only",
+        "quoteAmountAtomic": "100000",
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "quoteOutputWETH": "0.000039",
+        "secondAction": "fresh preparation and fixture wallet review",
+        "noRealSignatures": true,
+        "overflow": false,
+        "renderErrors": []
+      },
+      {
+        "width": 1440,
+        "balances": "Wallet\n1 USDC\nGateway\n0.1065 USDC",
+        "firstAction": "quote only",
+        "quoteAmountAtomic": "100000",
+        "pair": "ETH-USDT",
+        "executionPair": "WETH/USDC",
+        "quoteOutputWETH": "0.000039",
+        "secondAction": "fresh preparation and fixture wallet review",
+        "noRealSignatures": true,
+        "overflow": false,
+        "renderErrors": []
+      }
+    ]
+  },
+  "validation": {
+    "frontend": {
+      "passed": 172,
+      "failed": 0,
+      "skipped": 0
+    },
+    "api": {
+      "passed": 342,
+      "failed": 0,
+      "skipped": 1,
+      "skip": "External Redis-compatible TCP/Lua fixture not configured",
+      "environment": "PULSE_SKIP_DOTENV=1, NODE_ENV=test; production dotenv is excluded from isolated fixtures"
+    },
+    "apiBuild": true,
+    "frontendTypeScript": true,
+    "frontendProductionBuild": true,
+    "browserArtifactScan": {
+      "auditedAt": "2026-10-08T10:41:45.899Z",
+      "browserArtifacts": 236,
+      "serverSecretValuesChecked": 28,
+      "leaks": 0,
+      "matches": []
+    }
+  },
+  "effects": {
+    "transactionsSent": 0,
+    "paidRequests": 0,
+    "usdcSpent": 0,
+    "hostingDeployed": false,
+    "codePushed": false,
+    "registryPauseChanged": false,
+    "emailWalletsEnabled": false
+  },
+  "remaining": [
+    "User manual release of API and frontend together. Old hosted Arc preflight still lacks signalMarket at these snapshots.",
+    "Physical extension/mobile acceptance and any new funded Autopilot creation remain unqualified by this read-only/fixture audit.",
+    "Existing migration acceptance gates remain recorded in ARC_MAINNET_MIGRATION.md; this fix does not certify complete production rollout."
+  ]
+}

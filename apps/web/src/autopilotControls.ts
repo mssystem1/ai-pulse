@@ -12,3 +12,18 @@ export function autopilotControlState(input: {
   return { resumeAllowed: input.paused === true && !reason, reason,
     purchaseAllowed: input.storageReady && input.registered && input.funded && input.paused != null };
 }
+
+/** Arc pays passes from Gateway while capital and gas stay in the wallet. */
+export function autopilotFundingState(input: {
+  network: string; depositRequired: number; walletBalance: number | null;
+  needsPass: boolean; passPrice: number; gatewayBalance: number | null;
+}) {
+  const requiredWalletFunds = input.depositRequired + (input.network === "arc" || !input.needsPass ? 0 : input.passPrice);
+  const paymentBalance = input.network === "arc" ? input.gatewayBalance : input.walletBalance;
+  const requiredPaymentFunds = input.network === "arc" ? (input.needsPass ? input.passPrice : 0) : requiredWalletFunds;
+  return {
+    requiredWalletFunds,
+    passFundingUnavailable: input.needsPass && (paymentBalance === null || (input.depositRequired > 0 && input.walletBalance === null)),
+    passFundingInsufficient: paymentBalance !== null && paymentBalance + 1e-9 < requiredPaymentFunds,
+  };
+}
