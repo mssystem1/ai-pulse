@@ -1,0 +1,7 @@
+imageio-ffmpeg==0.6.0
+edge-tts==7.2.8
+numpy==2.5.3
+Pillow==12.3.0
+scipy==1.18.1
+truststore==0.10.4
+fonttools==4.66.1

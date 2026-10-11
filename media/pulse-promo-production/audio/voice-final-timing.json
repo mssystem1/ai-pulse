@@ -1,0 +1,242 @@
+[
+  {
+    "chapter": "intro",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\01-intro-voice.mp3",
+    "seconds": 14.42,
+    "start": 0.7,
+    "available": 15,
+    "ratePercent": 0,
+    "script": "Markets move fast. Your decisions deserve context. Meet PULSE: market intelligence, wallet-approved Spot, and guarded Autopilot. Read the market. Trade your way."
+  },
+  {
+    "chapter": "portfolio",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\02-portfolio-voice.mp3",
+    "seconds": 18.19,
+    "start": 16.7,
+    "available": 23,
+    "ratePercent": 0,
+    "script": "Start with your portfolio. Follow orders, Autopilot accounts, activity, and saved reports. On Arc, keep two balances in view. Your wallet funds trading and gas. Circle Gateway pays for research and Autopilot entry passes."
+  },
+  {
+    "chapter": "gateway",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\gateway-01-aligned-voice.mp3",
+    "seconds": 4.97,
+    "start": 40.7,
+    "available": 5.049999999999997,
+    "ratePercent": 2,
+    "script": "Open Wallet and funding. Choose your Gateway deposit amount."
+  },
+  {
+    "chapter": "gateway",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\gateway-02-aligned-voice.mp3",
+    "seconds": 3.58,
+    "start": 46.5,
+    "available": 5.25,
+    "ratePercent": 0,
+    "script": "Review the USDC approval in your wallet."
+  },
+  {
+    "chapter": "gateway",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\gateway-03-aligned-voice.mp3",
+    "seconds": 3.53,
+    "start": 52.6,
+    "available": 5.149999999999999,
+    "ratePercent": 0,
+    "script": "Then review and confirm the Gateway deposit."
+  },
+  {
+    "chapter": "gateway",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\gateway-04-aligned-voice.mp3",
+    "seconds": 5.38,
+    "start": 58.3,
+    "available": 5.450000000000003,
+    "ratePercent": 11,
+    "script": "Check the updated Gateway balance. Your trading capital remains separate."
+  },
+  {
+    "chapter": "research",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\research-01-aligned-voice.mp3",
+    "seconds": 6.58,
+    "start": 64.6,
+    "available": 9.150000000000006,
+    "ratePercent": 0,
+    "script": "In Global Market, choose a market and timeframe, then inspect live OKX reference data."
+  },
+  {
+    "chapter": "research",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\research-02-aligned-voice.mp3",
+    "seconds": 6.0,
+    "start": 74.5,
+    "available": 7.25,
+    "ratePercent": 0,
+    "script": "Quick and Pro research add context, scenarios, targets, and invalidation."
+  },
+  {
+    "chapter": "research",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\research-03-aligned-voice.mp3",
+    "seconds": 7.06,
+    "start": 82.7,
+    "available": 12.049999999999997,
+    "ratePercent": 0,
+    "script": "Compare what would support or challenge the idea. Pause on the chart and understand the scenarios."
+  },
+  {
+    "chapter": "research",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\research-04-aligned-voice.mp3",
+    "seconds": 7.3,
+    "start": 95.4,
+    "available": 8.349999999999994,
+    "ratePercent": 0,
+    "script": "Open the research plan in Spot Trading. The report informs your decision; you still review the order."
+  },
+  {
+    "chapter": "spot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\spot-01-aligned-voice.mp3",
+    "seconds": 4.75,
+    "start": 104.6,
+    "available": 7.150000000000006,
+    "ratePercent": 0,
+    "script": "On Arc, Ether research maps to wrapped Ether and USDC."
+  },
+  {
+    "chapter": "spot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\spot-02-aligned-voice.mp3",
+    "seconds": 9.36,
+    "start": 112.3,
+    "available": 9.450000000000003,
+    "ratePercent": 0,
+    "script": "Review the amount, trigger, slippage, and take-profit and stop-loss protection. Manual Spot orders require your wallet approval."
+  },
+  {
+    "chapter": "spot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\spot-03-aligned-voice.mp3",
+    "seconds": 4.37,
+    "start": 122.5,
+    "available": 7.25,
+    "ratePercent": 0,
+    "script": "This limit order is pending, so it waits for its condition."
+  },
+  {
+    "chapter": "spot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\spot-04-aligned-voice.mp3",
+    "seconds": 5.33,
+    "start": 130.6,
+    "available": 9.150000000000006,
+    "ratePercent": 0,
+    "script": "Follow the order in the dashboard, or cancel it and reclaim the remaining funds."
+  },
+  {
+    "chapter": "prediction",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\prediction-01-aligned-voice.mp3",
+    "seconds": 5.23,
+    "start": 140.6,
+    "available": 6.150000000000006,
+    "ratePercent": 0,
+    "script": "In Prediction Market intelligence, choose a live question to investigate."
+  },
+  {
+    "chapter": "prediction",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\prediction-02-aligned-voice.mp3",
+    "seconds": 4.8,
+    "start": 147.5,
+    "available": 7.25,
+    "ratePercent": 0,
+    "script": "Inspect its probabilities, liquidity, and resolution rules."
+  },
+  {
+    "chapter": "prediction",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\prediction-03-aligned-voice.mp3",
+    "seconds": 5.38,
+    "start": 155.3,
+    "available": 5.449999999999989,
+    "ratePercent": 14,
+    "script": "Research adds evidence and alternative scenarios, alongside relevant market structure."
+  },
+  {
+    "chapter": "prediction",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\prediction-04-aligned-voice.mp3",
+    "seconds": 7.78,
+    "start": 161.5,
+    "available": 10.25,
+    "ratePercent": 0,
+    "script": "Probability is a starting point for investigation. PULSE helps you understand the context before you decide."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\autopilot-01-aligned-voice.mp3",
+    "seconds": 4.42,
+    "start": 172.7,
+    "available": 9.050000000000011,
+    "ratePercent": 0,
+    "script": "For autonomous execution, choose a market and strategy."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\autopilot-02-aligned-voice.mp3",
+    "seconds": 6.86,
+    "start": 182.6,
+    "available": 11.150000000000006,
+    "ratePercent": 0,
+    "script": "Review your capital, exposure, and risk limits. Your wallet authorizes the policy."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\autopilot-03-aligned-voice.mp3",
+    "seconds": 9.02,
+    "start": 194.3,
+    "available": 9.449999999999989,
+    "ratePercent": 0,
+    "script": "Your wallet funds the vault. Gateway funds the entry pass. Autopilot acts only when its required rules pass."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\autopilot-04-aligned-voice.mp3",
+    "seconds": 7.9,
+    "start": 204.2,
+    "available": 9.550000000000011,
+    "ratePercent": 0,
+    "script": "Follow the vault, pause entries, and manage capital from its controls. Running does not mean a new trade."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\autopilot-05-aligned-voice.mp3",
+    "seconds": 8.38,
+    "start": 214.3,
+    "available": 9.449999999999989,
+    "ratePercent": 0,
+    "script": "Open the journal for holds, checks, recovery events, and confirmed actions. A hold is a decision, too."
+  },
+  {
+    "chapter": "outro",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\08-outro-voice.mp3",
+    "seconds": 14.16,
+    "start": 224.7,
+    "available": 15,
+    "ratePercent": 0,
+    "script": "Research with context. Act within the boundaries you choose. PULSE. Signal when you need it. Proof when it matters. Find your PULSE at ai-pulse dot tech."
+  }
+]

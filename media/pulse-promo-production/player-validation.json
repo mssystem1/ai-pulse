@@ -1,0 +1,46 @@
+[
+  {
+    "width": 1440,
+    "errors": [],
+    "first": {
+      "duration": 240,
+      "width": 1920,
+      "height": 1080,
+      "readyState": 4
+    },
+    "second": {
+      "duration": 240,
+      "width": 1920,
+      "height": 1080,
+      "currentTime": 104.026564,
+      "paused": true,
+      "error": null
+    },
+    "chapterNavigationPassed": true,
+    "audioVersionSwitchPreservesTime": true,
+    "horizontalOverflow": false,
+    "minimumButtonHeight": 44
+  },
+  {
+    "width": 390,
+    "errors": [],
+    "first": {
+      "duration": 240,
+      "width": 1920,
+      "height": 1080,
+      "readyState": 4
+    },
+    "second": {
+      "duration": 240,
+      "width": 1920,
+      "height": 1080,
+      "currentTime": 104.017714,
+      "paused": true,
+      "error": null
+    },
+    "chapterNavigationPassed": true,
+    "audioVersionSwitchPreservesTime": true,
+    "horizontalOverflow": false,
+    "minimumButtonHeight": 44
+  }
+]

@@ -1,0 +1,6 @@
+# Local render intermediates and duplicate preview packages.
+pulse-promo-production/audio/*.wav
+pulse-promo-production/audio/audition-*.mp3
+pulse-promo-production/PULSE-production-sample.mp4
+pulse-promo-production/sample-*.jpg
+pulse-promo-plan/PULSE-promo-design.zip

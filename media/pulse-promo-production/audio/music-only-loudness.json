@@ -1,0 +1,14 @@
+{
+  "input_i": "-16.81",
+  "input_tp": "-2.05",
+  "input_lra": "5.60",
+  "input_thresh": "-26.86",
+  "output_i": "-14.98",
+  "output_tp": "-1.00",
+  "output_lra": "5.10",
+  "output_thresh": "-25.01",
+  "normalization_type": "dynamic",
+  "target_offset": "-0.02",
+  "targetIntegratedLUFS": -15,
+  "targetTruePeakDbTP": -1
+}

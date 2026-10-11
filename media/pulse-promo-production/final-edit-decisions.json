@@ -1,0 +1,870 @@
+{
+  "durationSeconds": 240,
+  "chapters": [
+    {
+      "id": "intro",
+      "start": 0,
+      "end": 16,
+      "name": "Meet PULSE",
+      "headline": "Read the market. Trade your way.",
+      "description": "Market intelligence, wallet-approved Spot and guarded Autopilot. One connected workspace.",
+      "shots": [
+        {
+          "timelineStart": 0,
+          "timelineEnd": 6,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 0.6,
+          "sourceOut": 1.3,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.02,
+              1.055
+            ],
+            "center": [
+              0.5,
+              0.48
+            ],
+            "focus": [
+              0.67,
+              0.57
+            ],
+            "alpha": 32,
+            "in": 0.6,
+            "out": 1.3
+          },
+          "note": "Open on the real landing hero; reveal the wordmark with the music."
+        },
+        {
+          "timelineStart": 6,
+          "timelineEnd": 10,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 5.8,
+          "sourceOut": 8.8,
+          "duration": 4,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.12,
+              1.19
+            ],
+            "center": [
+              0.52,
+              0.64
+            ],
+            "focus": [
+              0.58,
+              0.66
+            ],
+            "alpha": 32
+          },
+          "note": "Spot / Autopilot distinction; keep the words readable."
+        },
+        {
+          "timelineStart": 10,
+          "timelineEnd": 16,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 9.3,
+          "sourceOut": 14.3,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.05,
+              1.11
+            ],
+            "center": [
+              0.5,
+              0.6
+            ],
+            "focus": [
+              0.5,
+              0.63
+            ],
+            "alpha": 32
+          },
+          "note": "Research, prediction and Risk Guard overview; feature tease, no invented Risk Guard demo."
+        }
+      ]
+    },
+    {
+      "id": "portfolio",
+      "start": 16,
+      "end": 40,
+      "name": "Your command center",
+      "headline": "See the whole picture.",
+      "description": "Follow your balances, orders and strategy activity. Wallet and Gateway funds stay distinct.",
+      "shots": [
+        {
+          "timelineStart": 16,
+          "timelineEnd": 24,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 33,
+          "sourceOut": 39,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.16,
+              1.22
+            ],
+            "center": [
+              0.5,
+              0.5
+            ],
+            "focus": [
+              0.66,
+              0.54
+            ],
+            "alpha": 32
+          },
+          "note": "Portfolio totals; use a measured push-in on the two workspaces, not the warning panel."
+        },
+        {
+          "timelineStart": 24,
+          "timelineEnd": 32,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 40.2,
+          "sourceOut": 44.2,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.17,
+              1.23
+            ],
+            "center": [
+              0.5,
+              0.57
+            ],
+            "focus": [
+              0.5,
+              0.61
+            ],
+            "alpha": 32
+          },
+          "note": "Recent activity and saved reports; do not present old warning states as a new failure or success."
+        },
+        {
+          "timelineStart": 32,
+          "timelineEnd": 40,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 45.2,
+          "sourceOut": 47.0,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.06,
+              1.09
+            ],
+            "center": [
+              0.79,
+              0.5
+            ],
+            "focus": [
+              0.86,
+              0.42
+            ],
+            "alpha": 32,
+            "in": 45.2,
+            "out": 47.0
+          },
+          "note": "Brief balance comparison; reconnect visually to Wallet & funding."
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "start": 40,
+      "end": 64,
+      "name": "Fund your research",
+      "headline": "One deposit. Ready for research.",
+      "description": "Deposit USDC into Circle Gateway, review the wallet steps, then check the confirmed balance.",
+      "shots": [
+        {
+          "timelineStart": 40,
+          "timelineEnd": 46,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 23.7,
+          "sourceOut": 24.85,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.03,
+              1.065
+            ],
+            "center": [
+              0.82,
+              0.52
+            ],
+            "focus": [
+              0.87,
+              0.7
+            ],
+            "alpha": 32,
+            "in": 23.7,
+            "out": 24.85
+          },
+          "note": "Funding drawer and deposit controls; follow the original cursor."
+        },
+        {
+          "timelineStart": 46,
+          "timelineEnd": 52,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 31.65,
+          "sourceOut": 32.5,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.025,
+              1.075
+            ],
+            "center": [
+              0.84,
+              0.48
+            ],
+            "focus": [
+              0.83,
+              0.48
+            ],
+            "alpha": 10,
+            "in": 31.65,
+            "out": 32.5
+          },
+          "note": "Real Circle approval; shorten idle time without hiding the amount or recipient."
+        },
+        {
+          "timelineStart": 52,
+          "timelineEnd": 58,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 37.7,
+          "sourceOut": 38.7,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.02,
+              1.07
+            ],
+            "center": [
+              0.84,
+              0.49
+            ],
+            "focus": [
+              0.83,
+              0.44
+            ],
+            "alpha": 10,
+            "in": 37.7,
+            "out": 38.7
+          },
+          "note": "Real deposit confirmation; give the viewer time to read."
+        },
+        {
+          "timelineStart": 58,
+          "timelineEnd": 64,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 44.5,
+          "sourceOut": 47.5,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.04,
+              1.1
+            ],
+            "center": [
+              0.83,
+              0.48
+            ],
+            "focus": [
+              0.88,
+              0.43
+            ],
+            "alpha": 32,
+            "in": 44.5,
+            "out": 47.5
+          },
+          "note": "Confirmed deposit and Gateway balance; show the recorded 0.6-USDC demonstration accurately."
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "start": 64,
+      "end": 104,
+      "name": "Global Market research",
+      "headline": "Turn market data into a plan.",
+      "description": "Explore live OKX data, inspect the report and compare scenarios before opening a Spot ticket.",
+      "shots": [
+        {
+          "timelineStart": 64,
+          "timelineEnd": 74,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 2.5,
+          "sourceOut": 12.5,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.02,
+              1.08
+            ],
+            "center": [
+              0.5,
+              0.55
+            ],
+            "focus": [
+              0.52,
+              0.49
+            ],
+            "alpha": 32
+          },
+          "note": "Market selection and transition to ETH research."
+        },
+        {
+          "timelineStart": 74,
+          "timelineEnd": 82,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 45.9,
+          "sourceOut": 49.7,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.22,
+              1.34
+            ],
+            "center": [
+              0.62,
+              0.6
+            ],
+            "focus": [
+              0.66,
+              0.6
+            ],
+            "alpha": 32,
+            "in": 45.9,
+            "out": 49.7
+          },
+          "note": "Cut the generation wait; start with the returned report."
+        },
+        {
+          "timelineStart": 82,
+          "timelineEnd": 95,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 54.8,
+          "sourceOut": 55.7,
+          "duration": 13,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.06,
+              1.12
+            ],
+            "center": [
+              0.49,
+              0.52
+            ],
+            "focus": [
+              0.62,
+              0.59
+            ],
+            "alpha": 32,
+            "in": 54.8,
+            "out": 55.7
+          },
+          "note": "Readable expanded scenario chart; hold actual chart frame for the explanation."
+        },
+        {
+          "timelineStart": 95,
+          "timelineEnd": 104,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 72.5,
+          "sourceOut": 79.5,
+          "duration": 9,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.2,
+              1.26
+            ],
+            "center": [
+              0.58,
+              0.62
+            ],
+            "focus": [
+              0.6,
+              0.68
+            ],
+            "alpha": 32
+          },
+          "note": "Report-to-Spot action. Fine-tune the cut on the actual navigation click."
+        }
+      ]
+    },
+    {
+      "id": "spot",
+      "start": 104,
+      "end": 140,
+      "name": "Spot Trading",
+      "headline": "From research to your order.",
+      "description": "On Arc, ETH research maps to WETH/USDC. Review the trigger and protection; follow the order state.",
+      "shots": [
+        {
+          "timelineStart": 104,
+          "timelineEnd": 112,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 80,
+          "sourceOut": 88,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.06,
+              1.12
+            ],
+            "center": [
+              0.53,
+              0.59
+            ],
+            "focus": [
+              0.51,
+              0.62
+            ],
+            "alpha": 32
+          },
+          "note": "Research handoff and reviewed WETH pair."
+        },
+        {
+          "timelineStart": 112,
+          "timelineEnd": 122,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 89.3,
+          "sourceOut": 92.6,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.52,
+              1.6
+            ],
+            "center": [
+              0.51,
+              0.6
+            ],
+            "focus": [
+              0.55,
+              0.61
+            ],
+            "alpha": 14,
+            "in": 89.3,
+            "out": 92.6
+          },
+          "note": "Limit ticket and protection. Hold a clear frame; exclude the blank wallet pane that follows."
+        },
+        {
+          "timelineStart": 122,
+          "timelineEnd": 130,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 122.9,
+          "sourceOut": 123.85,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.18,
+              1.25
+            ],
+            "center": [
+              0.52,
+              0.61
+            ],
+            "focus": [
+              0.5,
+              0.62
+            ],
+            "alpha": 32,
+            "in": 122.9,
+            "out": 123.85
+          },
+          "note": "Order registration and Pending dashboard. Do not describe this order as filled."
+        },
+        {
+          "timelineStart": 130,
+          "timelineEnd": 140,
+          "originalFile": "global market research TO spot trading.mp4",
+          "sourceIn": 131.7,
+          "sourceOut": 134.65,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.17,
+              1.22
+            ],
+            "center": [
+              0.52,
+              0.64
+            ],
+            "focus": [
+              0.52,
+              0.65
+            ],
+            "alpha": 32,
+            "in": 131.7,
+            "out": 134.65
+          },
+          "note": "Owner cancellation and changed order count; preserve the actual result."
+        }
+      ]
+    },
+    {
+      "id": "prediction",
+      "start": 140,
+      "end": 172,
+      "name": "Prediction Market intelligence",
+      "headline": "See the evidence behind the odds.",
+      "description": "Inspect a live question, its rules and probabilities. Research adds evidence and alternative scenarios.",
+      "shots": [
+        {
+          "timelineStart": 140,
+          "timelineEnd": 147,
+          "originalFile": "Gateway funding.mp4",
+          "sourceIn": 4.7,
+          "sourceOut": 8.3,
+          "duration": 7,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.14,
+              1.2
+            ],
+            "center": [
+              0.5,
+              0.5
+            ],
+            "focus": [
+              0.5,
+              0.52
+            ],
+            "alpha": 32,
+            "in": 4.7,
+            "out": 8.3
+          },
+          "note": "Borrow the question picker from the funding recording; it belongs before this report."
+        },
+        {
+          "timelineStart": 147,
+          "timelineEnd": 155,
+          "originalFile": "arc prediction market analysis.mp4",
+          "sourceIn": 0.45,
+          "sourceOut": 1.65,
+          "duration": 8,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.16,
+              1.23
+            ],
+            "center": [
+              0.5,
+              0.58
+            ],
+            "focus": [
+              0.4,
+              0.58
+            ],
+            "alpha": 32,
+            "in": 0.45,
+            "out": 1.65
+          },
+          "note": "Recorded live event, probabilities and rules."
+        },
+        {
+          "timelineStart": 155,
+          "timelineEnd": 161,
+          "originalFile": "arc prediction market analysis.mp4",
+          "sourceIn": 25,
+          "sourceOut": 29,
+          "duration": 6,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.2,
+              1.29
+            ],
+            "center": [
+              0.6,
+              0.59
+            ],
+            "focus": [
+              0.66,
+              0.58
+            ],
+            "alpha": 32
+          },
+          "note": "Returned prediction report; omit the long spinner and recovery prompt."
+        },
+        {
+          "timelineStart": 161,
+          "timelineEnd": 172,
+          "originalFile": "arc prediction market analysis.mp4",
+          "sourceIn": 33.2,
+          "sourceOut": 39.9,
+          "duration": 11,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.06,
+              1.12
+            ],
+            "center": [
+              0.5,
+              0.53
+            ],
+            "focus": [
+              0.64,
+              0.6
+            ],
+            "alpha": 32,
+            "in": 33.2,
+            "out": 39.9
+          },
+          "note": "Expanded scenario chart and return toward the decision framework."
+        }
+      ]
+    },
+    {
+      "id": "autopilot",
+      "start": 172,
+      "end": 224,
+      "name": "Guarded Autopilot",
+      "headline": "Your strategy. Your boundaries.",
+      "description": "Choose the strategy, review your limits and follow the vault. Every hold and action stays visible.",
+      "shots": [
+        {
+          "timelineStart": 172,
+          "timelineEnd": 182,
+          "originalFile": "arc autopilot.mp4",
+          "sourceIn": 38.3,
+          "sourceOut": 39.35,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.18,
+              1.25
+            ],
+            "center": [
+              0.51,
+              0.6
+            ],
+            "focus": [
+              0.51,
+              0.59
+            ],
+            "alpha": 32,
+            "in": 38.3,
+            "out": 39.35
+          },
+          "note": "Move the recorded opportunity chooser before setup and dashboard."
+        },
+        {
+          "timelineStart": 182,
+          "timelineEnd": 194,
+          "originalFile": "arc autopilot.mp4",
+          "sourceIn": 45.65,
+          "sourceOut": 47.1,
+          "duration": 12,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.22,
+              1.3
+            ],
+            "center": [
+              0.55,
+              0.62
+            ],
+            "focus": [
+              0.57,
+              0.61
+            ],
+            "alpha": 32,
+            "in": 45.65,
+            "out": 47.1
+          },
+          "note": "Setup, strategy review and explanation of wallet authorizations; freeze a readable view as needed."
+        },
+        {
+          "timelineStart": 194,
+          "timelineEnd": 204,
+          "originalFile": "arc autopilot.mp4",
+          "sourceIn": 0.8,
+          "sourceOut": 1.5,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.18,
+              1.24
+            ],
+            "center": [
+              0.55,
+              0.59
+            ],
+            "focus": [
+              0.67,
+              0.62
+            ],
+            "alpha": 32,
+            "in": 0.8,
+            "out": 1.5
+          },
+          "note": "Owner controls and funding; explain wallet/vault capital versus Gateway pass."
+        },
+        {
+          "timelineStart": 204,
+          "timelineEnd": 214,
+          "originalFile": "arc autopilot.mp4",
+          "sourceIn": 24.5,
+          "sourceOut": 28.5,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.3,
+              1.38
+            ],
+            "center": [
+              0.53,
+              0.49
+            ],
+            "focus": [
+              0.54,
+              0.49
+            ],
+            "alpha": 32
+          },
+          "note": "Running BTC vault and separate paused ETH vault; preserve both identities and their different fill counts."
+        },
+        {
+          "timelineStart": 214,
+          "timelineEnd": 224,
+          "originalFile": "arc autopilot.mp4",
+          "sourceIn": 7.8,
+          "sourceOut": 14.8,
+          "duration": 10,
+          "dissolveHandleSeconds": 0.6,
+          "treatment": {
+            "zoom": [
+              1.26,
+              1.32
+            ],
+            "center": [
+              0.56,
+              0.6
+            ],
+            "focus": [
+              0.58,
+              0.66
+            ],
+            "alpha": 12
+          },
+          "note": "Journal and live workflow. Historical dependency rows remain history; do not turn a hold into a new execution."
+        }
+      ]
+    },
+    {
+      "id": "outro",
+      "start": 224,
+      "end": 240,
+      "name": "Find your PULSE",
+      "headline": "Signal when you need it. Proof when it matters.",
+      "description": "Explore PULSE. Research the market. Review your next move. www.ai-pulse.tech",
+      "shots": [
+        {
+          "timelineStart": 224,
+          "timelineEnd": 229,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 33,
+          "sourceOut": 36,
+          "duration": 5,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.05,
+              1.1
+            ],
+            "center": [
+              0.5,
+              0.47
+            ],
+            "focus": [
+              0.52,
+              0.54
+            ],
+            "alpha": 32
+          },
+          "note": "Return to the familiar Portfolio workspace."
+        },
+        {
+          "timelineStart": 229,
+          "timelineEnd": 234,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 28.5,
+          "sourceOut": 32.5,
+          "duration": 5,
+          "dissolveHandleSeconds": 0.3,
+          "treatment": {
+            "zoom": [
+              1.01,
+              1.04
+            ],
+            "center": [
+              0.5,
+              0.52
+            ],
+            "focus": [
+              0.49,
+              0.57
+            ],
+            "alpha": 32
+          },
+          "note": "Recorded Find your PULSE call to action."
+        },
+        {
+          "timelineStart": 234,
+          "timelineEnd": 240,
+          "originalFile": "PULSE overview and portfolio.mp4",
+          "sourceIn": 0.6,
+          "sourceOut": 1.6,
+          "duration": 6,
+          "dissolveHandleSeconds": 0,
+          "treatment": {
+            "zoom": [
+              1.015,
+              1.045
+            ],
+            "center": [
+              0.5,
+              0.5
+            ],
+            "focus": [
+              0.55,
+              0.58
+            ],
+            "alpha": 32,
+            "endcard": true
+          },
+          "note": "Resolve into a designed wordmark/end card; URL is held clearly for at least six seconds."
+        }
+      ]
+    }
+  ]
+}

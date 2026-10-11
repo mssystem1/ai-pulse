@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PULSE — Signal to action</title>
+<style>
+@font-face{font-family:Syne;src:url(fonts/Syne-400.ttf);font-weight:400}@font-face{font-family:Syne;src:url(fonts/Syne-700.ttf);font-weight:700}
+:root{color-scheme:dark;--navy:#041528;--gold:#e5d19a;--cyan:#78c8dd;--muted:#abc1cc;--line:#233f51}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 10% 0%,#17394b88,transparent 55%),radial-gradient(ellipse at 100% 80%,#77602b22,transparent 50%),var(--navy);color:#eef5f8;font-family:Syne,system-ui,sans-serif;min-height:100vh}
+main{width:min(1420px,94%);margin:0 auto;padding:35px 0 45px}header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:25px}.brand{display:flex;align-items:center;gap:14px;font-weight:700;letter-spacing:.22em;font-size:24px}.brand svg{width:45px;height:35px;stroke:var(--gold);fill:none;stroke-width:2}.meta{font:12px ui-monospace,monospace;color:var(--muted);letter-spacing:.1em}h1{font-size:clamp(27px,3.2vw,48px);line-height:1.15;margin:0 0 12px;letter-spacing:-.03em}.lead{font-size:17px;color:var(--muted);margin:0 0 22px;line-height:1.6}.film{margin:0;overflow:hidden;border-radius:10px;background:#03101c;box-shadow:0 24px 100px #0005}video{display:block;width:100%;aspect-ratio:16/9;background:#041528}button,a{font:inherit}button:focus-visible,a:focus-visible{outline:3px solid var(--gold);outline-offset:4px}.toolbar{display:flex;gap:14px;justify-content:space-between;flex-wrap:wrap;align-items:center;padding:22px 0}.versions{display:flex;gap:8px;flex-wrap:wrap}button{border:1px solid var(--line);background:#0b2336;color:#d9e7ed;border-radius:8px;cursor:pointer;padding:12px 18px;font-size:15px;min-height:44px}.versions button[aria-pressed="true"]{color:#041528;background:linear-gradient(110deg,#c5e4eb,var(--cyan));border-color:#9fd4e1}.download{color:var(--gold);text-decoration:none;font-size:15px;padding:12px 4px}.download:hover{text-decoration:underline}.chapters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:10px 0 32px}.chapters button{text-align:left;background:#0b223380;display:grid;gap:7px;padding:16px}.chapters button[aria-current="true"]{border-color:var(--cyan);background:linear-gradient(115deg,#79c9dd22,#79c9dd05)}.chapters span{font:12px ui-monospace,monospace;color:var(--cyan)}.chapters strong{font-size:15px;font-weight:400}.credits{border-top:1px solid var(--line);padding-top:20px;color:var(--muted);line-height:1.7;font-size:13px}.credits a{color:var(--gold)}.credits p{margin:4px 0}footer{margin-top:20px;color:#6e90a1;font:12px ui-monospace,monospace}
+@media(max-width:760px){main{width:95%;padding-top:22px}header{align-items:start}.meta{text-align:right;font-size:10px;max-width:115px;line-height:1.6}.chapters{grid-template-columns:repeat(2,minmax(0,1fr))}.toolbar{gap:7px}.versions button{font-size:13px;padding:11px 13px}.lead{font-size:15px}.chapters strong{font-size:14px}}
+@media(prefers-reduced-motion:no-preference){button{transition:background .2s,border-color .2s}.chapters button:hover{border-color:var(--gold)}}
+</style>
+</head>
+<body><main>
+<header><div class="brand"><svg aria-hidden="true" viewBox="0 0 45 35"><path d="M0 18h10l5-7 6 18 6-22 6 11h12"/></svg>PULSE</div><div class="meta">ARC MAINNET<br>4 MIN · 1080p · 30 FPS</div></header>
+<h1>Read the market. Trade your way.</h1>
+<p class="lead">A guided look at market research, wallet-approved Spot and guarded Autopilot.</p>
+<figure class="film"><video id="film" controls playsinline preload="metadata" poster="PULSE-demo-poster.jpg" aria-label="Four-minute PULSE product demo"><source src="PULSE-Arc-Mainnet-Demo-4min.mp4" type="video/mp4">Open the MP4 file to watch the PULSE demo.</video></figure>
+<div class="toolbar"><div class="versions" aria-label="Choose audio version"><button type="button" data-file="PULSE-Arc-Mainnet-Demo-4min.mp4" aria-pressed="true">Female narration + music</button><button type="button" data-file="PULSE-Arc-Mainnet-Demo-4min-music-only.mp4" aria-pressed="false">Music + on-screen text</button></div><a id="download" class="download" href="PULSE-Arc-Mainnet-Demo-4min.mp4" download>Download this MP4 ↗</a></div>
+<nav class="chapters" aria-label="Film chapters">
+<button type="button" data-time="0" aria-current="true"><span>00:00 / 01</span><strong>Meet PULSE</strong></button>
+<button type="button" data-time="16"><span>00:16 / 02</span><strong>Your command center</strong></button>
+<button type="button" data-time="40"><span>00:40 / 03</span><strong>Fund your research</strong></button>
+<button type="button" data-time="64"><span>01:04 / 04</span><strong>Global Market research</strong></button>
+<button type="button" data-time="104"><span>01:44 / 05</span><strong>Spot Trading</strong></button>
+<button type="button" data-time="140"><span>02:20 / 06</span><strong>Prediction intelligence</strong></button>
+<button type="button" data-time="172"><span>02:52 / 07</span><strong>Guarded Autopilot</strong></button>
+<button type="button" data-time="224"><span>03:44 / 08</span><strong>Find your PULSE</strong></button>
+</nav>
+<div class="credits"><p>Original score: <strong>PULSE — Signal to Action</strong> · 120 BPM. Female voice: Microsoft Aria, synthetic English narration.</p><p>Edited from your five recordings. <a href="TRANSCRIPT.md">Read the narration</a> · <a href="README.md">Film notes</a>.</p></div>
+<footer>Intelligence. Execution. Your control.</footer>
+</main>
+<script>
+const film=document.querySelector('#film'),download=document.querySelector('#download'),modes=[...document.querySelectorAll('[data-file]')],chapters=[...document.querySelectorAll('[data-time]')];
+for(const button of modes)button.addEventListener('click',()=>{if(button.getAttribute('aria-pressed')==='true')return;const position=film.currentTime,playing=!film.paused;film.pause();film.src=button.dataset.file;download.href=button.dataset.file;for(const b of modes)b.setAttribute('aria-pressed',String(b===button));film.addEventListener('loadedmetadata',()=>{film.currentTime=Math.min(position,film.duration);if(playing)film.play().catch(()=>{});},{once:true});film.load();});
+for(const button of chapters)button.addEventListener('click',()=>{film.currentTime=Number(button.dataset.time);film.play().catch(()=>{});});
+film.addEventListener('timeupdate',()=>{let current=chapters[0];for(const b of chapters)if(film.currentTime>=Number(b.dataset.time))current=b;for(const b of chapters)b.setAttribute('aria-current',String(b===current));});
+</script></body></html>

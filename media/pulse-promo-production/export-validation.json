@@ -1,0 +1,111 @@
+{
+  "exports": [
+    {
+      "file": "PULSE-Arc-Mainnet-Demo-4min.mp4",
+      "durationSeconds": 240.0,
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "decodedVideoFrames": 7200,
+      "videoCodec": "H.264",
+      "audioCodec": "AAC",
+      "sampleRate": 48000,
+      "channels": 2,
+      "integratedLUFS": -15.0,
+      "truePeakDbTP": -1.04,
+      "LRA": 6.2,
+      "completeDecodePassed": true,
+      "unexpectedBlackIntervals": [],
+      "closingFadeBlackIntervals": [],
+      "bytes": 78256675,
+      "sha256": "52ccc013e80578f26d6543fa51864b5c6005da09a6bb599a3f8250cdaa824487"
+    },
+    {
+      "file": "PULSE-Arc-Mainnet-Demo-4min-music-only.mp4",
+      "durationSeconds": 240.0,
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "decodedVideoFrames": 7200,
+      "videoCodec": "H.264",
+      "audioCodec": "AAC",
+      "sampleRate": 48000,
+      "channels": 2,
+      "integratedLUFS": -15.03,
+      "truePeakDbTP": -0.82,
+      "LRA": 5.2,
+      "completeDecodePassed": true,
+      "unexpectedBlackIntervals": [],
+      "closingFadeBlackIntervals": [],
+      "bytes": 78411008,
+      "sha256": "67fcd306b13f73b006adce111ae7a27f8daf75e69cab72b6df715d739b0dddaa"
+    }
+  ],
+  "titlesAboveFootage": true,
+  "descriptionsBelowFootage": true,
+  "completeDecodePassed": true,
+  "titleWidthCheckPassed": true,
+  "encodedTitlePixelBounds": [
+    {
+      "chapter": "intro",
+      "left": 164,
+      "right": 977,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "portfolio",
+      "left": 162,
+      "right": 690,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "gateway",
+      "left": 163,
+      "right": 947,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "research",
+      "left": 161,
+      "right": 856,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "spot",
+      "left": 164,
+      "right": 842,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "prediction",
+      "left": 162,
+      "right": 986,
+      "top": 97,
+      "bottom": 128
+    },
+    {
+      "chapter": "autopilot",
+      "left": 162,
+      "right": 911,
+      "top": 97,
+      "bottom": 136
+    },
+    {
+      "chapter": "outro",
+      "left": 162,
+      "right": 1284,
+      "top": 97,
+      "bottom": 136
+    }
+  ],
+  "descriptionMaximumLines": 2,
+  "voiceGroupsAlignedToSceneSteps": 24,
+  "originalSourceRecordingsModified": false,
+  "originalSourceAudioIncluded": false,
+  "visualReviewFrameCount": 30
+}

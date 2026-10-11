@@ -1,0 +1,28 @@
+{
+  "reviewedAt": "2026-10-08T18:45:05.293Z",
+  "mode": "Local storyboard only; all network requests blocked",
+  "checks": [
+    {
+      "width": 390,
+      "scenes": 8,
+      "renderErrors": [],
+      "titlesAboveVideo": true,
+      "descriptionsBelowVideo": true,
+      "descriptionsClipped": false,
+      "horizontalOverflow": false,
+      "timelineScrubAndHighlightToggle": true
+    },
+    {
+      "width": 1440,
+      "scenes": 8,
+      "renderErrors": [],
+      "titlesAboveVideo": true,
+      "descriptionsBelowVideo": true,
+      "descriptionsClipped": false,
+      "horizontalOverflow": false,
+      "timelineScrubAndHighlightToggle": true
+    }
+  ],
+  "designFrames": 8,
+  "finalVideoRendered": false
+}

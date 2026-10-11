@@ -1,0 +1,82 @@
+[
+  {
+    "chapter": "intro",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\01-intro-voice.mp3",
+    "seconds": 14.42,
+    "start": 0.7,
+    "available": 15,
+    "ratePercent": 0,
+    "script": "Markets move fast. Your decisions deserve context. Meet PULSE: market intelligence, wallet-approved Spot, and guarded Autopilot. Read the market. Trade your way."
+  },
+  {
+    "chapter": "portfolio",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\02-portfolio-voice.mp3",
+    "seconds": 18.19,
+    "start": 16.7,
+    "available": 23,
+    "ratePercent": 0,
+    "script": "Start with your portfolio. Follow orders, Autopilot accounts, activity, and saved reports. On Arc, keep two balances in view. Your wallet funds trading and gas. Circle Gateway pays for research and Autopilot entry passes."
+  },
+  {
+    "chapter": "gateway",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\03-gateway-voice.mp3",
+    "seconds": 15.7,
+    "start": 40.7,
+    "available": 23,
+    "ratePercent": 0,
+    "script": "Open Wallet and funding. Choose a Gateway deposit amount and review the wallet prompts: the USDC approval, then the deposit confirmation. Check the updated Gateway balance. Your trading capital remains separate."
+  },
+  {
+    "chapter": "research",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\04-research-voice.mp3",
+    "seconds": 24.17,
+    "start": 64.7,
+    "available": 39,
+    "ratePercent": 0,
+    "script": "In Global Market, choose a market and timeframe, then inspect live OKX reference data. Quick and Pro research add context, scenarios, targets, and invalidation. Compare what would support or challenge the idea. When you want to act, open the research plan in Spot Trading. The report informs your decision; you still review the order."
+  },
+  {
+    "chapter": "spot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\05-spot-voice.mp3",
+    "seconds": 22.61,
+    "start": 104.7,
+    "available": 35,
+    "ratePercent": 0,
+    "script": "On Arc, Ether research maps to wrapped Ether and USDC. Review the amount, trigger, slippage, and optional take-profit and stop-loss protection. Manual Spot orders require your wallet approval. This limit order is pending, so it waits for its condition. Follow it in the dashboard, or cancel it and reclaim the remaining funds."
+  },
+  {
+    "chapter": "prediction",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\06-prediction-voice.mp3",
+    "seconds": 21.55,
+    "start": 140.7,
+    "available": 31,
+    "ratePercent": 0,
+    "script": "In Prediction Market intelligence, inspect a live question, its probabilities, liquidity, and resolution rules. Research adds evidence and alternative scenarios, alongside relevant market structure. Probability is a starting point for investigation. PULSE helps you understand the context before you decide."
+  },
+  {
+    "chapter": "autopilot",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\07-autopilot-voice.mp3",
+    "seconds": 34.2,
+    "start": 172.7,
+    "available": 51,
+    "ratePercent": 0,
+    "script": "For autonomous execution, choose a market and strategy, then review your capital, exposure, and risk limits. Your wallet funds the vault and authorizes the policy. Gateway funds the entry pass. Autopilot acts only when its required rules pass. Follow the vault, pause entries, and manage capital from its controls. Open the journal to see holds, checks, recovery events, and confirmed actions. A hold is a decision, too. Running does not mean a new trade."
+  },
+  {
+    "chapter": "outro",
+    "voice": "en-US-AriaNeural",
+    "file": "C:\\Users\\maksim.shishkov\\ai-pulse\\media\\pulse-promo-production\\audio\\08-outro-voice.mp3",
+    "seconds": 14.16,
+    "start": 224.7,
+    "available": 15,
+    "ratePercent": 0,
+    "script": "Research with context. Act within the boundaries you choose. PULSE. Signal when you need it. Proof when it matters. Find your PULSE at ai-pulse dot tech."
+  }
+]

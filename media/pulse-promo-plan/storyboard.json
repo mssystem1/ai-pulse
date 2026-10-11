@@ -1,0 +1,593 @@
+{
+  "version": 1,
+  "phase": "Approved pre-production storyboard; final films rendered and validated",
+  "duration": 240,
+  "canvas": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "audio": {
+    "music": "Instrumental progressive electronic / cinematic synth, proposed 120 BPM",
+    "voice": "Warm natural adult female English voice; audition before full render",
+    "captions": "Complete explanation remains understandable muted",
+    "mix": "Voice remains clear; music ducks during narration and rises between chapters"
+  },
+  "style": {
+    "base": "#041528",
+    "cyan": "#78c8dd",
+    "gold": "#e5d19a",
+    "mint": "#80d8bd",
+    "violet": "#b5a0ed",
+    "titles": "Above footage",
+    "descriptions": "Below footage",
+    "emphasis": "Soft radial / linear gradient pools, light sweeps and gentle zoom; no annotation boxes",
+    "callouts": "Short translucent type in verified empty regions; omit when no safe region exists"
+  },
+  "sources": [
+    {
+      "id": "overview",
+      "name": "PULSE overview and portfolio.mp4",
+      "duration": 48.533021,
+      "width": 1896,
+      "height": 912
+    },
+    {
+      "id": "gateway",
+      "name": "Gateway funding.mp4",
+      "duration": 51.6333,
+      "width": 1898,
+      "height": 908
+    },
+    {
+      "id": "global-spot",
+      "name": "global market research TO spot trading.mp4",
+      "duration": 141.161771,
+      "width": 1902,
+      "height": 910
+    },
+    {
+      "id": "prediction",
+      "name": "arc prediction market analysis.mp4",
+      "duration": 52.245,
+      "width": 1892,
+      "height": 908
+    },
+    {
+      "id": "autopilot",
+      "name": "arc autopilot.mp4",
+      "duration": 50.773,
+      "width": 1902,
+      "height": 914
+    }
+  ],
+  "chapters": [
+    {
+      "id": "intro",
+      "start": 0,
+      "end": 16,
+      "name": "Meet PULSE",
+      "headline": "Read the market. Trade your way.",
+      "description": "Market intelligence, wallet-approved Spot and guarded Autopilot. One connected workspace.",
+      "color": "#e5d19a",
+      "image": "overview-1.jpg",
+      "source": "overview",
+      "focus": {
+        "x": 40,
+        "y": 47,
+        "w": 25,
+        "h": 28
+      },
+      "callout": "Intelligence. Execution. Your control.",
+      "placement": "right",
+      "beats": [
+        [
+          "00:00–00:06",
+          "Read the market."
+        ],
+        [
+          "00:06–00:11",
+          "Trade your way."
+        ],
+        [
+          "00:11–00:16",
+          "Research → Review → Act"
+        ]
+      ],
+      "shots": [
+        {
+          "source": "overview",
+          "in": 0.6,
+          "out": 5.6,
+          "target": 6,
+          "note": "Open on the real landing hero; reveal the wordmark with the music."
+        },
+        {
+          "source": "overview",
+          "in": 5.8,
+          "out": 8.8,
+          "target": 4,
+          "note": "Spot / Autopilot distinction; keep the words readable."
+        },
+        {
+          "source": "overview",
+          "in": 9.3,
+          "out": 14.3,
+          "target": 6,
+          "note": "Research, prediction and Risk Guard overview; feature tease, no invented Risk Guard demo."
+        }
+      ],
+      "voice": "Markets move fast. Your decisions deserve context. Meet PULSE: market intelligence, wallet-approved Spot, and guarded Autopilot in one connected workspace. Read the market. Trade your way.",
+      "transition": "The landing diagram resolves into the real Portfolio workspace."
+    },
+    {
+      "id": "portfolio",
+      "start": 16,
+      "end": 40,
+      "name": "Your command center",
+      "headline": "See the whole picture.",
+      "description": "Follow your balances, orders and strategy activity. Wallet and Gateway funds stay distinct.",
+      "color": "#78c8dd",
+      "image": "overview-35.7.jpg",
+      "source": "overview",
+      "focus": {
+        "x": 67,
+        "y": 38,
+        "w": 31,
+        "h": 16
+      },
+      "callout": "Wallet ≠ Gateway",
+      "placement": "left",
+      "beats": [
+        [
+          "00:16–00:24",
+          "Your research. Your trades. Your strategies."
+        ],
+        [
+          "00:24–00:32",
+          "Follow funds, orders and receipts."
+        ],
+        [
+          "00:32–00:40",
+          "Wallet = trading + gas · Gateway = services"
+        ]
+      ],
+      "shots": [
+        {
+          "source": "overview",
+          "in": 33,
+          "out": 39,
+          "target": 8,
+          "note": "Portfolio totals; use a measured push-in on the two workspaces, not the warning panel."
+        },
+        {
+          "source": "overview",
+          "in": 40.2,
+          "out": 44.2,
+          "target": 8,
+          "note": "Recent activity and saved reports; do not present old warning states as a new failure or success."
+        },
+        {
+          "source": "gateway",
+          "in": 46.5,
+          "out": 50.5,
+          "target": 8,
+          "note": "Brief balance comparison; reconnect visually to Wallet & funding."
+        }
+      ],
+      "voice": "Start with your portfolio. Follow Spot orders, Autopilot accounts, recorded activity, and saved reports. On Arc, watch two separate balances. Wallet USDC funds trading and gas. Circle Gateway USDC pays for research and Autopilot entry passes. Knowing the difference makes the next step clear.",
+      "transition": "Match the Wallet & funding control to the open funding drawer."
+    },
+    {
+      "id": "gateway",
+      "start": 40,
+      "end": 64,
+      "name": "Fund your research",
+      "headline": "One deposit. Ready for research.",
+      "description": "Deposit USDC into Circle Gateway, review the wallet steps, then check the confirmed balance.",
+      "color": "#e5d19a",
+      "image": "gateway-47.5.jpg",
+      "source": "gateway",
+      "focus": {
+        "x": 87,
+        "y": 73,
+        "w": 19,
+        "h": 20
+      },
+      "callout": "Gateway deposit confirmed",
+      "placement": "left",
+      "beats": [
+        [
+          "00:40–00:46",
+          "Choose your deposit amount."
+        ],
+        [
+          "00:46–00:52",
+          "Review the USDC approval."
+        ],
+        [
+          "00:52–00:58",
+          "Confirm the Gateway deposit."
+        ],
+        [
+          "00:58–01:04",
+          "Check your funded Gateway balance."
+        ]
+      ],
+      "shots": [
+        {
+          "source": "gateway",
+          "in": 17.8,
+          "out": 23.8,
+          "target": 6,
+          "note": "Funding drawer and deposit controls; follow the original cursor."
+        },
+        {
+          "source": "gateway",
+          "in": 30.5,
+          "out": 33.5,
+          "target": 6,
+          "note": "Real Circle approval; shorten idle time without hiding the amount or recipient."
+        },
+        {
+          "source": "gateway",
+          "in": 36.5,
+          "out": 39.5,
+          "target": 6,
+          "note": "Real deposit confirmation; give the viewer time to read."
+        },
+        {
+          "source": "gateway",
+          "in": 44.5,
+          "out": 50.5,
+          "target": 6,
+          "note": "Confirmed deposit and Gateway balance; show the recorded 0.6-USDC demonstration accurately."
+        }
+      ],
+      "voice": "To fund research, open Wallet and funding, enter a Gateway deposit amount, and review the wallet prompts. First comes the USDC approval, then the deposit confirmation. The updated Gateway balance shows when those funds are ready for service payments. Your trading capital remains separate.",
+      "transition": "The funded balance glow travels toward Global Market; warm gold gives way to cyan."
+    },
+    {
+      "id": "research",
+      "start": 64,
+      "end": 104,
+      "name": "Global Market research",
+      "headline": "Turn market data into a plan.",
+      "description": "Explore live OKX data, inspect the report and compare scenarios before opening a Spot ticket.",
+      "color": "#78c8dd",
+      "image": "global-spot-57.jpg",
+      "source": "global-spot",
+      "focus": {
+        "x": 55,
+        "y": 51,
+        "w": 39,
+        "h": 40
+      },
+      "callout": "Context. Targets. Invalidation.",
+      "placement": "right",
+      "beats": [
+        [
+          "01:04–01:14",
+          "Choose a market and timeframe."
+        ],
+        [
+          "01:14–01:22",
+          "Review Quick or Pro research."
+        ],
+        [
+          "01:22–01:35",
+          "Compare scenarios, targets and invalidation."
+        ],
+        [
+          "01:35–01:44",
+          "Open the plan in Spot Trading."
+        ]
+      ],
+      "shots": [
+        {
+          "source": "global-spot",
+          "in": 2.5,
+          "out": 12.5,
+          "target": 10,
+          "note": "Market selection and transition to ETH research."
+        },
+        {
+          "source": "global-spot",
+          "in": 42,
+          "out": 50,
+          "target": 8,
+          "note": "Cut the generation wait; start with the returned report."
+        },
+        {
+          "source": "global-spot",
+          "in": 53,
+          "out": 62,
+          "target": 13,
+          "note": "Readable expanded scenario chart; hold actual chart frame for the explanation."
+        },
+        {
+          "source": "global-spot",
+          "in": 72.5,
+          "out": 79.5,
+          "target": 9,
+          "note": "Report-to-Spot action. Fine-tune the cut on the actual navigation click."
+        }
+      ],
+      "voice": "In Global Market, choose a market and timeframe, then inspect live OKX reference data. Quick and Pro research add context, scenarios, targets, and invalidation. Pause on the chart and understand what would support or challenge the idea. When you want to act, open the research plan in Spot Trading. The report informs your decision; you still review the order.",
+      "transition": "A matched chart-to-ticket cut preserves ETH-USDT identity; the lower caption explains WETH/USDC."
+    },
+    {
+      "id": "spot",
+      "start": 104,
+      "end": 140,
+      "name": "Spot Trading",
+      "headline": "From research to your order.",
+      "description": "On Arc, ETH research maps to WETH/USDC. Review the trigger and protection; follow the order state.",
+      "color": "#80d8bd",
+      "image": "global-spot-92.jpg",
+      "source": "global-spot",
+      "focus": {
+        "x": 51,
+        "y": 67,
+        "w": 34,
+        "h": 22
+      },
+      "callout": "Review. Sign. Track.",
+      "placement": "right",
+      "beats": [
+        [
+          "01:44–01:52",
+          "ETH-USDT research → WETH/USDC execution."
+        ],
+        [
+          "01:52–02:02",
+          "Review amount, trigger, slippage and TP/SL."
+        ],
+        [
+          "02:02–02:10",
+          "A pending limit order waits for its trigger."
+        ],
+        [
+          "02:10–02:20",
+          "Track, cancel and reclaim funds."
+        ]
+      ],
+      "shots": [
+        {
+          "source": "global-spot",
+          "in": 80,
+          "out": 88,
+          "target": 8,
+          "note": "Research handoff and reviewed WETH pair."
+        },
+        {
+          "source": "global-spot",
+          "in": 89,
+          "out": 93,
+          "target": 10,
+          "note": "Limit ticket and protection. Hold a clear frame; exclude the blank wallet pane that follows."
+        },
+        {
+          "source": "global-spot",
+          "in": 117,
+          "out": 125,
+          "target": 8,
+          "note": "Order registration and Pending dashboard. Do not describe this order as filled."
+        },
+        {
+          "source": "global-spot",
+          "in": 129.5,
+          "out": 139.5,
+          "target": 10,
+          "note": "Owner cancellation and changed order count; preserve the actual result."
+        }
+      ],
+      "voice": "On Arc, ETH research maps to WETH and USDC. Review the amount, route, trigger, slippage, and optional take-profit and stop-loss protection. Manual Spot orders require your wallet approval. The recorded limit order is pending, so it waits for its condition rather than filling immediately. Follow it in the dashboard, or cancel it and reclaim the remaining funds.",
+      "transition": "The price chart dissolves into a live prediction question: from price context to event context."
+    },
+    {
+      "id": "prediction",
+      "start": 140,
+      "end": 172,
+      "name": "Prediction Market intelligence",
+      "headline": "See the evidence behind the odds.",
+      "description": "Inspect a live question, its rules and probabilities. Research adds evidence and alternative scenarios.",
+      "color": "#b5a0ed",
+      "image": "prediction-26.3.jpg",
+      "source": "prediction",
+      "focus": {
+        "x": 71,
+        "y": 53,
+        "w": 31,
+        "h": 40
+      },
+      "callout": "Probability needs context.",
+      "placement": "left",
+      "beats": [
+        [
+          "02:20–02:27",
+          "One question. A clearer perspective."
+        ],
+        [
+          "02:27–02:35",
+          "Read probability, liquidity and resolution rules."
+        ],
+        [
+          "02:35–02:46",
+          "Compare evidence and alternative scenarios."
+        ],
+        [
+          "02:46–02:52",
+          "Research supports your judgment."
+        ]
+      ],
+      "shots": [
+        {
+          "source": "gateway",
+          "in": 3,
+          "out": 9,
+          "target": 7,
+          "note": "Borrow the question picker from the funding recording; it belongs before this report."
+        },
+        {
+          "source": "prediction",
+          "in": 0.5,
+          "out": 7.5,
+          "target": 8,
+          "note": "Recorded live event, probabilities and rules."
+        },
+        {
+          "source": "prediction",
+          "in": 25,
+          "out": 29,
+          "target": 6,
+          "note": "Returned prediction report; omit the long spinner and recovery prompt."
+        },
+        {
+          "source": "prediction",
+          "in": 31.5,
+          "out": 40.5,
+          "target": 11,
+          "note": "Expanded scenario chart and return toward the decision framework."
+        }
+      ],
+      "voice": "Markets also move around events. In Prediction Market intelligence, inspect a live question, its probabilities, liquidity, and resolution rules. Research brings in evidence and alternative scenarios, alongside relevant market structure. A probability is a starting point for investigation. PULSE helps you understand the context before you decide.",
+      "transition": "From an event scenario to a strategy choice; violet evolves into cyan and gold."
+    },
+    {
+      "id": "autopilot",
+      "start": 172,
+      "end": 224,
+      "name": "Guarded Autopilot",
+      "headline": "Your strategy. Your boundaries.",
+      "description": "Choose the strategy, review your limits and follow the vault. Every hold and action stays visible.",
+      "color": "#78c8dd",
+      "image": "autopilot-27.jpg",
+      "source": "autopilot",
+      "focus": {
+        "x": 56,
+        "y": 65,
+        "w": 40,
+        "h": 18
+      },
+      "callout": "A hold is a decision.",
+      "placement": "left",
+      "beats": [
+        [
+          "02:52–03:02",
+          "Choose a market and strategy."
+        ],
+        [
+          "03:02–03:14",
+          "Review your capital, exposure and risk limits."
+        ],
+        [
+          "03:14–03:24",
+          "Wallet funds the vault · Gateway funds the pass."
+        ],
+        [
+          "03:24–03:34",
+          "Follow the running vault and owner controls."
+        ],
+        [
+          "03:34–03:44",
+          "Check the journal: holds, checks and confirmed actions."
+        ]
+      ],
+      "shots": [
+        {
+          "source": "autopilot",
+          "in": 35.5,
+          "out": 41.5,
+          "target": 10,
+          "note": "Move the recorded opportunity chooser before setup and dashboard."
+        },
+        {
+          "source": "autopilot",
+          "in": 42,
+          "out": 48.8,
+          "target": 12,
+          "note": "Setup, strategy review and explanation of wallet authorizations; freeze a readable view as needed."
+        },
+        {
+          "source": "autopilot",
+          "in": 0.8,
+          "out": 4.8,
+          "target": 10,
+          "note": "Owner controls and funding; explain wallet/vault capital versus Gateway pass."
+        },
+        {
+          "source": "autopilot",
+          "in": 24.5,
+          "out": 28.5,
+          "target": 10,
+          "note": "Running BTC vault and separate paused ETH vault; preserve both identities and their different fill counts."
+        },
+        {
+          "source": "autopilot",
+          "in": 7.8,
+          "out": 14.8,
+          "target": 10,
+          "note": "Journal and live workflow. Historical dependency rows remain history; do not turn a hold into a new execution."
+        }
+      ],
+      "voice": "For autonomous execution, choose an Autopilot market and strategy, then review your capital, exposure, and risk limits. Your wallet funds the vault and authorizes the policy. Gateway funds the entry pass. Autopilot monitors the setup and acts only when its required rules pass. You can follow the vault, pause entries, and manage capital from its controls. Open the strategy journal to see holds, checks, recovery events, and confirmed actions. A hold is a decision, too. Running does not mean a new trade has occurred.",
+      "transition": "The journal resolves back into the overview. One final gold pulse carries the call to action."
+    },
+    {
+      "id": "outro",
+      "start": 224,
+      "end": 240,
+      "name": "Find your PULSE",
+      "headline": "Signal when you need it. Proof when it matters.",
+      "description": "Explore PULSE. Research the market. Review your next move. www.ai-pulse.tech",
+      "color": "#e5d19a",
+      "image": "overview-30.5.jpg",
+      "source": "overview",
+      "focus": {
+        "x": 51,
+        "y": 54,
+        "w": 28,
+        "h": 35
+      },
+      "callout": "Find your PULSE.",
+      "placement": "right",
+      "beats": [
+        [
+          "03:44–03:52",
+          "Intelligence. Execution. Your control."
+        ],
+        [
+          "03:52–04:00",
+          "Find your PULSE. · www.ai-pulse.tech"
+        ]
+      ],
+      "shots": [
+        {
+          "source": "overview",
+          "in": 33,
+          "out": 36,
+          "target": 5,
+          "note": "Return to the familiar Portfolio workspace."
+        },
+        {
+          "source": "overview",
+          "in": 28.5,
+          "out": 32.5,
+          "target": 5,
+          "note": "Recorded Find your PULSE call to action."
+        },
+        {
+          "source": "overview",
+          "in": 0.6,
+          "out": 1.6,
+          "target": 6,
+          "note": "Resolve into a designed wordmark/end card; URL is held clearly for at least six seconds."
+        }
+      ],
+      "voice": "Research with context. Act within the boundaries you choose. PULSE. Signal when you need it. Proof when it matters. Find your PULSE at ai-pulse dot tech.",
+      "transition": "Resolve the music and pulse line; hold the readable URL, then fade for the last second."
+    }
+  ],
+  "finalPlayer": "../pulse-promo-production/index.html"
+}
