@@ -74,16 +74,16 @@ PULSE exposes the same approved eight-service catalog under `/arbitrum`, using `
 
 There is no repository-side action that can guarantee approval by an Arbitrum editorial directory. Follow the current official form/dashboard visible to the operator at submission time and save the resulting submission ID.
 
-## Arc Testnet and Circle publication
+## Arc Mainnet and Circle publication
 
-Arc is testnet-only in PULSE. Use `/arc`, `eip155:5042002`, test USDC `0x3600000000000000000000000000000000000000`, and Circle Gateway.
+Use `/arc`, Arc Mainnet `eip155:5042`, USDC `0x3600000000000000000000000000000000000000`, and production Circle Gateway (domain 26). A wallet USDC balance is distinct from its prepaid Gateway balance. The retired testnet must not be used in current discovery metadata.
 
-1. Keep `ARC_AI_MODE=fixture` for the first deployed certification.
-2. Verify Circle entity secret, wallet set, seller wallet, Gateway balance/deposit, and testnet RPC without exposing credentials.
-3. Run a controlled Arc test-USDC settlement and recover its report.
-4. Confirm every page, challenge, receipt, and listing field says Arc Testnet and test USDC.
+1. Use `ARC_AI_MODE=live` and verify the production inference configuration.
+2. Verify the production seller, Gateway balance/deposit and chain-5042 RPC without exposing credentials.
+3. Run a bounded Arc USDC authorization, confirm its Gateway receipt/debit and recover its report. A Gateway transfer identifier is not an immediate on-chain transaction hash.
+4. Confirm every page, challenge, receipt and listing uses Arc Mainnet, the production Gateway signing contract and USDC.
 5. Use `docs/CIRCLE_AGENT_MARKETPLACE_LISTING.md` as proposed copy, then reconcile every field with the live marketplace form/API available to the operator.
-6. Submit only through Circle’s current official marketplace/discovery interface. Save the returned listing identifier and search result as proof.
+6. Query `https://api.circle.com/v2/x402/discovery/resources` to verify actual indexing. Submit through Circle’s official listing process only when authorized, and save the returned identifier/search result as proof.
 7. Do not describe xAI or any routed provider as “Arc-native inference.” `docs/ARC_AI_PROVIDER_REVIEW.md` explains the provider boundary.
 
 If Circle has no public self-service publication surface at submission time, the document remains listing material—not evidence of publication. Obtain the official partner/submission route from Circle and record that external dependency.
@@ -116,18 +116,15 @@ Public record: https://www.okx.ai/agents/8355
 8. Re-check the marketplace detail page, service rows, active state, logo, search result, and validator output. Do not rely only on transaction success.
 9. If listing review is required, submit #8355 and wait for the review result sent to the Agentic Wallet email. Record the review/submission identifier.
 
-Recommended OKX.AI service rows should use X Layer URLs because OKX’s x402 facilitator and marketplace payment validation are X Layer-focused:
+Agent 8355 currently selects five research/risk services. The owner removed its three Autopilot rows on October 1; preserve that choice. The product API/MCP can independently expose its eight-service catalog. The five OKX.AI service rows use X Layer URLs because OKX’s facilitator and marketplace validation are X Layer-focused:
 
 - Global Quick → Spot Market or Limit — `/xlayer/v1/analysis/spot/standard` — $0.20.
 - Global Pro → Spot Market or Limit — `/xlayer/v1/analysis/spot/premium` — $0.30.
 - Prediction Quick — `/xlayer/v1/analysis/prediction/standard` — $0.20.
 - Prediction Pro — `/xlayer/v1/analysis/prediction/premium` — $0.30.
 - Token Risk Guard — `/xlayer/v1/preflight` — $0.20.
-- Start Autopilot · 24h — `/xlayer/v1/autopilot/pass/24h` — $1.50.
-- Start Autopilot · 7d — `/xlayer/v1/autopilot/pass/7d` — $10.50.
-- Start Autopilot · 30d — `/xlayer/v1/autopilot/pass/30d` — $45.00.
 
-Do not publish Fused, Divergence, Event-risk, route tickets, separate Market/Limit execution or Autopilot evaluation as extra marketplace services. Market/Limit are Agentic Wallet actions inside the two Global services. The three duration-specific Autopilot starts are the only separate Autopilot marketplace rows.
+Do not publish Fused, Divergence, Event-risk, route tickets, separate Market/Limit execution or Autopilot evaluation as extra marketplace services. Market/Limit are separately reviewed wallet actions inside the two Global services. Do not re-add the removed Autopilot rows without explicit owner authorization and paid-delivery evidence.
 
 The two Global service descriptions must explicitly list the two report-linked next actions: a prefilled Agentic-Wallet-signed Spot Market order or Spot Limit order. Both Base/Quick and Premium/Pro expose those choices; Premium adds analysis depth rather than exclusive permission to trade. Autopilot starts independently through one of its three dedicated duration services and does not require a Global report.
 

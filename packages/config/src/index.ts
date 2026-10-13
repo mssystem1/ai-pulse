@@ -380,7 +380,7 @@ export function loadConfig(): AppConfig {
     "POST /v1/analysis/spot/standard": {
       name: "Global Quick → Spot Market or Limit",
       priceUsd: parsed.PRICE_ANALYSIS_BASE,
-      description: "A concise Global Base analysis with live OKX evidence, actionable levels, an Elliott candidate count, invalidation and a Buy-or-Wait conclusion, followed by a prefilled wallet-signed Spot Market or Limit order on a supported execution mainnet.",
+      description: "Global Quick: 520 completed OHLCV candles on the selected timeframe, conditional main and alternative moves, and one aligned Spot plan with trigger, targets and cancellation. A supported Elliott candidate is labelled; otherwise Count unclear. Recover the full report and canonical chart data free. Market or Limit orders require separate wallet review and signing.",
     },
     "POST /v1/autopilot/pass/24h": {
       name: "Start Autopilot · 24h",
@@ -400,7 +400,7 @@ export function loadConfig(): AppConfig {
     "POST /v1/analysis/spot/premium": {
       name: "Global Pro → Spot Market or Limit",
       priceUsd: parsed.PRICE_ANALYSIS_PREMIUM,
-      description: "A Premium Global analysis with chart, Fibonacci and pivot levels, global Elliott wave paths and DeFi opportunities, followed by a prefilled wallet-signed Spot Market or Limit order on a supported execution mainnet.",
+      description: "Global Pro adds independent higher-timeframe context, SMA family, regression channel, anchored VWAP, Fibonacci, confirmed pivots, RSI and ATR evidence to the same 520-candle chart and aligned Spot plan. Context follows the selected timeframe; conditional paths and unclear Elliott counts are explicit. Free full-report recovery. Market or Limit orders require separate wallet review and signing.",
     },
     "POST /v1/analysis/prediction/standard": {
       name: "Prediction Quick",

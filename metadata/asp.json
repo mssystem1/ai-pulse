@@ -109,6 +109,24 @@
     "autopilotPass30d": "POST /v1/autopilot/pass/30d"
   },
   "timeframes": ["15m", "1H", "4H", "1D", "1W"],
+  "globalChart": {
+    "engine": "TradingView Lightweight Charts",
+    "history": "520 saved completed OHLCV candles; pair, venue, quote currency, timeframe and snapshot time are visible",
+    "default": "Candles, volume, SMA55, available confirmed swing channel and the same conditional Spot plan",
+    "pro": "Independent higher-timeframe context and RSI; optional SMA family, regression, Fibonacci retracement, anchored VWAP, pivots and ATR",
+    "fibonacci": "Confirmed A-to-B swing with standard 0/23.6/38.2/50/61.8/78.6/100% horizontal retracements; thesis targets and extensions remain distinct",
+    "guide": "https://app.ai-pulse.tech/docs#docs-global-chart",
+    "execution": "Market/Limit review can prefill eligible observed TP/SL; Watching never fabricates entry or protective SL"
+  },
+  "reportDelivery": {
+    "globalRequiredInputs": ["instId", "timeframe", "lang"],
+    "predictionRequiredInputs": ["primaryMarketId", "lang"],
+    "riskRequiredInputs": ["tokenAddress", "lang"],
+    "async": "202 is a receipt. Poll pollUrl using PULSE-RECOVERY-TOKEN until completed or completed_partial; fetch reportUrl and deliver every reportMarkdown section. Recovery reads are free.",
+    "synchronousRisk": "200 contains the complete Risk Guard reportMarkdown; no job polling is required.",
+    "partial": "Disclose unavailable evidence. Failed jobs expose failure stage and guidance; never pay again merely to recover a report.",
+    "okxCli": "Repeat all selected business parameters on payment pay; quote-time knownParams do not automatically replay them."
+  },
   "paymentProtocol": "x402",
   "agentInterfaces": {
     "restMetadata": "https://pulse-api-production-7aae.up.railway.app/v1/metadata",

@@ -11,13 +11,43 @@ test("timeframe labels distinguish minutes, days, weeks and calendar months",()=
   assert.match(globalTimeframeLabel("1Mutc","zh"),/个月/);assert.match(globalTimeframeLabel("1m","zh"),/分钟/);
 });
 
+test("projected swing channels stay inside the price pane on steep rising and falling swings",()=>{
+  for(const delta of [-10,10]){
+    const report=globalDesignFixture("pro"),anchor=report.indicators.pivots[0];
+    report.indicators.channel={lower:[{...anchor,ts:10,price:100},{...anchor,ts:20,price:100+delta}],upper:[{...anchor,ts:10,price:105},{...anchor,ts:20,price:105+delta}]};
+    const svg=globalChartAnnotations(report,{left:62,right:1110,top:100,bottom:450,historyEnd:700,x:ts=>ts*10,y:price=>1000-price*8});
+    const segments=[...svg.matchAll(/data-channel="swing"><line x1="([^"]+)" y1="([^"]+)" x2="([^"]+)" y2="([^"]+)"/g)];
+    assert.equal(segments.length,2);
+    for(const match of segments){const [,x1,y1,x2,y2]=match.map(Number);assert.ok(x1>=62&&x2<=700);assert.ok(y1>=100&&y1<=450&&y2>=100&&y2<=450);assert.ok(x2<700,"Projection should end at the viewport boundary before the time axis");}
+    assert.doesNotMatch(svg,/NaN|Infinity/);
+  }
+});
+
+test("Fibonacci is drawn from the same confirmed endpoints for rising and falling swings",()=>{
+  for(const down of [false,true]){
+    const report=globalDesignFixture("pro"),a=report.indicators.pivots.find(p=>p.id==="anchor-0")!,b=report.indicators.pivots.find(p=>p.id==="anchor-5")!;
+    if(down){a.price=125.2;b.price=101;a.kind="high";b.kind="low";report.indicators.fibonacci=report.indicators.fibonacci.map(f=>({...f,price:b.price-(b.price-a.price)*f.ratio}));}
+    const g={left:20,right:900,top:20,bottom:600,historyEnd:700,x:(ts:number)=>40+(ts-report.candles[0].ts)/3600000,y:(price:number)=>600-(price-95)*15};
+    const svg=globalChartAnnotations(report,g,{layers:{fibonacci:true}});
+    for(const ratio of[0,.236,.382,.5,.618,.786,1]){const match=svg.match(new RegExp(`data-fib-ratio="${ratio}"[^]*?<line x1="[^"]+" y1="([^"]+)"`));assert.ok(match);assert.ok(Math.abs(Number(match[1])-g.y(b.price-(b.price-a.price)*ratio))<1e-8);}
+    assert.match(svg,/data-fibonacci="confirmed-swing"/);assert.match(svg,/data-anchor-a="anchor-0" data-anchor-b="anchor-5"/);
+    const history=globalChartAnnotations(report,g,{layers:{fibonacci:true},showScenarios:false});
+    assert.match(history,/data-fib-ratio/);assert.doesNotMatch(history,/data-path-id|data-stage|CONDITIONAL MOVES/);
+    report.indicators.fibonacci[0].price+=1;
+    assert.doesNotMatch(globalChartAnnotations(report,g,{layers:{fibonacci:true}}),/data-fib-ratio/);
+    report.indicators.fibonacci[0].price-=1;
+    b.confirmedAt=null;assert.doesNotMatch(globalChartAnnotations(report,g,{layers:{fibonacci:true}}),/data-fib-ratio/);
+  }
+});
+
 test("Quick and Pro preserve canonical stage prices, pending protection and actual tier identity",()=>{
   for(const tier of ["quick","pro"] as const){const report=globalDesignFixture(tier), svg=globalReportChartSvg(report)!,p=presentResearch(report),txt=researchText(p);
     assert.equal(p.serviceId,`global-${tier}`);assert.equal(p.subject,"SOL-USDT");
     for(const value of ["117.3","113.12","120.56","124.8"]) {assert.ok(txt.includes(value));assert.ok(svg.includes(value));}
     assert.match(svg,/data-stage="S1"/);assert.match(svg,/data-stage="S2"/);assert.match(svg,/data-stage="S3"/);assert.match(svg,/Pending the observed retest/);assert.doesNotMatch(svg,/undefined|NaN/);
     assert.equal(report.setup.entryZone,null);assert.equal(report.setup.protectiveStop,null);assert.equal(report.setup.netRewardRisk,null);assert.equal(report.view.pathIds.length,tier==="quick"?2:3);
-    assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),tier==="pro");
+    assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),false);
+    assert.equal(globalReportChartSvg(report,{layers:{allSmas:true}})!.includes("SMA144"),tier==="pro");
     assert.ok(svg.includes("1-hour candles"));assert.ok(txt.includes("Primary chart: 1H · 1-hour candles"));
     assert.equal(svg.includes("4-hour candles"),tier==="pro");
   }

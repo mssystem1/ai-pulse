@@ -15,7 +15,7 @@ info:
     identifier: MIT
 externalDocs:
   description: PULSE source repository
-  url: https://github.com/mssystem1/Pulse
+  url: https://github.com/mssystem1/ai-pulse
 servers:
   - url: https://pulse-api-production-7aae.up.railway.app
     description: Production API origin; Arc routes use Arc Mainnet payments
@@ -28,7 +28,12 @@ paths:
     post:
       operationId: createArcSpotStandardReport
       summary: Global Quick to Spot Market or Limit
-      description: Concise Global Base analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Mainnet itself remains analysis-only.
+      description: >-
+        Global Quick with 520 completed OHLCV candles, selected primary timeframe,
+        conditional main and alternative moves, and one aligned Spot plan.
+        Returns a recoverable job; poll its free GET endpoints and deliver all
+        reportMarkdown sections plus the canonical report.global chart data.
+        Elliott count is shown only when supported; otherwise Count unclear.
       tags: [Global Market]
       x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042
@@ -47,7 +52,13 @@ paths:
     post:
       operationId: createArcSpotPremiumReport
       summary: Global Pro to Spot Market or Limit
-      description: Premium Global analysis followed by a prefilled Agentic-Wallet-signed Spot Market or Limit next action on supported execution mainnets. Arc Mainnet itself remains analysis-only.
+      description: >-
+        Global Pro adds independently observed higher-timeframe context, SMA
+        family, regression channel, anchored VWAP, Fibonacci, confirmed pivots,
+        RSI and ATR evidence to the same aligned Spot plan. Context follows the
+        chosen timeframe. Conditional moves and unclear Elliott counts are
+        labelled explicitly. Poll the free job endpoints for the full Markdown
+        and canonical report.global chart data; an accepted job is not delivery.
       tags: [Global Market]
       x-pulse-price-usd: 0.30
       x-x402-network: eip155:5042
@@ -104,7 +115,7 @@ paths:
       summary: Onchain Pre-Trade Risk Guard
       description: Deeper PASS/WARN/FAIL review of a token, route, amount or counterparty before an on-chain action.
       tags: [Risk Guard]
-      x-pulse-price-usd: 0.15
+      x-pulse-price-usd: 0.20
       x-x402-network: eip155:5042
       x-x402-asset: "0x3600000000000000000000000000000000000000"
       x-x402-provider: circle-gateway
@@ -122,7 +133,71 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "402":
           $ref: "#/components/responses/PaymentRequired"
+  /v1/jobs/{jobId}:
+    get:
+      operationId: getResearchJob
+      summary: Free private job status
+      description: Poll every three seconds until completed or completed_partial. Report any failure explicitly; never repay an accepted job.
+      security: [{ ReportRecovery: [] }]
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Current job stage
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+        "403":
+          description: Invalid or missing recovery token
+  /v1/jobs/{jobId}/report:
+    get:
+      operationId: getCompletedResearchReport
+      summary: Free private full report recovery
+      description: >-
+        Returns report, reportMarkdown and delivery. Present every Markdown
+        section. Global reports include canonical report.global OHLCV,
+        indicators, conditional paths and the aligned setup for chart rendering.
+        HTTP 409 means continue polling; storage 503 means retry this GET.
+      security: [{ ReportRecovery: [] }]
+      parameters:
+        - $ref: "#/components/parameters/JobId"
+      responses:
+        "200":
+          description: Original purchased report snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [report, reportMarkdown, delivery]
+                properties:
+                  report:
+                    type: object
+                    additionalProperties: true
+                  reportMarkdown:
+                    type: string
+                    description: Full readable deliverable; present every section.
+                  delivery:
+                    type: object
+                    additionalProperties: true
+                additionalProperties: true
+        "403":
+          description: Invalid or missing recovery token
+        "409":
+          description: Report not yet ready
+        "503":
+          description: Temporary storage failure; retry GET without another payment
 components:
+  securitySchemes:
+    ReportRecovery:
+      type: apiKey
+      in: header
+      name: PULSE-RECOVERY-TOKEN
+  parameters:
+    JobId:
+      in: path
+      name: jobId
+      required: true
+      schema: { type: string, format: uuid }
   requestBodies:
     SpotRequest:
       required: true
@@ -145,7 +220,7 @@ components:
           examples:
             selectedMarket:
               value:
-                primaryMarketId: "POLYMARKET_MARKET_ID"
+                primaryMarketId: "pm:0x8717c39520cadcb8ad6f88af148c30acf7d044c92a9cf48416b9b9a5ed65d6d8"
                 additionalMarketIds: []
                 lang: en
     RiskGuardRequest:
@@ -157,14 +232,14 @@ components:
           examples:
             tokenBeforeTrade:
               value:
-                intent: swap
-                tokenAddress: "0x0000000000000000000000000000000000000001"
-                amount: "1"
+                tokenAddress: "0x3600000000000000000000000000000000000000"
+                chainId: "5042"
+                lang: en
   schemas:
     SpotRequest:
       type: object
       additionalProperties: false
-      required: [instId]
+      required: [instId, timeframe, lang]
       properties:
         instId:
           type: string
@@ -173,22 +248,22 @@ components:
           examples: [BTC-USDT]
         timeframe:
           type: string
-          default: 1H
+          enum: [1m, 3m, 5m, 15m, 30m, 1H, 2H, 4H, 6H, 12H, 1D, 1W, 1Dutc, 1Wutc]
           examples: [15m, 1H, 4H, 1D, 1W]
         lang:
           type: string
           enum: [en, zh]
-          default: en
         userNote:
           type: string
           maxLength: 500
     PredictionRequest:
       type: object
       additionalProperties: false
-      required: [primaryMarketId]
+      required: [primaryMarketId, lang]
       properties:
         primaryMarketId:
           type: string
+          description: Select an active orderbook-enabled market from /v1/polymarket/markets and verify its detail immediately before payment. Examples are historical snapshots, not guaranteed active markets.
           minLength: 1
           maxLength: 256
         additionalMarketIds:
@@ -202,14 +277,20 @@ components:
         lang:
           type: string
           enum: [en, zh]
-          default: en
         userNote:
           type: string
           maxLength: 500
     RiskGuardRequest:
       type: object
       additionalProperties: false
+      required: [tokenAddress, lang]
       properties:
+        lang:
+          type: string
+          enum: [en, zh]
+        chainId:
+          type: string
+          const: "5042"
         intent:
           type: string
           enum: [swap, transfer, approve, hire_agent, generic]
@@ -237,7 +318,7 @@ components:
     JobAccepted:
       type: object
       description: Durable paid job accepted for asynchronous processing.
-      required: [job]
+      required: [job, recoveryToken, pollUrl, reportUrl, delivery]
       properties:
         job:
           type: object
@@ -246,11 +327,18 @@ components:
             id:
               type: string
               format: uuid
-            state:
+            stage:
               type: string
-            recoveryToken:
-              type: string
-              description: Private capability used to poll and recover the report without repaying.
+        recoveryToken:
+          type: string
+          description: Private capability sent in PULSE-RECOVERY-TOKEN; never publish it or pay again to retrieve the report.
+        pollUrl:
+          type: string
+        reportUrl:
+          type: string
+        delivery:
+          type: object
+          additionalProperties: true
         replay:
           type: boolean
     Error:

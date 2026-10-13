@@ -1,5 +1,5 @@
 import type { RequestHandler } from "express";
-import type { AppConfig, NetworkKey } from "@pulse/config";
+import { getNetwork, type AppConfig, type NetworkKey } from "@pulse/config";
 import { paymentMiddleware, x402ResourceServer } from "@x402/express";
 import { HTTPFacilitatorClient } from "@x402/core/server";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
@@ -7,7 +7,7 @@ import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/
 import { createCdpAuthHeaders } from "./cdpAuth.js";
 import { canonicalPaymentResource, inlineSettlement } from "./inlineSettlement.js";
 
-export function buildCdpDiscoveryContract(path: string) {
+export function buildCdpDiscoveryContract(path: string, networkKey: "base" | "arbitrum" = "base") {
   const riskGuard = path === "/v1/preflight";
   const autopilotStart = path.startsWith("/v1/autopilot/pass/");
   const prediction = path.includes("prediction") || path.includes("event-risk");
@@ -29,17 +29,20 @@ export function buildCdpDiscoveryContract(path: string) {
     };
   }
   if (riskGuard) {
+    const network = getNetwork(networkKey);
     return {
       input: {
-        intent: "swap",
-        tokenAddress: "0x0000000000000000000000000000000000000001",
-        amount: "1",
+        tokenAddress: network.paymentAsset.address,
+        chainId: String(network.chainId),
+        lang: "en",
         notes: "Review this on-chain action before signing",
       },
       inputSchema: {
         properties: {
           intent: { type: "string", enum: ["swap", "transfer", "approve", "hire_agent", "generic"], description: "Action being reviewed" },
           tokenAddress: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Primary token contract, when applicable" },
+          chainId: { type: "string", description: "Must match the selected settlement network" },
+          lang: { type: "string", enum: ["en", "zh"] },
           walletAddress: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Wallet initiating the action" },
           counterparty: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Router, spender or counterparty contract" },
           fromToken: { type: "string", pattern: "^0x[a-fA-F0-9]{40}$", description: "Input token contract" },
@@ -47,25 +50,26 @@ export function buildCdpDiscoveryContract(path: string) {
           amount: { type: "string", description: "Human-readable amount under review" },
           notes: { type: "string", maxLength: 500, description: "Optional transaction context" },
         },
-        required: [],
+        required: ["tokenAddress", "lang"],
       },
     };
   }
+  const exampleMarket = "pm:0x8717c39520cadcb8ad6f88af148c30acf7d044c92a9cf48416b9b9a5ed65d6d8";
   const input = prediction
-    ? { primaryMarketId: "pm:condition-id", additionalMarketIds: [], lang: "en" }
+    ? { primaryMarketId: exampleMarket, additionalMarketIds: [], lang: "en" }
     : fused
-      ? { instId: "BTC-USDT", timeframe: "1H", primaryMarketId: "pm:condition-id", additionalMarketIds: [], lang: "en" }
+      ? { instId: "BTC-USDT", timeframe: "1H", primaryMarketId: exampleMarket, additionalMarketIds: [], lang: "en" }
       : { instId: "BTC-USDT", timeframe: "1H", lang: "en" };
   const properties: Record<string, unknown> = {
     ...(fused || !prediction ? { instId: { type: "string", description: "OKX spot instrument, for example BTC-USDT" }, timeframe: { type: "string", description: "Analysis timeframe" } } : {}),
-    ...(prediction || fused ? { primaryMarketId: { type: "string", description: "Canonical Polymarket market identifier selected by the caller" }, additionalMarketIds: { type: "array", items: { type: "string" }, maxItems: 6 } } : {}),
+    ...(prediction || fused ? { primaryMarketId: { type: "string", description: "Caller-selected active market from /v1/polymarket/markets; verify its detail before payment. Example is a historical snapshot, not guaranteed active." }, additionalMarketIds: { type: "array", items: { type: "string" }, maxItems: 6 } } : {}),
     lang: { type: "string", enum: ["en", "zh"] },
   };
   return {
     input,
     inputSchema: {
       properties,
-      required: ["instId", "primaryMarketId", "lang"].filter((key) => key in input),
+      required: ["instId", "timeframe", "primaryMarketId", "lang"].filter((key) => key in input),
     },
   };
 }
@@ -89,13 +93,15 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
     const cacheKey = `${req.method}:${req.path}:${network}:${route.priceUsd}`;
     let middleware = cache.get(cacheKey);
     if (!middleware) {
-      const { input, inputSchema } = buildCdpDiscoveryContract(req.path);
+      const { input, inputSchema } = buildCdpDiscoveryContract(req.path, key);
       const autopilotStart = req.path.startsWith("/v1/autopilot/pass/");
+      const riskGuard = req.path === "/v1/preflight";
       const extensions = cfg.BAZAAR_DISCOVERABLE ? declareDiscoveryExtension({
         input, inputSchema, bodyType: "json",
         output: { example: autopilotStart
           ? { aiPass: { vault: "owner-controlled-vault", status: "active", expiresAt: "ISO-8601 timestamp" }, behavior: { newEntries: "AI-assisted while runtime is active" } }
-          : { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id" } },
+          : riskGuard ? { reportMarkdown: "Full token due-diligence report", history: { jobId: "opaque-job-id", recoveryToken: "opaque-recovery-token" } }
+          : { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id", reportUrl: "/v1/jobs/opaque-job-id/report", delivery: { status: "processing", authHeader: "PULSE-RECOVERY-TOKEN", paymentRequired: false } } },
       }) : undefined;
       middleware = paymentMiddleware({
         [`${req.method.toUpperCase()} ${req.path}`]: {

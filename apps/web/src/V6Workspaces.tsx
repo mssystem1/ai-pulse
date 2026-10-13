@@ -1,4 +1,5 @@
 import { TelegramGuide } from './TelegramGuide';
+import { GlobalChartGuide } from "./GlobalChartGuide";
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -7474,6 +7475,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-workflows", "Workflow maps"],
     ["docs-start", "Quick start"],
     ["docs-global", "Global reports"],
+    ["docs-global-chart", lang === "zh" ? "阅读图表与指标" : "Chart & indicator guide"],
     ["docs-catalog", "Assets & routes"],
     ["docs-global-flow", "Timeframes & handoff"],
     ["docs-prediction", "Prediction reports"],
@@ -7722,6 +7724,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
+          <section id="docs-global-chart" className="docs-section" hidden={article !== "docs-global-chart"}><GlobalChartGuide lang={lang}/></section>
           <section id="docs-global-flow" className="docs-deep-dive" hidden={article !== "docs-global-flow"}>
             <div className="docs-deep-head">
               <span className="eyebrow">

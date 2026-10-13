@@ -146,6 +146,11 @@ export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: Reques
     catch (err) { console.error("[payments] Failed to init OKX middleware, falling back to mock:", err); return mock; }
   })() : mock;
   return (req, res, next) => {
+    // MCP must validate arguments and forward to the canonical paid REST
+    // route before a signed header reaches any settlement adapter. Recovery
+    // and other free routes must also ignore unrelated payment headers.
+    const route = cfg.routes[`${req.method.toUpperCase()} ${normalizePath(req.path)}`];
+    if (!route || route.free || route.priceUsd <= 0) return next();
     const networkKey = (req as Request & { pulseNetworkKey?: string }).pulseNetworkKey || "xlayer";
     if (cfg.X402_MOCK) return mock(req, res, next);
     if (networkKey === "robinhood") {

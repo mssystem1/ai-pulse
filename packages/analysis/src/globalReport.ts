@@ -154,7 +154,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const fibonacci: GlobalReport["indicators"]["fibonacci"] = [];
   if (leg.length === 2 && Math.abs(leg[1].price - leg[0].price) >= latestAtr * 2) {
     const [a, b] = leg, delta = b.price - a.price;
-    for (const ratio of [.382, .5, .618]) { const price = b.price - delta * ratio; if (price > 0) fibonacci.push({ ratio, price: rounded(price), anchorIds: [a.id, b.id] }); }
+    for (const ratio of [0, .236, .382, .5, .618, .786, 1]) { const price = b.price - delta * ratio; if (price > 0) fibonacci.push({ ratio, price: rounded(price), anchorIds: [a.id, b.id] }); }
     // Extension levels are measured projections of an observed leg, not
     // fabricated support, a guaranteed wave target, or a liquidity claim.
     for (const ratio of [1.272, 1.618]) { const price = a.price + delta * ratio; if (price > 0) addLevel({ ...b, price: rounded(price) }, "extension", ratio, [a.id, b.id]); }
@@ -195,7 +195,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
     indicators: { sma, atr: { period: 14, points: atr }, rsi: { period: 14, points: rsi }, volumeRatio: meanVolume > 0 && last ? rounded(last.volume / meanVolume) : null, regression: regression(candles), fibonacci, vwap: vwapAnchor && vwap.length ? { anchorId: vwapAnchor.id, points: vwap } : null, pivots, channel: lowAnchors.length === 2 && highAnchors.length === 2 ? { lower: lowAnchors as [GlobalAnchor, GlobalAnchor], upper: highAnchors as [GlobalAnchor, GlobalAnchor] } : null },
     context: { timeframe: contextFrame, status: tier === "quick" ? "not_requested" : contextAverage.length ? "available" : "unavailable", source: contextAverage.length ? input.contextMarket!.source : null, candles: tier === "pro" ? contextCandles : [], sma55: tier === "pro" ? contextAverage : [], agreement: tier === "quick" || contextClose === undefined || contextSma === undefined ? "unknown" : contextClose < contextSma ? "conflicts" : contextClose > contextSma ? "supports" : "neutral" },
     narrative: { headline: "", summary: "", reasons: [], riskNotes: [], limitations: [], disclaimer: "" },
-    view: { levelIds: [], pathIds: [], smaPeriods: tier === "pro" ? [21, 55, 144] : [55], defaultLayers: tier === "pro" ? ["sma", "regression", "rsi", "atr", "context"] : ["sma"] },
+    view: { levelIds: [], pathIds: [], smaPeriods: [55], defaultLayers: tier === "pro" ? ["sma", "channel", "rsi", "context"] : ["sma", "channel"] },
   };
   report.setup = evaluateGlobalSetup(report, Number.isFinite(input.executionCostsBps) && input.executionCostsBps! >= 0 ? input.executionCostsBps! : null);
   const includedPaths = report.paths.slice(0, tier === "quick" ? 2 : 3);

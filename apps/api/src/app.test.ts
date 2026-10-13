@@ -149,7 +149,10 @@ describe("PULSE API", () => {
       assert.equal(res.headers.has("PAYMENT-RESPONSE"), false);
     }
   });
+  const originalArcTrading = process.env.FEATURE_ARC_TRADING;
   before(async () => {
+    // This catalog fixture excludes Arc execution regardless of local .env.
+    process.env.FEATURE_ARC_TRADING = "0";
     // Complete, secret-free test profile; do not depend on the operator's .env.
     Object.assign(process.env, {
       ENABLED_NETWORKS: "xlayer,base,arbitrum,arc,robinhood",
@@ -212,6 +215,8 @@ describe("PULSE API", () => {
     await new Promise<void>((resolve, reject) => {
       server.close((err) => (err ? reject(err) : resolve()));
     });
+    if (originalArcTrading === undefined) delete process.env.FEATURE_ARC_TRADING;
+    else process.env.FEATURE_ARC_TRADING = originalArcTrading;
   });
 
   it("never accepts client-declared confirmed trading activity", async () => {

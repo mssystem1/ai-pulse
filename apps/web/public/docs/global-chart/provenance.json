@@ -1,0 +1,56 @@
+{
+  "purpose": "Historical educational chart images; not current trading signals",
+  "snapshot": {
+    "completedOnly": true,
+    "instId": "BTC-USDT",
+    "lastCandleTs": 1791896400000,
+    "observedAt": "2026-10-13T14:42:01.787Z",
+    "price": 83276,
+    "priceCurrency": "USDT",
+    "pricePrecision": 2,
+    "source": "okx-public-spot",
+    "timeframe": "1H",
+    "venue": "OKX Spot"
+  },
+  "contextTimeframe": "4H",
+  "candles": 520,
+  "renderer": "PULSE canonical saved-report renderer",
+  "examples": [
+    {
+      "name": "setup",
+      "layers": {
+        "channel": true
+      }
+    },
+    {
+      "name": "trend",
+      "layers": {
+        "channel": false,
+        "allSmas": true,
+        "regression": true
+      }
+    },
+    {
+      "name": "fibonacci",
+      "layers": {
+        "channel": false,
+        "fibonacci": true
+      }
+    },
+    {
+      "name": "vwap-atr-pivots",
+      "layers": {
+        "channel": false,
+        "vwap": true,
+        "atr": true,
+        "pivots": true
+      }
+    },
+    {
+      "name": "rsi-context",
+      "layers": {
+        "channel": false
+      }
+    }
+  ]
+}
