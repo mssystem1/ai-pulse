@@ -1,0 +1,40 @@
+PULSE research report
+BTC-USDT · 1H · Global Quick
+2026-10-13 04:22 UTC
+
+BTC-USDT 1H · renderer validation
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 1H · 1-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Range
+• Watch the range 83,287.60–83,520.00; a completed close outside either boundary requires reassessment.
+• ② Alternative · Recovery
+• Completed 1H close above 80,400.00, then a held retest: 83,520.00 → 84,200.00.
+• Cancel if price closes back through the trigger after confirmation, or the 79,725.17 invalidation breaks; reassess.
+
+SPOT PLAN
+• Spot plan · Watching · ② Alternative · Recovery
+• S1: completed 1H close above 80,400.00, then a retest that closes at or above it. Keep the 79,725.17 floor intact.
+• S2 / target 1: 83,520.00
+• S3 / target 2: 84,200.00
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 1H close below 79,725.17; or back below 80,400.00 after reclaim. Thesis invalidation is not the protective stop.
+• Completed close above S1 required
+• A subsequent held retest is required
+
+LIMITATIONS
+• Renderer validation only; this is not a purchased model report.
+
+DISCLAIMER
+Research display validation · no execution instruction.

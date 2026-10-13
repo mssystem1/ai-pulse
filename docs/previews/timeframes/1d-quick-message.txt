@@ -1,0 +1,28 @@
+<b>PULSE · GLOBAL QUICK</b>
+<b>BTC-USDT · 1D · 1-day candles</b>
+OKX Spot · USDT · 2026-10-13T04:22:15.592Z
+
+<b>BTC-USDT 1D · renderer validation</b>
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+<b>Spot plan · Watching · ① Main · Continuation</b>
+S1: completed 1D close above 87,399.00, then a retest that closes at or above it. Keep the 82,556.60 floor intact.
+S2 / target 1: 126,200.00
+Observed entry zone: Pending the observed retest
+Protective stop: Pending the observed retest
+Net R:R: —
+Cancel: completed 1D close below 82,556.60; or back below 87,399.00 after reclaim. Thesis invalidation is not the protective stop.
+Completed close above S1 required
+A subsequent held retest is required
+
+<b>Possible moves</b>
+① Main · Continuation
+Completed 1D close above 87,399.00, then a held retest: 126,200.00.
+Cancel if price closes back through the trigger after confirmation, or the 82,556.60 invalidation breaks; reassess.
+② Alternative · Correction
+Completed 1D close below 82,556.60, then a held retest: 82,285.00 → 81,499.90.
+Cancel if price closes back through the trigger after confirmation, or the 87,399.00 invalidation breaks; reassess.
+
+Elliott hypothesis: Candidate 3?
+
+Original purchased snapshot. Recheck conditions before execution. Full evidence and limitations are in the TXT; reopen free from My reports.

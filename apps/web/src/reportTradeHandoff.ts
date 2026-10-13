@@ -1,6 +1,16 @@
 import type { ReportTradeIntent } from "./Report";
+import { readGlobalReport } from "@pulse/domain";
 
 export function buildReportBuyIntent(data: Record<string, unknown>, orderType: "market" | "limit"): ReportTradeIntent {
+  const global = readGlobalReport(data);
+  if (global) {
+    const s = global.setup, target = global.levels.find(l => l.id === s.targetIds[0])?.price;
+    if (s.state !== "ready" || !s.expiresAt || Date.now() >= s.expiresAt || !s.entryZone || s.protectiveStop === null || !target || s.netRewardRisk === null || s.netRewardRisk < 1.5)
+      throw new Error("This saved setup is not ready. Fresh confirmation, protection and execution costs are required.");
+    return { pair: global.snapshot.instId, timeframe: global.snapshot.timeframe, side: "buy", orderType, entryPrice: s.entryZone[1], observedPrice: global.snapshot.price ?? undefined, takeProfit: target, stopLoss: s.protectiveStop, rationale: "Observed report retest and protection. Recheck the current quote, costs and invalidation before wallet approval.", sourceTier: global.tier, reportSetupMode: "confirmed" };
+  }
+  if (data.version === "pulse-global-v3" || (data.global as Record<string, unknown> | undefined)?.version === "pulse-global-v3")
+    throw new Error("This saved Global setup is invalid. Reopen a valid report before preparing an order.");
   const analysis = (data.analysis || {}) as Record<string, unknown>;
   const plan = (data.executionPlan || {}) as Record<string, unknown>;
   const buy = (plan.buy || {}) as Record<string, unknown>;
@@ -13,6 +23,29 @@ export function buildReportBuyIntent(data: Record<string, unknown>, orderType: "
     rationale: recommended ? String(buy.scenario || recommendation.reason || "Report buy setup")
       : `Manual trade selected with risk acceptance. Report context: ${String(analysis.bias || "unknown")}, ${String(analysis.confidence ?? "unknown")}% confidence. ${valid ? "Valid trigger, TP and SL are loaded for your review and wallet approval." : "The report has no valid long protection setup. Configure entry and protection yourself."}`,
     sourceTier: String(data.tier || data.service || "").toLowerCase() };
+}
+
+/** Explicit manual review preserves observed protection without upgrading
+ * Watching to Ready or pricing an unobserved retest. */
+export function buildReportManualBuyIntent(data: Record<string, unknown>, orderType: "market" | "limit"): ReportTradeIntent {
+  const global=readGlobalReport(data);
+  if (!global) {
+    if (data.version === "pulse-global-v3" || (data.global as Record<string, unknown> | undefined)?.version === "pulse-global-v3") throw new Error("This saved Global setup is invalid. Reopen a valid report before preparing an order.");
+    return {...buildReportBuyIntent(data,orderType),reportSetupMode:"manual"};
+  }
+  const s=global.setup,target=global.levels.find(l=>l.id===s.targetIds[0])?.price;
+  const observed=s.state==="watching" && s.expiresAt!==null && Date.now()<s.expiresAt && s.entryZone!==null && s.protectiveStop!==null && s.protectiveStop<s.entryZone[0] && target!==undefined && target>s.entryZone[1];
+  return {pair:global.snapshot.instId,timeframe:global.snapshot.timeframe,side:"buy",orderType,observedPrice:global.snapshot.price??undefined,
+    ...(observed?{entryPrice:s.entryZone![1],takeProfit:target,stopLoss:s.protectiveStop!}:{}),
+    rationale:`Manual trade selected with risk acceptance. Saved report setup: ${s.state}. ${observed?"Observed entry, TP and SL are loaded for review; confirmation, execution costs and current conditions still require your checks.":"The report has no current confirmed protection to copy. Configure entry, TP and SL in Spot before signing."}`,
+    sourceTier:global.tier,reportSetupMode:"manual"};
+}
+
+/** Carry only the order-type choice; prices always come from the saved report. */
+export function buildTelegramReportBuyIntent(data: Record<string, unknown>, fragment: string): ReportTradeIntent {
+  const params = new URLSearchParams(fragment.replace(/^#/, ""));
+  const orderType=params.get("orderType") === "market" ? "market" : "limit";
+  return params.get("manual")==="1"?buildReportManualBuyIntent(data,orderType):buildReportBuyIntent(data,orderType);
 }
 
 /** Preserve report distances, not nominal prices of a different representation. */

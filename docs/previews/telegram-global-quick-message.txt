@@ -1,0 +1,21 @@
+PULSE · Global Quick
+SOL-USDT · 1H · Binance · USDT
+08 Oct 2026 08:00 UTC
+
+WAIT · correction below the recovery threshold
+Snapshot price 115.75. Candidate A–B–C correction; last C? remains provisional.
+
+Possible moves
+① Main · C? correction: while below 117.30, watch 113.12 → 109.93. Confirmed reclaim and held retest of 117.30 cancels this local continuation view.
+② Recovery: 1H close above 117.30 + held retest, with 113.12 intact → 120.56 → 124.80.
+
+Spot plan · WATCHING · linked to amber path ②
+S1: 1H close above 117.30, then a retest that closes at or above it. Keep 113.12 intact.
+S2 / target 1: 120.56 · S3 / target 2: 124.80.
+Entry / protective stop / R:R: pending the observed retest.
+Cancel: 1H close below 113.12; or back below 117.30 after reclaim.
+
+Snapshot
+DESIGN ONLY · Historical screenshot levels; synthetic market evidence. Not a live report.
+Saved snapshot · recheck current conditions before acting.
+Research only · not financial advice.

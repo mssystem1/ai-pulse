@@ -109,6 +109,8 @@ export function toOkxBar(tf: string): string {
     "12H": "12H",
     "1Dutc": "1Dutc",
     "1Wutc": "1Wutc",
+    "1Mutc": "1Mutc",
+    "1M": "1M",
     "1H": "1H",
     "1h": "1H",
     "4H": "4H",
@@ -272,11 +274,22 @@ export async function buildMarketContext(opts: {
   completedOnly?: boolean;
 }): Promise<SpotMarketContext> {
   const bar = toOkxBar(opts.timeframe ?? "1H");
+  const limit = Math.min(1500, Math.max(1, Math.floor(opts.candleLimit ?? 100)));
   const [ticker, rawCandles] = await Promise.all([
     getTicker(opts.instId),
-    getCandles(opts.instId, bar, opts.candleLimit ?? 100),
+    getCandles(opts.instId, bar, Math.min(300, limit)),
   ]);
-  const candles = opts.completedOnly ? rawCandles.filter((candle) => candle.confirmed === true) : rawCandles;
+  // The recent-candle endpoint caps a page at 300. Global charts need enough
+  // saved history for SMA233; older callers retain their one-page behavior.
+  let history = rawCandles;
+  const retained = () => opts.completedOnly ? history.filter(c => c.confirmed === true).length : history.length;
+  for (let page = 0; limit > 300 && retained() < limit && history.length && page < 5; page += 1) {
+    const older = await getHistoricalCandles(opts.instId, bar, Math.min(300, limit - retained()), history[0].ts);
+    if (!older.length) break;
+    history = [...older, ...history];
+  }
+  history = [...new Map(history.map(c => [c.ts, c])).values()].sort((a, b) => a.ts - b.ts);
+  const candles = (opts.completedOnly ? history.filter((candle) => candle.confirmed === true) : history).slice(-limit);
   return {
     source: "okx-public-spot",
     instId: opts.instId,

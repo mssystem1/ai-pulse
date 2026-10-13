@@ -1,0 +1,275 @@
+{
+  "validatedAt": "2026-10-13T09:50:29.176Z",
+  "syntheticInteractionFixture": true,
+  "walletSpendUSDC": 0,
+  "telegramSends": 0,
+  "checks": [
+    {
+      "name": "handoff-ready-pro-desktop",
+      "state": "ready",
+      "tier": "pro",
+      "width": 1454,
+      "orderTypes": [
+        "market",
+        "limit"
+      ],
+      "protectedLevelsCopied": true,
+      "pageOverflow": false
+    },
+    {
+      "name": "handoff-ready-pro-mobile",
+      "state": "ready",
+      "tier": "pro",
+      "width": 390,
+      "orderTypes": [
+        "market",
+        "limit"
+      ],
+      "protectedLevelsCopied": true,
+      "pageOverflow": false
+    },
+    {
+      "name": "handoff-watching-quick-mobile",
+      "state": "watching",
+      "tier": "quick",
+      "width": 390,
+      "orderTypes": [
+        "market",
+        "limit"
+      ],
+      "protectedLevelsCopied": false,
+      "pageOverflow": false
+    },
+    {
+      "name": "handoff-cancelled-weekly-desktop",
+      "state": "cancelled",
+      "tier": "pro",
+      "width": 1454,
+      "orderTypes": [
+        "market",
+        "limit"
+      ],
+      "protectedLevelsCopied": false,
+      "pageOverflow": false
+    }
+  ],
+  "legacyEvmMiniAppComponent": true,
+  "currentTonMiniAppTrading": false,
+  "telegramOrderTypeHandoffs": [
+    {
+      "orderType": "market",
+      "savedReportToken": true,
+      "pricesInUrl": false
+    },
+    {
+      "orderType": "limit",
+      "savedReportToken": true,
+      "pricesInUrl": false
+    }
+  ],
+  "telegramManualReview": true,
+  "chartPngDownload": true,
+  "refreshedNativeMatrix": [
+    {
+      "frame": "15m",
+      "tier": "quick",
+      "width": 1454,
+      "height": 1816,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 15m",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2 → S3"
+    },
+    {
+      "frame": "15m",
+      "tier": "quick",
+      "width": 390,
+      "height": 2147,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 15m",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2 → S3"
+    },
+    {
+      "frame": "15m",
+      "tier": "pro",
+      "width": 1454,
+      "height": 2303,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 15m",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2 → S3"
+    },
+    {
+      "frame": "15m",
+      "tier": "pro",
+      "width": 390,
+      "height": 3116,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 15m",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2 → S3"
+    },
+    {
+      "frame": "1h",
+      "tier": "quick",
+      "width": 1454,
+      "height": 1782,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1H",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1h",
+      "tier": "quick",
+      "width": 390,
+      "height": 2053,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1H",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1h",
+      "tier": "pro",
+      "width": 1454,
+      "height": 2269,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1H",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1h",
+      "tier": "pro",
+      "width": 390,
+      "height": 2983,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1H",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "4h",
+      "tier": "quick",
+      "width": 1454,
+      "height": 1584,
+      "overflow": false,
+      "state": "none",
+      "primary": "BTC-USDT · 4H",
+      "stageRoute": "Spot plan"
+    },
+    {
+      "frame": "4h",
+      "tier": "quick",
+      "width": 390,
+      "height": 1408,
+      "overflow": false,
+      "state": "none",
+      "primary": "BTC-USDT · 4H",
+      "stageRoute": "Spot plan"
+    },
+    {
+      "frame": "4h",
+      "tier": "pro",
+      "width": 1454,
+      "height": 2103,
+      "overflow": false,
+      "state": "none",
+      "primary": "BTC-USDT · 4H",
+      "stageRoute": "Spot plan"
+    },
+    {
+      "frame": "4h",
+      "tier": "pro",
+      "width": 390,
+      "height": 2223,
+      "overflow": false,
+      "state": "none",
+      "primary": "BTC-USDT · 4H",
+      "stageRoute": "Spot plan"
+    },
+    {
+      "frame": "1d",
+      "tier": "quick",
+      "width": 1454,
+      "height": 1782,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1D",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2"
+    },
+    {
+      "frame": "1d",
+      "tier": "quick",
+      "width": 390,
+      "height": 2003,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1D",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2"
+    },
+    {
+      "frame": "1d",
+      "tier": "pro",
+      "width": 1454,
+      "height": 2294,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1D",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2"
+    },
+    {
+      "frame": "1d",
+      "tier": "pro",
+      "width": 390,
+      "height": 2811,
+      "overflow": false,
+      "state": "watching",
+      "primary": "BTC-USDT · 1D",
+      "stageRoute": "Conditional Spot plan · amber path ① · S1 → S2"
+    },
+    {
+      "frame": "1w",
+      "tier": "quick",
+      "width": 1454,
+      "height": 1806,
+      "overflow": false,
+      "state": "cancelled",
+      "primary": "BTC-USDT · 1W",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1w",
+      "tier": "quick",
+      "width": 390,
+      "height": 2078,
+      "overflow": false,
+      "state": "cancelled",
+      "primary": "BTC-USDT · 1W",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1w",
+      "tier": "pro",
+      "width": 1454,
+      "height": 2293,
+      "overflow": false,
+      "state": "cancelled",
+      "primary": "BTC-USDT · 1W",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    },
+    {
+      "frame": "1w",
+      "tier": "pro",
+      "width": 390,
+      "height": 3008,
+      "overflow": false,
+      "state": "cancelled",
+      "primary": "BTC-USDT · 1W",
+      "stageRoute": "Conditional Spot plan · amber path ② · S1 → S2 → S3"
+    }
+  ],
+  "runtimeErrors": []
+}

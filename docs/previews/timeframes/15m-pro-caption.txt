@@ -1,0 +1,8 @@
+PULSE · GLOBAL PRO · BTC-USDT · 15m · 15-minute candles
+OKX Spot · USDT · 2026-10-13T04:22:14.138Z
+Spot plan: Watching
+S1 83,148.70 → S2 83,318.80 → S3 83,464.00
+S1 needs a completed 15m close above it and subsequent held retest. Cancel: completed close below 83,109.10, or back below S1 after reclaim.
+Expires 2026-10-13T04:30:00.000Z
+Context: 1H · 1-hour candles
+Timing is schematic; conditional moves, not guaranteed forecasts.

@@ -103,7 +103,7 @@ describe("V5 paid job E2E", () => {
     const report = await reportResponse.json() as { report?: { service?: string; analysis?: { fixture?: boolean }; analysisProfile?: { mode?: string; reasoningEffort?: string } } };
     assert.equal(report.report?.service, "prediction_analysis_standard");
     assert.equal(report.report?.analysis?.fixture, true);
-    assert.deepEqual(report.report?.analysisProfile, { mode: "fixture", model: "fixture", reasoningEffort: "none" });
+    assert.deepEqual(report.report?.analysisProfile, { mode: "fixture", model: "fixture", reasoningEffort: "low" });
 
     const replay = await fetch(`${origin}/arc/v1/analysis/prediction/standard`, request);
     assert.equal(replay.status, 202);
@@ -125,10 +125,10 @@ describe("V5 paid job E2E", () => {
       const response = await fetch(`${origin}/v1/jobs/${body.job.id}`, { headers: { "PULSE-RECOVERY-TOKEN": body.recoveryToken } });
       const status = await response.json() as { job?: { stage?: string } };
       stage = status.job?.stage || "";
-      if (stage === "completed") break;
+      if (["completed", "completed_partial"].includes(stage)) break;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    assert.equal(stage, "completed");
+    assert.equal(stage, "completed_partial");
     const response = await fetch(`${origin}/v1/jobs/${body.job.id}/report`, { headers: { "PULSE-RECOVERY-TOKEN": body.recoveryToken } });
     const result = await response.json() as { report?: { service?: string; fixture?: boolean; model?: string } };
     assert.equal(result.report?.service, "spot_analysis_standard");
@@ -153,10 +153,10 @@ describe("V5 paid job E2E", () => {
       assert.equal(response.status, 200);
       assert.equal(response.headers.get("PAYMENT-REQUIRED"), null);
       stage = (await response.json() as any).result.structuredContent.job.stage;
-      if (stage === "completed") break;
+      if (["completed", "completed_partial"].includes(stage)) break;
       await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    assert.equal(stage, "completed");
+    assert.equal(stage, "completed_partial");
     const response = await call("job_report", { jobId: job.id, recoveryToken });
     assert.equal(response.status, 200);
     const report = (await response.json() as any).result.structuredContent.report;
@@ -213,7 +213,7 @@ describe("V5 paid job E2E", () => {
       if (["completed", "failed_terminal"].includes(stage)) break;
       await new Promise(resolve => setTimeout(resolve, 20));
     }
-    assert.equal(stage, "completed");
+    assert.equal(stage, "completed_partial");
     const retrieved = await call("arc", "job_report", { jobId: delivery.job.id, recoveryToken: delivery.recoveryToken });
     assert.equal(retrieved.headers.get("PAYMENT-REQUIRED"), null);
     const report = (await retrieved.json() as any).result.structuredContent.report;

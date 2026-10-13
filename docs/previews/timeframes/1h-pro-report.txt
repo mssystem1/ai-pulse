@@ -1,0 +1,51 @@
+PULSE research report
+BTC-USDT · 1H · Global Pro
+2026-10-13 04:22 UTC
+
+BTC-USDT 1H · renderer validation
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 1H · 1-hour candles
+• Context: 4H · 4-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Range
+• Watch the range 83,287.60–83,520.00; a completed close outside either boundary requires reassessment.
+• ② Alternative · Recovery
+• Completed 1H close above 80,400.00, then a held retest: 83,520.00 → 84,200.00.
+• Cancel if price closes back through the trigger after confirmation, or the 79,725.17 invalidation breaks; reassess.
+• ③ Alternative · Correction
+• Completed 1H close below 83,287.60, then a held retest: 83,169.00 → 82,950.00.
+• Cancel if price closes back through the trigger after confirmation, or the 83,520.00 invalidation breaks; reassess.
+• Stress: only after a completed 1H close below 82,950.00, watch 82,767.40. This is not a Spot target.
+
+SPOT PLAN
+• Spot plan · Watching · ② Alternative · Recovery
+• S1: completed 1H close above 80,400.00, then a retest that closes at or above it. Keep the 79,725.17 floor intact.
+• S2 / target 1: 83,520.00
+• S3 / target 2: 84,200.00
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 1H close below 79,725.17; or back below 80,400.00 after reclaim. Thesis invalidation is not the protective stop.
+• Completed close above S1 required
+• A subsequent held retest is required
+
+PRO EVIDENCE
+• SMA21 82,816.41 · SMA55 83,181.10 · SMA144 82,940.33
+• RSI14 55.38 · ATR14 534.72 · volume / prior 20 bars 1.64×
+• 4H Context: conflicts with recovery · SMA55 83,868.71
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+LIMITATIONS
+• Renderer validation only; this is not a purchased model report.
+
+DISCLAIMER
+Research display validation · no execution instruction.

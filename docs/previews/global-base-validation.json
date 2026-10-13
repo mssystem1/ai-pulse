@@ -1,0 +1,38 @@
+{
+  "validatedAt": "2026-10-12T19:50:42.389Z",
+  "chainId": 8453,
+  "wallet": "0xA7d827622c4F9c884cA8F751b2060DD767F18683",
+  "totalSpentUSDC": 0.5,
+  "results": [
+    {
+      "tier": "quick",
+      "jobId": "db1f36c3-668a-4b1f-907e-b89b6d2ac3c8",
+      "stage": "completed",
+      "transaction": "0x0c9e08b63c964b4020da80a7c09fee7183dfd9fa12aeefebbbc990efa3e7db8e",
+      "paidUSDC": 0.2,
+      "model": "grok-4.5",
+      "reasoning": "low",
+      "completedCandles": 520,
+      "waveCount": "unclear",
+      "setupState": "watching",
+      "context": "not_requested",
+      "chartBytes": 134429,
+      "reopenedFree": true
+    },
+    {
+      "tier": "pro",
+      "jobId": "d3185616-efca-4adc-ae9a-2dc1406a44cb",
+      "stage": "completed",
+      "transaction": "0x78a902c03f0086a86dfae5fe219eb28b1138611b8dd7fe41a90b00f25fb3406f",
+      "paidUSDC": 0.3,
+      "model": "grok-4.5",
+      "reasoning": "medium",
+      "completedCandles": 520,
+      "waveCount": "unclear",
+      "setupState": "watching",
+      "context": "available",
+      "chartBytes": 186630,
+      "reopenedFree": true
+    }
+  ]
+}

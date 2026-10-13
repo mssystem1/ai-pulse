@@ -120,8 +120,13 @@ REDIS_URL=${{Redis.REDIS_URL}}
 PERSISTENCE_NAMESPACE=pulse:production
 
 # PULSE Global reports require enough room to complete the strict Elliott schema.
-GROK_MAX_OUTPUT_STANDARD=1800
-GROK_MAX_OUTPUT_PREMIUM=3200
+GROK_MODEL=grok-4.5
+GROK_REASONING_STANDARD=low
+GROK_REASONING_PREMIUM=medium
+GROK_MAX_INPUT_STANDARD=16000
+GROK_MAX_INPUT_PREMIUM=32000
+GROK_MAX_OUTPUT_STANDARD=4096
+GROK_MAX_OUTPUT_PREMIUM=8192
 GROK_AUTOPILOT_MODEL=grok-4.3
 GROK_MAX_INPUT_AUTOPILOT=4000
 GROK_MAX_OUTPUT_AUTOPILOT=320
@@ -139,6 +144,8 @@ PRICE_TOKEN_SCAN=0.20
 ```
 
 Use [`.env.production.example`](../.env.production.example) as the complete server-variable checklist, not as a file to upload verbatim. Replace every placeholder, remove disabled-provider secrets that are not needed and preserve the verified public contract addresses.
+
+`GROK_REASONING_PREMIUM=medium` requires the current configuration build, which accepts `none`, `low` and `medium` and defaults Pro to `medium`. A startup error listing only `none` and `low` identifies an older build. Deploy the revision containing the updated `packages/config/src/index.ts`; the root Dockerfile recompiles `@pulse/config` before the API. Keep Pro at `medium`, then verify `/healthz` on that deployment.
 
 The user selected `pulse-api-production-7aae` for the Arc mainnet API release and will deploy manually. Prepare its configuration locally with:
 
@@ -170,7 +177,7 @@ Important Railway rules:
 - `PAY_TO_ADDRESS` must be a deliberately verified non-zero seller address.
 - The supplied PULSE Blob store is public, so Railway must use `BLOB_ACCESS=public` with the same server-only 32-byte `REPORT_ENCRYPTION_KEY` used for all report reads. Do not change this access mode during deployment.
 - Production startup fails closed before accepting traffic if `STORAGE_PROVIDER=vercel_blob` is combined with any Blob access mode other than `public`, or if the encryption key is missing or invalid.
-- Do not reduce `GROK_MAX_OUTPUT_STANDARD` below `1800` or `GROK_MAX_OUTPUT_PREMIUM` below `3200`. The runtime clamps obsolete lower values, but the environment should reflect the actual cost ceiling used by PULSE reports.
+- Do not reduce `GROK_MAX_OUTPUT_STANDARD` below `4096` or `GROK_MAX_OUTPUT_PREMIUM` below `8192`. The runtime clamps obsolete lower values, but the environment should reflect the actual cost ceiling used by PULSE reports.
 - `DATABASE_URL` remains empty. PULSE uses KV and Blob, not PostgreSQL.
 - Leave `CRON_SECRET` empty in this Railway topology.
 
@@ -344,7 +351,7 @@ Changing Railway variables creates a new deployment. Changing Vercel `VITE_*` va
 | Browser says API offline | Wrong build-time `VITE_API_URL`, failed Railway health or TLS/CORS issue | Open Railway `/healthz`, compare the exact API origin, then rebuild Vercel. |
 | Reports or dashboards disappear | Vercel and Railway point to different KV/Blob resources or namespaces | Verify Railway storage variables; Vercel web must not own authoritative storage. |
 | Paid report reaches `failed terminal` or `manual reconciliation` with `Cannot use private access on a public store` | Railway `BLOB_ACCESS` does not match the Vercel Blob store | For the supplied public store, set `BLOB_ACCESS=public` and the stable server-only `REPORT_ENCRYPTION_KEY`; redeploy, sign into Paid report history and press **Retry**. The settled receipt is reused and no second payment occurs. |
-| Global report logs show `Unterminated string` near the end of Grok JSON | Obsolete Global output limits truncated the strict PULSE schema | Set `GROK_MAX_OUTPUT_STANDARD=1800` and `GROK_MAX_OUTPUT_PREMIUM=3200`, redeploy, then retry the settled job from report history. |
+| Global report logs show `Unterminated string` near the end of Grok JSON | Obsolete Global output limits truncated the strict PULSE schema | Set `GROK_MAX_OUTPUT_STANDARD=4096` and `GROK_MAX_OUTPUT_PREMIUM=8192`, redeploy, then retry the settled job from report history. |
 
 ## Alternative: all-in-one Vercel serverless
 

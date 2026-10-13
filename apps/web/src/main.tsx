@@ -1,6 +1,7 @@
 import { lazy, StrictMode, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import "./styles.css";
+import "./globalReport.css";
 import { siteSurface } from "./siteRouting";
 import { applyAppearance, readAppearance } from "./appearancePreference";
 import { applySiteMetadata } from "./siteMetadata";

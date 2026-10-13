@@ -1,0 +1,7 @@
+PULSE · GLOBAL PRO · SOL-USDT · 1H · 1-hour candles
+OKX Spot · USDT · 2026-10-08T08:00:00.000Z
+Spot plan: Watching
+S1 117.30 → S2 120.56 → S3 124.80
+S1 needs a completed 1H close above it and subsequent held retest. Cancel: completed close below 113.12, or back below S1 after reclaim.
+Context: 4H · 4-hour candles
+Timing is schematic; conditional moves, not guaranteed forecasts.

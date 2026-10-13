@@ -1,0 +1,11 @@
+{
+  "validatedAt": "2026-10-13T09:25:10.674Z",
+  "environment": "production",
+  "compiledConfig": true,
+  "quickReasoning": "low",
+  "proReasoning": "medium",
+  "healthStatus": 200,
+  "realCredentials": false,
+  "workersStarted": false,
+  "externalCalls": 0
+}

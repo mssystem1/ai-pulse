@@ -1,0 +1,38 @@
+PULSE research report
+BTC-USDT · 4H · Global Pro
+2026-10-13 04:44 UTC
+
+BTC-USDT 4H · renderer validation
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 4H · 4-hour candles
+• Context: 1Dutc · 1-day candles
+
+ELLIOTT HYPOTHESIS
+• Candidate · impulse · 3? · minor
+
+POSSIBLE MOVES
+• ① Main · Correction
+• While below 83,530.10, watch 83,174.70. A completed 4H close below 83,174.70 opens 82,874.50.
+• Cancel the local continuation on a completed 4H reclaim and held retest of 83,530.10.
+• Stress: only after a completed 4H close below 82,874.50, watch 82,556.60. This is not a Spot target.
+
+SPOT PLAN
+• No supported setup
+• Mapped target unavailable
+
+PRO EVIDENCE
+• SMA21 83,068.20 · SMA55 83,868.71 · SMA144 83,956.47
+• RSI14 51.10 · ATR14 822.81 · volume / prior 20 bars 3.08×
+• 1Dutc Context: supports recovery · SMA55 80,506.42
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+LIMITATIONS
+• Renderer validation only; this is not a purchased model report.
+
+DISCLAIMER
+Research display validation · no execution instruction.

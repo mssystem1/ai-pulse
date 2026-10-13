@@ -1,0 +1,61 @@
+PULSE research report
+SOL-USDT · 1H · Global Pro
+2026-10-08 08:00 UTC
+
+等待确认恢复
+S1 下方主要观察调整；恢复须完整收盘突破并回测守住。
+
+市场快照
+• OKX Spot · USDT · okx-public-spot
+
+图表周期
+• 主图: 1H · 每根 K 线 1 小时
+• 高周期背景: 4H · 每根 K 线 4 小时
+
+艾略特波浪假设
+• 候选 · abc correction · C? · minor
+
+可能的走势
+• ① 主要路径 · 调整
+• 保持在 117.30 下方时，观察 113.12。1H 完整收盘跌破 113.12 后才观察 109.93。
+• 1H 完整收盘突破 117.30 并回测守住后，该局部延续路径失效。
+• 压力分支：仅在 1H 完整收盘跌破 109.93 后，才观察 95.24。这不是现货目标。
+• Local correction below the recovery threshold.
+• ② 备选路径 · 恢复
+• 1H 完整收盘位于 117.30 上方，随后回测守住：120.56 → 124.80。
+• 确认后跌回触发位或 113.12 失守则取消；重新评估结构。
+• Reclaim and held retest required.
+• ③ 备选路径 · 恢复后重数
+• 1H 完整收盘位于 124.80 上方，随后回测守住：128.00 → 132.74。
+• 确认后跌回触发位或 124.80 失守则取消；重新评估结构。
+• Reassess the count only after a confirmed recovery.
+
+现货计划
+• 现货计划 · 观察中 · ② 备选路径 · 恢复
+• S1：1H 完整收盘高于 117.30，随后回测并收盘守住。113.12 底线须保持。
+• S2 / 目标 1: 120.56
+• S3 / 目标 2: 124.80
+• 已观察入场区间: 等待实际回测
+• 保护止损: 等待实际回测
+• 费用后收益风险比: —
+• 取消：1H 完整收盘低于 113.12；或突破后回到 117.30 下方。结构失效不是保护止损。
+• 需完整收盘突破 S1
+• 需后续回测并守住
+
+PRO 证据
+• SMA21 117.46 · SMA55 119.75 · SMA144 120.40
+• RSI14 26.98 · ATR14 1.05 · 成交量/前20根均值 1.18×
+• 4H 高周期背景: 与恢复冲突 · SMA55 119.60
+• RSI 超卖本身不确认入场。SMA、波浪与斐波那契共享价格证据；不应当作独立投票。
+
+判断依据
+• Historical design example; generated candles and indicators.
+
+风险
+• Recovery can fail. No calibrated probability is available.
+
+限制
+• Illustration from the accepted design; not a current market report.
+
+DISCLAIMER
+Research only; not financial advice.

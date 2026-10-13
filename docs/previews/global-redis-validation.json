@@ -1,0 +1,22 @@
+{
+  "validatedAt": "2026-10-13T11:00:01.916Z",
+  "test": "local Redis-compatible TCP/Lua: concurrent dedupe, exact volume and cold-reader persistence",
+  "server": {
+    "name": "Microsoft Garnet",
+    "version": "2.1.8",
+    "bind": "127.0.0.1",
+    "luaTransactions": true
+  },
+  "passed": 1,
+  "failed": 0,
+  "skipped": 0,
+  "concurrentDuplicateCalls": 25,
+  "expectedUniqueResearchCount": 1,
+  "expectedUniqueExecutionCount": 2,
+  "expectedExactVolume": "1000000000000.000000",
+  "randomNamespace": true,
+  "cleanup": "Only the five exact keys created by this test",
+  "productionEndpointUsed": false,
+  "existingTestUnmodified": true,
+  "scope": "Command and Lua semantics plus a fresh reader; not server restart, disk recovery or Railway availability"
+}

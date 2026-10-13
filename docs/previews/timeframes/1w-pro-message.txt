@@ -1,0 +1,37 @@
+<b>PULSE · GLOBAL PRO</b>
+<b>BTC-USDT · 1W · 1-week candles</b>
+OKX Spot · USDT · 2026-10-13T04:22:16.621Z
+
+<b>BTC-USDT 1W · renderer validation</b>
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+<b>Spot plan · Cancelled · ② Alternative · Recovery</b>
+S1: completed 1W close above 82,842.00, then a retest that closes at or above it. Keep the 80,636.30 floor intact.
+S2 / target 1: 89,111.00
+S3 / target 2: 98,188.40
+Observed entry zone: Plan cancelled
+Protective stop: Plan cancelled
+Net R:R: —
+Cancel: completed 1W close below 80,636.30; or back below 82,842.00 after reclaim. Thesis invalidation is not the protective stop.
+Expires 2026-10-18T16:00:00.000Z; fresh execution evidence is required.
+
+<b>Possible moves</b>
+① Main · Range
+Watch the range 82,842.00–89,111.00; a completed close outside either boundary requires reassessment.
+② Alternative · Recovery
+Completed 1W close above 82,842.00, then a held retest: 89,111.00 → 98,188.40.
+Cancel if price closes back through the trigger after confirmation, or the 80,636.30 invalidation breaks; reassess.
+③ Alternative · Correction
+Completed 1W close below 82,842.00, then a held retest: 80,636.30 → 76,011.80.
+Cancel if price closes back through the trigger after confirmation, or the 89,111.00 invalidation breaks; reassess.
+Stress: only after a completed 1W close below 76,011.80, watch 74,501.60. This is not a Spot target.
+
+Elliott hypothesis: Count unclear
+
+<b>Pro evidence</b>
+Context: 1Mutc · 1-month candles
+SMA21 71,210.21 · SMA55 80,501.26 · SMA144 81,197.44
+RSI14 61.04 · ATR14 6,253.97 · volume / prior 20 bars 0.75×
+1Mutc Context: supports recovery · SMA55 59,493.97
+
+Original purchased snapshot. Recheck conditions before execution. Full evidence and limitations are in the TXT; reopen free from My reports.

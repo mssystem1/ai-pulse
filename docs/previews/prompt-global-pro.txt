@@ -1,0 +1,68 @@
+PULSE research report
+SOL-USDT · 1H · Global Pro
+2026-10-12 19:49 UTC
+
+SOL-USDT 1H stays under the SMA stack with an active downside correction
+Spot holds below the full SMA family with oversold RSI and light volume while the main path favors further correction toward the support floor. Recovery remains a conditional watching setup until a close-retest trigger forms; the Elliott count is unclear.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 1H · 1-hour candles
+• Context: 4H · 4-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Correction
+• While below 108.45, watch 105.71.
+• Cancel the local continuation on a completed 1H reclaim and held retest of 108.45.
+• Active main path: continued lower work toward the support floor while price holds the downside structure.
+• ② Alternative · Recovery
+• Completed 1H close above 108.45, then a held retest: 108.81 → 108.97.
+• Cancel if price closes back through the trigger after confirmation, or the 105.71 invalidation breaks; reassess.
+• Conditional alternative: upside only after a confirmed close-retest of the recovery trigger; setup is watching with trigger and retest still missing.
+• ③ Alternative · Recount after recovery
+• Completed 1H close above 108.97, then a held retest: 109.38 → 109.90.
+• Cancel if price closes back through the trigger after confirmation, or the 108.97 invalidation breaks; reassess.
+• Secondary conditional upside path that needs its own close-retest confirmation before challenging nearby former swing markers.
+
+SPOT PLAN
+• Spot plan · Watching · ② Alternative · Recovery
+• S1: completed 1H close above 108.45, then a retest that closes at or above it. Keep the 105.71 floor intact.
+• S2 / target 1: 108.81
+• S3 / target 2: 108.97
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 1H close below 105.71; or back below 108.45 after reclaim. Thesis invalidation is not the protective stop.
+• Completed close above S1 required
+• A subsequent held retest is required
+
+PRO EVIDENCE
+• SMA21 110.88 · SMA55 110.49 · SMA144 112.18
+• RSI14 27.00 · ATR14 0.91 · volume / prior 20 bars 0.57×
+• 4H Context: conflicts with recovery · SMA55 115.17
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+WHY THIS VIEW
+• Price trades beneath SMA21–233 with soft near-term SMA drift, supporting the active downside correction path.
+• RSI14 is deeply oversold but shares the same price inputs as the decline, so it is correlated stretch evidence rather than a reversal vote.
+• Participation is subdued on the latest leg, limiting conviction in any immediate bounce.
+• Four-hour context conflicts with the hourly slide, weakening higher-timeframe agreement.
+
+RISKS
+• Net reward on any bounce is capped quickly by a dense band of former swing lows now acting as overhead resistance.
+• Oversold RSI can persist in a trend; it does not alone justify entries.
+• Structural invalidation on the main path is not a protective stop; the recovery setup has no priced entry or stop while trigger and retest are missing.
+
+LIMITATIONS
+• Wave candidate origin invalidated by completed close; count remains unclear with no usable anchors.
+• Watching setup lacks trigger and retest, so entry zone, protective stop, and R:R are unavailable.
+• Four-hour agreement conflicts; no independent order-book context supplied.
+• Analysis uses completed candles only; projection spacing does not imply timing.
+
+DISCLAIMER
+Not trading advice. Spot narrative from supplied completed OHLCV and mapped levels only; structure can change on the next completed bar.

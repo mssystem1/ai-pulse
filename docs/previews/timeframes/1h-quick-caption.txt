@@ -1,0 +1,6 @@
+PULSE · GLOBAL QUICK · BTC-USDT · 1H · 1-hour candles
+OKX Spot · USDT · 2026-10-13T04:22:14.863Z
+Spot plan: Watching
+S1 80,400.00 → S2 83,520.00 → S3 84,200.00
+S1 needs a completed 1H close above it and subsequent held retest. Cancel: completed close below 79,725.17, or back below S1 after reclaim.
+Timing is schematic; conditional moves, not guaranteed forecasts.

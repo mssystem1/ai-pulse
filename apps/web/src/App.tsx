@@ -37,7 +37,7 @@ import { RouteAvailability } from "./RouteAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import { OverviewWorkspace } from "./OverviewWorkspace";
-import { buildReportBuyIntent } from "./reportTradeHandoff";
+import { buildTelegramReportBuyIntent } from "./reportTradeHandoff";
 import {
   clearWalletDisconnected,
   connectWallet,
@@ -202,8 +202,8 @@ export function App() {
     void fetch(`${API_BASE}/v1/shared/reports/${encodeURIComponent(token)}`, { signal: controller.signal, cache: "no-store", referrerPolicy: "no-referrer" })
       .then(async response => { if (!response.ok) throw new Error("Your Telegram report could not be loaded. Reopen the Spot handoff from My reports."); return response.json(); })
       .then(data => {
-        if (!data.report?.instId) throw new Error("This report has no Spot market context.");
-        setTradeIntent(buildReportBuyIntent(data.report, "limit"));
+        if (!data.report || typeof data.report !== "object") throw new Error("This report has no Spot market context.");
+        setTradeIntent(buildTelegramReportBuyIntent(data.report, window.location.hash));
         const url = new URL(window.location.href); url.hash = "";
         window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
       }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Report handoff unavailable"); });

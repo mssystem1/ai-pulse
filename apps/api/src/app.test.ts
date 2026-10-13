@@ -20,6 +20,13 @@ it("prices cached xAI input at the configured cached-token rate", () => {
 });
 
 let server: Server;
+it("includes Grok reasoning in output cost without counting it twice", () => {
+  const cfg = { XAI_INPUT_COST_PER_MILLION_USD: 2, XAI_CACHED_INPUT_COST_PER_MILLION_USD: .3, XAI_OUTPUT_COST_PER_MILLION_USD: 6 };
+  const separate = estimateAiCostUsd(cfg, { promptTokens: 4946, cachedTokens: 384, completionTokens: 575, reasoningTokens: 1183, totalTokens: 6704 });
+  assert.ok(Math.abs(separate - .0197872) < 1e-12);
+  assert.equal(estimateAiCostUsd(cfg, { promptTokens: 4946, cachedTokens: 384, completionTokens: 1758, reasoningTokens: 1183, totalTokens: 6704 }), separate);
+  assert.equal(estimateAiCostUsd(cfg, { promptTokens: 4946, cachedTokens: 384, completionTokens: 575, reasoningTokens: 1183 }), separate);
+});
 let port: number;
 let testConfig: ReturnType<typeof loadConfig>;
 const ADDRESS = "0x779ded0c9e1022225f8e0630b35a9b54be713736";

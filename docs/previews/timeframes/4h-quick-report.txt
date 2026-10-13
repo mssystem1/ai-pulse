@@ -1,0 +1,30 @@
+PULSE research report
+BTC-USDT · 4H · Global Quick
+2026-10-13 04:44 UTC
+
+BTC-USDT 4H · renderer validation
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 4H · 4-hour candles
+
+ELLIOTT HYPOTHESIS
+• Candidate · impulse · 3? · minor
+
+POSSIBLE MOVES
+• ① Main · Correction
+• While below 83,530.10, watch 83,174.70. A completed 4H close below 83,174.70 opens 82,874.50.
+• Cancel the local continuation on a completed 4H reclaim and held retest of 83,530.10.
+
+SPOT PLAN
+• No supported setup
+• Mapped target unavailable
+
+LIMITATIONS
+• Renderer validation only; this is not a purchased model report.
+
+DISCLAIMER
+Research display validation · no execution instruction.

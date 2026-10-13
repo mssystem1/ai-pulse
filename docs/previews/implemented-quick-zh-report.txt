@@ -1,0 +1,49 @@
+PULSE research report
+SOL-USDT · 1H · Global Quick
+2026-10-08 08:00 UTC
+
+等待确认恢复
+S1 下方主要观察调整；恢复须完整收盘突破并回测守住。
+
+市场快照
+• OKX Spot · USDT · okx-public-spot
+
+图表周期
+• 主图: 1H · 每根 K 线 1 小时
+
+艾略特波浪假设
+• 候选 · abc correction · C? · minor
+
+可能的走势
+• ① 主要路径 · 调整
+• 保持在 117.30 下方时，观察 113.12。1H 完整收盘跌破 113.12 后才观察 109.93。
+• 1H 完整收盘突破 117.30 并回测守住后，该局部延续路径失效。
+• Local correction below the recovery threshold.
+• ② 备选路径 · 恢复
+• 1H 完整收盘位于 117.30 上方，随后回测守住：120.56 → 124.80。
+• 确认后跌回触发位或 113.12 失守则取消；重新评估结构。
+• Reclaim and held retest required.
+
+现货计划
+• 现货计划 · 观察中 · ② 备选路径 · 恢复
+• S1：1H 完整收盘高于 117.30，随后回测并收盘守住。113.12 底线须保持。
+• S2 / 目标 1: 120.56
+• S3 / 目标 2: 124.80
+• 已观察入场区间: 等待实际回测
+• 保护止损: 等待实际回测
+• 费用后收益风险比: —
+• 取消：1H 完整收盘低于 113.12；或突破后回到 117.30 下方。结构失效不是保护止损。
+• 需完整收盘突破 S1
+• 需后续回测并守住
+
+判断依据
+• Historical design example; generated candles and indicators.
+
+风险
+• Recovery can fail. No calibrated probability is available.
+
+限制
+• Illustration from the accepted design; not a current market report.
+
+DISCLAIMER
+Research only; not financial advice.

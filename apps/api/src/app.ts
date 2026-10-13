@@ -14,15 +14,21 @@ import { buildAspMetadata, getNetwork, priceLabel, type NetworkKey } from "@puls
 
 export function estimateAiCostUsd(
   cfg: Pick<AppConfig, "XAI_INPUT_COST_PER_MILLION_USD" | "XAI_CACHED_INPUT_COST_PER_MILLION_USD" | "XAI_OUTPUT_COST_PER_MILLION_USD">,
-  usage: { promptTokens: number; completionTokens: number; cachedTokens?: number },
+  usage: { promptTokens: number; completionTokens: number; cachedTokens?: number; totalTokens?: number; reasoningTokens?: number },
 ): number {
   const cached = Math.min(usage.promptTokens, Math.max(0, usage.cachedTokens || 0));
   const cachedRate = Number.isFinite(cfg.XAI_CACHED_INPUT_COST_PER_MILLION_USD)
     ? cfg.XAI_CACHED_INPUT_COST_PER_MILLION_USD
     : cfg.XAI_INPUT_COST_PER_MILLION_USD;
+  // xAI Chat Completions reports visible output separately from reasoning.
+  // The total reconciles both formats without double-counting reasoning when
+  // a provider already includes it in completionTokens.
+  const outputTokens = usage.totalTokens === undefined
+    ? usage.completionTokens + (usage.reasoningTokens || 0)
+    : Math.max(usage.completionTokens, usage.totalTokens - usage.promptTokens);
   return ((usage.promptTokens - cached) * cfg.XAI_INPUT_COST_PER_MILLION_USD
     + cached * cachedRate
-    + usage.completionTokens * cfg.XAI_OUTPUT_COST_PER_MILLION_USD) / 1_000_000;
+    + outputTokens * cfg.XAI_OUTPUT_COST_PER_MILLION_USD) / 1_000_000;
 }
 import {
   buildX402InputRequired,
@@ -30,7 +36,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, buildSpotExecutionPlan, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit } from "@pulse/analysis";
+import { buildFusedAiContext, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, prepareGlobalReport, finishGlobalReport, globalCompatibility } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -76,7 +82,7 @@ import { collectLiveContractEvidence, inspectEvmAddress, simulateEvmTransaction 
 import { getCdpNativeUsdcSwap } from "./cdpSwap.js";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
 import { createPersistence, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type AnalysisJob, type PaymentReceipt } from "./jobs.js";
-import { executionTicker, isRobinhoodMarket, robinhoodCandles } from "./robinhoodMarkets.js";
+import { executionTicker, executionMarketContext, isRobinhoodMarket, robinhoodCandles } from "./robinhoodMarkets.js";
 import { isArcMarket, arcTokenCatalog } from "./arcMarkets.js";
 import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
@@ -176,7 +182,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   };
   const reportHistoryAuth = new ReportHistoryAuth(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || ((input: Parameters<typeof buildMarketContext>[0]) =>
-    buildMarketContext(input));
+    executionMarketContext(cfg, { ...input, timeframe: input.timeframe ?? "1H", candleLimit: input.candleLimit ?? 100 }));
   const arcBudget = dependencies.arcBudget || createArcBudgetStore({
     QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, REDIS_URL: cfg.REDIS_URL, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
     PERSISTENCE_NAMESPACE: cfg.PERSISTENCE_NAMESPACE,
@@ -1297,8 +1303,11 @@ export function createApp(cfg: AppConfig, dependencies: {
       const market = await observeProvider("okx", "spot_context", () => loadSpotContext({
         instId: body.instId,
         timeframe: body.timeframe,
-        candleLimit: tier === "premium" ? 120 : 80,
+        candleLimit: GLOBAL_HISTORY_LIMIT,
+        completedOnly: true,
       }));
+      const contextTimeframe = tier === "premium" ? globalContextTimeframe(market.bar) : null;
+      const contextMarket = contextTimeframe ? await observeProvider("okx", "global_context", () => loadSpotContext({ instId: body.instId, timeframe: contextTimeframe, candleLimit: 300, completedOnly: true })).catch(() => null) : null;
       await onContextReady?.();
       if (isArc(req) && cfg.ARC_AI_MODE === "fixture") {
         const fixtureAnalysis = body.lang === "zh"
@@ -1313,12 +1322,15 @@ export function createApp(cfg: AppConfig, dependencies: {
           analysisProfile: { mode: "fixture", model: "fixture", reasoningEffort: "none" },
           usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, fixture: true,
         };
-        return canonical ? { ...fixture, service: `spot_analysis_${tier === "base" ? "standard" : "premium"}`, tier: tier === "base" ? "standard" : "premium" } : fixture;
+        const prepared = prepareGlobalReport({ market, tier, lang: body.lang, contextMarket });
+        const global = finishGlobalReport(prepared, { ...fixtureAnalysis, regime: "transition", bias: "neutral", confidence: 0, waveCandidateId: null, mainPathId: null, setupPathId: null, reasons: [], pathNotes: [], riskNotes: [] });
+        const enhanced = { ...fixture, global, ...globalCompatibility(global), chart: { source: market.source, timeframe: market.bar, candles: global.candles } };
+        return canonical ? { ...enhanced, service: `spot_analysis_${tier === "base" ? "standard" : "premium"}`, tier: tier === "base" ? "standard" : "premium" } : enhanced;
       }
       if (!cfg.hasXaiKey) throw new Error("XAI_API_KEY not configured on server");
       const normalizedTier = tier === "premium" ? "premium" : "standard";
       await reserveArcAi(req, normalizedTier);
-      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(grokCfg, { ...body, tier, ...modelLimits(normalizedTier) }, market));
+      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(grokCfg, { ...body, tier, contextMarket, ...modelLimits(normalizedTier) }, market));
       if (result.usage) {
         const cost = estimateAiCostUsd(cfg, result.usage);
         recordAiUsage(result.usage.promptTokens, result.usage.completionTokens, cost, result.usage.cachedTokens, result.usage.reasoningTokens);
@@ -1349,20 +1361,8 @@ export function createApp(cfg: AppConfig, dependencies: {
           opportunities = await searchOkxDefiOpportunities(cfg, executionToken.symbol, defiChainId, executionToken.address).catch(() => []);
         }
       }
-      const technical = buildTechnicalStructure(market.candles);
-      const executionPlan = buildSpotExecutionPlan({
-        instId: body.instId,
-        timeframe: market.bar,
-        tier: normalizedTier,
-        lastPrice: Number((market.ticker as { last?: unknown }).last || market.candles.at(-1)?.close || 0),
-        analysis: result.analysis,
-        technical,
-      });
       const enhanced = {
         ...result,
-        chart: { source: market.source, timeframe: market.bar, candles: market.candles },
-        technical,
-        executionPlan,
         defi: { network: selectedNetwork, chainId: defiChainId, requestedAsset: assetSymbol, asset: defiAsset, tokenAddress: defiTokenAddress || null, aliasesChecked: [...new Set(defiAliases.filter(Boolean))], status: opportunities.length ? "live_verified_contract" : defiTokenAddress ? "no_verified_opportunity" : "no_identity_safe_chain_asset", observedAt: new Date().toISOString(), opportunities, explanation: body.lang === "zh"
           ? opportunities.length
             ? `${assetSymbol} 在 ${selectedNetwork} 上由 ${defiAsset}（${defiTokenAddress}）表示。以下产品均与该标的代币合约精确匹配，并依据可执行性、退出支持、TVL、风险标记和已观测 APY 综合排序，而非仅按 APY 排序。`
@@ -1701,6 +1701,8 @@ export function createApp(cfg: AppConfig, dependencies: {
             await persistence.jobs.transition(current.id, "generating_analysis");
           },
         ));
+        const global = (report as { global?: { candles: unknown[]; tier: string; context: { status: string } } }).global;
+        partial = Boolean(global && (global.candles.length < GLOBAL_HISTORY_LIMIT || global.tier === "pro" && global.context.status !== "available"));
       } else if (current.mode === "prediction") {
         const body = PredictionAnalysisRequestSchema.parse(current.input);
         const context = await preparePredictionContext({

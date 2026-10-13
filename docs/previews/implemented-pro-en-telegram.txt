@@ -1,0 +1,39 @@
+<b>PULSE · GLOBAL PRO</b>
+<b>SOL-USDT · 1H · 1-hour candles</b>
+OKX Spot · USDT · 2026-10-08T08:00:00.000Z
+
+<b>Correction in progress. Watch 113.12 for a response.</b>
+Correction remains the main view below S1. Recovery is conditional on a completed reclaim and held retest.
+
+<b>Spot plan · Watching · ② Alternative · Recovery</b>
+S1: completed 1H close above 117.30, then a retest that closes at or above it. Keep the 113.12 floor intact.
+S2 / target 1: 120.56
+S3 / target 2: 124.80
+Observed entry zone: Pending the observed retest
+Protective stop: Pending the observed retest
+Net R:R: —
+Cancel: completed 1H close below 113.12; or back below 117.30 after reclaim. Thesis invalidation is not the protective stop.
+Completed close above S1 required
+A subsequent held retest is required
+
+<b>Possible moves</b>
+① Main · Correction
+While below 117.30, watch 113.12. A completed 1H close below 113.12 opens 109.93.
+Cancel the local continuation on a completed 1H reclaim and held retest of 117.30.
+Stress: only after a completed 1H close below 109.93, watch 95.24. This is not a Spot target.
+② Alternative · Recovery
+Completed 1H close above 117.30, then a held retest: 120.56 → 124.80.
+Cancel if price closes back through the trigger after confirmation, or the 113.12 invalidation breaks; reassess.
+③ Alternative · Recount after recovery
+Completed 1H close above 124.80, then a held retest: 128.00 → 132.74.
+Cancel if price closes back through the trigger after confirmation, or the 124.80 invalidation breaks; reassess.
+
+Elliott hypothesis: Candidate C?
+
+<b>Pro evidence</b>
+Context: 4H · 4-hour candles
+SMA21 117.46 · SMA55 119.75 · SMA144 120.40
+RSI14 26.98 · ATR14 1.05 · volume / prior 20 bars 1.18×
+4H Context: conflicts with recovery · SMA55 119.60
+
+Original purchased snapshot. Recheck conditions before execution. Full evidence and limitations are in the TXT; reopen free from My reports.

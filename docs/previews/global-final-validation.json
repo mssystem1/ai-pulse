@@ -1,0 +1,73 @@
+{
+  "validatedAt": "2026-10-13T09:38:43.995Z",
+  "checks": [
+    {
+      "variant": "live",
+      "tier": "quick",
+      "primaryTimeframe": "1H",
+      "completedCandles": 520,
+      "contextTimeframe": "4H",
+      "contextCandles": 0,
+      "chartBytes": 136289,
+      "messageCharacters": 1676,
+      "captionCharacters": 353,
+      "summaryWords": 101,
+      "setup": "watching",
+      "wave": "unclear",
+      "originalPurchasedSnapshotsUnchanged": true,
+      "usesFinalPrompt": false,
+      "primaryHistorySha256": "30819801d9321a0dc8e757bc8c1a55a285acda9dac63fcabef9cccabbaa09609"
+    },
+    {
+      "variant": "live",
+      "tier": "pro",
+      "primaryTimeframe": "1H",
+      "completedCandles": 520,
+      "contextTimeframe": "4H",
+      "contextCandles": 299,
+      "chartBytes": 190344,
+      "messageCharacters": 1985,
+      "captionCharacters": 380,
+      "summaryWords": 52,
+      "setup": "watching",
+      "wave": "unclear",
+      "originalPurchasedSnapshotsUnchanged": true,
+      "usesFinalPrompt": false,
+      "primaryHistorySha256": "30819801d9321a0dc8e757bc8c1a55a285acda9dac63fcabef9cccabbaa09609"
+    },
+    {
+      "variant": "prompt",
+      "tier": "quick",
+      "primaryTimeframe": "1H",
+      "completedCandles": 520,
+      "contextTimeframe": "4H",
+      "contextCandles": 0,
+      "chartBytes": 136283,
+      "messageCharacters": 1375,
+      "captionCharacters": 353,
+      "summaryWords": 25,
+      "setup": "watching",
+      "wave": "unclear",
+      "originalPurchasedSnapshotsUnchanged": true,
+      "usesFinalPrompt": true,
+      "primaryHistorySha256": "30819801d9321a0dc8e757bc8c1a55a285acda9dac63fcabef9cccabbaa09609"
+    },
+    {
+      "variant": "prompt",
+      "tier": "pro",
+      "primaryTimeframe": "1H",
+      "completedCandles": 520,
+      "contextTimeframe": "4H",
+      "contextCandles": 299,
+      "chartBytes": 190344,
+      "messageCharacters": 1921,
+      "captionCharacters": 380,
+      "summaryWords": 40,
+      "setup": "watching",
+      "wave": "unclear",
+      "originalPurchasedSnapshotsUnchanged": true,
+      "usesFinalPrompt": true,
+      "primaryHistorySha256": "30819801d9321a0dc8e757bc8c1a55a285acda9dac63fcabef9cccabbaa09609"
+    }
+  ]
+}

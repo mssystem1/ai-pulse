@@ -1,0 +1,32 @@
+PULSE · Global Quick
+SOL-USDT · 1H · Binance · USDT
+08 Oct 2026 08:00 UTC
+
+WAIT · correction below the recovery threshold
+Snapshot price 115.75. Candidate A–B–C correction; last C? remains provisional.
+
+Possible moves
+① Main · C? correction: while below 117.30, watch 113.12 → 109.93. Confirmed reclaim and held retest of 117.30 cancels this local continuation view.
+② Recovery: 1H close above 117.30 + held retest, with 113.12 intact → 120.56 → 124.80.
+
+Spot plan · WATCHING · linked to amber path ②
+S1: 1H close above 117.30, then a retest that closes at or above it. Keep 113.12 intact.
+S2 / target 1: 120.56 · S3 / target 2: 124.80.
+Entry / protective stop / R:R: pending the observed retest.
+Cancel: 1H close below 113.12; or back below 117.30 after reclaim.
+
+Snapshot
+DESIGN ONLY · Historical screenshot levels; synthetic market evidence. Not a live report.
+Saved snapshot · recheck current conditions before acting.
+Research only · not financial advice.
+
+HOW TO READ THIS CHART
+Observed anchors carry 1–5 / A–B labels. C? is an unconfirmed candidate. Projection arrows are conditional routes; their spacing does not forecast arrival time.
+The main downside view and the amber Spot alternative are different branches. The Spot plan activates only on its stated confirmation and retest.
+
+SETUP CHECKS
+The 113.12 floor is thesis invalidation, not the protective stop. The stop belongs below the observed retest low with a measured buffer.
+A retest that has not formed provides no priced entry, stop or R:R. If the observed entry offers insufficient net reward to target 1, keep WAIT.
+
+LIMITATIONS
+All market evidence in this preview is synthetic. The levels are historical screenshot references. No actual order-book data or live confirmation is claimed. Indicator defaults are proposed PULSE settings, not Vilarso’s private script.

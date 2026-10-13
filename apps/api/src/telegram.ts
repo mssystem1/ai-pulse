@@ -5,8 +5,8 @@ import { isKvUnavailableError, kvConfigured, runKvCommand } from "./resilientKv.
 import { asyncRoute } from "./httpResilience.js";
 import { TelegramCommerce, TELEGRAM_SERVICES, type TelegramCommerceDependencies, type StarsUpdate } from "./telegramCommerce.js";
 import { TelegramBotChat } from "./telegramBotChat.js";
-import { presentResearch } from "@pulse/domain";
-import { formatTelegramResearch, telegramResearchMessage, telegramResearchFilename, renderTelegramResearchChart, type ResearchContext } from "./telegramResearch.js";
+import { presentResearch, readGlobalReport } from "@pulse/domain";
+import { formatTelegramResearch, telegramResearchMessage, telegramResearchCaption, telegramResearchOrder, telegramResearchFilename, renderTelegramResearchChart, type ResearchContext } from "./telegramResearch.js";
 
 type TelegramUpdate = StarsUpdate & { update_id?: number; message?: { chat?: { id?: number; type?: string }; text?: string; from?: { id?: number } }; callback_query?: { id?: string; data?: string; from?: { id?:number }; message?: { message_id?: number; chat?: { id?: number; type?: string } } } };
 
@@ -101,15 +101,15 @@ async function kv(command: unknown[]) {
 }
 
 async function telegram(token: string, method: string, payload: unknown) {
-  if(method==="sendResearchDocument"||method==="sendResearchChart"){
+  if(method==="sendResearchDocument"||method==="sendResearchChart"||method==="sendResearchOriginalChart"){
     const request=payload as {chat_id:number|string;report:unknown;context?:ResearchContext};
     const body=new FormData();body.set("chat_id",String(request.chat_id));
     const presentation=presentResearch(request.report,request.context);
-    if(method==="sendResearchChart"){
+    if(method==="sendResearchChart"||method==="sendResearchOriginalChart"){
       const chart=renderTelegramResearchChart(request.report,request.context);
-      if(!chart)return {ok:true,result:null};
-      body.set("caption",`${presentation.label.slice(0,400)}\nOriginal report snapshot · conditional paths, not live prices or guaranteed forecasts.`);
-      body.set("photo",new Blob([Uint8Array.from(chart)],{type:"image/png"}),"PULSE-report-chart.png");
+      if(!chart){if(readGlobalReport(request.report)?.candles.length!>=2)throw new Error("Saved Global chart could not be rendered");return {ok:true,result:null};}
+      body.set("caption",telegramResearchCaption(request.report,request.context));
+      body.set(method==="sendResearchOriginalChart"?"document":"photo",new Blob([Uint8Array.from(chart)],{type:"image/png"}),"PULSE-report-chart.png");
     }else{
       body.set("caption",`${presentation.label.slice(0,400)}\nComplete research sections · no transaction required to read.`);
       body.set("document",new Blob([formatTelegramResearch(request.report,request.context)],{type:"text/plain;charset=utf-8"}),telegramResearchFilename(request.report,request.context));
@@ -168,9 +168,9 @@ async function attemptDelivery(task:DeliveryTask){
           if(kvConfigured())await kv(["SET",key,"1","EX",604800]);else {memoryDocuments.add(memoryKey);if(memoryDocuments.size>3000)memoryDocuments.delete(memoryDocuments.values().next().value!);}
         };
         const payload={chat_id:chatId,report,context:task.context};
-        await part("document",()=>telegram(token,"sendResearchDocument",payload));
-        await part("overview",()=>telegram(token,"sendMessage",{chat_id:chatId,text:telegramResearchMessage(report,task.context),parse_mode:"HTML",disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"Open full PULSE report",url:task.reportUrl}],[{text:"My reports",callback_data:"/reports"}]]}}));
-        await part("chart",()=>telegram(token,"sendResearchChart",payload));
+        const failed:unknown[]=[];
+        for(const name of telegramResearchOrder(report))try{await part(name,()=>name==="overview"?telegram(token,"sendMessage",{chat_id:chatId,text:telegramResearchMessage(report,task.context),parse_mode:"HTML",disable_web_page_preview:true,reply_markup:{inline_keyboard:[[{text:"Open full PULSE report",url:task.reportUrl}],[{text:"My reports",callback_data:"/reports"}]]}}):telegram(token,name==="chart"?"sendResearchChart":"sendResearchDocument",payload));}catch(error){failed.push(error);}
+        if(failed.length)throw failed[0];
       }else await deliverTelegramReport(task.delivery,task.text,task.reportUrl);
       if(kvConfigured())await kv(["SET",`pulse:v6:telegram:sent:${task.id}`,"1","EX",604800]);
       else { memoryDelivered.add(task.id); if(memoryDelivered.size>1000)memoryDelivered.delete(memoryDelivered.values().next().value!); }

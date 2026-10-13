@@ -1,0 +1,53 @@
+PULSE research report
+SOL-USDT · 1H · Global Quick
+2026-10-12 19:49 UTC
+
+SOL-USDT 1H softens under prior swing structure as downside correction stays active
+Spot trades below the 55-period SMA after failing to hold the recent impulse highs, with the main visible path a continued correction toward deeper support. The supplied up-count is no longer reliable because price has moved through its origin anchor and waves 4/5 were never observed. A conditional recovery path exists only if the mapped trigger reclaims and retests; the linked setup remains Watching with trigger and retest still missing, so there is no priced entry, protective stop, or R:R yet. What would change the view is a confirmed reclaim-and-retest of the recovery trigger versus further acceptance toward the correction target.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 1H · 1-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Correction
+• While below 108.45, watch 105.71.
+• Cancel the local continuation on a completed 1H reclaim and held retest of 108.45.
+• Main path treats the decline as an active correction, with focus on the mapped support target while structure remains below the recent failed highs.
+• ② Alternative · Recovery
+• Completed 1H close above 108.45, then a held retest: 108.81 → 108.97.
+• Cancel if price closes back through the trigger after confirmation, or the 105.71 invalidation breaks; reassess.
+• Alternative upside path is conditional on reclaiming the shared trigger level and completing a close retest; until then it is not a live buy setup.
+
+SPOT PLAN
+• Spot plan · Watching · ② Alternative · Recovery
+• S1: completed 1H close above 108.45, then a retest that closes at or above it. Keep the 105.71 floor intact.
+• S2 / target 1: 108.81
+• S3 / target 2: 108.97
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 1H close below 105.71; or back below 108.45 after reclaim. Thesis invalidation is not the protective stop.
+• Completed close above S1 required
+• A subsequent held retest is required
+
+WHY THIS VIEW
+• Completed price action sits under SMA55 with the active main path defined as a downside correction after the latest swing high failed to hold.
+• Elliott impulse candidate is unclear: partial 4/5 unobserved and price has already violated the labelled origin, so the count is not used.
+
+RISKS
+• Setup state is Watching with missing trigger and retest, so no entry zone, protective stop, or reward/risk is available.
+• Structural invalidation on the recovery path is not a substitute for a protective stop.
+
+LIMITATIONS
+• 4H context was not requested, so higher-timeframe agreement is unknown.
+• RSI14 and regression are null; volume ratio and SMA are correlated trend context only.
+• Projection and Fibonacci levels are schematic references, not timed forecasts.
+
+DISCLAIMER
+Educational market map narrative only; not advice. Elliott labels are hypotheses. Spot conditions and costs can change without notice.

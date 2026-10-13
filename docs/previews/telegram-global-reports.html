@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PULSE · Telegram Global report design</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0a1019;color:#e6edf6;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}main{max-width:1340px;margin:auto;padding:28px 24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}.brand{letter-spacing:3px;font-weight:800;font-size:21px}.brand span{color:#56ddbd}h1{font-size:28px;letter-spacing:-.5px;margin:18px 0 8px}.lead{color:#acbdd0;max-width:900px}.notice{color:#d4b582;background:#211d17;border:1px solid #5b4932;padding:10px 14px;border-radius:8px;font-size:12px;margin:18px 0}.tabs{display:flex;gap:5px;background:#131e2d;padding:4px;border:1px solid #2f4055;border-radius:9px}button,a{font:inherit}.tabs button{cursor:pointer;border:0;background:none;color:#a2b4cb;border-radius:6px;padding:7px 18px}.tabs button.active{background:#2b415c;color:#edf4fe}.layout{display:grid;grid-template-columns:minmax(320px,450px) minmax(0,1fr);gap:30px;align-items:start}.phone{background:#142132;border:1px solid #35475d;border-radius:18px;overflow:hidden}.chat-header{background:#1f3045;padding:17px 20px;display:flex;align-items:center;gap:12px}.avatar{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#2d806e;color:#e3fff4;font-weight:800}.chat-header strong{display:block}.chat-header small{display:block;color:#93a8bd}.chat{padding:16px 12px;background:radial-gradient(ellipse at 0 30%,#213443 0,transparent 50%),#152535}.bubble{background:#263e52;border-radius:10px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#e8f0f8;white-space:pre-wrap;overflow-wrap:anywhere;position:relative}.bubble b{font-weight:750;color:#fff}.photo-bubble{padding:0;overflow:hidden}.photo-link{display:block;background:#0f1826;cursor:zoom-in}.photo-link img{display:block;width:100%;height:auto}.caption{padding:11px 13px;white-space:pre-wrap;font-size:11px;color:#c7d7e6}.message-time{font-size:10px;color:#8ea9bf;text-align:right;margin-top:8px}.inline-actions{display:flex;flex-wrap:wrap;gap:5px;margin:10px 0 2px}.inline-actions a,.inline-actions button{font-size:12px;display:block;padding:9px;text-decoration:none;background:#1c3348;border:1px solid #415970;border-radius:5px;color:#a9e0eb;text-align:center;flex:1;cursor:pointer}.document{display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit}.file-icon{background:#497fb5;border-radius:8px;padding:11px 9px;font-size:10px;font-weight:800}.file-name{font-size:12px;font-weight:650;word-break:break-all}.file-meta{font-size:11px;color:#a9bccd}.delivery-label{text-transform:uppercase;color:#9bb1c6;letter-spacing:1px;font-size:10px;margin:12px 0 6px}.details-pane{min-width:0}.details-pane h2{font-size:18px;margin:3px 0 8px}.details-pane p{color:#a9bbcf}.chart-preview{width:100%;border:1px solid #324157;border-radius:10px;background:#0f1826}.feature-list{padding:15px 18px;border:1px solid #31425a;background:#111c2b;border-radius:10px;margin:18px 0}.feature-list h3{font-size:14px;margin:0 0 8px}.feature-list ul{padding-left:18px;margin:0;font-size:13px;color:#b6c8da}.feature-list li{margin:5px 0}.miniapp-card{background:#181c24;border:1px solid #695335;border-radius:10px;padding:17px 18px}.miniapp-card h3{margin:0 0 8px;color:#f1c16b;font-size:16px}.miniapp-card p{font-size:12px;margin:7px 0;white-space:pre-wrap}.links{display:flex;gap:12px;flex-wrap:wrap;margin-top:14px}.links a{color:#84d7cf;font-size:12px}details{border:1px solid #324157;border-radius:9px;margin:18px 0;padding:14px}summary{cursor:pointer;font-weight:650}pre{white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.6 system-ui;color:#b6c8da;margin:14px 0 0}.foot{font-size:11px;color:#8094ab;margin-top:20px}.controls-note{margin:5px 0 15px;font-size:11px;color:#8198b0}.toast{min-height:20px;color:#b6c8da;font-size:11px}.is-quick .pro-only{display:none}@media(max-width:850px){main{padding:20px 14px}.layout{grid-template-columns:1fr;gap:22px}.phone{max-width:500px;margin:auto;width:100%}h1{font-size:23px}.details-pane{width:100%}.tabs button{padding:7px 12px}.brand{font-size:17px}}
+</style>
+</head>
+<body><main>
+<header><div class="brand">PULSE <span>TELEGRAM</span></div><div class="tabs" aria-label="Report tier"><button data-tier="quick">Quick</button><button data-tier="pro" class="active">Pro</button></div></header>
+<h1>The chart, possible moves and one linked Spot plan</h1>
+<p class="lead">Telegram should be useful inside the message. The chart comes first, the summary explains what changes the view, and the TXT holds the complete report. Pro adds visible evidence and deeper context.</p>
+<div class="notice">DESIGN PREVIEW · This is a local mockup, not a Telegram screenshot or a live report. Historical screenshot levels; synthetic OHLCV, Elliott anchors, indicators and 4H context. No messages are sent.</div>
+<div class="layout">
+<section class="phone" aria-label="Telegram conversation preview"><div class="chat-header"><span class="avatar">P</span><div><strong>PULSE</strong><small>bot · private report</small></div></div><div class="chat">
+<div class="delivery-label">1 · Chart attachment</div>
+<div class="bubble photo-bubble"><a class="photo-link" id="photo-link" target="_blank" rel="noopener"><img id="chat-chart" alt="Illustrative chart: Elliott structure, conditional moves and linked Watching setup"></a><div class="caption" id="caption"></div></div>
+<div class="delivery-label">2 · Report message</div><div class="bubble"><div id="message"></div><div class="inline-actions"><a href="global-report-v2.html" target="_blank" rel="noopener">Open full report ↗</a><button id="history-button">My reports</button></div><div class="message-time">08:00 · snapshot</div></div>
+<div class="delivery-label">3 · Full TXT</div><div class="bubble"><a class="document" id="txt-link"><span class="file-icon">TXT</span><span><span class="file-name" id="txt-name"></span><br><span class="file-meta">Complete report · free to reopen</span></span></a></div>
+<div class="toast" id="toast" role="status"></div></div></section>
+<section class="details-pane"><h2 id="chart-heading"></h2><p class="controls-note">Tap either image to inspect the full chart. The tier switch changes the chart and message together.</p><a id="large-chart-link" target="_blank" rel="noopener"><img class="chart-preview" id="large-chart" alt="Full illustrative Telegram report chart"></a>
+<div class="feature-list"><h3 id="features-heading"></h3><ul id="features"></ul></div>
+<div class="miniapp-card"><h3>Mini App · Spot plan attached to the chart</h3><p id="card"></p><p>Entry and protective stop appear only after the actual retest. The floor shown on the chart is thesis invalidation.</p><div class="links"><a href="global-report-v2.html" target="_blank" rel="noopener">Inspect interactive web design</a><a id="png-download" download>Download original chart PNG</a></div></div>
+<details><summary>Read the full TXT preview</summary><pre id="full-text"></pre></details>
+<p class="foot">Planning artifact · 12 October 2026 · same level IDs and setup state as the accepted web design. Production needs versioned snapshots, validated anchors, completed bars and actual context. This page does not change the application’s report renderers.</p></section>
+</div></main>
+<script src="telegram-global-design.js"></script>
+<script>
+const design=window.TelegramGlobalDesign;let blob;
+function render(tier){
+  document.body.classList.toggle('is-quick',tier==='quick');
+  document.querySelectorAll('[data-tier]').forEach(b=>{b.classList.toggle('active',b.dataset.tier===tier);b.setAttribute('aria-pressed',String(b.dataset.tier===tier))});
+  const title='Global '+(tier==='pro'?'Pro':'Quick'),image='telegram-global-'+tier+'.png';
+  document.getElementById('message').innerHTML=design.message(tier);
+  document.getElementById('caption').textContent=design.caption(tier);
+  for(const id of ['chat-chart','large-chart'])document.getElementById(id).src=image;
+  for(const id of ['photo-link','large-chart-link','png-download'])document.getElementById(id).href=image;
+  document.getElementById('chart-heading').textContent=title+' · matching chart export';
+  document.getElementById('features-heading').textContent=tier==='pro'?'Why choose Pro':'Quick includes the complete core decision';
+  const features=tier==='pro'?['Same core Elliott map and linked Spot setup; up to three material paths.','SMA21/55/144, 120-bar regression, RSI14, ATR14, measured volume and a 4H inset.','Explicit trend and context conflicts; no entry from an oversold reading alone.','Deeper levels, cost and reward checks, recount conditions and optional layers in the full report.']:['Candlesticks, Elliott anchors, swing channel, SMA55 and volume.','Main correction + one conditional recovery path, each with cancellation.','S1/S2/S3 setup stages match the chart and message.','Missing retest means pending entry / stop / R:R; current action stays WAIT.'];
+  const list=document.getElementById('features');list.replaceChildren(...features.map(s=>{const li=document.createElement('li');li.textContent=s;return li}));
+  const setup=design.blocks(tier).find(b=>b.title.startsWith('Spot plan'));
+  document.getElementById('card').textContent=setup.title+'\n'+setup.lines.join('\n');
+  const text=design.fullText(tier);document.getElementById('full-text').textContent=text;
+  if(blob)URL.revokeObjectURL(blob);blob=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'}));
+  const name='PULSE-Global-'+(tier==='pro'?'Pro':'Quick')+'-SOL-USDT-1H.txt';
+  document.getElementById('txt-link').href=blob;document.getElementById('txt-link').download=name;document.getElementById('txt-name').textContent=name;
+  window.telegramDesignPreview={tier,snapshot:design.snapshot,message:design.message(tier),caption:design.caption(tier),fullText:text};
+}
+document.querySelectorAll('[data-tier]').forEach(b=>b.addEventListener('click',()=>render(b.dataset.tier)));
+document.getElementById('history-button').addEventListener('click',()=>{document.getElementById('toast').textContent='Design only: My reports will reopen this original snapshot without a new purchase.'});
+render('pro');
+</script></body></html>

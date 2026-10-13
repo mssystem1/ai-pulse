@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildReportBuyIntent } from "./reportTradeHandoff";
+import { GlobalResearchReport, readGlobalReport } from "./GlobalResearchReport";
 
 type AnyRec = Record<string, unknown>;
 
@@ -16,6 +17,7 @@ export type ReportTradeIntent = {
   downsideReference?: number;
   rationale: string;
   sourceTier: string;
+  reportSetupMode?: "confirmed" | "manual";
 };
 
 function gradeClass(grade: string): string {
@@ -262,6 +264,11 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
 }
 
 export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {
+  const global = readGlobalReport(data);
+  return global ? <GlobalResearchReport report={global} onTrade={onTrade} /> : <LegacyAnalysisReport data={data} nfa={nfa} onTrade={onTrade} />;
+}
+
+function LegacyAnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {
   const a = (data.analysis as AnyRec) || {};
   const bias = String(a.bias || "—");
   const badgeClass = bias === "bearish" ? "bad" : bias === "neutral" ? "mid" : "good";

@@ -1,0 +1,52 @@
+PULSE research report
+BTC-USDT · 15m · Global Pro
+2026-10-13 04:22 UTC
+
+BTC-USDT 15m · renderer validation
+This view validates chart and export layout using observed completed market candles. It contains no new model opinion.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 15m · 15-minute candles
+• Context: 1H · 1-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Continuation
+• Completed 15m close above 83,148.70, then a held retest: 83,318.80 → 83,464.00.
+• Cancel if price closes back through the trigger after confirmation, or the 83,109.10 invalidation breaks; reassess.
+• ② Alternative · Correction
+• Completed 15m close below 83,282.00, then a held retest: 83,148.70 → 83,109.10.
+• Cancel if price closes back through the trigger after confirmation, or the 83,318.80 invalidation breaks; reassess.
+• Stress: only after a completed 15m close below 83,109.10, watch 82,958.60. This is not a Spot target.
+• ③ Alternative · Recount after recovery
+• Completed 15m close above 83,464.00, then a held retest: 83,500.00 → 83,612.20.
+• Cancel if price closes back through the trigger after confirmation, or the 83,464.00 invalidation breaks; reassess.
+
+SPOT PLAN
+• Spot plan · Watching · ① Main · Continuation
+• S1: completed 15m close above 83,148.70, then a retest that closes at or above it. Keep the 83,109.10 floor intact.
+• S2 / target 1: 83,318.80
+• S3 / target 2: 83,464.00
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 15m close below 83,109.10; or back below 83,148.70 after reclaim. Thesis invalidation is not the protective stop.
+• Expires 2026-10-13T04:30:00.000Z; fresh execution evidence is required.
+• A subsequent held retest is required
+
+PRO EVIDENCE
+• SMA21 82,355.89 · SMA55 82,559.98 · SMA144 83,234.39
+• RSI14 70.50 · ATR14 276.84 · volume / prior 20 bars 0.28×
+• 1H Context: supports recovery · SMA55 83,181.10
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+LIMITATIONS
+• Renderer validation only; this is not a purchased model report.
+
+DISCLAIMER
+Research display validation · no execution instruction.

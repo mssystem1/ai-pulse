@@ -1,0 +1,51 @@
+PULSE research report
+SOL-USDT · 1H · Global Quick
+2026-10-12 19:49 UTC
+
+SOL-USDT 1H softens under prior swing cluster
+WAIT while the active downside correction holds. A firm reclaim and retest of the nearby recovery threshold would shift focus to the conditional upside path.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+
+CHART TIMEFRAMES
+• Primary chart: 1H · 1-hour candles
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+
+POSSIBLE MOVES
+• ① Main · Correction
+• While below 108.45, watch 105.71.
+• Cancel the local continuation on a completed 1H reclaim and held retest of 108.45.
+• Active downside correction remains in force while price stays beneath the trigger area, with the nearer support floor as the primary path objective.
+• ② Alternative · Recovery
+• Completed 1H close above 108.45, then a held retest: 108.81 → 108.97.
+• Cancel if price closes back through the trigger after confirmation, or the 105.71 invalidation breaks; reassess.
+• Conditional upside alternative only if price reclaims and retests the same trigger zone, then can work toward the first and second recovery targets.
+
+SPOT PLAN
+• Spot plan · Watching · ② Alternative · Recovery
+• S1: completed 1H close above 108.45, then a retest that closes at or above it. Keep the 105.71 floor intact.
+• S2 / target 1: 108.81
+• S3 / target 2: 108.97
+• Observed entry zone: Pending the observed retest
+• Protective stop: Pending the observed retest
+• Net R:R: —
+• Cancel: completed 1H close below 105.71; or back below 108.45 after reclaim. Thesis invalidation is not the protective stop.
+• Completed close above S1 required
+• A subsequent held retest is required
+
+WHY THIS VIEW
+• Completed price action remains below the dense overhead swing resistance band and the longer SMA reference.
+• Main path still points toward the lower support floor unless the recovery trigger is confirmed.
+
+RISKS
+• Failure to hold the support floor would extend the correction and invalidate the recovery alternative.
+
+LIMITATIONS
+• Elliott wave count is unclear after origin invalidation; path structure is used without a validated five-wave framework.
+• Setup remains watching with trigger and retest still missing, so no priced entry or protective stop is formed.
+
+DISCLAIMER
+Informational market desk summary only; not advice. Spot conditions can change on the next completed candle.

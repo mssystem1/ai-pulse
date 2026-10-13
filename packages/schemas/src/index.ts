@@ -1,4 +1,6 @@
 import { z } from "zod";
+export * from "./globalReport.js";
+export * from "./candleTimeframe.js";
 
 export const AddressSchema = z
   .string()
@@ -61,7 +63,7 @@ const AiCostSchema = z.object({ promptTokens: z.number().int().nonnegative(), co
 export const AnalysisProfileSchema = z.object({
   mode: z.enum(["live", "fixture", "deterministic"]),
   model: z.string(),
-  reasoningEffort: z.enum(["none", "low"]),
+  reasoningEffort: z.enum(["none", "low", "medium"]),
 });
 
 export const SpotGeneratedAnalysisSchema = z.object({
@@ -89,7 +91,7 @@ export const SpotGeneratedAnalysisSchema = z.object({
       target: z.number().nullable(),
       invalidation: z.number().nullable(),
       sequence: z.array(z.string()),
-    }).strict()).min(1).max(3),
+    }).strict()).max(3),
   }).strict(),
   chartNotes: z.string(),
   agentAction: z.string(),

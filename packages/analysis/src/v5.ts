@@ -1,4 +1,4 @@
-import type { GrokConfig } from "./grok.js";
+import type { AnalysisReasoningEffort, GrokConfig } from "./grok.js";
 import type { SpotMarketContext } from "@pulse/market";
 import type { PreparedPredictionContext } from "./predictionContext.js";
 import type { FusionFeatures } from "./predictionFeatures.js";
@@ -134,7 +134,7 @@ function parseAnalysis(text: string): V5GeneratedAnalysis {
 
 export async function runPreparedV5Analysis(
   cfg: GrokConfig,
-  input: { mode: V5Mode; tier: V5Tier; lang: "en" | "zh"; context: unknown; userNote?: string; fixture?: boolean; maxInputTokens?: number; maxOutputTokens?: number; reasoningEffort?: "none" | "low" },
+  input: { mode: V5Mode; tier: V5Tier; lang: "en" | "zh"; context: unknown; userNote?: string; fixture?: boolean; maxInputTokens?: number; maxOutputTokens?: number; reasoningEffort?: AnalysisReasoningEffort },
 ): Promise<V5GeneratedAnalysis> {
   if (input.fixture) return Object.freeze({
     headline: input.lang === "zh" ? `Arc 测试 ${input.mode} 分析` : `Arc fixture ${input.mode} analysis`,

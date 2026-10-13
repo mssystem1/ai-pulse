@@ -121,10 +121,13 @@ export function createPaidFetch(cfg: BuyerConfig): typeof fetch {
     };
     if (selected.key === "arc" && request.method === "POST") return recoverableArcBuyerFetch({ request, resource, wallet: signer.address,
       store: cfg.paymentRecoveryStore || memoryBuyerPaymentRecovery, fetch: fetchImpl, authorize });
-    const first = await fetchImpl(request.clone());
+    // Preserve a separate body stream before fetch consumes the first request.
+    // Native fetch may disturb the original stream while sending a clone.
+    const retryRequest = request.clone();
+    const first = await fetchImpl(request);
     if (first.status !== 402) return first;
     const headers = new Headers(request.headers); headers.set("PAYMENT-SIGNATURE", await authorize(first));
-    return fetchImpl(new Request(request, { headers }));
+    return fetchImpl(new Request(retryRequest, { headers }));
   }) as typeof fetch;
 }
 

@@ -1,7 +1,13 @@
 import { presentResearch, researchChartSvg, researchText, type ResearchContext } from "@pulse/domain";
 import { useEffect, useState } from "react";
+import { GlobalResearchReport, readGlobalReport } from "./GlobalResearchReport";
+import type { ReportTradeIntent } from "./Report";
 
-export function TelegramResearchReport({report,context}:{report:unknown;context?:ResearchContext}) {
+export function TelegramResearchReport({report,context,onTrade}:{report:unknown;context?:ResearchContext;onTrade?:(intent:ReportTradeIntent)=>void}) {
+  const global=readGlobalReport(report);
+  return global ? <GlobalResearchReport report={global} onTrade={onTrade}/> : <LegacyTelegramResearchReport report={report} context={context}/>;
+}
+function LegacyTelegramResearchReport({report,context}:{report:unknown;context?:ResearchContext}) {
   const presentation=presentResearch(report,context),chart=researchChartSvg(report,context);
   const [expanded,setExpanded]=useState(false);
   useEffect(()=>{if(!expanded)return;const close=(event:KeyboardEvent)=>{if(event.key==="Escape")setExpanded(false);};window.addEventListener("keydown",close);return()=>window.removeEventListener("keydown",close);},[expanded]);

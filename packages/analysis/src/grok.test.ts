@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { SpotMarketContext } from "@pulse/market";
+import { AnalysisProfileSchema } from "@pulse/schemas";
 import { runPreparedSpotAnalysis } from "./grok.js";
 
 const market: SpotMarketContext = {
@@ -41,6 +42,24 @@ const validAnalysis = {
 };
 
 describe("context-first Grok analysis", () => {
+  it("preserves configured Pro medium reasoning and output budget through the provider and report profile", async () => {
+    const result = await runPreparedSpotAnalysis({
+      apiKey: "test", baseUrl: "https://xai.invalid/v1", model: "grok-4.5",
+      fetchImpl: async (_input, init) => {
+        const request = JSON.parse(String(init?.body));
+        assert.equal(request.reasoning_effort, "medium");
+        assert.equal(request.max_tokens, 8192);
+        return new Response(JSON.stringify({
+          choices: [{ finish_reason: "stop", message: { content: JSON.stringify(validAnalysis) } }],
+          usage: { prompt_tokens: 500, completion_tokens: 3500, total_tokens: 4000, completion_tokens_details: { reasoning_tokens: 3000 } },
+        }), { status: 200 });
+      },
+    }, { instId: "BTC-USDT", timeframe: "1H", tier: "premium", reasoningEffort: "medium", maxInputTokens: 32000, maxOutputTokens: 8192 }, market);
+    assert.equal(result.analysisProfile.reasoningEffort, "medium");
+    assert.equal(AnalysisProfileSchema.safeParse(result.analysisProfile).success, true);
+    assert.equal(result.usage?.reasoningTokens, 3000);
+  });
+
   it("does not fetch OKX and preserves the legacy response schema", async () => {
     let calls = 0;
     const result = await runPreparedSpotAnalysis(
@@ -52,11 +71,11 @@ describe("context-first Grok analysis", () => {
           calls += 1;
           const request = JSON.parse(String(init?.body)) as { max_tokens?: number; reasoning_effort?: string; response_format?: { type?: string; json_schema?: { name?: string; strict?: boolean } }; messages: Array<{ content: string }> };
           assert.match(request.messages[1].content, /BTC-USDT/);
-          assert.equal(request.max_tokens, 1_800);
-          assert.equal(request.reasoning_effort, "none");
+          assert.equal(request.max_tokens, 4096);
+          assert.equal(request.reasoning_effort, "low");
           assert.equal(request.response_format?.type, "json_schema");
           assert.equal(request.response_format?.json_schema?.strict, true);
-          assert.equal(request.response_format?.json_schema?.name, "pulse_spot_base_v6_elliott");
+          assert.equal(request.response_format?.json_schema?.name, "pulse_global_base_v3_map");
           return new Response(JSON.stringify({
             choices: [{ message: { content: JSON.stringify(validAnalysis) } }],
             usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
@@ -73,7 +92,7 @@ describe("context-first Grok analysis", () => {
     assert.equal(result.market.source, "okx-public-spot");
     assert.equal(result.analysis.headline, "Prepared context used");
     assert.equal(result.usage?.totalTokens, 120);
-    assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "none" });
+    assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "low" });
   });
 
   it("reports provider length termination before attempting to parse truncated JSON", async () => {
@@ -82,7 +101,7 @@ describe("context-first Grok analysis", () => {
       fetchImpl: async () => new Response(JSON.stringify({
         choices: [{ finish_reason: "length", message: { content: '{"headline":"truncated' } }],
       }), { status: 200 }),
-    }, { instId: "BTC-USDT", tier: "base", maxOutputTokens: 700 }, market), /1800-token limit/);
+    }, { instId: "BTC-USDT", tier: "base", maxOutputTokens: 700 }, market), /4096-token limit/);
   });
 
   it("rejects an oversized spot prompt before calling xAI", async () => {
@@ -114,7 +133,9 @@ describe("context-first Grok analysis", () => {
 
     const analysis = result.analysis as { elliottWave?: { currentWave?: string; paths?: unknown[] }; scenarios?: unknown };
     assert.ok(analysis.elliottWave);
-    assert.ok((analysis.elliottWave?.paths?.length || 0) >= 1);
+    assert.equal(analysis.elliottWave?.paths?.length, 0);
+    assert.equal(result.global.waveCount.status, "unclear");
+    assert.equal(result.global.setup.state, "none");
     assert.equal(analysis.scenarios, undefined);
   });
 });

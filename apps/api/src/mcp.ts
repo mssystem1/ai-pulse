@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { priceLabel, type AppConfig } from "@pulse/config";
 import { createMcpPaymentGate } from "@pulse/payments";
-import { runGrokAnalysis } from "@pulse/analysis";
+import { runPreparedSpotAnalysis, GLOBAL_HISTORY_LIMIT, globalContextTimeframe } from "@pulse/analysis";
 import { searchSpotInstruments } from "@pulse/market";
 import {
   marketPulse,
@@ -26,7 +26,7 @@ import {
 import { z } from "zod";
 import { saveReport } from "./store.js";
 import { autopilotPassTargetExists } from "./autopilotAutomation.js";
-import { executionTicker } from "./robinhoodMarkets.js";
+import { executionTicker, executionMarketContext } from "./robinhoodMarkets.js";
 
 type JsonRpc = {
   jsonrpc?: string;
@@ -367,11 +367,14 @@ async function dispatch(
     }
     case "analysis_base": {
       const p = AnalysisArgs.parse(args);
-      return runGrokAnalysis(grokCfg, { ...p, tier: "base" });
+      const market = await executionMarketContext(cfg, { instId:p.instId,timeframe:p.timeframe ?? "1H",candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true });
+      return runPreparedSpotAnalysis(grokCfg, { ...p, tier: "base", reasoningEffort:cfg.GROK_REASONING_STANDARD,maxInputTokens:cfg.GROK_MAX_INPUT_STANDARD,maxOutputTokens:cfg.GROK_MAX_OUTPUT_STANDARD }, market);
     }
     case "analysis_premium": {
       const p = AnalysisArgs.parse(args);
-      return runGrokAnalysis(grokCfg, { ...p, tier: "premium" });
+      const market = await executionMarketContext(cfg, { instId:p.instId,timeframe:p.timeframe ?? "1H",candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true }), timeframe=globalContextTimeframe(market.bar);
+      const contextMarket=timeframe?await executionMarketContext(cfg,{instId:p.instId,timeframe,candleLimit:300,completedOnly:true}).catch(()=>null):null;
+      return runPreparedSpotAnalysis(grokCfg, { ...p, tier: "premium",contextMarket,reasoningEffort:cfg.GROK_REASONING_PREMIUM,maxInputTokens:cfg.GROK_MAX_INPUT_PREMIUM,maxOutputTokens:cfg.GROK_MAX_OUTPUT_PREMIUM }, market);
     }
     case "resolve": {
       const p = ResolveRequestSchema.parse(args);

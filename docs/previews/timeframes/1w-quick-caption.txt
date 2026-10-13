@@ -1,0 +1,7 @@
+PULSE · GLOBAL QUICK · BTC-USDT · 1W · 1-week candles
+OKX Spot · USDT · 2026-10-13T04:22:16.621Z
+Spot plan: Cancelled
+S1 82,842.00 → S2 89,111.00 → S3 98,188.40
+S1 needs a completed 1W close above it and subsequent held retest. Cancel: completed close below 80,636.30, or back below S1 after reclaim.
+Expires 2026-10-18T16:00:00.000Z
+Timing is schematic; conditional moves, not guaranteed forecasts.

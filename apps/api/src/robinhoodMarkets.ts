@@ -183,7 +183,18 @@ async function robinhoodDexLiveMarks(cfg: AppConfig, addresses: string[]) {
 export async function robinhoodMarketContext(cfg: AppConfig, input: { instId: string; timeframe: string; candleLimit: number; completedOnly?: boolean }): Promise<SpotMarketContext> {
   const market = await resolveRobinhoodMarket(cfg, input.instId);
   const [rawCandles, marks] = await Promise.all([robinhoodCandles(cfg, input.instId, input.timeframe, input.candleLimit), robinhoodLiveMarks(cfg, [market.token.address])]);
-  const candles = input.completedOnly ? rawCandles.filter(candle => candle.confirmed === true) : rawCandles;
+  let history = rawCandles;
+  const limit = Math.min(1500, Math.max(1, input.candleLimit));
+  const retained = () => input.completedOnly ? history.filter(c => c.confirmed === true).length : history.length;
+  for (let page = 0; limit > 299 && retained() < limit && history.length && page < 5; page += 1) {
+    const before = history[0].ts;
+    const older = await robinhoodCandles(cfg, input.instId, input.timeframe, Math.min(299, limit - retained()), before);
+    if (!older.length) break;
+    if (older[0].ts >= before) throw new Error("Robinhood candle history did not advance its cursor");
+    history = [...older.filter(c => c.ts < before), ...history];
+  }
+  history = [...new Map(history.map(c => [c.ts, c])).values()].sort((a, b) => a.ts - b.ts);
+  const candles = (input.completedOnly ? history.filter(candle => candle.confirmed === true) : history).slice(-limit);
   const latest = marks[0];
   if (!latest || Date.now() - latest.ts > 180_000 || latest.ts > Date.now() + 30_000) throw new Error("Robinhood live mark is stale or unavailable");
   if (candles.length < 2) throw new Error("Robinhood price history is not yet available");

@@ -1,4 +1,6 @@
 import { researchIdentity, researchNumber, researchRecord, type ResearchContext } from "./researchPresentation.js";
+import { readGlobalReport } from "./globalPresentation.js";
+import { globalReportChartSvg } from "./globalChart.js";
 
 const array = (value: unknown) => Array.isArray(value) ? value.map(researchRecord) : [];
 const escape = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[char]!));
@@ -9,6 +11,8 @@ const colors: Record<string,string> = {wave_3_continuation:"#45e7a6",wave_5_cont
 /** Self-contained SVG of the purchased snapshot. No external URLs or live data. */
 export function researchChartSvg(report: unknown, context: ResearchContext = {}): string | null {
   const data=researchRecord(report),identity=researchIdentity(context,report);
+  const global = identity.serviceId.startsWith("global") ? readGlobalReport(report) : null;
+  if (global) return globalReportChartSvg(global);
   const prediction=identity.serviceId.startsWith("prediction"),source=prediction?researchRecord(data.underlyingSpot):data;
   // Quick reports have no premium chart; never invent a prediction chart for an unmapped asset.
   if (!identity.serviceId.endsWith("pro") || source.status==="unmapped") return null;

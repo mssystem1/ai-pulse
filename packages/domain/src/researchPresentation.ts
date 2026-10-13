@@ -2,6 +2,7 @@
  * Explicit fields keep provider payloads, candle arrays and payment metadata out of exports.
  */
 type RecordValue = Record<string, unknown>;
+import { readGlobalReport, globalHumanText, globalSections } from "./globalPresentation.js";
 export type ResearchContext = { serviceId?: string; input?: unknown; networkKey?: string; createdAt?: number | string };
 export type ResearchIdentity = { serviceId: string; serviceTitle: string; subject: string; timeframe?: string; label: string };
 export type ResearchSection = { title: string; lines: string[]; featured?: boolean };
@@ -23,6 +24,8 @@ export function researchServiceTitle(id: string) {
   return ({ "global-quick": "Global Quick", "global-pro": "Global Pro", "risk-guard": "Risk Guard", "prediction-quick": "Prediction Quick", "prediction-pro": "Prediction Pro" } as Record<string,string>)[id] || "Research";
 }
 export function researchIdentity(context: ResearchContext = {}, report?: unknown): ResearchIdentity {
+  const global=readGlobalReport(report);
+  if(global){const serviceId=`global-${global.tier}`,subject=global.snapshot.instId,timeframe=global.snapshot.timeframe;return {serviceId,serviceTitle:researchServiceTitle(serviceId),subject,timeframe,label:joined(subject,timeframe,researchServiceTitle(serviceId))};}
   const data = researchRecord(report), input = researchRecord(context.input), execution = researchRecord(data.executionPlan);
   const primary = researchRecord(items(researchRecord(data.predictionContext).markets)[0]);
   const market = researchRecord(primary.market), token = researchRecord(data.token);
@@ -43,7 +46,7 @@ export function researchIdentity(context: ResearchContext = {}, report?: unknown
   return { serviceId, serviceTitle: researchServiceTitle(serviceId), subject, ...(timeframe ? { timeframe } : {}), label: joined(subject, timeframe, researchServiceTitle(serviceId)) };
 }
 export function researchStatus(status: string) {
-  return ({completed:"Ready",completed_partial:"Ready · partial evidence",awaiting_payment:"Awaiting payment",payment_received:"Payment received",queued:"Queued",running:"Generating",failed_retriable:"Retrying",failed_terminal:"Failed",manual_reconciliation:"Needs support",refunded:"Refunded"} as Record<string,string>)[status] || words(status);
+  return ({completed:"Report ready",completed_partial:"Report ready · partial evidence",awaiting_payment:"Awaiting payment",payment_received:"Payment received",queued:"Queued",running:"Generating",failed_retriable:"Retrying",failed_terminal:"Failed",manual_reconciliation:"Needs support",refunded:"Refunded"} as Record<string,string>)[status] || words(status);
 }
 export function researchDate(value: unknown): string {
   if (typeof value !== "number" && typeof value !== "string") return "";
@@ -52,6 +55,9 @@ export function researchDate(value: unknown): string {
 }
 export function presentResearch(report: unknown, context: ResearchContext = {}): ResearchPresentation {
   const data = researchRecord(report), a = researchRecord(data.analysis), identity = researchIdentity(context, report);
+  const global = identity.serviceId.startsWith("global") ? readGlobalReport(report) : null;
+  if (global) return { ...identity, subject: global.snapshot.instId, timeframe: global.snapshot.timeframe, headline: globalHumanText(global,global.narrative.headline), summary: globalHumanText(global,global.narrative.summary),
+    generatedAt: researchDate(global.snapshot.observedAt), sections: [{ title: global.lang === "zh" ? "市场快照" : "Market snapshot", lines: [`${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.source}`] }, ...globalSections(global)], disclaimer: global.narrative.disclaimer };
   const sections: ResearchSection[] = [];
   const add = (title: string, lines: unknown[], featured = false) => {
     const clean = [...new Set(lines.map(text).filter(Boolean))];

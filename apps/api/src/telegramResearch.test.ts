@@ -26,7 +26,7 @@ test("Risk Guard retains source coverage, separate provider assessment and unkno
 test("history and downloads distinguish paid requests even before a report exists",()=>{
   const identity=researchIdentity({serviceId:"global-pro",input:{instId:"XAAPL-USDT",timeframe:"1D"}});
   const label=telegramHistoryLabel({...identity,status:"completed",createdAt:Date.parse("2026-10-04T08:30:00Z")});
-  assert.match(label,/XAAPL-USDT · 1D · Global Pro · Ready/);assert.match(label,/10-04 08:30 UTC/);
+  assert.match(label,/XAAPL-USDT · 1D · Global Pro · Report ready/);assert.match(label,/10-04 08:30 UTC/);
   assert.equal(researchIdentity({serviceId:"prediction-quick",input:{primaryMarketId:"CaseSensitiveID"}}).subject,"CaseSensitiveID");
   assert.match(researchIdentity({serviceId:"risk-guard",input:{address:"0x"+"a".repeat(40)},networkKey:"base"}).label,/0xaaaa…aaaa · base · Risk Guard/);
   assert.equal(telegramResearchFilename(global),"PULSE-Global-Pro-BTC-USDT-4H.txt");
