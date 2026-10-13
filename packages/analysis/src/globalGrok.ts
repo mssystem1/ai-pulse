@@ -9,7 +9,7 @@ function narrativeJsonSchema(report: GlobalReport) {
   const nullableId = (values: string[]) => ({ type: ["string", "null"], enum: [...values, null] });
   return { type: "object", additionalProperties: false, properties: {
     headline: { type: "string" }, summary: { type: "string" }, regime: { type: "string", enum: ["trend_up", "trend_down", "range", "transition"] }, bias: { type: "string", enum: ["bullish", "bearish", "neutral"] }, confidence: { type: "number", minimum: 0, maximum: 100 },
-    waveCandidateId: nullableId([report.waveCount.id]), mainPathId: nullableId(ids), setupPathId: nullableId(report.setup.pathId ? [report.setup.pathId] : []),
+    waveCandidateId: nullableId([report.waveCount.id]), mainPathId: nullableId(ids), setupPathId: report.setup.pathId ? {type:"string",enum:[report.setup.pathId]} : {type:"null"},
     reasons: { type: "array", items: { type: "string" } },
     pathNotes: { type: "array", maxItems: ids.length, items: { type: "object", additionalProperties: false, properties: { pathId: { type: "string", enum: ids.length ? ids : ["unavailable"] }, thesis: { type: "string" } }, required: ["pathId", "thesis"] } },
     riskNotes: { type: "array", items: { type: "string" } }, limitations: { type: "array", items: { type: "string" } }, disclaimer: { type: "string" },

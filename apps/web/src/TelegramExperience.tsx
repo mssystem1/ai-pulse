@@ -173,15 +173,15 @@ export function TelegramMiniApp() {
       runtime.openInvoice(order.invoiceUrl, status => { setBusy(false); if (status === "cancelled" || status === "failed") { setNotice(status === "cancelled" ? "Checkout cancelled. No report was purchased." : "Payment could not be confirmed. Check My reports before retrying."); setView("reports"); setActiveOrder(order.orderId); return; } setNotice("Checking Telegram’s payment confirmation…"); setSelected(""); setView("reports"); setActiveOrder(order.orderId); });
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Checkout failed"); setBusy(false); }
   };
-  const browserLink = (path: string, pair?: string, share?: string, walletLink?: string, orderType?: "market" | "limit", manual=false) => {
+  const browserLink = (path: string, pair?: string, share?: string, walletLink?: string, orderType?: "market" | "limit", manual=false, side?: "buy" | "sell") => {
     const origin = ["localhost", "127.0.0.1"].includes(window.location.hostname) ? window.location.origin : import.meta.env.VITE_APP_ORIGIN || "https://app.ai-pulse.tech";
     const url = new URL(path, origin); url.searchParams.set("source", "telegram-browser"); if (pair) url.searchParams.set("pair", pair);
     if(linkedWallet && ["/spot","/autopilot"].includes(path)) url.searchParams.set("expectedWallet",linkedWallet);
-    if (share) url.hash = new URLSearchParams({ telegramReport: share, ...(orderType ? { orderType } : {}), ...(manual ? { manual: "1" } : {}) }).toString();
+    if (share) url.hash = new URLSearchParams({ telegramReport: share, ...(orderType ? { orderType } : {}), ...(manual ? { manual: "1" } : {}), ...(side ? {side} : {}) }).toString();
     if (walletLink) url.hash = new URLSearchParams({ walletLink }).toString();
     if (runtime) runtime.openLink(url.href); else window.open(url.href, "_blank", "noopener,noreferrer");
   };
-  const handoff = async (intent?: ReportTradeIntent) => { if (busy) return; setBusy(true); setError(""); try { const pair = intent?.pair || readGlobalReport(result?.report)?.snapshot.instId || String(result?.report?.instId || ""); if (!intent) { browserLink("/spot", pair); return; } const data = await call(`orders/${activeOrder}/handoff`, {}); browserLink("/spot", pair, data.shareToken, undefined, intent.orderType, intent.reportSetupMode==="manual"); } catch(reason) { setError(reason instanceof Error ? reason.message : "Unable to open Spot context. Retry this report."); } finally { setBusy(false); } };
+  const handoff = async (intent?: ReportTradeIntent) => { if (busy) return; setBusy(true); setError(""); try { const pair = intent?.pair || readGlobalReport(result?.report)?.snapshot.instId || String(result?.report?.instId || ""); if (!intent) { browserLink("/spot", pair); return; } const data = await call(`orders/${activeOrder}/handoff`, {}); browserLink("/spot", pair, data.shareToken, undefined, intent.orderType, intent.reportSetupMode==="manual",intent.side); } catch(reason) { setError(reason instanceof Error ? reason.message : "Unable to open Spot context. Retry this report."); } finally { setBusy(false); } };
   const browseMarkets = async () => {
     setMarketLoading(true); setError("");
     try {

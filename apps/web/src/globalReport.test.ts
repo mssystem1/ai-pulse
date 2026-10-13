@@ -6,7 +6,7 @@ import { globalDesignFixture } from "../../../packages/domain/dist/globalReport.
 import { GlobalResearchReport } from "./GlobalResearchReport";
 import { TelegramResearchReport } from "./TelegramResearchReport";
 import { AnalysisReport } from "./Report";
-import { buildReportBuyIntent, buildReportManualBuyIntent, buildTelegramReportBuyIntent } from "./reportTradeHandoff";
+import { buildReportBuyIntent, buildReportManualBuyIntent, buildReportSellIntent, buildTelegramReportBuyIntent } from "./reportTradeHandoff";
 
 test("web and Telegram Mini App render the same aligned Spot plan for both tiers",()=>{for(const tier of ["quick","pro"] as const){const report=globalDesignFixture(tier);for(const html of [renderToStaticMarkup(createElement(GlobalResearchReport,{report})),renderToStaticMarkup(createElement(TelegramResearchReport,{report})),renderToStaticMarkup(createElement(AnalysisReport,{data:{global:report},nfa:"Research"}))]){assert.match(html,/data-global-version="pulse-global-v3"/);assert.match(html,/data-setup-state="watching"/);assert.match(html,/117.3/);assert.match(html,/120.56/);assert.match(html,/124.8/);assert.match(html,/113.12/);assert.match(html,/Pending the observed retest/);assert.ok(html.indexOf("global-spot-card")>html.indexOf("global-chart-stage"));assert.equal(html.includes("Regression 120"),tier==="pro");assert.equal(html.includes("Confirmed pivots"),tier==="pro");assert.ok(!html.includes("Manual trade selected"));}}});
 test("inactive canonical reports cannot preload Market or Limit orders",()=>{for(const state of ["watching","cancelled","expired","none"] as const){const report=globalDesignFixture();report.setup.state=state;for(const orderType of ["market","limit"] as const)assert.throws(()=>buildReportBuyIntent({global:report},orderType),/not ready/);}});
@@ -51,4 +51,12 @@ test("manual Market and Limit review preserve observed protection without promot
 test("manual review leaves unobserved, cancelled and expired trade protection blank",()=>{
   for(const state of ["watching","cancelled","expired","none"] as const){const report=globalDesignFixture();report.setup.state=state;for(const orderType of ["market","limit"] as const){const intent=buildReportManualBuyIntent({global:report},orderType);assert.equal(intent.entryPrice,undefined);assert.equal(intent.takeProfit,undefined);assert.equal(intent.stopLoss,undefined);assert.equal(intent.pair,"SOL-USDT");assert.equal(intent.timeframe,"1H");assert.equal(intent.orderType,orderType);}const html=renderToStaticMarkup(createElement(GlobalResearchReport,{report,onTrade:()=>{}}));assert.match(html,/Open manual Market ticket/);assert.match(html,/Open manual Limit ticket/);}
   const stale=readyFixture();stale.setup.state="watching";stale.setup.expiresAt=Date.now()-1;assert.equal(buildReportManualBuyIntent({global:stale},"limit").stopLoss,undefined);
+});
+test("bearish web and Mini App reports expose owned Market/Limit sells with no short protection copied",()=>{
+  const report=globalDesignFixture();report.setup.state="cancelled";
+  for(const Component of [GlobalResearchReport,TelegramResearchReport]){
+    const html=renderToStaticMarkup(createElement(Component,{report,onTrade:()=>{}}));assert.match(html,/data-plan-side="short"/);assert.match(html,/Review Market sell/);assert.match(html,/Review Limit sell/);assert.match(html,/Planned SL reference/);assert.match(html,/Plan cancelled/);
+  }
+  for(const orderType of ["market","limit"] as const){const draft=buildReportSellIntent({global:report},orderType);assert.equal(draft.side,"sell");assert.equal(draft.orderType,orderType);for(const key of ["entryPrice","takeProfit","stopLoss"] as const)assert.equal(draft[key],undefined);assert.match(draft.rationale,/owned Spot inventory/);assert.deepEqual(buildTelegramReportBuyIntent(report,`#side=sell&orderType=${orderType}&entryPrice=1&stopLoss=2`),draft);}
+  report.paths[0].role="alternative";report.paths[1].role="main";assert.throws(()=>buildTelegramReportBuyIntent(report,"#side=sell"),/bearish research plan/);
 });

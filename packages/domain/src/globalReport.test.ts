@@ -67,7 +67,7 @@ test("compressed long-term scenarios have separate labels and retain inactive se
   assert.match(svg,/Spot recovery plan · Cancelled/);
 });
 test("daily and weekly image axes retain the year of their saved history",()=>{
-  for(const timeframe of ["1D","1W"]){const report=globalDesignFixture();report.snapshot.timeframe=timeframe;const svg=globalReportChartSvg(report)!;assert.ok(svg.includes(new Date(report.candles[0].ts).toISOString().slice(0,10)+" UTC"));assert.ok(svg.includes(new Date(report.candles.at(-1)!.ts).toISOString().slice(0,10)+" UTC"));}
+  for(const timeframe of ["1D","1W"]){const report=globalDesignFixture();report.snapshot.timeframe=timeframe;const svg=globalReportChartSvg(report)!;assert.ok(svg.includes(new Date(report.candles.slice(-180)[0].ts).toISOString().slice(0,10)+" UTC"));assert.ok(svg.includes(new Date(report.candles.at(-1)!.ts).toISOString().slice(0,10)+" UTC"));}
 });
 test("nearby Elliott labels remain separate and connected to their observed anchors",()=>{
   const report=globalDesignFixture("pro"),svg=globalChartAnnotations(report,{left:0,right:1000,top:0,bottom:450,historyEnd:700,x:()=>680,y:()=>220});

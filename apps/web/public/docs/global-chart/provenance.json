@@ -52,5 +52,17 @@
         "channel": false
       }
     }
-  ]
+  ],
+  "directionalPlan": {
+    "image": "directional-plan.png",
+    "source": "Public OHLCV from reported BTC-USDT 4H market snapshot; no wallet/payment data or provider prose",
+    "observedAt": "2026-10-13T21:19:24.044Z",
+    "primaryTimeframe": "4H",
+    "contextTimeframe": "1Dutc",
+    "savedCandles": 520,
+    "shownCandles": 180,
+    "width": 2600,
+    "height": 2252,
+    "modelGenerated": false
+  }
 }

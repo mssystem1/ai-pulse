@@ -1,4 +1,5 @@
 import type { SpotMarketContext } from "@pulse/market";
+import { deriveGlobalTradePlan } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
 
 export const GLOBAL_HISTORY_LIMIT = 520;
@@ -81,7 +82,34 @@ function waveCandidate(pivots: GlobalAnchor[]): GlobalReport["waveCount"] {
     if (p[1] > p[0] && p[2] > p[0] && p[2] < p[1] && p[3] > p[1]) return { id: `count-${a[0].ts}-${a[3].ts}`, status: "candidate", structure: "impulse", direction: up ? "up" : "down", degree: "minor", activeWave: "3?",
       anchors: a.map((x, i) => ({ ...x, label: String(i) })), invalidationLevelId: null, validation: ["wave_2_holds_origin", "alternating_confirmed_pivots", "partial_count_4_5_unobserved"] };
   }
+  const two=recent.slice(-3);
+  if(two.length===3){const up=two[0].kind==="low",sign=up?1:-1,p=two.map(a=>a.price*sign);
+    if(p[1]>p[0]&&p[2]>p[0]&&p[2]<p[1])return {id:`count-${two[0].ts}-${two[2].ts}`,status:"candidate",structure:"impulse",direction:up?"up":"down",degree:"minor",activeWave:"2?",anchors:two.map((a,i)=>({...a,label:String(i)})),invalidationLevelId:null,validation:["wave_2_holds_origin","alternating_confirmed_pivots","partial_count_3_4_5_unobserved"]};
+  }
   return unclear;
+}
+/** Search local swing scales instead of assigning every 3-bar fractal the same
+ * wave degree. Each deviation uses ATR known when that pivot was confirmed. */
+export function globalWaveCandidate(candles: GlobalCandle[], pivots: GlobalAnchor[], atr: Point[]): GlobalReport["waveCount"] {
+  const atrAt = new Map(atr.map(p => [p.ts,p.value]));
+  const candidates: GlobalReport["waveCount"][] = [];
+  let originInvalidated=false;
+  for (const scale of [0,1,2,3]) {
+    const swings: GlobalAnchor[] = [];
+    for (const anchor of pivots) {
+      const prior = swings.at(-1);
+      if (prior?.kind === anchor.kind) {if (anchor.kind === "high" ? anchor.price > prior.price : anchor.price < prior.price) swings[swings.length-1]=anchor;}
+      else if (!prior || ((anchor.kind === "high" ? anchor.price > prior.price : anchor.price < prior.price) && Math.abs(anchor.price-prior.price) >= scale * (atrAt.get(anchor.confirmedAt!) ?? Infinity))) swings.push(anchor);
+    }
+    const candidate = waveCandidate(swings), origin = candidate.anchors[0];
+    const invalid=origin&&candles.some(c=>c.ts>origin.ts&&(candidate.direction==="up"?c.low<=origin.price:c.high>=origin.price));
+    if(invalid)originInvalidated=true;
+    if (origin && !invalid) candidates.push({...candidate,degree:"local",swingScaleAtr:scale,validation:[...candidate.validation,"swing_pattern_only_subdivisions_unverified"]});
+  }
+  // Prefer recent validated anchors. A complete older pattern cannot hide a
+  // current partial count; ties favor the larger, less noisy measured swings.
+  candidates.sort((a,b) => b.anchors.at(-1)!.ts-a.anchors.at(-1)!.ts || (b.swingScaleAtr ?? 0)-(a.swingScaleAtr ?? 0));
+  return candidates[0] ?? {...waveCandidate([]),degree:"local",validation:[originInvalidated?"origin_invalidated_by_completed_close":pivots.length>=4?"no_rule_compliant_recent_pattern":"insufficient_validated_swings","swing_pattern_only_subdivisions_unverified"]};
 }
 function regression(candles: GlobalCandle[]): GlobalReport["indicators"]["regression"] {
   if (candles.length < 120) return null;
@@ -103,13 +131,13 @@ export function evaluateGlobalSetup(report: GlobalReport, costsBps: number | nul
   if (!anchor?.confirmedAt) return { ...setup, missing: ["trigger", "retest"] };
   let confirmationIndex = -1;
   for (let i = Math.max(1, candles.length - 8); i < candles.length; i += 1) {
-    if (candles[i].ts > anchor.confirmedAt && candles[i - 1].close <= trigger.price && candles[i].close > trigger.price) confirmationIndex = i;
+    if (candles[i].ts > anchor.confirmedAt && (path.confirmation === "support_hold" ? confirmationIndex < 0 && candles[i].low <= trigger.price && candles[i].close >= trigger.price && candles[i].low > floor.price : candles[i - 1].close <= trigger.price && candles[i].close > trigger.price)) confirmationIndex = i;
   }
   if (confirmationIndex < 0) return { ...setup, missing: ["trigger", "retest", ...(path.targetIds.length ? [] : ["targets" as const])] };
   const confirmation = candles[confirmationIndex], expiry = confirmation.ts + interval * 4;
   const confirmedSetup = { ...setup, confirmationTs: confirmation.ts, expiresAt: expiry };
   const subsequent = candles.slice(confirmationIndex + 1);
-  if (subsequent.some(c => c.close < trigger.price || c.close < floor.price)) return { ...confirmedSetup, state: "cancelled" };
+  if (subsequent.some(c => c.close < trigger.price || c.low <= floor.price)) return { ...confirmedSetup, state: "cancelled" };
   if (Number.isFinite(Date.parse(report.snapshot.observedAt)) && Date.parse(report.snapshot.observedAt) >= expiry) return { ...confirmedSetup, state: "expired" };
   const retest = subsequent.find(c => c.low <= trigger.price && c.close >= trigger.price && c.low > floor.price);
   if (!retest) return { ...confirmedSetup, missing: ["retest"] };
@@ -137,7 +165,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   // Pivot confirmation uses only local completed bars, not today's ATR applied
   // retrospectively to older swings.
   const pivots = globalConfirmedPivots(candles), levels: GlobalLevel[] = [];
-  let waveCount = waveCandidate(pivots);
+  let waveCount = globalWaveCandidate(candles,pivots,atr);
   const origin=waveCount.anchors[0];
   if(origin&&candles.some(c=>c.ts>origin.ts&&(waveCount.direction==="up"?c.close<=origin.price:c.close>=origin.price)))waveCount={...waveCount,id:"unclear",status:"unclear",structure:"unclear",direction:"unclear",activeWave:"unclear",anchors:[],invalidationLevelId:null,validation:["origin_invalidated_by_completed_close"]};
   const addLevel = (anchor: GlobalAnchor, basis: GlobalLevel["basis"] = "swing", ratio?: number, anchors = [anchor.id]) => {
@@ -150,7 +178,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   if (candles.length) for (const kind of ["low", "high"] as const) { const c = candles.reduce((best, c) => kind === "low" ? c.low < best.low ? c : best : c.high > best.high ? c : best, candles[0]);
     addLevel({ id: `range-${c.ts}-${kind}`, ts: c.ts, price: c[kind], kind, confirmedAt: null }); }
   if (waveCount.anchors.length) waveCount.invalidationLevelId = addLevel(waveCount.anchors[0]);
-  const leg = waveCount.anchors.length >= 6 ? [waveCount.anchors[0], waveCount.anchors[5]] : pivots.length >= 2 ? pivots.slice(-2) : [];
+  const leg = waveCount.anchors.length >= 6 ? [waveCount.anchors[0], waveCount.anchors[5]] : waveCount.anchors.length>=3 ? [waveCount.anchors[0],waveCount.anchors[waveCount.anchors.length===3?1:3]] : pivots.length >= 2 ? pivots.slice(-2) : [];
   const fibonacci: GlobalReport["indicators"]["fibonacci"] = [];
   if (leg.length === 2 && Math.abs(leg[1].price - leg[0].price) >= latestAtr * 2) {
     const [a, b] = leg, delta = b.price - a.price;
@@ -168,9 +196,12 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const recentReclaimed = pivots.filter(a => a.kind === "high" && close !== null && a.price < close && a.confirmedAt !== null
     && candles.slice(-4).some((c, j, tail = candles.slice(-4)) => j > 0 && c.ts > a.confirmedAt! && tail[j - 1].close <= a.price && c.close > a.price)).at(-1);
   const triggerUp = recentReclaimed ? levels.find(l => l.anchorIds.includes(recentReclaimed.id)) : above[0];
-  const floor = below.find(l => l.price < (triggerUp?.price ?? close ?? 0)), upTargets = above.filter(l => l.id !== triggerUp?.id && l.price > (triggerUp?.price ?? 0)).slice(0, 2);
+  const floor = below.find(l => l.price < (triggerUp?.price ?? close ?? 0)), materialAbove=above.filter((l,i)=>i===0||l.price-(close??0)<=latestAtr*4), upTargets = materialAbove.filter(l => l.id !== triggerUp?.id && l.price > (triggerUp?.price ?? 0)).slice(0, 2);
   const paths: GlobalPath[] = [];
   if (triggerUp && floor && upTargets.length) paths.push({ id: "recovery", role: trend === "up" ? "main" : "alternative", direction: "up", kind: trend === "up" ? "continuation" : "recovery", state: "conditional", triggerLevelId: triggerUp.id, targetIds: upTargets.map(l => l.id), invalidationLevelId: floor.id, confirmation: "close_retest", thesis: "" });
+  // A rising market with one overhead obstacle can still have a support-hold
+  // plan. Do not manufacture a breakout target beyond the known resistance.
+  if (!paths.some(p=>p.direction==="up") && trend==="up" && below.length>=2 && materialAbove.length) paths.push({id:"pullback",role:"main",direction:"up",kind:"pullback",state:"conditional",triggerLevelId:below[0].id,targetIds:materialAbove.slice(0,2).map(l=>l.id),invalidationLevelId:below[1].id,confirmation:"support_hold",thesis:""});
   if (below.length >= (trend === "down" ? 1 : 2) && above.length) paths.push({ id: "correction", role: trend === "down" ? "main" : "alternative", direction: "down", kind: "correction", state: trend === "down" ? "active" : "conditional", triggerLevelId: trend === "down" ? above[0].id : below[0].id, targetIds: (trend === "down" ? below : below.slice(1)).slice(0, 2).map(l => l.id), invalidationLevelId: above[0].id, confirmation: trend === "down" ? "hold" : "close_retest", thesis: "" });
   if(tier==="pro"){const down=paths.find(p=>p.direction==="down"),deep=down?.targetIds.at(-1),threshold=levels.find(l=>l.id===deep),stress=threshold?below.find(l=>l.price<threshold.price):null;if(down&&threshold&&stress)down.stress={triggerLevelId:threshold.id,targetIds:[stress.id]};}
   if (trend === "range" && below.length && above.length) paths.unshift({ id: "range", role: "main", direction: "range", kind: "range", state: "active", triggerLevelId: below[0].id, targetIds: [above[0].id], invalidationLevelId: below[0].id, confirmation: "hold", thesis: "" });
@@ -178,7 +209,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main"));
   if (paths.length < 3 && paths.some(p => p.direction === "up") && upTargets.length === 2) {
     const target = upTargets.at(-1)!, further = above.filter(l => l.price > target.price).slice(0, 2);
-    if (further.length) paths.push({ id: "recount", role: "alternative", direction: "up", kind: "recount", state: "conditional", triggerLevelId: target.id, targetIds: further.map(l => l.id), invalidationLevelId: target.id, confirmation: "close_retest", thesis: "" });
+    if (further.length && target.price-(close??0)<=latestAtr*4) paths.push({ id: "recount", role: "alternative", direction: "up", kind: "recount", state: "conditional", triggerLevelId: target.id, targetIds: further.map(l => l.id), invalidationLevelId: target.id, confirmation: "close_retest", thesis: "" });
   }
   const contextFrame = globalContextTimeframe(market.bar), contextCandles = input.contextMarket && input.contextMarket.instId === market.instId && input.contextMarket.source === market.source && input.contextMarket.bar === contextFrame && (input.contextMarket.ticker.priceCurrency ?? market.instId.split("-").at(-1)) === (market.ticker.priceCurrency ?? market.instId.split("-").at(-1)) ? completedGlobalCandles({ ...input.contextMarket, fetchedAt: market.fetchedAt }) : [];
   const contextAverage = globalSma(contextCandles, 55), contextClose = contextCandles.at(-1)?.close, contextSma = contextAverage.at(-1)?.value;
@@ -203,12 +234,14 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const selected = report.paths.find(p => p.id === report.setup.pathId);
   if (selected && !includedPaths.includes(selected)) includedPaths[includedPaths.length - 1] = selected;
   report.view.pathIds = includedPaths.map(p => p.id);
-  report.view.levelIds = [...new Set([...includedPaths.flatMap(p => [p.triggerLevelId, p.invalidationLevelId, ...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]), report.waveCount.invalidationLevelId].filter((id): id is string => id !== null))];
+  report.view.levelIds = [...new Set(includedPaths.flatMap(p => [p.triggerLevelId, p.invalidationLevelId, ...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]).filter((id): id is string => id !== null))];
+  report.tradePlan = deriveGlobalTradePlan(report);
+  report.view.levelIds = [...new Set([...report.view.levelIds,report.tradePlan.triggerLevelId,report.tradePlan.invalidationLevelId,...report.tradePlan.targetIds].filter((id):id is string=>id!==null))];
   return GlobalReportSchema.parse(report);
 }
 
 export function globalPromptEvidence(report: GlobalReport) {
-  return { snapshot: report.snapshot, waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup,
+  return { snapshot: report.snapshot, waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, tradePlan: report.tradePlan,
     indicators: { sma: report.indicators.sma.filter(s => report.tier === "pro" || s.period === 55).map(s => ({ period: s.period, value: s.points.at(-1)?.value ?? null, change10Bars: s.points.length > 10 ? rounded(s.points.at(-1)!.value - s.points.at(-11)!.value) : null })), rsi14: report.tier === "pro" ? report.indicators.rsi.points.at(-1)?.value ?? null : null, atr14: report.indicators.atr.points.at(-1)?.value ?? null, volumeRatio: report.indicators.volumeRatio, fibonacci: report.indicators.fibonacci, regression: report.tier === "pro" ? { bars: report.indicators.regression?.bars, residualSigma: report.indicators.regression?.residualSigma } : null },
     context: { timeframe: report.context.timeframe, status: report.context.status, agreement: report.context.agreement, close: report.context.candles.at(-1)?.close ?? null, sma55: report.context.sma55.at(-1)?.value ?? null },
     recentCandles: report.candles.slice(-48).map(c => [c.ts, c.open, c.high, c.low, c.close, c.volume, c.confirmed]), note: "Only completed candles. All candidate anchors and level prices are supplied evidence. Projection timing is schematic." };
@@ -219,7 +252,10 @@ export function finishGlobalReport(prepared: GlobalReport, narrative: GlobalNarr
   if (report.waveCount.status!=="unclear"&&narrative.waveCandidateId !== report.waveCount.id) report.waveCount = { ...report.waveCount, id: "unclear", status: "unclear", structure: "unclear", direction: "unclear", activeWave: "unclear", anchors: [], invalidationLevelId: null, validation: ["model_did_not_accept_candidate"] };
   if (narrative.mainPathId && shown.some(p => p.id === narrative.mainPathId)) { report.paths.forEach(p => p.role = p.id === narrative.mainPathId ? "main" : "alternative"); report.paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main")); }
   report.view.pathIds=report.paths.filter(p=>report.view.pathIds.includes(p.id)).map(p=>p.id);
-  if (narrative.setupPathId !== report.setup.pathId) report.setup = { ...report.setup, state: "none", pathId: null, triggerLevelId: null, retestLevelId: null, invalidationLevelId: null, targetIds: [], entryZone: null, protectiveStop: null, grossRewardRisk: null, netRewardRisk: null, confirmationTs: null, retestTs: null, expiresAt: null, missing: [] };
+  // A model may explain a cancelled or unconfirmed setup, but cannot erase its
+  // observed state, protection or missing evidence by selecting null.
+  report.tradePlan = deriveGlobalTradePlan(report);
+  report.view.levelIds = [...new Set([...report.view.levelIds,report.tradePlan.triggerLevelId,report.tradePlan.invalidationLevelId,...report.tradePlan.targetIds].filter((id):id is string=>id!==null))];
   for (const path of report.paths) path.thesis = narrative.pathNotes.find(n => n.pathId === path.id)?.thesis ?? "";
   const missing = report.candles.length < 55 ? report.lang === "zh" ? "完整 K 线不足，SMA55 和波浪结构可能不可用。" : "Insufficient completed history for SMA55 or a defensible wave count." : "";
   const contextMissing = report.tier === "pro" && report.context.status !== "available" ? report.lang === "zh" ? "未取得同一标的、同一报价货币的独立高周期背景。" : "Independent context for this instrument and quote currency is unavailable." : "";
@@ -231,12 +267,14 @@ export function finishGlobalReport(prepared: GlobalReport, narrative: GlobalNarr
 export function globalCompatibility(report: GlobalReport, narrative?: Pick<GlobalNarrative, "bias" | "regime" | "confidence">) {
   const level = (id: string | null) => report.levels.find(l => l.id === id)?.price ?? null;
   const setup = report.setup, firstTarget = level(setup.targetIds[0] ?? null), entry = setup.entryZone?.[1] ?? null;
+  const researchPlan=report.tradePlan;
   return { analysis: { ...report.narrative, bias: narrative?.bias ?? "neutral", regime: narrative?.regime ?? "transition", confidence: narrative?.confidence ?? 0,
     keyLevels: { support: report.levels.filter(l => l.role === "support").map(l => l.price), resistance: report.levels.filter(l => l.role === "resistance").map(l => l.price) },
     targets: [], invalidation: { price: level(report.waveCount.invalidationLevelId), condition: "Use the canonical path and setup cancellation conditions." },
-    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: setup.state === "ready" ? "Review a fresh execution quote" : "Wait", agentChecklist: [] },
+    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: setup.state === "ready" ? "Review a fresh execution quote" : researchPlan?.side==="short" ? "Wait for short confirmation; review a sell/reduce of owned Spot inventory" : researchPlan?.side==="long" ? "Wait for the planned support/reclaim confirmation before a Spot buy" : "Wait for usable market levels", agentChecklist: [] },
     technical: { methodology: report.version, elliott: { status: report.waveCount.status, currentWave: report.waveCount.activeWave, direction: report.waveCount.direction, waves: report.waveCount.anchors, invalidation: level(report.waveCount.invalidationLevelId) } },
     executionPlan: { version: report.version, pair: report.snapshot.instId, timeframe: report.snapshot.timeframe, tier: report.tier, observedPrice: report.snapshot.price,
-      recommendation: { action: setup.state === "ready" ? "buy" : "wait", label: setup.state, reason: "The setup and chart share canonical conditions; recheck live execution evidence." },
+      researchPlan,
+      recommendation: { action: setup.state === "ready" ? "buy" : "wait", label: setup.state==="ready"?setup.state:researchPlan?.side&&researchPlan.side!=="none"?`Conditional ${researchPlan.side} · ${researchPlan.state}`:setup.state, reason: "The directional research plan supplies planned references; observed Spot protection and fresh execution costs are separate checks." },
       buy: { valid: setup.state === "ready", side: "buy", orderType: "limit", trigger: entry, entryZone: setup.entryZone, takeProfit: firstTarget, stopLoss: setup.protectiveStop, riskReward: setup.netRewardRisk }, riskExit: { trigger: level(setup.invalidationLevelId), downsideReference: null } } };
 }

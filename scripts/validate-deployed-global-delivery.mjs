@@ -111,7 +111,11 @@ for(const [network,tier,transport] of matrix){
     assert.equal(global.tier,tier==='standard'?'quick':'pro');assert.equal(global.snapshot.instId,business.instId);assert.equal(global.snapshot.timeframe,business.timeframe);
     assert.equal(global.candles.length,520);assert.ok(global.candles.every(c=>c.confirmed));assert.ok(global.candles.some(c=>c.open!==c.close));
     assert.ok(global.view.pathIds.length<=(tier==='standard'?2:3));assert.ok(delivered.reportMarkdown?.includes(business.instId));
-    for(const section of p.sections)assert.ok(delivered.reportMarkdown.includes('## '+section.title),'Full section missing: '+section.title);
+    // Older purchased snapshots predate tradePlan. Their frozen Markdown is
+    // checked against the sections they were sold with; the local renderer can
+    // derive an additional planning view without rewriting that old document.
+    const promisedSections=p.sections.filter(section=>global.tradePlan!==undefined||!['Directional trade plan','方向性交易计划'].includes(section.title));
+    for(const section of promisedSections)assert.ok(delivered.reportMarkdown.includes('## '+section.title),'Full section missing: '+section.title);
     if(tier==='premium'){assert.equal(global.context.status,'available');assert.equal(global.context.timeframe,'4H');assert.ok(global.indicators.regression);assert.ok(global.indicators.rsi.points.length);}
     const txt=formatTelegramResearch(report),message=telegramResearchMessage(report),caption=telegramResearchCaption(report),svg=researchChartSvg(report),png=renderTelegramResearchChart(report);
     assert.ok(svg && png);assert.ok(message.length<=3900 && caption.length<=1024);

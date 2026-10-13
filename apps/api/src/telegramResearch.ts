@@ -1,7 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
-import { readGlobalReport, globalLabel, globalSetupLines, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText } from "@pulse/domain";
+import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice } from "@pulse/domain";
 
 export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -22,10 +22,13 @@ export function telegramResearchMessage(report: unknown, context: ResearchContex
       html(`${s.venue} · ${s.priceCurrency} · ${s.observedAt}`),
     ].join("\n");
     const conditions = [
+      `<b>${html(globalTradePlanTitle(global))}</b>`,
+      ...globalTradePlanLines(global).slice(1,7).map(html),
+      html(globalTradePlanLines(global).slice(7,-1).join(" · ")),"",
       `<b>${html(global.setup.pathId ? setup[0] : `${globalLabel("setup",global.lang)} · ${setup[0]}`)}</b>`,
-      ...setup.slice(1).map(html), "", `<b>${globalLabel("moves",global.lang)}</b>`,
+      ...setup.slice(1).filter(line=>!line.startsWith("Net R:R")&&!line.startsWith("费用后")&&!global.setup.missing.some(key=>line===globalMissingLabel(global,key))).map(html), "", `<b>${globalLabel("moves",global.lang)}</b>`,
       ...global.paths.filter(p=>global.view.pathIds.includes(p.id)).flatMap(p=>[
-        html(globalPathTitle(global,p)), ...globalPathLines(global,p).slice(0,p.stress?3:2).map(html),
+        html(globalPathTitle(global,p)), ...globalPathLines(global,p).slice(0,2).map(html),
       ]), "",
       html(`${globalLabel("wave",global.lang)}: ${global.waveCount.status==="unclear"?globalLabel("unclear",global.lang):`${zh?"候选":"Candidate"} ${global.waveCount.activeWave}`}`),
       ...(global.tier==="pro" ? ["", `<b>${globalLabel("evidence",global.lang)}</b>`,
@@ -59,10 +62,12 @@ export function telegramResearchOrder(report: unknown): Array<"chart"|"overview"
 export function telegramResearchCaption(report: unknown, context: ResearchContext = {}) {
   const global=readGlobalReport(report);
   if(!global)return `${presentResearch(report,context).label.slice(0,400)}\nOriginal report snapshot · conditional paths, not guaranteed forecasts.`;
-  const s=global.setup, zh=global.lang==="zh";
+  const s=global.setup, zh=global.lang==="zh",plan=globalTradePlan(global);
   return [
     `PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalTimeframeLabel(global.snapshot.timeframe,global.lang)}`,
     `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt}`,
+    globalTradePlanTitle(global),
+    ...(plan.referenceEntry&&plan.referenceStop?[`${zh?"计划价格（非已观察保护）":"Planned references (not observed protection)"}: ${plan.referenceEntry.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,plan.referenceStop)} · ${plan.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),
     `${globalLabel("setup",global.lang)}: ${globalLabel(s.state,global.lang)}`,
     ...(s.pathId ? [
       `S1 ${globalLevelPrice(global,s.triggerLevelId)} → ${s.targetIds.map((id,i)=>`S${i+2} ${globalLevelPrice(global,id)}`).join(" → ")}`,

@@ -1,5 +1,5 @@
 import type { ReportTradeIntent } from "./Report";
-import { readGlobalReport } from "@pulse/domain";
+import { readGlobalReport, globalTradePlan } from "@pulse/domain";
 
 export function buildReportBuyIntent(data: Record<string, unknown>, orderType: "market" | "limit"): ReportTradeIntent {
   const global = readGlobalReport(data);
@@ -40,11 +40,19 @@ export function buildReportManualBuyIntent(data: Record<string, unknown>, orderT
     rationale:`Manual trade selected with risk acceptance. Saved report setup: ${s.state}. ${observed?"Observed entry, TP and SL are loaded for review; confirmation, execution costs and current conditions still require your checks.":"The report has no current confirmed protection to copy. Configure entry, TP and SL in Spot before signing."}`,
     sourceTier:global.tier,reportSetupMode:"manual"};
 }
+/** A bearish research plan can reduce owned Spot inventory. Its hypothetical
+ * short TP/SL must not be attached to a Spot exit or inverted into a buy. */
+export function buildReportSellIntent(data: Record<string,unknown>,orderType:"market"|"limit"):ReportTradeIntent {
+  const report=readGlobalReport(data);
+  if(!report || globalTradePlan(report).side!=="short")throw new Error("A valid bearish research plan is required to prepare an owned Spot sell.");
+  return {pair:report.snapshot.instId,timeframe:report.snapshot.timeframe,side:"sell",orderType,observedPrice:report.snapshot.price ?? undefined,sourceTier:report.tier,reportSetupMode:"manual",rationale:"Manual sell/reduce of owned Spot inventory. This research short plan does not open a leveraged short or copy short TP/SL. Choose the quantity and current execution price before signing."};
+}
 
 /** Carry only the order-type choice; prices always come from the saved report. */
 export function buildTelegramReportBuyIntent(data: Record<string, unknown>, fragment: string): ReportTradeIntent {
   const params = new URLSearchParams(fragment.replace(/^#/, ""));
   const orderType=params.get("orderType") === "market" ? "market" : "limit";
+  if(params.get("side")==="sell")return buildReportSellIntent(data,orderType);
   return params.get("manual")==="1"?buildReportManualBuyIntent(data,orderType):buildReportBuyIntent(data,orderType);
 }
 

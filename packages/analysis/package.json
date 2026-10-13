@@ -15,6 +15,7 @@
     "test": "tsx --test src/**/*.test.ts"
   },
   "dependencies": {
+    "@pulse/domain": "1.0.0",
     "@pulse/market": "1.0.0",
     "@pulse/schemas": "1.0.0"
   },

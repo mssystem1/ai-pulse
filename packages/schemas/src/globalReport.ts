@@ -6,12 +6,12 @@ const seriesPoint = z.object({ ts: time, value: z.number().finite() });
 export const GlobalCandleSchema = z.object({ ts: time, open: price, high: price, low: price, close: price, volume: z.number().finite().nonnegative(), confirmed: z.boolean() });
 export const GlobalAnchorSchema = z.object({ id: z.string(), ts: time, price, kind: z.enum(["high", "low"]), confirmedAt: time.nullable(), label: z.string().optional() });
 export const GlobalLevelSchema = z.object({ id: z.string(), price, role: z.enum(["support", "resistance", "projection"]), anchorIds: z.array(z.string()), basis: z.enum(["swing", "extension", "retracement"]), ratio: z.number().optional() });
-export const GlobalWaveSchema = z.object({ id: z.string(), status: z.enum(["candidate", "unclear"]), structure: z.enum(["impulse", "abc_correction", "unclear"]), direction: z.enum(["up", "down", "unclear"]), degree: z.literal("minor"), activeWave: z.string(), anchors: z.array(GlobalAnchorSchema), invalidationLevelId: z.string().nullable(), validation: z.array(z.string()) });
+export const GlobalWaveSchema = z.object({ id: z.string(), status: z.enum(["candidate", "unclear"]), structure: z.enum(["impulse", "abc_correction", "unclear"]), direction: z.enum(["up", "down", "unclear"]), degree: z.enum(["minor", "local"]), activeWave: z.string(), anchors: z.array(GlobalAnchorSchema), invalidationLevelId: z.string().nullable(), validation: z.array(z.string()), swingScaleAtr: z.number().nonnegative().optional() });
 export const GlobalPathSchema = z.object({
   id: z.string(), role: z.enum(["main", "alternative"]), direction: z.enum(["up", "down", "range"]),
-  kind: z.enum(["continuation", "recovery", "correction", "recount", "range"]),
+  kind: z.enum(["continuation", "recovery", "correction", "recount", "range", "pullback"]),
   state: z.enum(["active", "conditional", "cancelled"]), triggerLevelId: z.string().nullable(),
-  targetIds: z.array(z.string()), invalidationLevelId: z.string().nullable(), confirmation: z.enum(["hold", "close_retest"]),
+  targetIds: z.array(z.string()), invalidationLevelId: z.string().nullable(), confirmation: z.enum(["hold", "close_retest", "support_hold"]),
   thesis: z.string(),
   stress: z.object({triggerLevelId:z.string(),targetIds:z.array(z.string()).min(1).max(2)}).optional(),
 });
@@ -22,6 +22,17 @@ export const GlobalSetupSchema = z.object({
   grossRewardRisk: z.number().finite().nonnegative().nullable(), netRewardRisk: z.number().finite().nonnegative().nullable(),
   costsBps: z.number().finite().nonnegative().nullable(), confirmationTs: time.nullable(), retestTs: time.nullable(), expiresAt: time.nullable(),
   missing: z.array(z.enum(["trigger", "retest", "targets", "protection", "reward", "execution_costs", "context", "completed_history", "entry_price"])),
+});
+/** Research prices are planning references. Only setup contains executable,
+ * observed long protection; a short plan never authorizes a Spot short. */
+export const GlobalTradePlanSchema = z.object({
+  side: z.enum(["long", "short", "none"]), pathId: z.string().nullable(),
+  state: z.enum(["conditional", "confirmed", "avoid", "none"]),
+  condition: z.enum(["close_retest", "support_hold", "rejection"]),
+  triggerLevelId: z.string().nullable(), invalidationLevelId: z.string().nullable(), targetIds: z.array(z.string()),
+  referenceEntry: z.tuple([price, price]).nullable(), referenceStop: price.nullable(), grossRewardRisk: z.number().finite().nonnegative().nullable(),
+  stopBufferAtr: z.number().positive(), confirmationTs: time.nullable(), retestTs: time.nullable(),
+  blockers: z.array(z.enum(["history", "levels", "confirmation", "retest", "reward", "entry_price", "cancelled", "expired"])),
 });
 export const GlobalIndicatorsSchema = z.object({
   sma: z.array(z.object({ period: z.number().int().positive(), points: z.array(seriesPoint) })),
@@ -39,7 +50,7 @@ export const GlobalReportSchema = z.object({
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
   candles: z.array(GlobalCandleSchema), levels: z.array(GlobalLevelSchema), waveCount: GlobalWaveSchema, paths: z.array(GlobalPathSchema).max(3),
-  setup: GlobalSetupSchema, indicators: GlobalIndicatorsSchema,
+  setup: GlobalSetupSchema, tradePlan: GlobalTradePlanSchema.optional(), indicators: GlobalIndicatorsSchema,
   context: z.object({ timeframe: z.string().nullable(), status: z.enum(["available", "unavailable", "not_requested"]), source: z.string().nullable(),
     candles: z.array(GlobalCandleSchema), sma55: z.array(seriesPoint), agreement: z.enum(["supports", "conflicts", "neutral", "unknown"]) }),
   narrative: z.object({ headline: z.string(), summary: z.string(), reasons: z.array(z.string()), riskNotes: z.array(z.string()), limitations: z.array(z.string()), disclaimer: z.string() }),
@@ -54,6 +65,20 @@ export const GlobalReportSchema = z.object({
   if (pathIds.size !== report.paths.length || report.view.pathIds.some(id => !pathIds.has(id)) || (report.setup.pathId !== null && !pathIds.has(report.setup.pathId))) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Unknown or duplicate path reference" });
   const selected = report.paths.find(p => p.id === report.setup.pathId);
   if (selected && (selected.direction !== "up" || selected.triggerLevelId !== report.setup.triggerLevelId || report.setup.retestLevelId !== report.setup.triggerLevelId || selected.invalidationLevelId !== report.setup.invalidationLevelId || JSON.stringify(selected.targetIds) !== JSON.stringify(report.setup.targetIds))) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Setup must match its plotted upside path" });
+  const plan = report.tradePlan;
+  if (plan) {
+    const path = report.paths.find(p => p.id === plan.pathId), level = (id: string | null) => report.levels.find(l => l.id === id)?.price;
+    if ([plan.triggerLevelId, plan.invalidationLevelId, ...plan.targetIds].some(id => id !== null && !ids.has(id)) || (plan.pathId !== null && (!path || !report.view.pathIds.includes(plan.pathId)))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan must use visible canonical levels and path"});
+    if (path && ((path.direction === "up" && plan.side !== "long") || (path.direction === "down" && plan.side !== "short"))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan direction must match its path"});
+    if(path&&path.direction!=="range"&&(plan.triggerLevelId!==path.triggerLevelId||plan.invalidationLevelId!==path.invalidationLevelId||JSON.stringify(plan.targetIds)!==JSON.stringify(path.targetIds)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional plan must retain its path trigger, invalidation and targets"});
+    if (plan.side !== "none" && (!path || !plan.referenceEntry || !plan.referenceStop || !plan.targetIds.length || !plan.triggerLevelId || !plan.invalidationLevelId)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional research plan requires a path, entry, risk reference and targets"});
+    if (plan.referenceEntry && plan.referenceStop) {
+      const [lo,hi] = plan.referenceEntry, targets = plan.targetIds.map(id => level(id)!);
+      if (lo > hi || (plan.side === "long" ? plan.referenceStop >= lo || targets.some(p => p <= hi) : plan.referenceStop <= hi || targets.some(p => p >= lo))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Research plan prices must be ordered for its side"});
+    }
+    if (plan.state === "confirmed" && (!plan.confirmationTs || !plan.retestTs || plan.blockers.length || plan.grossRewardRisk === null || plan.grossRewardRisk < 1.5)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Confirmed research plan requires observed confirmation and sufficient gross reward"});
+    if(plan.state==="confirmed"&&plan.referenceEntry&&(report.snapshot.price===null||report.snapshot.price<plan.referenceEntry[0]||report.snapshot.price>plan.referenceEntry[1]||plan.retestTs!<=plan.confirmationTs!))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Confirmed research price must remain in its planned zone after a subsequent retest"});
+  }
   if (report.setup.state === "ready" && (!report.setup.entryZone || !report.setup.protectiveStop || report.setup.netRewardRisk === null || report.setup.netRewardRisk < 1.5 || report.setup.missing.length || !report.setup.retestTs || report.setup.protectiveStop >= report.setup.entryZone[0])) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ready setup requires observed protection, net reward and complete evidence" });
   const s=report.setup;
   if(s.entryZone && (s.entryZone[0]>s.entryZone[1] || !s.confirmationTs || !s.retestTs || s.retestTs<=s.confirmationTs))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Priced entry requires a subsequent observed retest"});

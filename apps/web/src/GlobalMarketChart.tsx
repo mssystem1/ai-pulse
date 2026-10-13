@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, type UTCTimestamp, type AutoscaleInfo, type Time } from "lightweight-charts";
-import { parseCandleTimeframe, globalChartAnnotations, globalReportChartSvg, globalFibonacciAnchors, globalLabel, globalPrice, globalTimeframeLabel, type GlobalReport, type GlobalChartLayers } from "@pulse/domain";
+import { parseCandleTimeframe, globalChartAnnotations, globalReportChartSvg, globalFibonacciAnchors, globalLabel, globalPrice, globalTimeframeLabel, globalTradePlan, type GlobalReport, type GlobalChartLayers } from "@pulse/domain";
 import { downloadGlobalChart } from "./globalChartDownload";
 
 const stamp = (ts: number) => Math.floor(ts / 1000) as UTCTimestamp;
@@ -34,7 +34,7 @@ export function GlobalMarketChart({ report, selectedPathId }: { report: GlobalRe
     if (!ref.current || report.candles.length < 2) return;
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
     const chart = createChart(ref.current, { ...chartOptions, localization:{locale:report.lang==="zh"?"zh-CN":"en-US"}, height: pro ? 660 : 540, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
-    const values = report.view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []);
+    const plan=globalTradePlan(report),values = [...report.view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(plan.referenceEntry ?? []),...(plan.referenceStop===null?[]:[plan.referenceStop])];
     const candles = chart.addSeries(CandlestickSeries, { upColor: "#35d0aa", downColor: "#ef6b85", wickUpColor: "#35d0aa", wickDownColor: "#ef6b85", borderVisible: false, priceFormat: { type: "price", precision: report.snapshot.pricePrecision, minMove: 10 ** -report.snapshot.pricePrecision }, autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => { const info = base(), latestX = chart.timeScale().timeToCoordinate(lastTime), plotWidth = chart.timeScale().width(); if (info?.priceRange && values.length && latestX !== null && latestX >= 8 && latestX + 70 < plotWidth - 145) { info.priceRange.minValue = Math.min(info.priceRange.minValue, ...values); info.priceRange.maxValue = Math.max(info.priceRange.maxValue, ...values); } return info; } });
     const data = report.candles, last = data.at(-1)!, interval = data.length > 1 ? last.ts - data.at(-2)!.ts : 3600000;
     candles.setData([...data.map(c => ({ time: stamp(c.ts), open: c.open, high: c.high, low: c.low, close: c.close })), ...Array.from({ length: 300 }, (_, i) => ({ time: stamp(last.ts + interval * (i + 1)) }))]);
