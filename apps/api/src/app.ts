@@ -1116,6 +1116,16 @@ export function createApp(cfg: AppConfig, dependencies: {
     next();
   });
 
+  // An unindexed Bazaar endpoint is initially crawled without business inputs.
+  // Advertise its input contract without selecting a market or accepting a
+  // payment. Any supplied body or authorization still needs normal validation.
+  const isUnsignedPredictionDiscoveryProbe = (req: express.Request) => {
+    const network = (req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey;
+    return req.method === "POST" && (network === "base" || network === "arbitrum")
+      && /^\/v1\/analysis\/prediction\/(standard|premium)$/.test(req.path)
+      && !req.header("PAYMENT-SIGNATURE") && !req.header("X-PAYMENT")
+      && (req.body === undefined || (req.body !== null && typeof req.body === "object" && !Array.isArray(req.body) && Object.keys(req.body).length === 0));
+  };
   const v5InputSchemas = new Map<string, z.ZodType>([
     ["/v1/analysis/base", AnalysisBodySchema],
     ["/v1/analysis/premium", AnalysisBodySchema],
@@ -1135,6 +1145,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (req.method !== "POST") return next();
     const schema = v5InputSchemas.get(req.path);
     if (!schema) return next();
+    if (isUnsignedPredictionDiscoveryProbe(req)) return next();
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json(buildX402InputRequired(req.path, parsed.error.issues));
     req.body = parsed.data;
@@ -1169,6 +1180,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   ]);
   app.use(async (req, res, next) => {
     if (req.method !== "POST" || !predictionEvidencePaths.has(req.path)) return next();
+    if (isUnsignedPredictionDiscoveryProbe(req)) return next();
     const body = req.body as { primaryMarketId: string };
     try {
       const market = await polymarket.getMarket(body.primaryMarketId);

@@ -1,5 +1,7 @@
 # ASP discovery and paid-delivery audit — 2026-10-13
 
+The [14 October post-deployment follow-up](./ASP_POST_DEPLOY_VALIDATION_2026-10-14.md) records the successful live X Layer Pro MCP regression, deployed rendering/recovery checks, current review status and the newly identified Prediction crawler blocker. The remaining checks below describe this earlier snapshot.
+
 Production API: `https://pulse-api-production-7aae.up.railway.app`.
 Test buyer: `TEST_WALLET_ADDRESS`, `0xa7d827622c4f9c884ca8f751b2060dd767f18683`.
 The authenticated Codespace owner wallet was used only for the approved agent identity update, never for report purchases.

@@ -74,6 +74,8 @@ PULSE exposes the same approved eight-service catalog under `/arbitrum`, using `
 
 There is no repository-side action that can guarantee approval by an Arbitrum editorial directory. Follow the current official form/dashboard visible to the operator at submission time and save the resulting submission ID.
 
+Use `node scripts/validate-bazaar-discovery.mjs` after deployment to run Coinbase's [read-only endpoint validator](https://docs.cdp.coinbase.com/api-reference/v2/rest-api/x402-facilitator/validate-x402-endpoint) against all ten Base/Arbitrum research/risk endpoints. Direct calls with valid inputs do not prove that a crawler's initial probe succeeds. The result distinguishes discovery readiness from actual indexing. [Coinbase's seller guide](https://docs.cdp.coinbase.com/x402/seller/get-discovered) says indexing follows a successful settled CDP call; there is no separate registration API. An unsigned, empty Prediction POST on Base/Arbitrum advertises its input contract; supplied or signed input still requires normal validation before settlement.
+
 ## Arc Mainnet and Circle publication
 
 Use `/arc`, Arc Mainnet `eip155:5042`, USDC `0x3600000000000000000000000000000000000000`, and production Circle Gateway (domain 26). A wallet USDC balance is distinct from its prepaid Gateway balance. The retired testnet must not be used in current discovery metadata.

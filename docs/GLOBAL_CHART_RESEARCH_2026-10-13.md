@@ -28,7 +28,7 @@ Indicator visibility changes preserve the existing chart and time viewport. Rece
 
 PULSE uses the saved confirmed A→B swing on a linear price scale. Zero is B; one is A. Retracement prices are `B − (B − A) × ratio`, for `0, 0.236, 0.382, 0.5, 0.618, 0.786, 1`. The drawing shows the reference diagonal, faint measured range, ratio/percentage/price labels and left-extended horizontal lines. The first and last ratios identify B and A. Labels can be omitted when too close together; their lines retain the actual price coordinates.
 
-Older reports containing three internal ratios use those same saved anchors to display the complete standard retracement drawing. Saved market data, trade levels and report interpretation are not recalculated. Missing, unconfirmed or inconsistent anchor evidence makes Fibonacci unavailable. Retracement lines never silently replace Spot targets or protective SL.
+Older reports containing three internal ratios use those same saved anchors to display the complete standard retracement drawing. Saved market data, trade levels and report interpretation are not recalculated. Missing, unconfirmed or inconsistent anchor evidence makes Fibonacci unavailable. The report engine also requires the measured confirmed leg to span at least twice the current ATR14; a smaller latest leg leaves Fibonacci unavailable. Retracement lines never silently replace Spot targets or protective SL.
 
 ## TradingView API evaluation
 
