@@ -1,5 +1,5 @@
 import type { SpotMarketContext } from "@pulse/market";
-import { deriveGlobalTradePlan, globalConfirmationEvidence } from "@pulse/domain";
+import { deriveGlobalTradePlan, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
 
 export const GLOBAL_HISTORY_LIMIT = 520;
@@ -238,7 +238,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
 }
 
 export function globalPromptEvidence(report: GlobalReport) {
-  return { snapshot: report.snapshot, waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, tradePlan: report.tradePlan,
+  return { snapshot: report.snapshot, priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:globalPrimaryAttemptEvidence(report),
     indicators: { sma: report.indicators.sma.filter(s => report.tier === "pro" || s.period === 55).map(s => ({ period: s.period, value: s.points.at(-1)?.value ?? null, change10Bars: s.points.length > 10 ? rounded(s.points.at(-1)!.value - s.points.at(-11)!.value) : null })), rsi14: report.tier === "pro" ? report.indicators.rsi.points.at(-1)?.value ?? null : null, atr14: report.indicators.atr.points.at(-1)?.value ?? null, volumeRatio: report.indicators.volumeRatio, fibonacci: report.indicators.fibonacci, regression: report.tier === "pro" ? { bars: report.indicators.regression?.bars, residualSigma: report.indicators.regression?.residualSigma } : null },
     context: { timeframe: report.context.timeframe, status: report.context.status, agreement: report.context.agreement, close: report.context.candles.at(-1)?.close ?? null, sma55: report.context.sma55.at(-1)?.value ?? null },
     recentCandles: report.candles.slice(-48).map(c => [c.ts, c.open, c.high, c.low, c.close, c.volume, c.confirmed]), note: "Only completed candles. All candidate anchors and level prices are supplied evidence. Projection timing is schematic." };

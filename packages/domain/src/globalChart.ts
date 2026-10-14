@@ -1,5 +1,5 @@
 import { parseCandleTimeframe, type GlobalReport } from "@pulse/schemas";
-import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines } from "./globalPresentation.js";
+import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
 
 export type GlobalChartLayers = { allSmas?: boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean };
@@ -103,7 +103,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     if (labelY <= bottom - 3) svg += `<g data-level-id="${escapeGlobalSvg(l.id)}">${Math.abs(labelY-y)>2?line(right-10,y,right+8,labelY-2,color,.7):""}<rect x="${right + 8}" y="${labelY - 12}" width="132" height="20" rx="3" fill="${color}" fill-opacity=".12"/>` + text(right + 132, labelY + 2, globalPrice(report,l.price), color, 11,"end")+text(right+4,labelY+2,label,color,8,"end")+ "</g>";
   }
   const last = report.candles.at(-1), lastY = last ? g.y(last.close) : null;
-  if (visible(lastY)) svg += text(historyEnd - 8, lastY - 7, `${report.lang === "zh" ? "收盘" : "CLOSE"} ${globalPrice(report, last!.close)}`, "#d1dae8", 10, "end");
+  if (visible(lastY)) svg += text(historyEnd - 8, lastY - 7, `${report.lang === "zh" ? "最后收盘" : "LAST CLOSE"} ${globalPrice(report, last!.close)}`, "#d1dae8", 10, "end");
   const scenarioLabels: Array<{ y: number; value: string; color: string; size: number; dim: boolean }> = [];
   const stageRows: number[] = [];
   for (const path of report.paths.filter(p => report.view.pathIds.includes(p.id))) {
@@ -179,7 +179,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 103, left = 62, historyEnd = 818, right = 1110, footerTop = pro ? 774 : 595;
   const planLines=globalTradePlanLines(report),setupLines=globalSetupLines(report);
-  const footerLines=[...planLines.slice(0,7),...planLines.slice(7,-1),planLines.at(-1)!,setupLines[0],...setupLines.filter(s=>s.startsWith("Previous attempt")||s.startsWith("先前尝试")||s.startsWith("The previous confirmation")||s.startsWith("先前确认")||s.startsWith("Observed entry")||s.startsWith("已观察入场")||s.startsWith("Observed setup gross")||s.startsWith("已观察计划")||s.startsWith("Protective stop")||s.startsWith("保护止损")||s.startsWith("Cancel:")||s.startsWith("取消")||s.startsWith("Expires")||s.startsWith("有效期"))];
+  const footerLines=[...planLines.slice(0,7),...planLines.slice(7,-1),planLines.at(-1)!,setupLines[0],...setupLines.filter(s=>s.startsWith("A held retest")||s.startsWith("先前回测")||s.startsWith("Previous attempt")||s.startsWith("先前尝试")||s.startsWith("The previous confirmation")||s.startsWith("先前确认")||s.startsWith("Observed entry")||s.startsWith("已观察入场")||s.startsWith("Observed setup gross")||s.startsWith("已观察计划")||s.startsWith("Protective stop")||s.startsWith("保护止损")||s.startsWith("Cancel:")||s.startsWith("取消")||s.startsWith("Expires")||s.startsWith("有效期"))];
   const wrapped=footerLines.flatMap(value=>{const max=report.lang==="zh"?100:185,chars=Array.from(value),rows:string[]=[];while(chars.length)rows.push(chars.splice(0,max).join(""));return rows;});
   const footerHeight=wrapped.length*19+32,height=footerTop+footerHeight+35;
   const layers = { channel: true, ...options.layers }, periods = pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
@@ -192,7 +192,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" rx="16" fill="#0f1826"/><g font-family="Inter, Noto Sans SC, Arial, sans-serif">`;
   svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${report.snapshot.timeframe}`, "#55dfb5", 20);
-  svg += text(25, 54, `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.snapshot.observedAt} · ${globalLabel("history", report.lang)}`, "#a5b7cd", 11);
+  svg += text(25, 54, `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.lang==="zh"?"获取":"Fetched"} ${report.snapshot.observedAt} · ${globalCompletedPriceLine(report)}`, "#a5b7cd", 10);
   svg += text(left, 77, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}`, "#b9c6d8", 12);
   for (let i = 0; i < 6; i += 1) { const value = min + (max - min) * i / 5, py = y(value); svg += line(left, py, right, py, "#28374a", .8, "2 5") + text(width - 18, py + 4, globalPrice(report, value), "#8398b3", 10, "end"); }
   const maxVolume = Math.max(1, ...candles.map(c => c.volume)), candleWidth = Math.max(.8, Math.min(6, (historyEnd - left) / candles.length * .75));

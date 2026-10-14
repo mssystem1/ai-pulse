@@ -80,3 +80,53 @@ The chart numbers each arrow to match its main/alternative title. Primary ENTRY 
 Local validation evidence is in `.tmp/btc-oct14-review/`. All four report exports preserve primary prices across PNG/TXT/caption and leave the stored report unchanged; captions are 699–771 characters and messages 2,686–2,999 characters. Desktop and phone web/Telegram Mini App rendering passed 20 cases, including all-study and illustrated-guide views, with no runtime errors or horizontal overflow. Telegram hosting/library reads are mocked, and browser mutations are blocked. Market/Limit handoff checks preserve observed, unexpired protection and never copy research-only short references.
 
 Final local checks: 29 domain checks, 19 analysis checks, 9 Telegram export/delivery checks and 11 web/Spot handoff checks passed (68 total; no failures or skips). Domain, analysis, API and web production builds passed. The four original PNGs, revised exports, desktop native chart with all studies, mobile Telegram primary-plan card and phone guide were visually inspected. The revised live-model prose and deployment remain unverified until the user publishes this follow-up; no further live model test was made.
+
+## Follow-up after deployment of 78ad4c1: supplied 13:05–13:10 UTC reports
+
+All eight newly supplied TXT/PNG files were inspected and matched to their existing paid JSON through read-only wallet history. The investigation uses those saved snapshots, not newly purchased reports or current market predictions. No model call, payment, trading transaction or Telegram message was made.
+
+The planned entry, reference SL, target prices and least-favorable-entry gross R:R reproduce exactly on all four reports. Saved prices equal their last completed candle closes. SMA periods, Wilder RSI14 and ATR14 agree with recalculation from the saved candles. PNG, TXT and caption retain the primary plan's numeric references. The primary WAIT states are supported by the candle evidence.
+
+| Timeframe | Primary thesis | Planned entry reference | Reference SL | Nearest target / further target | Gross R:R | Why entry remains avoided |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1H | Conditional short / sell owned Spot | 82,744.74–82,767.40 | 82,858.04 | 82,627.18 / 82,277.20 | 1.04 | Below the 1.50 nearest-target threshold, with no valid confirmation or subsequent test; completed close is outside the zone. |
+| 4H | Conditional short / sell owned Spot | 83,490.27–83,530.10 | 83,689.40 | 83,168.90 / 82,902.80 | 1.61 | Prior primary confirmation failed. A fresh resistance rejection and subsequent failed test are required; completed close is outside the zone. |
+| 1D | Support-pullback long / Spot buy | 82,556.60–82,665.62 | 81,848.94 | 87,399.00 | 5.80 | Previous support attempt breached its structural boundary. Fresh support confirmation and subsequent test are required; completed close is outside the zone. |
+| 1W | Range-support long / Spot buy | 82,842.00–83,154.70 | 79,385.51 | 89,111.00 | 1.58 | Previous range-support attempt breached its structural boundary. Fresh support confirmation and subsequent test are required; completed close is outside the zone. |
+
+These are historical planning references, not observed fills or new trading recommendations. Confirmation alone cannot repair the 1H plan's insufficient gross reward. Selling owned Spot inventory is a separate manual decision; short research does not authorize a leveraged short. Current attempts have no observed entry or protective SL to copy. Existing Market/Limit handoffs continue to distinguish research references from observed, unexpired protection.
+
+### Presentation and narrative defects
+
+Three fresh reports displayed a misleading legacy correction warning. Their saved and recalculated blockers had the same members in a different order; all actual state and confirmation facts matched. The warning now compares blocker sets. Real legacy downgrades still display the correction notice.
+
+The 4H Spot recovery attempt had confirmation on the October 14 00:00 UTC candle and an observed held retest on the 04:00 candle. The 08:00 candle, completed at 12:00, had a low of 83,031.20 below the 83,168.90 floor and cancelled that protection. Provider prose claiming that a retest never occurred is inaccurate. The active setup deliberately clears its prices and retest timestamp on cancellation; that clearing must not be interpreted as historical absence. The evaluator now retains the prior retest in transient event evidence, and the rendered cancellation record states that the later failure cancels it.
+
+The daily attempt failed on the October 12 16:00 UTC candle, completed October 13 at 16:00, whose low of 81,032.80 breached 82,285.00. The narrative attributed failure to an absent retest/window instead of that structural breach. Prompt evidence now supplies the actual failure candle, completed time, reason and relevant boundary for both the primary research plan and the separate Spot buy attempt. Those events must not be mixed: weekly primary range-support failure is distinct from its still-Watching recovery alternative. No held retest is reconstructed before the weekly primary failure.
+
+The 1H prose describes poor net reward even though no execution quote exists. Its measured failure is poor **gross** reward to the nearest target. Prompts now distinguish gross reward from unknown costs/net reward, and the chart/TXT/UI action line explicitly retains the reward gate after confirmation.
+
+Original paid JSON, Markdown and provider prose remain unchanged. New structured renderings add factual history and price-reference clarity; prompt corrections apply to future generation. No new live-model response has been obtained to verify compliance with the revised instructions.
+
+### Time references and Elliott counts
+
+The new header identifies the last completed close and its UTC closing time separately from when evidence was fetched:
+
+| Timeframe | Saved completed close | Candle closed, UTC | Evidence fetched, UTC |
+| --- | --- | --- | --- |
+| 1H | 82,739.00 | October 14, 13:00 | October 14, 13:10:26.030 |
+| 4H | 83,476.60 | October 14, 12:00 | October 14, 13:08:50.350 |
+| 1D | 83,430.60 | October 13, 16:00 | October 14, 13:05:18.369 |
+| 1W | 83,902.10 | October 11, 16:00 | October 14, 13:07:10.779 |
+
+These prices are different completed bars, not contradictory live quotes. The selected OKX calendar bars preserve their actual UTC boundaries. Charts label LAST CLOSE, and TXT, UI and Telegram state that the reference is not live. Entry-zone blockers likewise refer to the completed close and require a fresh execution quote.
+
+The saved candidates pass independent basic price-geometry and pivot-availability checks: 1H has a downward partial 1–2, 4H an upward partial 1–2, daily a local 1–5/A, and weekly a 1–5/ABC hypothesis. The weekly C extreme is below A. A label identifies a confirmed candidate pivot, not necessarily the currently developing leg; a subsequent downward move alone does not establish a confirmed hourly wave-three pivot. Internal subdivisions remain unverified. Full [impulse](https://www.elliottwave.com/waveopedia/impulse/) and [zigzag](https://www.elliottwave.com/waveopedia/zigzags/) structures require subdivision evidence beyond these swing checks. Opposing intraday and broader conditional directions are allowed; independent context and all entry blockers remain explicit.
+
+### Local validation and review artifacts
+
+All 84 local checks pass with no skips: 30 domain, 25 analysis/mocked-provider, 15 Telegram/delivery and 14 web/report-handoff checks. Domain, analysis, API and final web production builds pass. Regression coverage includes blocker-order invariance, genuine legacy correction notices, previous retest capture without restoring protection, completed daily closing times, reward gates and multilingual Telegram budgets. Captions for the four saved reports are 840–941 characters; overview messages are 2,745–3,035.
+
+Desktop and phone web/Telegram Mini App rendering passed 20 cases, with two additional guide cases after the final guide update. No runtime errors or horizontal overflow occurred. Telegram host/library reads are mocked; browser network mutations are blocked. Chart preservation and Fibonacci availability are checked with all studies enabled. All four revised PNGs, native chart with all studies, mobile primary-plan card and final phone guide were visually inspected. The first guide image now uses the public numeric evidence from the supplied 13:05 daily snapshot, with provenance; the guide explains closing times, gross-reward gating and historical protection.
+
+Local review artifacts are under `.tmp/btc-oct14-13-review/`, including immutable-snapshot renderer fixtures, four exports, arithmetic/event summaries, wave checks and screenshots. They are not committed. This follow-up still requires deployment; revised provider prose has not been live-tested, as requested.

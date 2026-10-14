@@ -1,4 +1,4 @@
-import { candleTimeframeMs, type GlobalReport, type GlobalCandle } from "@pulse/schemas";
+import { candleTimeframeMs, candleCloseTime, type GlobalReport, type GlobalCandle } from "@pulse/schemas";
 
 /** Shared completed-candle evidence for a mapped attempt. A failed candle
  * cannot also start its replacement; a fresh confirmation needs a later bar. */
@@ -14,6 +14,7 @@ export function globalConfirmationEvidence(report: GlobalReport, input: {
   const anchor = report.indicators.pivots.find(a => trigger?.anchorIds.includes(a.id));
   let confirmation: GlobalCandle | undefined, retest: GlobalCandle | undefined;
   let failedConfirmation: GlobalCandle | undefined, failure: GlobalCandle | undefined;
+  let failedRetest: GlobalCandle | undefined;
   let failureReason: "floor" | "trigger" | "stop" | undefined;
   const interval = candleTimeframeMs(report.snapshot.timeframe);
   if (trigger && floor && anchor?.confirmedAt != null) {
@@ -27,8 +28,8 @@ export function globalConfirmationEvidence(report: GlobalReport, input: {
       const stopBroken = input.referenceStop != null && (input.side === "long" ? c.low <= input.referenceStop : c.high >= input.referenceStop);
       const triggerFailed = sign * (c.close - trigger.price) < 0;
       if (confirmation && (floorBroken || stopBroken || triggerFailed)) {
-        failedConfirmation = confirmation; failure = c;
-        failureReason = floorBroken ? "floor" : stopBroken ? "stop" : "trigger";
+        failedConfirmation = confirmation; failedRetest = retest; failure = c;
+        failureReason = floorBroken&&distinctFloor ? "floor" : triggerFailed ? "trigger" : "stop";
         confirmation = undefined; retest = undefined;
         continue;
       }
@@ -38,11 +39,36 @@ export function globalConfirmationEvidence(report: GlobalReport, input: {
         ? previous && sign * (previous.close - trigger.price) <= 0 && sign * (c.close - trigger.price) > 0
         : testHolds;
       if (starts && (!confirmation || interval>0&&c.ts>=confirmation.ts+interval*4)) {
-        confirmation = c; retest = undefined; failure = undefined; failedConfirmation = undefined; failureReason = undefined;
+        confirmation = c; retest = undefined; failure = undefined; failedConfirmation = undefined; failedRetest = undefined; failureReason = undefined;
       } else if (confirmation && c.ts > confirmation.ts && testHolds) retest ??= c;
     }
   }
   const expiresAt = confirmation && interval > 0 ? confirmation.ts + interval * 4 : null;
   const expired = expiresAt !== null && Date.parse(report.snapshot.observedAt) >= expiresAt;
-  return { confirmation, retest, failedConfirmation, failure, failureReason, expiresAt, expired };
+  return { confirmation, retest, failedConfirmation, failedRetest, failure, failureReason, expiresAt, expired };
+}
+
+/** Historical event evidence for narrative grounding. It never restores the
+ * inactive setup's entry/SL or authorizes an order. */
+export function globalSetupAttemptEvidence(report: GlobalReport) {
+  const s=report.setup,path=report.paths.find(p=>p.id===s.pathId);
+  if(!path||!s.triggerLevelId||!s.invalidationLevelId)return null;
+  const e=globalConfirmationEvidence(report,{side:"long",condition:path.confirmation==="support_hold"?"support_hold":"close_retest",triggerLevelId:s.triggerLevelId,invalidationLevelId:s.invalidationLevelId});
+  const retest=e.failedRetest??e.retest;
+  return {kind:"spot_buy_attempt",state:s.state,confirmationTs:e.failedConfirmation?.ts??e.confirmation?.ts??s.confirmationTs,
+    retestTs:retest?.ts??s.retestTs,retestObservedBeforeFailure:!!e.failedRetest,
+    failure:e.failure?{reason:e.failureReason,candleTs:e.failure.ts,completedAt:candleCloseTime(e.failure.ts,report.snapshot.timeframe),low:e.failure.low,high:e.failure.high,close:e.failure.close,
+      triggerPrice:report.levels.find(l=>l.id===s.triggerLevelId)?.price,invalidationPrice:report.levels.find(l=>l.id===s.invalidationLevelId)?.price}:null,
+    activeObservedProtection:s.state!=="cancelled"&&s.state!=="expired"&&s.entryZone!==null&&s.protectiveStop!==null};
+}
+
+export function globalPrimaryAttemptEvidence(report:GlobalReport) {
+  const p=report.tradePlan;
+  if(!p||p.side==="none"||!p.triggerLevelId||!p.invalidationLevelId)return null;
+  const e=globalConfirmationEvidence(report,{side:p.side,condition:p.condition,triggerLevelId:p.triggerLevelId,invalidationLevelId:p.invalidationLevelId,referenceStop:p.referenceStop});
+  return {kind:"directional_research_plan",side:p.side,state:p.state,confirmationTs:e.failedConfirmation?.ts??e.confirmation?.ts??p.confirmationTs,
+    retestTs:e.failedRetest?.ts??e.retest?.ts??p.retestTs,retestObservedBeforeFailure:!!e.failedRetest,
+    failure:e.failure?{reason:e.failureReason,candleTs:e.failure.ts,completedAt:candleCloseTime(e.failure.ts,report.snapshot.timeframe),low:e.failure.low,high:e.failure.high,close:e.failure.close,
+      triggerPrice:report.levels.find(l=>l.id===p.triggerLevelId)?.price,invalidationPrice:report.levels.find(l=>l.id===p.invalidationLevelId)?.price}:null,
+    activeObservedProtection:false};
 }

@@ -2,7 +2,7 @@
  * Explicit fields keep provider payloads, candle arrays and payment metadata out of exports.
  */
 type RecordValue = Record<string, unknown>;
-import { readGlobalReport, globalHumanText, globalSections } from "./globalPresentation.js";
+import { readGlobalReport, globalHumanText, globalSections, globalCompletedPriceLine } from "./globalPresentation.js";
 export type ResearchContext = { serviceId?: string; input?: unknown; networkKey?: string; createdAt?: number | string };
 export type ResearchIdentity = { serviceId: string; serviceTitle: string; subject: string; timeframe?: string; label: string };
 export type ResearchSection = { title: string; lines: string[]; featured?: boolean };
@@ -57,7 +57,7 @@ export function presentResearch(report: unknown, context: ResearchContext = {}):
   const data = researchRecord(report), a = researchRecord(data.analysis), identity = researchIdentity(context, report);
   const global = identity.serviceId.startsWith("global") ? readGlobalReport(report) : null;
   if (global) return { ...identity, subject: global.snapshot.instId, timeframe: global.snapshot.timeframe, headline: globalHumanText(global,global.narrative.headline), summary: globalHumanText(global,global.narrative.summary),
-    generatedAt: researchDate(global.snapshot.observedAt), sections: [{ title: global.lang === "zh" ? "市场快照" : "Market snapshot", lines: [`${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.source}`] }, ...globalSections(global)], disclaimer: global.narrative.disclaimer };
+    generatedAt: researchDate(global.snapshot.observedAt), sections: [{ title: global.lang === "zh" ? "市场快照" : "Market snapshot", lines: [`${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.source}`,globalCompletedPriceLine(global)] }, ...globalSections(global)], disclaimer: global.narrative.disclaimer };
   const sections: ResearchSection[] = [];
   const add = (title: string, lines: unknown[], featured = false) => {
     const clean = [...new Set(lines.map(text).filter(Boolean))];

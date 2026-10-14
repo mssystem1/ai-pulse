@@ -1,4 +1,4 @@
-import { GlobalReportSchema, parseCandleTimeframe, type GlobalReport, type GlobalPath } from "@pulse/schemas";
+import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
 
@@ -36,6 +36,11 @@ export function globalPrice(report: GlobalReport, value: number | null | undefin
   return value == null || !Number.isFinite(value) ? "—" : value.toLocaleString(report.lang === "zh" ? "zh-CN" : "en-US", { minimumFractionDigits: Math.min(2,report.snapshot.pricePrecision), maximumFractionDigits: report.snapshot.pricePrecision });
 }
 export function globalLevelPrice(report: GlobalReport, id: string | null | undefined): string { return globalPrice(report, report.levels.find(l => l.id === id)?.price); }
+export function globalCompletedPriceLine(report: GlobalReport): string {
+  const ts=report.candles.at(-1)?.ts,closed=ts===undefined?null:candleCloseTime(ts,report.snapshot.timeframe);
+  const when=closed===null?"":new Date(closed).toISOString().slice(0,16).replace("T"," ")+" UTC";
+  return report.lang==="zh"?`价格参考：最后完整 ${report.snapshot.timeframe} K 线收盘 ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · 收盘时间 ${when}`:""}；非实时报价。`:`Reference: last completed ${report.snapshot.timeframe} close ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · bar closed ${when}`:""}; not a live quote.`;
+}
 export function globalTimeframeLabel(timeframe: string, lang: "en" | "zh"): string {
   const frame = parseCandleTimeframe(timeframe);
   if (!frame) return timeframe;
@@ -94,7 +99,8 @@ export function globalSetupFailureLines(report: GlobalReport): string[] {
   const invalid=report.levels.find(l=>l.id===s.invalidationLevelId)?.price,trigger=report.levels.find(l=>l.id===s.triggerLevelId)?.price;
   const savedFailure=s.confirmationTs?report.candles.find(c=>c.ts>s.confirmationTs!&&((invalid!==undefined&&c.low<=invalid)||(trigger!==undefined&&c.close<trigger))):undefined;
   const failure=e.failure??savedFailure,floorFailed=failure&&invalid!==undefined&&failure.low<=invalid;
-  if (failure) return [zh?`先前尝试于 ${new Date(failure.ts).toISOString()} K 线失效：${floorFailed?`低点 ${globalPrice(report,failure.low)} 触及或跌破 ${globalLevelPrice(report,s.invalidationLevelId)} 底线`:`收盘失守 ${globalLevelPrice(report,s.triggerLevelId)} 触发位`}。`:`Previous attempt failed on the ${new Date(failure.ts).toISOString()} candle: ${floorFailed?`low ${globalPrice(report,failure.low)} touched/broke the ${globalLevelPrice(report,s.invalidationLevelId)} floor`:`close failed the ${globalLevelPrice(report,s.triggerLevelId)} trigger`}.`];
+  if (failure) return [zh?`先前尝试于 ${new Date(failure.ts).toISOString()} K 线失效：${floorFailed?`低点 ${globalPrice(report,failure.low)} 触及或跌破 ${globalLevelPrice(report,s.invalidationLevelId)} 底线`:`收盘失守 ${globalLevelPrice(report,s.triggerLevelId)} 触发位`}。`:`Previous attempt failed on the ${new Date(failure.ts).toISOString()} candle: ${floorFailed?`low ${globalPrice(report,failure.low)} touched/broke the ${globalLevelPrice(report,s.invalidationLevelId)} floor`:`close failed the ${globalLevelPrice(report,s.triggerLevelId)} trigger`}.`,
+    ...(e.failedRetest?[zh?`先前回测已于 ${new Date(e.failedRetest.ts).toISOString()} K 线观察到；后续失效使其取消，不能作为当前入场或保护。`:`A held retest was observed on the ${new Date(e.failedRetest.ts).toISOString()} candle; the later failure cancels it, so it supplies no current entry or protection.`]:[])];
   if (s.state==="expired" && s.expiresAt) return [zh?`先前确认窗口已于 ${new Date(s.expiresAt).toISOString()} 结束。`:`The previous confirmation window ended at ${new Date(s.expiresAt).toISOString()}.`];
   return [zh?"保存的先前尝试已失效；不支持当前入场。":"The saved previous attempt is inactive; it does not support entry."];
 }
@@ -105,7 +111,8 @@ export function globalTradePlanTitle(report: GlobalReport): string {
 }
 export function globalConfirmationCorrection(report:GlobalReport):string|null {
   const saved=report.tradePlan,shown=globalTradePlan(report);
-  if(!saved||saved.state===shown.state&&saved.confirmationTs===shown.confirmationTs&&saved.retestTs===shown.retestTs&&saved.blockers.join()===shown.blockers.join())return null;
+  const sameBlockers=saved&&new Set(saved.blockers).size===new Set(shown.blockers).size&&saved.blockers.every(b=>shown.blockers.includes(b));
+  if(!saved||saved.state===shown.state&&saved.confirmationTs===shown.confirmationTs&&saved.retestTs===shown.retestTs&&sameBlockers)return null;
   return report.lang==="zh"?"确认复核：保存的 K 线不支持先前确认。价位保持不变；须新的有效确认与后续测试。原始分析文字生成于此复核之前。":"Confirmation review: the saved candles do not support the previous confirmation. Prices are preserved; a fresh valid confirmation and subsequent test are required. The original narrative predates this correction.";
 }
 export function globalTradePlanLines(report: GlobalReport): string[] {
@@ -114,7 +121,7 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
   const trigger=globalLevelPrice(report,p.triggerLevelId),invalid=globalLevelPrice(report,p.invalidationLevelId);
   const distinctBoundary=p.triggerLevelId!==p.invalidationLevelId;
   const condition=p.condition==="support_hold"?zh?`回调至 ${trigger}，${tf} 完整收盘守住，随后再次回测守住。`:`Pull back to ${trigger}; hold on a completed ${tf} close, then a subsequent held test.`:p.condition==="rejection"?zh?`反弹测试 ${trigger} 并被拒绝；${tf} 完整收盘低于该位，再次测试守住。`:`A rally tests ${trigger} and is rejected; a completed ${tf} close below it, then a subsequent failed test.`:zh?`${tf} 完整收盘${p.side==="long"?"高于":"低于"} ${trigger}，随后回测守住。`:`Completed ${tf} close ${p.side==="long"?"above":"below"} ${trigger}, then a held retest.`;
-  const blockers:Record<typeof p.blockers[number],string>={history:zh?"完整历史不足":"Insufficient completed history",levels:zh?"缺少已映射价格":"Mapped levels unavailable",confirmation:zh?"等待完整收盘确认":"Wait for completed-close confirmation",retest:zh?"等待后续回测":"Wait for a subsequent retest",reward:zh?"最近目标的毛收益风险比低于 1.50；不入场":"Gross R:R to the nearest target is below 1.50; avoid entry",entry_price:zh?"当前价格不在计划区间；不追价":"Current price is outside the planned zone; do not chase",cancelled:zh?"之前确认已失效；需新的有效测试":"Prior confirmation failed; a new valid test is required",expired:zh?"之前确认已过期；需新的有效测试":"Prior confirmation expired; a new valid test is required"};
+  const blockers:Record<typeof p.blockers[number],string>={history:zh?"完整历史不足":"Insufficient completed history",levels:zh?"缺少已映射价格":"Mapped levels unavailable",confirmation:zh?"等待完整收盘确认":"Wait for completed-close confirmation",retest:zh?"等待后续回测":"Wait for a subsequent retest",reward:zh?"最近目标的毛收益风险比低于 1.50；不入场":"Gross R:R to the nearest target is below 1.50; avoid entry",entry_price:zh?"最后完整收盘价不在计划区间；执行前核查新报价，不追价":"Last completed close is outside the planned zone; recheck a fresh quote before execution; do not chase",cancelled:zh?"之前确认已失效；需新的有效测试":"Prior confirmation failed; a new valid test is required",expired:zh?"之前确认已过期；需新的有效测试":"Prior confirmation expired; a new valid test is required"};
   return [globalTradePlanTitle(report),condition,
     `${zh?"计划入场参考（尚非已观察入场）":"Planned entry reference (not an observed fill)"}: ${p.referenceEntry!.map(n=>globalPrice(report,n)).join("–")}`,
     `${zh?"计划止损参考（非已观察止损）":"Planned SL reference (not observed protection)"}: ${globalPrice(report,p.referenceStop)} · ${zh?"结构失效位之外":"outside structural invalidation"} + ${p.stopBufferAtr} × ATR14`,
@@ -122,7 +129,7 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
     `${zh?"最近目标的毛收益风险比":"Gross R:R to nearest target"}: ${p.grossRewardRisk?.toFixed(2) ?? "—"}; ${zh?"费用后的收益风险比需实际报价":"net R:R requires an execution quote"}`,
     zh?`取消：${tf} 完整收盘${p.side==="long"?"低于":"高于"} ${invalid}。确认后${distinctBoundary?"触及该结构底线或":""}收盘失守触发位时，旧确认失效，须重新确认。`:`Cancel: completed ${tf} close ${p.side==="long"?"below":"above"} ${invalid}. After confirmation, a completed candle ${distinctBoundary?"touching that structural boundary or ":""}closing back through the trigger resets the attempt.`,
     ...p.blockers.map(key=>blockers[key]),
-    p.side==="short"?zh?"现货操作：仅卖出或减持已持有资产；做空研究不创建杠杆空仓。":"Spot action: sell/reduce owned inventory on confirmation. Short research does not open a leveraged short.":zh?"现货操作：确认后复核买入；实际止损依据已观察回测，批准前复核实时费用。":"Spot action: review a buy after confirmation; executable SL comes from the observed retest and costs require a fresh quote."];
+    p.blockers.includes("reward")?zh?"新入场因收益不足而放弃；仅有确认无法弥补收益不足。减持已持有现货须单独决定并核查新报价。":"New entry is avoided for insufficient reward; confirmation alone does not repair it. Review any owned Spot reduction separately with a fresh quote.":p.side==="short"?zh?"现货操作：仅卖出或减持已持有资产；做空研究不创建杠杆空仓。":"Spot action: sell/reduce owned inventory on confirmation. Short research does not open a leveraged short.":zh?"现货操作：确认后复核买入；实际止损依据已观察回测，批准前复核实时费用。":"Spot action: review a buy after confirmation; executable SL comes from the observed retest and costs require a fresh quote."];
 }
 export function globalMissingLabel(report: GlobalReport, key: GlobalReport["setup"]["missing"][number]): string {
   if(key === "context" && (report.context.status !== "available" || report.context.agreement === "unknown")) return report.lang === "zh" ? "独立高周期背景不可用，继续观察" : "Independent context unavailable; keep watching";

@@ -4,7 +4,8 @@ import {GlobalReportSchema} from "@pulse/schemas";
 import {globalDesignFixture} from "./globalReport.fixtures.js";
 import {globalTradePlan,deriveGlobalTradePlan} from "./globalTradePlan.js";
 import {globalConfirmationEvidence} from "./globalConfirmation.js";
-import {globalTradePlanLines} from "./globalPresentation.js";
+import {globalTradePlanLines,globalConfirmationCorrection,globalSetupFailureLines,globalCompletedPriceLine} from "./globalPresentation.js";
+import {globalSetupAttemptEvidence} from "./globalConfirmation.js";
 import {globalReportChartSvg} from "./globalChart.js";
 
 test("a bearish saved map supplies short references without changing its historical buy setup",()=>{
@@ -20,6 +21,7 @@ test("insufficient reward remains visible with a concrete no-entry explanation",
   report.levels.find(l=>l.id==="floor")!.price=trigger-.06*atr;
   const plan=globalTradePlan(report);assert.equal(plan.state,"avoid");assert.ok(plan.grossRewardRisk!<1.5);assert.ok(plan.referenceEntry&&plan.referenceStop);
   assert.match(globalTradePlanLines(report).join("\n"),/below 1.50; avoid entry/);
+  assert.match(globalTradePlanLines(report).at(-1)!,/confirmation alone does not repair/);
 });
 test("canonical plan validation rejects reversed prices and mismatched chart targets",()=>{
   const report=globalDesignFixture();report.tradePlan=globalTradePlan(report);assert.equal(GlobalReportSchema.safeParse(report).success,true);
@@ -53,10 +55,24 @@ test("a structural wick breach invalidates a prior confirmation even without rea
   tail[5].low=trigger-.01;tail[6].low=trigger-.02;tail[7].low=floor-.001;
   report.candles=[...report.candles.slice(0,-8),...tail];report.snapshot.price=tail[7].close;report.snapshot.observedAt=new Date(tail[7].ts+3600000).toISOString();
   const plan=deriveGlobalTradePlan(report);assert.equal(plan.state,"avoid");assert.equal(plan.confirmationTs,null);assert.equal(plan.retestTs,null);assert.ok(plan.blockers.includes("cancelled"));assert.ok(plan.referenceStop!<tail[7].low);
+  report.tradePlan=plan;
+  assert.equal(globalConfirmationCorrection(report),null,"A fresh correctly avoided report is not a legacy correction");
+  report.tradePlan={...plan,blockers:[...plan.blockers].reverse()};
+  assert.equal(globalConfirmationCorrection(report),null,"Blocker order has no effect on report facts");
+  report.setup={...report.setup,state:"cancelled",confirmationTs:tail[5].ts,retestTs:null};
+  const event=globalSetupAttemptEvidence(report)!;assert.equal(event.retestObservedBeforeFailure,true);assert.equal(event.retestTs,tail[6].ts);assert.equal(event.failure?.reason,"floor");assert.equal(event.activeObservedProtection,false);
+  assert.match(globalSetupFailureLines(report).join("\n"),/A held retest was observed/);
   report.tradePlan={...plan,state:"conditional",confirmationTs:tail[5].ts,retestTs:tail[6].ts,blockers:["entry_price"]};const before=structuredClone(report);
   assert.equal(globalTradePlan(report).state,"avoid");assert.ok(globalTradePlan(report).blockers.includes("confirmation"));assert.deepEqual(report,before,"Stored purchases must stay immutable");
+  assert.match(globalConfirmationCorrection(report)!,/Confirmation review/,"A genuine historical downgrade still needs its notice");
   tail.push({...tail[7],ts:tail[7].ts+3600000,low:trigger-.01});report.candles.push(tail.at(-1)!);report.snapshot.observedAt=new Date(tail.at(-1)!.ts+3600000).toISOString();
   const rearmed=deriveGlobalTradePlan(report);assert.equal(rearmed.confirmationTs,tail.at(-1)!.ts);assert.equal(rearmed.retestTs,null);assert.ok(rearmed.blockers.includes("retest"));assert.ok(!rearmed.blockers.includes("cancelled"));
+});
+
+test("the displayed price reference names the completed candle close, not the fetched time or live quote",()=>{
+  const report=globalDesignFixture();report.snapshot.timeframe="1D";report.candles.at(-1)!.ts=Date.parse("2026-10-12T16:00:00Z");report.snapshot.lastCandleTs=report.candles.at(-1)!.ts;report.snapshot.observedAt="2026-10-14T13:05:18.369Z";
+  assert.match(globalCompletedPriceLine(report),/last completed 1D close 115.75/);assert.match(globalCompletedPriceLine(report),/bar closed 2026-10-13 16:00 UTC/);assert.doesNotMatch(globalCompletedPriceLine(report),/13:05/);
+  report.lang="zh";assert.match(globalCompletedPriceLine(report),/最后完整.*非实时报价/);
 });
 
 test("a rejection can touch a coincident trigger/invalidation without fabricating a failed test",()=>{

@@ -1,7 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
-import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection } from "@pulse/domain";
+import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine } from "@pulse/domain";
 
 export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -19,7 +19,7 @@ export function telegramResearchMessage(report: unknown, context: ResearchContex
     const header = [
       `<b>PULSE · GLOBAL ${global.tier.toUpperCase()}</b>`,
       `<b>${html(s.instId)} · ${html(globalTimeframeLabel(s.timeframe, global.lang))}</b>`,
-      html(`${s.venue} · ${s.priceCurrency} · ${s.observedAt}`),
+      html(`${s.venue} · ${s.priceCurrency} · ${s.observedAt}`),html(globalCompletedPriceLine(global)),
     ].join("\n");
     const conditions = [
       ...(globalConfirmationCorrection(global)?[html(globalConfirmationCorrection(global)!),""]:[]),
@@ -67,6 +67,7 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
   return [
     `PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalTimeframeLabel(global.snapshot.timeframe,global.lang)}`,
     `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt}`,
+    globalCompletedPriceLine(global),
     globalTradePlanTitle(global),
     ...(plan.referenceEntry&&plan.referenceStop?[`${zh?"计划价格（非已观察保护）":"Planned references (not observed protection)"}: ${plan.referenceEntry.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,plan.referenceStop)} · ${plan.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),
     ...(["cancelled","expired"].includes(s.state)?[]:[`${globalLabel("setup",global.lang)}: ${globalLabel(s.state,global.lang)}`]),
@@ -74,7 +75,8 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
       globalTradePlanLines(global)[1],
       zh ? `取消：完整收盘${plan.side==="long"?"低于":"高于"} ${globalLevelPrice(global,plan.invalidationLevelId)}；确认后结构底线失守或收盘失守触发位须重新确认。` : `Cancel: completed close ${plan.side==="long"?"below":"above"} ${globalLevelPrice(global,plan.invalidationLevelId)}; a failed structural test or trigger close resets confirmation.`,
       ...(plan.blockers.includes("cancelled")?[zh?"先前确认已失效；等待新的确认及后续测试。":"Prior confirmation failed; wait for a fresh confirmation and subsequent test."]:[]),
-      ...(plan.blockers.includes("entry_price")?[zh?"价格不在计划区间；请勿追价。":"Price is outside the planned zone; do not chase."]:[]),
+      ...(plan.blockers.includes("reward")?[zh?"最近目标的毛收益风险比低于 1.50；放弃新入场。":"Gross R:R to the nearest target is below 1.50; avoid new entry."]:[]),
+      ...(plan.blockers.includes("entry_price")?[zh?"最后完整收盘不在计划区间；核查新报价，勿追价。":"Last completed close is outside the planned zone; recheck a fresh quote; do not chase."]:[]),
     ] : []),
     ...(["cancelled","expired"].includes(s.state)?[globalSetupLines(global)[0]]:s.pathId?[globalSetupLines(global)[1]]:[]),
     ...(s.expiresAt === null || ["cancelled","expired"].includes(s.state) ? [] : [`${zh ? "有效期至" : "Expires"} ${new Date(s.expiresAt).toISOString()}`]),

@@ -4,7 +4,7 @@ import {readFileSync} from "node:fs";
 import {summarizeCandles, type SpotMarketContext} from "@pulse/market";
 import {GlobalReportSchema} from "@pulse/schemas";
 import {globalTradePlanLines, globalSetupLines, globalReportChartSvg, globalWaveExplanationLines} from "@pulse/domain";
-import {prepareGlobalReport,finishGlobalReport,globalWaveCandidate,globalConfirmedPivots,globalWilderIndicators} from "./globalReport.js";
+import {prepareGlobalReport,finishGlobalReport,globalWaveCandidate,globalConfirmedPivots,globalWilderIndicators,globalPromptEvidence} from "./globalReport.js";
 
 // Only public OHLCV/timeframes, copied from the three reported October 13
 // snapshots. No wallet, receipt, recovery token, user note or model output.
@@ -18,6 +18,9 @@ for(const row of rows)test(`${row.frame} reproduces a priced directional plan wi
   assert.equal(GlobalReportSchema.safeParse(report).success,true);
   assert.equal(plan.side,row.frame==="4H"?"short":"long");assert.ok(plan.referenceEntry&&plan.referenceStop&&plan.targetIds.length);
   assert.equal(report.paths.find(p=>p.id===plan.pathId)!.role,"main");
+  const prompt=globalPromptEvidence(report);assert.equal(prompt.priceReference.kind,"last_completed_close");assert.equal(prompt.priceReference.liveQuote,false);
+  if(row.frame==="1D")assert.equal(prompt.setupAttemptEvidence!.failure!.reason,"floor");
+  if(row.frame==="1W"){assert.equal(prompt.primaryAttemptEvidence!.failure!.reason,"floor");assert.equal(prompt.primaryAttemptEvidence!.retestObservedBeforeFailure,false);assert.equal(prompt.setupAttemptEvidence!.failure,null);}
   const target=report.levels.find(l=>l.id===plan.targetIds[0])!.price;
   assert.ok(plan.side==="short"?plan.referenceStop>plan.referenceEntry[1]&&target<plan.referenceEntry[0]:plan.referenceStop<plan.referenceEntry[0]&&target>plan.referenceEntry[1]);
   assert.equal(report.setup.state,row.frame==="1W"?"watching":"cancelled");assert.equal(report.setup.entryZone,null);assert.equal(report.setup.protectiveStop,null);assert.equal(report.setup.costsBps,null);
