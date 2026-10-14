@@ -5,6 +5,7 @@ import {summarizeCandles, type SpotMarketContext} from "@pulse/market";
 import {GlobalReportSchema} from "@pulse/schemas";
 import {globalTradePlanLines, globalSetupLines, globalReportChartSvg, globalWaveExplanationLines} from "@pulse/domain";
 import {prepareGlobalReport,finishGlobalReport,globalWaveCandidate,globalConfirmedPivots,globalWilderIndicators,globalPromptEvidence} from "./globalReport.js";
+import {runPreparedSpotAnalysis} from "./grok.js";
 
 // Only public OHLCV/timeframes, copied from the three reported October 13
 // snapshots. No wallet, receipt, recovery token, user note or model output.
@@ -40,6 +41,26 @@ for(const row of rows)test(`${row.frame} reproduces a priced directional plan wi
   assert.match(globalSetupLines(finished).join("\n"),row.frame==="1W"?/Watching|Pending/:/Cancelled|Plan cancelled/);
   assert.match(globalTradePlanLines(finished).join("\n"),/Planned entry reference|Planned SL reference/);
   const svg=globalReportChartSvg(finished)!;assert.match(svg,/180 \/ (520|470)/);assert.match(svg,/data-wave-swings/);assert.match(svg,/PLAN SL/);assert.doesNotMatch(svg,/NaN|Infinity/);
+});
+test("Quick and Pro provider inputs distinguish rising SMA21 from the falling default SMA55 on the weekly BTC snapshot",async()=>{
+  const row=rows.find(r=>r.frame==="1W")!;
+  for(const tier of ["base","premium"] as const)for(const lang of ["en","zh"] as const){
+    const input=market(row),before=structuredClone(input);let calls=0;
+    const result=await runPreparedSpotAnalysis({apiKey:"test",baseUrl:"https://xai.invalid/v1",model:"grok-4.5",fetchImpl:async(_url,init)=>{
+      calls++;
+      const request=JSON.parse(String(init?.body));
+      const block=request.messages[1].content.match(/<saved_market_map>\s*([\s\S]*?)\s*<\/saved_market_map>/);
+      assert.ok(block,"The provider must receive the saved map");
+      const evidence=JSON.parse(block[1]),sma=evidence.indicators.sma;
+      assert.deepEqual(sma.filter((s:{displayedByDefault:boolean})=>s.displayedByDefault).map((s:{period:number})=>s.period),[55]);
+      const plotted=sma.find((s:{period:number})=>s.period===55);assert.ok(plotted.change10Bars<0);
+      if(tier==="premium"){const optional=sma.find((s:{period:number})=>s.period===21);assert.equal(optional.displayedByDefault,false);assert.ok(optional.change10Bars>0);}else assert.deepEqual(sma.map((s:{period:number})=>s.period),[55]);
+      assert.ok(evidence.waveCandidate.validation.includes("swing_pattern_only_subdivisions_unverified"));
+      return Response.json({choices:[{message:{content:JSON.stringify({headline:lang==="zh"?"候选推动浪之后的条件区间":"Conditional range after a candidate impulse",summary:lang==="zh"?"SMA55 下行；仍须确认。":"SMA55 fell over ten completed bars; confirmation remains required.",regime:"range",bias:"neutral",confidence:50,waveCandidateId:evidence.waveCandidate.id,mainPathId:evidence.paths.find((p:{role:string})=>p.role==="main")?.id??null,setupPathId:evidence.setup.pathId,reasons:[],pathNotes:[],riskNotes:[],limitations:[],disclaimer:"Research only"})}}]});
+    }},{instId:input.instId,timeframe:row.frame,tier,lang,reasoningEffort:tier==="premium"?"medium":"low",maxInputTokens:32000,contextMarket:market(row,true)},input);
+    assert.equal(calls,1);assert.deepEqual(input,before,"Prompt evidence must not change market data");
+    assert.equal(result.global.lang,lang);assert.equal(result.global.waveCount.status,"candidate");assert.deepEqual(result.global.candles,prepareGlobalReport({market:input,tier,lang}).candles);
+  }
 });
 test("swing scale filtering uses each pivot's confirmation-time ATR, independently of later bars",()=>{
   const row=rows[1],all=market(row).candles.map(c=>({...c,confirmed:true})),prefix=all.slice(0,-20);
