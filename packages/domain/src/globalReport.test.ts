@@ -44,7 +44,7 @@ test("Quick and Pro preserve canonical stage prices, pending protection and actu
   for(const tier of ["quick","pro"] as const){const report=globalDesignFixture(tier), svg=globalReportChartSvg(report)!,p=presentResearch(report),txt=researchText(p);
     assert.equal(p.serviceId,`global-${tier}`);assert.equal(p.subject,"SOL-USDT");
     for(const value of ["117.3","113.12","120.56","124.8"]) {assert.ok(txt.includes(value));assert.ok(svg.includes(value));}
-    assert.match(svg,/data-stage="S1"/);assert.match(svg,/data-stage="S2"/);assert.match(svg,/data-stage="S3"/);assert.match(svg,/Pending the observed retest/);assert.doesNotMatch(svg,/undefined|NaN/);
+    assert.match(svg,/data-stage="ENTRY"/);assert.match(svg,/data-stage="TP1"/);assert.match(svg,/data-stage="TP2"/);assert.match(svg,/Pending the observed retest/);assert.doesNotMatch(svg,/undefined|NaN/);
     assert.equal(report.setup.entryZone,null);assert.equal(report.setup.protectiveStop,null);assert.equal(report.setup.netRewardRisk,null);assert.equal(report.view.pathIds.length,tier==="quick"?2:3);
     assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),false);
     assert.equal(globalReportChartSvg(report,{layers:{allSmas:true}})!.includes("SMA144"),tier==="pro");
@@ -59,12 +59,13 @@ test("chart exports retain expiry without dropping the cancellation condition",(
 test("inactive plans use terminal protection labels consistently in image and TXT exports",()=>{
   for(const state of ["cancelled","expired"] as const)for(const lang of ["en","zh"] as const){const report=globalDesignFixture("pro",lang);report.setup.state=state;const expected=lang==="zh"?state==="cancelled"?"计划已取消":"计划已过期":state==="cancelled"?"Plan cancelled":"Plan expired";for(const output of [globalReportChartSvg(report)!,researchText(presentResearch(report))]){assert.ok(output.includes(expected));assert.doesNotMatch(output,/Pending the observed retest|等待实际回测/);}}
 });
-test("compressed long-term scenarios have separate labels and retain inactive setup status",()=>{
+test("compressed scenarios separate primary labels from the previous inactive attempt",()=>{
   const report=globalDesignFixture("pro");report.setup.state="cancelled";
   const svg=globalChartAnnotations(report,{left:0,right:1000,top:0,bottom:450,historyEnd:700,x:()=>400,y:price=>200+(price-117)*.1});
   const rows=[...svg.matchAll(/data-scenario-label="\d+"[^]*?<text x="[^"]+" y="([^"]+)"/g)].map(match=>Number(match[1])).sort((a,b)=>a-b);
   assert.ok(rows.length>=4);for(let i=1;i<rows.length;i++)assert.ok(rows[i]-rows[i-1]>=19);
-  assert.match(svg,/Spot recovery plan · Cancelled/);
+  assert.match(svg,/Alternative · Recovery/);assert.doesNotMatch(svg,/Spot recovery plan · Cancelled/);
+  assert.match(globalReportChartSvg(report)!,/Previous Spot attempt · Cancelled/);
 });
 test("daily and weekly image axes retain the year of their saved history",()=>{
   for(const timeframe of ["1D","1W"]){const report=globalDesignFixture();report.snapshot.timeframe=timeframe;const svg=globalReportChartSvg(report)!;assert.ok(svg.includes(new Date(report.candles.slice(-180)[0].ts).toISOString().slice(0,10)+" UTC"));assert.ok(svg.includes(new Date(report.candles.at(-1)!.ts).toISOString().slice(0,10)+" UTC"));}

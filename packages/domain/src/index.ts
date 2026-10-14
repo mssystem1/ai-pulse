@@ -12,3 +12,4 @@ export * from "./globalPresentation.js";
 export * from "./globalChart.js";
 export { parseCandleTimeframe } from "@pulse/schemas";
 export * from "./globalTradePlan.js";
+export * from "./globalConfirmation.js";

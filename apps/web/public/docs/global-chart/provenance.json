@@ -55,14 +55,14 @@
   ],
   "directionalPlan": {
     "image": "directional-plan.png",
-    "source": "Public OHLCV from reported BTC-USDT 4H market snapshot; no wallet/payment data or provider prose",
-    "observedAt": "2026-10-13T21:19:24.044Z",
-    "primaryTimeframe": "4H",
-    "contextTimeframe": "1Dutc",
+    "source": "Public OHLCV and canonical numeric evidence from the reported BTC-USDT daily snapshot; no wallet/payment data or provider prose",
+    "observedAt": "2026-10-14T09:31:39.586Z",
+    "primaryTimeframe": "1D",
+    "contextTimeframe": "1Wutc",
     "savedCandles": 520,
     "shownCandles": 180,
     "width": 2600,
-    "height": 2252,
+    "height": 2328,
     "modelGenerated": false
   }
 }

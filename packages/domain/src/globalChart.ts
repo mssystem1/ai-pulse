@@ -95,9 +95,9 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   for(let i=1;i<labelPositions.length;i++)labelPositions[i]=Math.max(labelPositions[i],labelPositions[i-1]+20);
   for(let i=labelPositions.length-1;i>=0;i--)labelPositions[i]=Math.min(labelPositions[i],i===labelPositions.length-1?bottom-3:labelPositions[i+1]-20);
   for (const { level: l, y } of labels) {
-    const setup = report.setup, trigger = l.id === setup.triggerLevelId, targetIndex = setup.targetIds.indexOf(l.id), floor = l.id === setup.invalidationLevelId;
+    const trigger = l.id === plan.triggerLevelId, targetIndex = plan.targetIds.indexOf(l.id), floor = l.id === plan.invalidationLevelId;
     const stress=report.paths.some(p=>p.stress?.targetIds.includes(l.id)),upside=report.paths.some(p=>p.kind==="recount"&&p.targetIds.includes(l.id));
-    const label = trigger ? report.paths.find(p=>p.id===setup.pathId)?.confirmation==="support_hold"?"S1 SUPPORT / RETEST":"S1 RECLAIM / RETEST" : targetIndex >= 0 ? `S${targetIndex + 2} TARGET ${targetIndex+1}` : floor ? report.lang === "zh" ? "结构失效" : "FLOOR / INVALIDATION" : stress?report.lang==="zh"?"有条件压力":"CONDITIONAL STRESS":upside?report.lang==="zh"?"上行":"UPSIDE":l.basis === "extension" ? report.lang === "zh" ? "投射" : "PROJECTION" : l.role === "support" ? report.lang === "zh" ? "支撑" : "SUPPORT" : report.lang === "zh" ? "阻力" : "RESISTANCE";
+    const label = trigger ? plan.condition==="support_hold"?"ENTRY / SUPPORT TEST":plan.condition==="rejection"?"ENTRY / REJECTION":"ENTRY / CLOSE + RETEST" : targetIndex >= 0 ? `TP${targetIndex+1} / PRIMARY` : floor ? report.lang === "zh" ? "结构失效" : "INVALIDATION" : stress?report.lang==="zh"?"有条件压力":"CONDITIONAL STRESS":upside?report.lang==="zh"?"上行":"UPSIDE":l.basis === "extension" ? report.lang === "zh" ? "投射" : "PROJECTION" : l.role === "support" ? report.lang === "zh" ? "支撑" : "SUPPORT" : report.lang === "zh" ? "阻力" : "RESISTANCE";
     const color = trigger || targetIndex >= 0 ? "#ffcb76" : floor ? "#ff8194" : stress?"#b790ff":upside?"#48e3ad":"#97a8c1", labelY = labelPositions[labels.findIndex(item=>item.level.id===l.id)];
     svg += line(Math.max(left,historyEnd-(historyEnd-left)*.25), y, right+7, y, color, .8).replace("/>",' stroke-opacity=".35"/>');
     if (labelY <= bottom - 3) svg += `<g data-level-id="${escapeGlobalSvg(l.id)}">${Math.abs(labelY-y)>2?line(right-10,y,right+8,labelY-2,color,.7):""}<rect x="${right + 8}" y="${labelY - 12}" width="132" height="20" rx="3" fill="${color}" fill-opacity=".12"/>` + text(right + 132, labelY + 2, globalPrice(report,l.price), color, 11,"end")+text(right+4,labelY+2,label,color,8,"end")+ "</g>";
@@ -107,26 +107,28 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   const scenarioLabels: Array<{ y: number; value: string; color: string; size: number; dim: boolean }> = [];
   const stageRows: number[] = [];
   for (const path of report.paths.filter(p => report.view.pathIds.includes(p.id))) {
-    const color = path.id===report.setup.pathId?"#ffcb76":GLOBAL_PATH_COLORS[path.kind], dim = options.selectedPathId && options.selectedPathId !== path.id, targets = path.targetIds.map(id => find(id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
-    const trigger = find(path.triggerLevelId), triggerY = trigger ? g.y(trigger.price) : lastY;
+    const primary=path.id===plan.pathId&&plan.side!=="none";
+    const color = primary?(plan.side==="short"?"#f0738c":"#ffcb76"):["recovery","continuation","pullback"].includes(path.kind)?"#8da8ce":GLOBAL_PATH_COLORS[path.kind], dim = options.selectedPathId && options.selectedPathId !== path.id, targets = (primary?plan.targetIds:path.targetIds).map(id => find(id)).filter((l): l is NonNullable<typeof l> => Boolean(l));
+    const trigger = find(primary?plan.triggerLevelId:path.triggerLevelId), triggerY = trigger ? g.y(trigger.price) : lastY;
     if (!visible(triggerY) || !targets.length) continue;
     const targetPoints = targets.map((l, i) => ({ x: xFuture(path.kind === "recount" ? .72 + i * .16 : .47 + i * .25), y: g.y(l.price) })).filter((p): p is {x:number;y:number} => visible(p.y));
     if (!targetPoints.length) continue;
     const startX = path.confirmation === "hold" ? historyEnd + 7 : xFuture(path.kind === "recount" ? .6 : .18), startY = path.confirmation === "hold" && visible(lastY) ? lastY : triggerY;
-    const planned=plan.pathId===path.id&&path.direction!=="range"&&plan.referenceEntry!==null;
-    const points = path.direction==="range" ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.2),y:targetPoints[0].y},{x:xFuture(.42),y:triggerY},{x:xFuture(.7),y:targetPoints[0].y}] : planned ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.16),y:triggerY},{x:xFuture(.22),y:triggerY-(path.direction==="up"?10:-10)},{x:xFuture(.28),y:triggerY},...targetPoints] : [{ x: startX, y: startY }, ...(path.confirmation !== "hold" ? [{ x: startX + 16, y: triggerY - (path.direction === "up" ? 10 : -10) }, { x: startX + 30, y: triggerY }] : []), ...targetPoints];
+    const planned=primary&&plan.referenceEntry!==null;
+    const points = planned ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.16),y:triggerY},{x:xFuture(.22),y:triggerY-(plan.side==="long"?10:-10)},{x:xFuture(.28),y:triggerY},...targetPoints] : path.direction==="range" ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.2),y:targetPoints[0].y},{x:xFuture(.42),y:triggerY},{x:xFuture(.7),y:targetPoints[0].y}] : [{ x: startX, y: startY }, ...(path.confirmation !== "hold" ? [{ x: startX + 16, y: triggerY - (path.direction === "up" ? 10 : -10) }, { x: startX + 30, y: triggerY }] : []), ...targetPoints];
     const d = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" "), end = points.at(-1)!, prev = points.at(-2)!, angle = Math.atan2(end.y - prev.y, end.x - prev.x);
     const arrow = [end, { x: end.x - 11 * Math.cos(angle) + 5 * Math.sin(angle), y: end.y - 11 * Math.sin(angle) - 5 * Math.cos(angle) }, { x: end.x - 11 * Math.cos(angle) - 5 * Math.sin(angle), y: end.y - 11 * Math.sin(angle) + 5 * Math.cos(angle) }];
     svg += `<g data-path-id="${escapeGlobalSvg(path.id)}"${planned?' data-planned-entry-route="true"':""} opacity="${dim ? .2 : 1}"><path d="${d}" fill="none" stroke="${color}" stroke-width="${path.role === "main" ? 2.5 : 2}"${path.state === "conditional" || planned&&plan.state!=="confirmed" ? ' stroke-dasharray="6 5"' : ""}/><polygon points="${arrow.map(p => `${p.x},${p.y}`).join(" ")}" fill="${color}"/>`;
-    const pathIndex=report.view.pathIds.indexOf(path.id),compactTitle=`${["①","②","③"][pathIndex]} ${path.id===report.setup.pathId?(path.confirmation==="support_hold"?(report.lang==="zh"?"现货支撑计划":"Spot support plan"):(report.lang==="zh"?"现货恢复计划":"Spot recovery plan")):path.kind==="recount"?(report.lang==="zh"?"确认恢复后重新评估浪形":"Recount after recovery"):globalLabel(path.kind,report.lang)}`;
-    const titleY=path.kind==="recount"?Math.min(...targetPoints.map(p=>p.y))-28:path.id===report.setup.pathId?targetPoints[0].y-18:startY+38;
-    const inactive = path.id === report.setup.pathId && ["cancelled", "expired"].includes(report.setup.state);
-    scenarioLabels.push({ y: titleY, value: compactTitle + (inactive ? ` · ${globalLabel(report.setup.state, report.lang)}` : ""), color, size: 11, dim: Boolean(dim) });
-    if (path.id === report.setup.pathId) {
-      const stages = [{ x: startX + 30, y: triggerY, id: report.setup.triggerLevelId }, ...targetPoints.map((p, i) => ({ ...p, id: report.setup.targetIds[i] }))];
+    const pathIndex=report.view.pathIds.indexOf(path.id),compactTitle=`${["①","②","③"][pathIndex]} ${globalLabel(path.role,report.lang)} · ${globalLabel(path.kind,report.lang)}`;
+    svg+=text(end.x+10,end.y+4,["①","②","③"][pathIndex],color,12);
+    const titleY=path.kind==="recount"?Math.min(...targetPoints.map(p=>p.y))-28:primary?targetPoints[0].y-18:startY+38;
+    scenarioLabels.push({ y: titleY, value: compactTitle, color, size: 11, dim: Boolean(dim) });
+    if (primary) {
+      const stages = [{ x: xFuture(.28), y: triggerY, id: plan.triggerLevelId }, ...targetPoints.map((p, i) => ({ ...p, id: plan.targetIds[i] }))];
       stageRows.push(...stages.map(stage => stage.y));
-      stages.forEach((p, i) => svg += `<g data-stage="S${i + 1}" data-level-id="${escapeGlobalSvg(p.id)}"><circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${color}"/>` + text(p.x, p.y + (i===1?-10:16), `S${i + 1}`, color, 10, "middle") + "</g>");
-      scenarioLabels.push({ y: triggerY + 35, value: report.lang === "zh" ? "S1 · 完整突破并回测守住" : "S1 · CLOSE + HELD RETEST", color, size: 8, dim: Boolean(dim) });
+      stages.forEach((p, i) => svg += `<g data-stage="${i?`TP${i}`:"ENTRY"}" data-level-id="${escapeGlobalSvg(p.id)}"><circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${color}"/>` + text(p.x, p.y + (i===1?-10:16), i?`TP${i}`:"ENTRY", color, 10, "middle") + "</g>");
+      const tested=plan.confirmationTs&&plan.retestTs&&!plan.blockers.includes("cancelled")&&!plan.blockers.includes("expired");
+      scenarioLabels.push({ y: triggerY + 35, value: tested?(report.lang==="zh"?"测试已观察 · 复核入场与费用":"TEST OBSERVED · RECHECK ENTRY / QUOTE"):(report.lang === "zh" ? "需新的确认和后续测试" : "FRESH CONFIRMATION + SUBSEQUENT TEST"), color, size: 8, dim: Boolean(dim) });
     }
     svg += "</g>";
     if(pro&&path.stress){const trigger=find(path.stress.triggerLevelId),target=find(path.stress.targetIds[0]),a=trigger?g.y(trigger.price):null,b=target?g.y(target.price):null;
@@ -139,7 +141,10 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   if (report.setup.entryZone && report.setup.protectiveStop !== null) {
     const a = g.y(report.setup.entryZone[0]), b = g.y(report.setup.entryZone[1]), stop = g.y(report.setup.protectiveStop);
     if (visible(a) && visible(b)) svg += `<rect x="${historyEnd}" y="${Math.min(a, b)}" width="${future * .3}" height="${Math.max(2, Math.abs(a - b))}" fill="#f6c368" fill-opacity=".15"/>`;
-    if (visible(stop)) svg += line(historyEnd, stop, xFuture(.42), stop, "#f0738c", 1.3, "5 3") + text(historyEnd + 4, stop - 6, `${globalLabel("stop", report.lang)} ${globalPrice(report, report.setup.protectiveStop)}`, "#f0738c", 10);
+    if (visible(stop)) {
+      svg += line(historyEnd, stop, xFuture(.42), stop, "#f0738c", 1.3, "5 3");
+      scenarioLabels.push({y:stop-6,value:`${report.setup.pathId!==plan.pathId?(report.lang==="zh"?"备选买入止损（已观察）":"ALT BUY SL (observed)"):globalLabel("stop", report.lang)} ${globalPrice(report, report.setup.protectiveStop)}`,color:"#f0738c",size:9,dim:Boolean(options.selectedPathId&&options.selectedPathId!==report.setup.pathId)});
+    }
   }
   if(plan.referenceEntry&&plan.referenceStop){
     const entry=g.y(plan.referenceEntry[0]),stop=g.y(plan.referenceStop),color=plan.side==="short"?"#f0738c":"#53dabb";
@@ -174,7 +179,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 103, left = 62, historyEnd = 818, right = 1110, footerTop = pro ? 774 : 595;
   const planLines=globalTradePlanLines(report),setupLines=globalSetupLines(report);
-  const footerLines=[...planLines.slice(0,7),...planLines.slice(7,-1),planLines.at(-1)!,setupLines[0],...setupLines.filter(s=>s.startsWith("Observed entry")||s.startsWith("已观察入场")||s.startsWith("Protective stop")||s.startsWith("保护止损")||s.startsWith("Cancel:")||s.startsWith("取消")||s.startsWith("Expires")||s.startsWith("有效期"))];
+  const footerLines=[...planLines.slice(0,7),...planLines.slice(7,-1),planLines.at(-1)!,setupLines[0],...setupLines.filter(s=>s.startsWith("Previous attempt")||s.startsWith("先前尝试")||s.startsWith("The previous confirmation")||s.startsWith("先前确认")||s.startsWith("Observed entry")||s.startsWith("已观察入场")||s.startsWith("Observed setup gross")||s.startsWith("已观察计划")||s.startsWith("Protective stop")||s.startsWith("保护止损")||s.startsWith("Cancel:")||s.startsWith("取消")||s.startsWith("Expires")||s.startsWith("有效期"))];
   const wrapped=footerLines.flatMap(value=>{const max=report.lang==="zh"?100:185,chars=Array.from(value),rows:string[]=[];while(chars.length)rows.push(chars.splice(0,max).join(""));return rows;});
   const footerHeight=wrapped.length*19+32,height=footerTop+footerHeight+35;
   const layers = { channel: true, ...options.layers }, periods = pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];

@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { presentResearch, researchIdentity, researchNumber, researchChartSvg } from "@pulse/domain";
-import { formatTelegramResearch, telegramResearchMessage, telegramResearchFilename, telegramHistoryLabel, renderTelegramResearchChart } from "./telegramResearch.js";
+import { formatTelegramResearch, telegramResearchMessage, telegramResearchCaption, telegramResearchFilename, telegramHistoryLabel, renderTelegramResearchChart } from "./telegramResearch.js";
+import {globalDesignFixture} from "../../../packages/domain/dist/globalReport.fixtures.js";
 import { globalResearchFixture as global, predictionResearchFixture as prediction, riskResearchFixture as risk } from "./telegramResearch.fixtures.js";
 import { configureTelegramReportReader, deliverTelegramReportDurably, telegramDeliveryToken, runTelegramDeliveryCycle } from "./telegram.js";
 
@@ -47,6 +48,18 @@ test("chart uses only a valid premium snapshot and renders a labelled PNG with n
   assert.match(researchChartSvg(prediction)!,/4H underlying asset/);
   assert.equal(researchChartSvg(global,{serviceId:"global-quick"}),null);assert.equal(researchChartSvg(risk),null);assert.equal(researchChartSvg({...global,chart:{candles:[{close:null,low:null,high:null},{close:0,low:0,high:0}]}}),null);
   assert.equal(researchChartSvg({...prediction,underlyingSpot:{status:"unmapped"}}),null);
+});
+
+test("Telegram captions keep primary support-hold/short conditions and identify cancelled attempts as history",()=>{
+  for(const lang of ["en","zh"] as const)for(const side of ["long","short"] as const){
+    const report=globalDesignFixture("pro",lang);report.setup.state="cancelled";
+    if(side==="long"){report.paths[0].role="alternative";report.paths[1].role="main";report.paths[1].confirmation="support_hold";}
+    const caption=telegramResearchCaption(report),message=telegramResearchMessage(report);
+    assert.ok(caption.length<=1024,`${lang} ${side} caption: ${caption.length}`);assert.ok(message.length<=3900);
+    assert.match(caption,lang==="en"?/Previous Spot attempt/:/先前现货尝试/);
+    if(lang==="en")assert.match(caption,side==="long"?/Pull back to 117.30; hold/:/A rally tests 117.30 and is rejected/);
+    assert.doesNotMatch(caption,/S1 needs a completed/);
+  }
 });
 test("durable chart retry does not resend a delivered document or overview",async()=>{
   const originalFetch=globalThis.fetch,originalNow=Date.now,saved={token:process.env.TELEGRAM_BOT_TOKEN,secret:process.env.TELEGRAM_WEBHOOK_SECRET};

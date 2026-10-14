@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {GlobalReportSchema} from "@pulse/schemas";
 import {globalDesignFixture} from "./globalReport.fixtures.js";
-import {globalTradePlan} from "./globalTradePlan.js";
+import {globalTradePlan,deriveGlobalTradePlan} from "./globalTradePlan.js";
+import {globalConfirmationEvidence} from "./globalConfirmation.js";
 import {globalTradePlanLines} from "./globalPresentation.js";
 import {globalReportChartSvg} from "./globalChart.js";
 
@@ -42,4 +43,47 @@ test("a very close first obstacle is retained instead of pricing reward to a far
   const report=globalDesignFixture(),trigger=report.levels.find(l=>l.id==="reclaim")!.price,atr=report.indicators.atr.points.at(-1)!.value;
   report.levels.find(l=>l.id==="floor")!.price=trigger-.01*atr;
   report.tradePlan=globalTradePlan(report);assert.equal(report.tradePlan.targetIds[0],"floor");assert.ok(report.tradePlan.grossRewardRisk!<1.5);assert.ok(report.tradePlan.blockers.includes("reward"));assert.equal(GlobalReportSchema.safeParse(report).success,true);
+});
+
+test("a structural wick breach invalidates a prior confirmation even without reaching the wider planned SL",()=>{
+  const report=globalDesignFixture();report.paths[0].role="alternative";report.paths[1].role="main";report.paths[1].confirmation="support_hold";
+  const floor=report.levels.find(l=>l.id==="floor")!.price,trigger=report.levels.find(l=>l.id==="reclaim")!.price;
+  report.indicators.pivots.push({id:"fresh-support",ts:report.candles.at(-10)!.ts,confirmedAt:report.candles.at(-9)!.ts,price:trigger,kind:"low"});report.levels.find(l=>l.id==="reclaim")!.anchorIds=["fresh-support"];
+  const tail=report.candles.slice(-8).map(c=>({...c,open:trigger+.01,high:trigger+.3,low:trigger+.005,close:trigger+.01}));
+  tail[5].low=trigger-.01;tail[6].low=trigger-.02;tail[7].low=floor-.001;
+  report.candles=[...report.candles.slice(0,-8),...tail];report.snapshot.price=tail[7].close;report.snapshot.observedAt=new Date(tail[7].ts+3600000).toISOString();
+  const plan=deriveGlobalTradePlan(report);assert.equal(plan.state,"avoid");assert.equal(plan.confirmationTs,null);assert.equal(plan.retestTs,null);assert.ok(plan.blockers.includes("cancelled"));assert.ok(plan.referenceStop!<tail[7].low);
+  report.tradePlan={...plan,state:"conditional",confirmationTs:tail[5].ts,retestTs:tail[6].ts,blockers:["entry_price"]};const before=structuredClone(report);
+  assert.equal(globalTradePlan(report).state,"avoid");assert.ok(globalTradePlan(report).blockers.includes("confirmation"));assert.deepEqual(report,before,"Stored purchases must stay immutable");
+  tail.push({...tail[7],ts:tail[7].ts+3600000,low:trigger-.01});report.candles.push(tail.at(-1)!);report.snapshot.observedAt=new Date(tail.at(-1)!.ts+3600000).toISOString();
+  const rearmed=deriveGlobalTradePlan(report);assert.equal(rearmed.confirmationTs,tail.at(-1)!.ts);assert.equal(rearmed.retestTs,null);assert.ok(rearmed.blockers.includes("retest"));assert.ok(!rearmed.blockers.includes("cancelled"));
+});
+
+test("a rejection can touch a coincident trigger/invalidation without fabricating a failed test",()=>{
+  const report=globalDesignFixture(),trigger=117.3;
+  report.indicators.pivots.push({id:"rejection",ts:report.candles.at(-10)!.ts,confirmedAt:report.candles.at(-9)!.ts,price:trigger,kind:"high"});report.levels.find(l=>l.id==="reclaim")!.anchorIds=["rejection"];
+  const tail=report.candles.slice(-8).map(c=>({...c,open:117.2,high:117.25,low:117.1,close:117.2}));tail[6].high=117.31;tail[7].high=117.32;report.candles=[...report.candles.slice(0,-8),...tail];
+  const e=globalConfirmationEvidence(report,{side:"short",condition:"rejection",triggerLevelId:"reclaim",invalidationLevelId:"reclaim",referenceStop:117.5});
+  assert.equal(e.confirmation?.ts,tail[6].ts);assert.equal(e.retest?.ts,tail[7].ts);assert.equal(e.failure,undefined);
+});
+
+test("an initial support test below its floor never qualifies and a later test can rearm an expired attempt",()=>{
+  const report=globalDesignFixture();report.paths[0].role="alternative";report.paths[1].role="main";report.paths[1].confirmation="support_hold";
+  report.levels.find(l=>l.id==="floor")!.price=116;
+  report.indicators.pivots.push({id:"new-support",ts:report.candles.at(-10)!.ts,confirmedAt:report.candles.at(-9)!.ts,price:117.3,kind:"low"});report.levels.find(l=>l.id==="reclaim")!.anchorIds=["new-support"];
+  const tail=report.candles.slice(-8).map(c=>({...c,open:117.32,high:117.4,low:117.31,close:117.32}));tail[0].low=115.99;tail[1].low=115.995;report.candles=[...report.candles.slice(0,-8),...tail];report.snapshot.observedAt=new Date(tail[7].ts+3600000).toISOString();
+  const fresh=deriveGlobalTradePlan(report);assert.equal(fresh.confirmationTs,null);assert.equal(fresh.retestTs,null);assert.ok(fresh.blockers.includes("confirmation"));
+  report.tradePlan={...fresh,state:"avoid",confirmationTs:tail[0].ts,retestTs:tail[1].ts,blockers:["expired","entry_price"]};
+  const guarded=globalTradePlan(report);assert.equal(guarded.confirmationTs,null);assert.equal(guarded.retestTs,null);assert.ok(guarded.blockers.includes("cancelled"));assert.ok(!guarded.blockers.includes("expired"));
+  tail[0].low=117.2;tail[1].low=117.25;tail[6].low=117.2;
+  const rearmed=deriveGlobalTradePlan(report);assert.equal(rearmed.confirmationTs,tail[6].ts);assert.equal(rearmed.retestTs,null);assert.ok(!rearmed.blockers.includes("expired"));assert.ok(rearmed.blockers.includes("retest"));
+});
+
+test("a valid old resistance-rejection test outside the lookback remains expired rather than cancelled",()=>{
+  const report=globalDesignFixture(),old=report.candles.at(-12)!;
+  old.open=117.29;old.close=117.29;old.high=117.31;old.low=117.1;
+  report.indicators.pivots.push({id:"old-rejection",ts:report.candles.at(-18)!.ts,confirmedAt:report.candles.at(-15)!.ts,price:117.3,kind:"high"});report.levels.find(l=>l.id==="reclaim")!.anchorIds=["old-rejection"];
+  report.candles.slice(-8).forEach(c=>Object.assign(c,{open:117.2,high:117.25,low:117.1,close:117.2}));
+  report.tradePlan={...deriveGlobalTradePlan(report),state:"avoid",confirmationTs:old.ts,retestTs:report.candles.at(-11)!.ts,blockers:["expired"]};
+  const guarded=globalTradePlan(report);assert.ok(guarded.blockers.includes("expired"));assert.ok(!guarded.blockers.includes("cancelled"));
 });

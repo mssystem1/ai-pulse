@@ -1,7 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
-import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice } from "@pulse/domain";
+import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection } from "@pulse/domain";
 
 export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -22,6 +22,7 @@ export function telegramResearchMessage(report: unknown, context: ResearchContex
       html(`${s.venue} · ${s.priceCurrency} · ${s.observedAt}`),
     ].join("\n");
     const conditions = [
+      ...(globalConfirmationCorrection(global)?[html(globalConfirmationCorrection(global)!),""]:[]),
       `<b>${html(globalTradePlanTitle(global))}</b>`,
       ...globalTradePlanLines(global).slice(1,7).map(html),
       html(globalTradePlanLines(global).slice(7,-1).join(" · ")),"",
@@ -68,12 +69,15 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
     `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt}`,
     globalTradePlanTitle(global),
     ...(plan.referenceEntry&&plan.referenceStop?[`${zh?"计划价格（非已观察保护）":"Planned references (not observed protection)"}: ${plan.referenceEntry.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,plan.referenceStop)} · ${plan.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),
-    `${globalLabel("setup",global.lang)}: ${globalLabel(s.state,global.lang)}`,
-    ...(s.pathId ? [
-      `S1 ${globalLevelPrice(global,s.triggerLevelId)} → ${s.targetIds.map((id,i)=>`S${i+2} ${globalLevelPrice(global,id)}`).join(" → ")}`,
-      zh ? `需 ${global.snapshot.timeframe} 完整收盘突破 S1，随后回测守住。取消：完整收盘跌破 ${globalLevelPrice(global,s.invalidationLevelId)}，或突破后回到 S1 下方。` : `S1 needs a completed ${global.snapshot.timeframe} close above it and subsequent held retest. Cancel: completed close below ${globalLevelPrice(global,s.invalidationLevelId)}, or back below S1 after reclaim.`,
+    ...(["cancelled","expired"].includes(s.state)?[]:[`${globalLabel("setup",global.lang)}: ${globalLabel(s.state,global.lang)}`]),
+    ...(plan.side!=="none" ? [
+      globalTradePlanLines(global)[1],
+      zh ? `取消：完整收盘${plan.side==="long"?"低于":"高于"} ${globalLevelPrice(global,plan.invalidationLevelId)}；确认后结构底线失守或收盘失守触发位须重新确认。` : `Cancel: completed close ${plan.side==="long"?"below":"above"} ${globalLevelPrice(global,plan.invalidationLevelId)}; a failed structural test or trigger close resets confirmation.`,
+      ...(plan.blockers.includes("cancelled")?[zh?"先前确认已失效；等待新的确认及后续测试。":"Prior confirmation failed; wait for a fresh confirmation and subsequent test."]:[]),
+      ...(plan.blockers.includes("entry_price")?[zh?"价格不在计划区间；请勿追价。":"Price is outside the planned zone; do not chase."]:[]),
     ] : []),
-    ...(s.expiresAt === null ? [] : [`${zh ? "有效期至" : "Expires"} ${new Date(s.expiresAt).toISOString()}`]),
+    ...(["cancelled","expired"].includes(s.state)?[globalSetupLines(global)[0]]:s.pathId?[globalSetupLines(global)[1]]:[]),
+    ...(s.expiresAt === null || ["cancelled","expired"].includes(s.state) ? [] : [`${zh ? "有效期至" : "Expires"} ${new Date(s.expiresAt).toISOString()}`]),
     ...(global.tier === "pro" ? [`${globalLabel("context",global.lang)}: ${globalTimeframeLabel(global.context.timeframe ?? "—",global.lang)}`] : []),
     zh ? "时间仅为示意；非保证预测。" : "Timing is schematic; conditional moves, not guaranteed forecasts.",
   ].join("\n");

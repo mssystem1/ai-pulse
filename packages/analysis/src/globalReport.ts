@@ -1,5 +1,5 @@
 import type { SpotMarketContext } from "@pulse/market";
-import { deriveGlobalTradePlan } from "@pulse/domain";
+import { deriveGlobalTradePlan, globalConfirmationEvidence } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
 
 export const GLOBAL_HISTORY_LIMIT = 520;
@@ -129,17 +129,14 @@ export function evaluateGlobalSetup(report: GlobalReport, costsBps: number | nul
   if(last.close<floor.price)return {...setup,state:"cancelled"};
   const anchor = report.indicators.pivots.find(a => trigger.anchorIds.includes(a.id));
   if (!anchor?.confirmedAt) return { ...setup, missing: ["trigger", "retest"] };
-  let confirmationIndex = -1;
-  for (let i = Math.max(1, candles.length - 8); i < candles.length; i += 1) {
-    if (candles[i].ts > anchor.confirmedAt && (path.confirmation === "support_hold" ? confirmationIndex < 0 && candles[i].low <= trigger.price && candles[i].close >= trigger.price && candles[i].low > floor.price : candles[i - 1].close <= trigger.price && candles[i].close > trigger.price)) confirmationIndex = i;
-  }
+  const evidence=globalConfirmationEvidence(report,{side:"long",condition:path.confirmation==="support_hold"?"support_hold":"close_retest",triggerLevelId:trigger.id,invalidationLevelId:floor.id});
+  if(evidence.failure&&!evidence.confirmation)return {...setup,state:"cancelled",confirmationTs:evidence.failedConfirmation?.ts??null,expiresAt:evidence.failedConfirmation?evidence.failedConfirmation.ts+interval*4:null};
+  const confirmationIndex = evidence.confirmation ? candles.indexOf(evidence.confirmation) : -1;
   if (confirmationIndex < 0) return { ...setup, missing: ["trigger", "retest", ...(path.targetIds.length ? [] : ["targets" as const])] };
   const confirmation = candles[confirmationIndex], expiry = confirmation.ts + interval * 4;
   const confirmedSetup = { ...setup, confirmationTs: confirmation.ts, expiresAt: expiry };
-  const subsequent = candles.slice(confirmationIndex + 1);
-  if (subsequent.some(c => c.close < trigger.price || c.low <= floor.price)) return { ...confirmedSetup, state: "cancelled" };
   if (Number.isFinite(Date.parse(report.snapshot.observedAt)) && Date.parse(report.snapshot.observedAt) >= expiry) return { ...confirmedSetup, state: "expired" };
-  const retest = subsequent.find(c => c.low <= trigger.price && c.close >= trigger.price && c.low > floor.price);
+  const retest = evidence.retest;
   if (!retest) return { ...confirmedSetup, missing: ["retest"] };
   const atr = report.indicators.atr.points.find(p => p.ts === retest.ts)?.value;
   if (!atr) return { ...confirmedSetup, retestTs: retest.ts, missing: ["protection"] };

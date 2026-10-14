@@ -27,7 +27,7 @@ These are **historical conditional references**, not current trade recommendatio
 | --- | --- | --- | --- | --- | --- | --- |
 | BTC 4H | Short thesis / sell owned Spot | 83,489.29–83,530.10 | 83,693.34 | 83,174.70 → 82,902.80 | 1.54 | Subsequent failed resistance test; price in the zone |
 | BTC 1D | Support-pullback long / Spot buy | 82,556.60–82,665.62 | 81,848.94 | 87,399.00 | 5.80 | New completed support hold, subsequent held test, and price in the zone |
-| BTC 1W | Range-support long / Spot buy | 82,842.00–83,154.70 | 79,385.51 | 89,111.00 | 1.58 | Price in the planned zone; recheck the saved confirmation and execution quote |
+| BTC 1W | Range-support long / Spot buy | 82,842.00–83,154.70 | 79,385.51 | 89,111.00 | 1.58 | Prior confirmation failed; a fresh valid support hold, subsequent test and price in the zone are required |
 
 The original observed buy setups are cancelled on all three replays and have no executable entry or protection to copy. The new references are conditional planning information; they do not turn those cancelled setups into ready orders.
 
@@ -59,3 +59,24 @@ Only public OHLCV/timeframes are retained in the committed BTC regression fixtur
 - Schema, domain, analysis, API and web production builds pass. Chart/TXT outputs and targeted desktop/mobile screenshots are visually inspected before acceptance.
 
 Private live-result previews are in `.tmp/btc-report-qa/`; renderer/browser evidence is in `.tmp/btc-local-render-qa/`. They are local validation artifacts and are not committed. Publishing the implementation requires the user's deployment of the local commit; the existing deployment is the earlier discovery fix.
+
+## Follow-up on the four supplied 14 October reports
+
+After the user deployed `ceb65c9`, the four attached TXT/PNG reports were matched to their existing paid deliveries through read-only wallet history. The matching observations are 09:51:55.972 UTC for 1H (Arbitrum), 09:50:46.136 for 4H (Arbitrum), 09:31:39.586 for 1D (Base), and 09:30:09.961 for 1W (X Layer). This investigation purchased no reports, called no model, placed no trade and sent no Telegram message.
+
+| Report | Finding | Resulting behavior |
+| --- | --- | --- |
+| 1H | The purported range-support confirmation candle had a low of 83,176.40 below its 83,230.00 structural boundary; the next supposed test also breached it. Calling the attempt merely expired concealed an invalid original test. The chart emphasized recovery targets of 83,960/84,200 instead of the primary plan's 83,858.20. | Reject the original confirmation. Keep planned prices, require fresh confirmation and a subsequent test, and label the primary target TP1. |
+| 4H | Primary short gross R:R is 1.63, while the alternative observed buy has entry 83,530.10–83,584.00, SL 83,160.61, and gross R:R 0.71. Provider risk prose incorrectly suggests that the retest/protection is not observed; actual blockers are costs and reward. | Preserve the observed buy protection for explicit manual Market/Limit review, identify it as alternative buy evidence, show its 0.71 reward warning, and keep its prices separate from the short plan. |
+| 1D | A subsequent candle low of 81,032.80 broke the 82,285.00 boundary after a support hold. One evaluator cancelled the observed attempt while the directional evaluator kept future planning active without describing that failure. | Use one confirmation evaluator and require a new valid support test; keep the previous failed attempt as a dated record. |
+| 1W | A candle low of 80,400 broke the 80,636.30 boundary. Directional confirmation survived because the wider reference SL was 79,385.51; the observed evaluator cancelled. The chart showed two recovery targets while the primary range plan had one. | Structural-boundary checks reset the confirmation before a wider reference SL is reached. Primary ENTRY/TP1 match the range plan; the recovery alternative retains its own two targets. |
+
+Both evaluators now use the same completed-candle qualification, subsequent-test, failure and expiry rules. A failing candle cannot restart its replacement. A later valid test can rearm an expired or failed attempt and still requires a later held test. When rejection trigger and invalidation coincide, touching that line is necessary for the test; its failed close invalidates it. A wider planned SL never substitutes for the structural qualification rule.
+
+Saved JSON and original Markdown remain immutable. The viewer preserves purchased prices and downgrades unsupported old confirmations, with a visible correction notice. Historical provider prose is preserved and explicitly identified as predating that correction. Revised prompts require all blockers, distinguish observed protection from executable readiness, separate alternative reward from primary reward, and explain that wave 2 retraces opposite the impulse orientation. These prompt revisions have not been sent to a live model, respecting the user's request to use existing reports.
+
+The chart numbers each arrow to match its main/alternative title. Primary ENTRY and TP1/TP2 use canonical primary-plan levels; alternative recovery is visually distinct. Labels for observed alternative-buy SL join the collision layout. WAIT appears in unconfirmed primary headings. Telegram captions use primary support-hold/rejection conditions and identify historical cancellations separately. The first guide image is refreshed from the public daily numeric evidence; the five older study illustrations are labelled as historical S1/S2/S3 examples.
+
+Local validation evidence is in `.tmp/btc-oct14-review/`. All four report exports preserve primary prices across PNG/TXT/caption and leave the stored report unchanged; captions are 699–771 characters and messages 2,686–2,999 characters. Desktop and phone web/Telegram Mini App rendering passed 20 cases, including all-study and illustrated-guide views, with no runtime errors or horizontal overflow. Telegram hosting/library reads are mocked, and browser mutations are blocked. Market/Limit handoff checks preserve observed, unexpired protection and never copy research-only short references.
+
+Final local checks: 29 domain checks, 19 analysis checks, 9 Telegram export/delivery checks and 11 web/Spot handoff checks passed (68 total; no failures or skips). Domain, analysis, API and web production builds passed. The four original PNGs, revised exports, desktop native chart with all studies, mobile Telegram primary-plan card and phone guide were visually inspected. The revised live-model prose and deployment remain unverified until the user publishes this follow-up; no further live model test was made.

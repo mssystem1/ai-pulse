@@ -114,7 +114,9 @@ for(const [network,tier,transport] of matrix){
     // Older purchased snapshots predate tradePlan. Their frozen Markdown is
     // checked against the sections they were sold with; the local renderer can
     // derive an additional planning view without rewriting that old document.
-    const promisedSections=p.sections.filter(section=>global.tradePlan!==undefined||!['Directional trade plan','方向性交易计划'].includes(section.title));
+    // A viewer correction is derived from immutable candles; an older saved
+    // Markdown document cannot contain a section introduced after purchase.
+    const promisedSections=p.sections.filter(section=>!['Saved confirmation review','保存确认复核'].includes(section.title)&&(global.tradePlan!==undefined||!['Directional trade plan','方向性交易计划'].includes(section.title)));
     for(const section of promisedSections)assert.ok(delivered.reportMarkdown.includes('## '+section.title),'Full section missing: '+section.title);
     if(tier==='premium'){assert.equal(global.context.status,'available');assert.equal(global.context.timeframe,'4H');assert.ok(global.indicators.regression);assert.ok(global.indicators.rsi.points.length);}
     const txt=formatTelegramResearch(report),message=telegramResearchMessage(report),caption=telegramResearchCaption(report),svg=researchChartSvg(report),png=renderTelegramResearchChart(report);
