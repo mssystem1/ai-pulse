@@ -188,15 +188,19 @@ function genericQuoteSummary(raw: Record<string, unknown>, chainId: string) {
       address: String(fromToken?.tokenContractAddress ?? ""),
       symbol: String(fromToken?.tokenSymbol ?? "TOKEN"),
       decimals: Number(fromToken?.decimal ?? 18),
+      priceUsd: fromToken?.tokenUnitPrice == null ? null : String(fromToken.tokenUnitPrice),
     },
     toToken: {
       address: String(toToken?.tokenContractAddress ?? ""),
       symbol: String(toToken?.tokenSymbol ?? "TOKEN"),
       decimals: Number(toToken?.decimal ?? 18),
+      priceUsd: toToken?.tokenUnitPrice == null ? null : String(toToken.tokenUnitPrice),
     },
     priceImpactPercent: String(raw.priceImpactPercent ?? "0"),
     estimateGasFee: String(raw.estimateGasFee ?? "0"),
     tradeFee: String(raw.tradeFee ?? "0"),
+    // Unlike the legacy display fields, absence must not become a free route.
+    networkFeeUsd: raw.tradeFee == null ? null : String(raw.tradeFee),
     route: routeNames(raw.dexRouterList),
     quoteId: String(raw.quoteId ?? ""),
   };
@@ -409,6 +413,9 @@ const OFFICIAL_WRAPPED_ASSETS: Record<string, Record<string, unknown>[]> = {
     { tokenSymbol: "EURC", tokenName: "Euro Coin", tokenContractAddress: "0xbEf5f6d51CB62b58e6A8f77868681825C6fe21c1", decimals: 6, tokenSource: "Arc official mainnet deployment" },
   ],
   "196": [
+    // OKX X Layer contract list; symbol/8 decimals checked onchain 2026-10-16.
+    // https://web3.okx.com/onchainos/dev-docs/xlayer/developer/build-on-xlayer/contracts
+    { tokenSymbol: "xBTC", tokenName: "OKX Wrapped BTC", tokenContractAddress: "0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f", decimals: 8, tokenSource: "X Layer official token list" },
     { tokenSymbol: "LINK", tokenName: "Chainlink", tokenContractAddress: "0x8af9711b44695a5a081f25ab9903ddb73acf8fa9", decimals: 18, tokenSource: "Chainlink official deployment" },
     { tokenSymbol: "USDT0", tokenName: "Tether USD0", tokenContractAddress: "0x779Ded0c9e1022225f8E0630b35a9b54bE713736", decimals: 6, tokenSource: "X Layer official token list" },
     { tokenSymbol: "WOKB", tokenName: "Wrapped OKB", tokenContractAddress: "0xe538905cf8410324e03A5A23C1c177a474D59b2b", decimals: 18, tokenSource: "X Layer official token list" },
@@ -495,6 +502,13 @@ export function executionAssetAliases(symbol: string, chainId: string, assetClas
     .map((item) => String(item.tokenSymbol || "").toUpperCase())
     .filter((candidate) => candidate === normalized || candidate === `CB${normalized}` || candidate === `W${normalized}`);
   return [...new Set([...(EXECUTION_ASSET_ALIASES[chainId]?.[normalized] || []), ...xStock, ...official, normalized])];
+}
+/** Report readiness requires a reviewed contract, not just a matching ticker. */
+export function reviewedExecutionRepresentation(chainId:string,analysisSymbol:string,token:{address:string;symbol:string;decimals:number}) {
+  const aliases=executionAssetAliases(analysisSymbol,chainId,"crypto");
+  const known=[...(OFFICIAL_WRAPPED_ASSETS[chainId]??[]).map(t=>({address:String(t.tokenContractAddress),symbol:String(t.tokenSymbol),decimals:Number(t.decimals)})),
+    ...CURATED_EXECUTION_TOKENS.filter(t=>String(t.chainId)===chainId)];
+  return known.some(t=>t.address.toLowerCase()===token.address.toLowerCase()&&t.decimals===token.decimals&&t.symbol.toUpperCase()===token.symbol.toUpperCase()&&aliases.includes(t.symbol.toUpperCase()));
 }
 
 export function analysisSymbolForExecutionToken(symbol: string, chainId?: string, tokenName?: string) {

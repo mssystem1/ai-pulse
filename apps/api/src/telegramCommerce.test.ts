@@ -7,6 +7,8 @@ import type { AppConfig } from "@pulse/config";
 import { MemoryJobStore, MemoryReportStore } from "./jobs.js";
 import { createTelegramRouter, telegramServiceMenu } from "./telegram.js";
 import { validateTelegramInitData, TELEGRAM_SERVICES, TelegramCommerce } from "./telegramCommerce.js";
+import { qualifiedGlobalFixture } from "../../../packages/analysis/dist/globalAssessment.fixtures.js";
+import { assessGlobalReport } from "@pulse/analysis";
 
 function signedData(userId = 123, date = Math.floor(Date.now() / 1000), token = "test-token") {
   const params = new URLSearchParams({ auth_date: String(date), query_id: "fixture", user: JSON.stringify({ id: userId, first_name: "Alex" }) });
@@ -75,7 +77,8 @@ test("Stars invoice, checkout, duplicate payment, account isolation, full report
   }) as typeof fetch;
   const jobs = new MemoryJobStore(), reports = new MemoryReportStore();
   const cfg = { FEATURE_TELEGRAM: true, FEATURE_PREDICTION_ANALYSIS: true, NODE_ENV: "test", PAID_REGENERATION_MAX_ATTEMPTS: 2 } as AppConfig;
-  const app = express(); app.use(express.json()); app.use(createTelegramRouter(cfg, { jobs, reports, wakeWorker: () => {}, validateGlobal: input => z.object({ instId: z.string().regex(/^[A-Z0-9]+-[A-Z0-9]+$/), timeframe: z.string(), lang: z.literal("en") }).parse(input) }));
+  let rechecks=0;const fixture=qualifiedGlobalFixture();
+  const app = express(); app.use(express.json()); app.use(createTelegramRouter(cfg, { jobs, reports, wakeWorker: () => {}, recheckGlobal:async()=>{rechecks++;return assessGlobalReport(fixture.report,fixture.market);},validateGlobal: input => z.object({ instId: z.string().regex(/^[A-Z0-9]+-[A-Z0-9]+$/), timeframe: z.string(), lang: z.literal("en") }).parse(input) }));
   const server = app.listen(0, "127.0.0.1");
   try {
     await new Promise<void>(resolve => server.once("listening", resolve));
@@ -115,6 +118,8 @@ test("Stars invoice, checkout, duplicate payment, account isolation, full report
     const job = (await jobs.listByPayer("telegram:123", "xlayer")).find(item => item.tier === "premium")!;
     const report = await reports.save("telegram:123", { instId: "TON-USDT", analysis: { summary: "fixture complete" } }); await jobs.attachReport(job.id, report.id);
     const retrieved = await (await request(`orders/${second.orderId}`)).json() as { report: { instId: string } }; assert.equal(retrieved.report.instId, "TON-USDT");
+    assert.equal((await request(`orders/${second.orderId}/setup-assessment`,{},456)).status,404);assert.equal(rechecks,0);
+    const rechecked=await request(`orders/${second.orderId}/setup-assessment`,{});assert.equal(rechecked.status,200);assert.equal((await rechecked.json() as {assessment:{state:string}}).assessment.state,"technical_valid");assert.equal(rechecks,1);
     assert.equal((await request(`orders/${second.orderId}/refund`, {})).status, 409);
     assert.equal((await request(`orders/${second.orderId}/handoff`, {}, 456)).status, 404);
     assert.equal((await request(`orders/${second.orderId}/handoff`, {})).status,404);

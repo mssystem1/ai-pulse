@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { API_BASE } from "./api";
+import { withSetupAccess } from "./globalSetupClient";
 import { AnalysisReport, PredictionAnalysisReport, SafetyPreflightReport } from "./Report";
 
 /** Read-only bearer-share viewer. Never connects a wallet or prepares a trade. */
@@ -19,7 +20,7 @@ export function SharedReport() {
         if (!response.ok) throw new Error(response.status === 404 || response.status === 403 ? "This share is unavailable or has been revoked. Recover the report through Paid report history in PULSE—do not pay again." : "The report service is temporarily unavailable. Retry this existing link without another payment.");
         const body = await response.json() as { report?: Record<string, unknown> };
         if (!body.report || typeof body.report !== "object" || Array.isArray(body.report)) throw new Error("The report response was incomplete. Retry without paying again.");
-        if (active) setReport(body.report);
+        if (active) setReport(withSetupAccess(body.report,{kind:"share",token}));
       }).catch(reason => { if (active) setError(controller.signal.aborted ? "Loading timed out. Retry this report without another payment." : reason instanceof Error ? reason.message : "Unable to load this report."); })
       .finally(() => clearTimeout(timeout));
     return () => { active = false; clearTimeout(timeout); controller.abort(); };

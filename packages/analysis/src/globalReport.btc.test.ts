@@ -40,7 +40,7 @@ for(const row of rows)test(`${row.frame} reproduces a priced directional plan wi
   assert.deepEqual(finished.candles,report.candles);assert.deepEqual(finished.levels,report.levels);
   assert.match(globalSetupLines(finished).join("\n"),row.frame==="1W"?/Watching|Pending/:/Cancelled|Plan cancelled/);
   assert.match(globalTradePlanLines(finished).join("\n"),/Planned entry reference|Planned SL reference/);
-  const svg=globalReportChartSvg(finished)!;assert.match(svg,/180 \/ (520|470)/);assert.match(svg,/data-wave-swings/);assert.match(svg,/PLAN SL/);assert.doesNotMatch(svg,/NaN|Infinity/);
+  const svg=globalReportChartSvg(finished)!;assert.ok(/(?:2\d|3[0-9]|[4-8]\d|9[0-6]) \/ (520|470)/.test(svg));assert.match(svg,/data-wave-swings/);assert.match(svg,/PLAN SL/);assert.doesNotMatch(svg,/NaN|Infinity/);
 });
 test("Quick and Pro provider inputs distinguish rising SMA21 from the falling default SMA55 on the weekly BTC snapshot",async()=>{
   const row=rows.find(r=>r.frame==="1W")!;

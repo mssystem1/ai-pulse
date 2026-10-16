@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet, apiPost } from "./api";
+import { withSetupAccess } from "./globalSetupClient";
 import { formatTokenBalance } from "./format";
 import { applySiteMetadata } from "./siteMetadata";
 import {
@@ -203,7 +204,7 @@ export function App() {
       .then(async response => { if (!response.ok) throw new Error("Your Telegram report could not be loaded. Reopen the Spot handoff from My reports."); return response.json(); })
       .then(data => {
         if (!data.report || typeof data.report !== "object") throw new Error("This report has no Spot market context.");
-        setTradeIntent(buildTelegramReportBuyIntent(data.report, window.location.hash));
+        setTradeIntent({...buildTelegramReportBuyIntent(data.report, window.location.hash),reportAccess:{kind:"share",token}});
         const url = new URL(window.location.href); url.hash = "";
         window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
       }).catch(reason => { if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : "Report handoff unavailable"); });
@@ -533,7 +534,7 @@ export function App() {
         const reportTimeframe = typeof body.report.timeframe === "string" ? body.report.timeframe : null;
         if (reportInstId) setInstId(reportInstId);
         if (reportTimeframe) setTimeframe(reportTimeframe);
-        setResult({ ...body.report, service: typeof body.report.service === "string" ? body.report.service : body.report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" });
+        setResult({ ...withSetupAccess(body.report,{kind:"job",id:jobId,token:recoveryToken}), service: typeof body.report.service === "string" ? body.report.service : body.report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" });
       }
       clearJobRecovery(localStorage, recoveryNetwork, "spot");
       setSpotJob(null);
@@ -1107,14 +1108,14 @@ export function App() {
             service !== "analysis_premium" &&
             service !== "spot_analysis_standard" &&
             service !== "spot_analysis_premium" && (
-              <pre className="raw">{JSON.stringify(result, null, 2)}</pre>
+              <pre className="raw">{JSON.stringify(result, (key,value)=>key==="_setupAccess"?undefined:value, 2)}</pre>
             )}
 
           {tab === "safety" && <ReportHistory networkKey={networkKey} scope="risk" wallet={wallet} onOpen={(report) => { if (typeof report.address === "string") setTokenAddr(report.address); setResult(report); }} />}
           {result && (
             <details className="raw-details">
               <summary>Raw JSON</summary>
-              <pre className="raw">{JSON.stringify(result, null, 2)}</pre>
+              <pre className="raw">{JSON.stringify(result, (key,value)=>key==="_setupAccess"?undefined:value, 2)}</pre>
             </details>
           )}
           {tab === "analyze" && <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={(report) => { const reportInstId = typeof report.instId === "string" ? report.instId : null; const reportTimeframe = typeof report.timeframe === "string" ? report.timeframe : null; if (reportInstId) setInstId(reportInstId); if (reportTimeframe) setTimeframe(reportTimeframe); setResult({ ...report, service: typeof report.service === "string" ? report.service : report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" }); }} />}

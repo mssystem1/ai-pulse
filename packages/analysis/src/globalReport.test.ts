@@ -33,7 +33,7 @@ test("the full market map keeps a recently reclaimed S1 and recognizes its obser
   for(const [i,open,high,low,close] of [[486,121,121.2,120.8,121],[492,114,114.2,113.8,114],[512,116.9,117.3,116.8,117.05],[513,116.8,117,116.4,116.8],[514,116.8,117,116.4,116.8],[515,116.8,117,116.4,116.8],[516,116.8,117,116.4,116.8],[517,116.8,117.8,116.7,117.6],[518,117.5,117.6,117.2,117.4],[519,117.4,118,117.35,117.4]])input.candles[i]={...input.candles[i],open,high,low,close};
   const report=prepareGlobalReport({market:input,tier:"base",executionCostsBps:5});
   assert.equal(report.levels.find(l=>l.id===report.setup.triggerLevelId)?.price,117.3);
-  assert.equal(report.setup.state,"ready");assert.deepEqual(report.setup.entryZone,[117.3,117.4]);assert.ok(report.setup.netRewardRisk!>=1.5);
+  assert.equal(report.setup.state,"watching");assert.deepEqual(report.setup.entryZone,[117.3,117.4]);assert.ok(report.setup.protectiveStop! < report.levels.find(l=>l.id===report.setup.invalidationLevelId)!.price);assert.ok(report.setup.missing.includes("reward"));
   assert.equal(prepareGlobalReport({market:input,tier:"base"}).setup.state,"watching");
 });
 test("flat, short, unconfirmed and incomplete data cannot fabricate a wave count",()=>{for(const input of [market(520,true),market(3)]){const report=prepareGlobalReport({market:input,tier:"base"});assert.equal(report.waveCount.status,"unclear");assert.equal(report.waveCount.anchors.length,0);assert.notEqual(report.setup.state,"ready");}const input=market(55);input.candles.push({...input.candles.at(-1)!,ts:input.candles.at(-1)!.ts+3600000,confirmed:false});assert.equal(completedGlobalCandles(input).length,55);input.candles[0].confirmed=undefined;assert.equal(completedGlobalCandles(input).length,54);});

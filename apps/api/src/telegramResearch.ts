@@ -1,7 +1,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
-import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine } from "@pulse/domain";
+import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine, globalRiskLines, globalSetupMap, globalArtifactTag, globalArtifactReference } from "@pulse/domain";
 
 export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -25,10 +25,10 @@ export function telegramResearchMessage(report: unknown, context: ResearchContex
       ...(globalConfirmationCorrection(global)?[html(globalConfirmationCorrection(global)!),""]:[]),
       `<b>${html(globalTradePlanTitle(global))}</b>`,
       ...globalTradePlanLines(global).slice(1,7).map(html),
-      html(globalTradePlanLines(global).slice(7,-1).join(" · ")),"",
+      html([...globalRiskLines(global).slice(0,1),...globalTradePlanLines(global).slice(7,-1).filter(line=>!globalRiskLines(global).includes(line))].join(" · ")),"",
       `<b>${html(global.setup.pathId ? setup[0] : `${globalLabel("setup",global.lang)} · ${setup[0]}`)}</b>`,
       ...setup.slice(1).filter(line=>!line.startsWith("Net R:R")&&!line.startsWith("费用后")&&!global.setup.missing.some(key=>line===globalMissingLabel(global,key))).map(html), "", `<b>${globalLabel("moves",global.lang)}</b>`,
-      ...global.paths.filter(p=>global.view.pathIds.includes(p.id)).flatMap(p=>[
+      ...globalSetupMap(global).paths.filter(p=>global.view.pathIds.includes(p.id)).flatMap(p=>[
         html(globalPathTitle(global,p)), ...globalPathLines(global,p).slice(0,2).map(html),
       ]), "",
       html(`${globalLabel("wave",global.lang)}: ${global.waveCount.status==="unclear"?globalLabel("unclear",global.lang):`${zh?"候选":"Candidate"} ${global.waveCount.activeWave}`}`),
@@ -66,7 +66,7 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
   const s=global.setup, zh=global.lang==="zh",plan=globalTradePlan(global);
   return [
     `PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalTimeframeLabel(global.snapshot.timeframe,global.lang)}`,
-    `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt}`,
+    `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt} · #${globalArtifactReference(global)}`,
     globalCompletedPriceLine(global),
     globalTradePlanTitle(global),
     ...(plan.referenceEntry&&plan.referenceStop?[`${zh?"计划价格（非已观察保护）":"Planned references (not observed protection)"}: ${plan.referenceEntry.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,plan.referenceStop)} · ${plan.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),
@@ -90,7 +90,8 @@ export function telegramHistoryLabel(order: ResearchIdentity & {status:string;cr
 }
 export function telegramResearchFilename(report: unknown, context: ResearchContext = {}) {
   const p=presentResearch(report,context);
-  return `PULSE-${[p.serviceTitle,p.subject,p.timeframe].filter(Boolean).join("-").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(0,120)}.txt`;
+  const global=readGlobalReport(report);
+  return `PULSE-${[p.serviceTitle,p.subject,p.timeframe,...(global?[globalArtifactTag(global)]:[])].filter(Boolean).join("-").replace(/[^a-zA-Z0-9._-]+/g,"-").slice(0,120)}.txt`;
 }
 export function renderTelegramResearchChart(report: unknown, context: ResearchContext = {}): Uint8Array | null {
   const svg=researchChartSvg(report,context);if(!svg)return null;

@@ -7,6 +7,7 @@ import { existsSync } from "node:fs";
 import { createCircleWalletRouter } from "./circleWallet.js";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { createTradeAutomationRouter } from "./tradeAutomation.js";
+import { createGlobalAssessmentRouter, recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
 import { normalizeExecutionRpcUrls } from "./onchainDiscovery.js";
 import { autopilotPassTargetExists, createAutopilotAutomationRouter, grantAutopilotPass } from "./autopilotAutomation.js";
 import type { AppConfig } from "@pulse/config";
@@ -197,7 +198,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.use(createV6Router(cfg, publicActivity));
   app.use(createTradeAutomationRouter(cfg));
   app.use(createAutopilotAutomationRouter(cfg));
-  app.use(createTelegramRouter(cfg, { ...persistence, wakeWorker, validateGlobal: input => AnalysisBodySchema.omit({ chartImageBase64: true, chartImageMime: true }).parse(input) }));
+  app.use(createTelegramRouter(cfg, { ...persistence, wakeWorker, recheckGlobal:raw=>recheckSavedGlobalReport(raw,loadSpotContext), validateGlobal: input => AnalysisBodySchema.omit({ chartImageBase64: true, chartImageMime: true }).parse(input) }));
   configureTelegramReportReader(async id=>{const record=await persistence.reports.get(id);return record?await persistence.reports.read(record):null;});
   app.use(telemetryMiddleware);
   app.use(morgan(cfg.NODE_ENV === "production" ? "combined" : "dev"));
@@ -924,6 +925,26 @@ export function createApp(cfg: AppConfig, dependencies: {
     const header = String(req.header("Authorization") || "");
     return reportHistoryAuth.authenticate(header.startsWith("Bearer ") ? header.slice(7) : "");
   };
+  app.use(createGlobalAssessmentRouter(cfg,{
+    market:loadSpotContext,
+    resolveReport:async(access,req)=>{
+      if(access.kind==="share"){
+        if(!cfg.REPORT_SHARE_LINK_ENABLED)return null;
+        const record=await persistence.reports.resolveShare(access.token);
+        return record?await persistence.reports.read(record):null;
+      }
+      const job=await persistence.jobs.get(access.id);
+      if(!job?.reportId)return null;
+      if(access.kind==="job"){
+        if(!verifyRecoveryToken(job,access.token)&&!verifyPaidReplayRecoveryToken(job,access.token,cfg.REPORT_ENCRYPTION_KEY))return null;
+      }else{
+        const session=await reportHistoryAuth.authenticate(access.token);
+        if(!session||job.payer.toLowerCase()!==session.wallet||job.networkKey!==session.networkKey)return null;
+      }
+      const record=await persistence.reports.get(job.reportId);
+      return record&&record.ownerWallet===job.payer.toLowerCase()?await persistence.reports.read(record):null;
+    },
+  }));
   const historyLabel = (job: AnalysisJob) => {
     const input = job.input && typeof job.input === "object" ? job.input as Record<string, unknown> : {};
     if (job.mode === "spot") return `${String(input.instId || "Global market")} · ${String(input.timeframe || "report")}`;

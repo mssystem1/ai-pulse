@@ -7,6 +7,15 @@ import { GlobalResearchReport } from "./GlobalResearchReport";
 import { TelegramResearchReport } from "./TelegramResearchReport";
 import { AnalysisReport } from "./Report";
 import { buildReportBuyIntent, buildReportManualBuyIntent, buildReportSellIntent, buildTelegramReportBuyIntent } from "./reportTradeHandoff";
+import { withSetupAccess } from "./globalSetupClient";
+
+test("recheck capabilities stay out of rendered/exported reports and are not attached to unrelated services",()=>{
+  const report=globalDesignFixture(),token="private-browser-recheck-capability",data=withSetupAccess({global:report},{kind:"share",token});
+  assert.ok(data._setupAccess);
+  const html=renderToStaticMarkup(createElement(AnalysisReport,{data,nfa:"Research"}));assert.ok(!html.includes(token));assert.ok(!html.includes("_setupAccess"));
+  const prediction={mode:"prediction",analysis:{summary:"Example"}};assert.equal(withSetupAccess(prediction,{kind:"share",token}),prediction);
+  const legacy={analysis:{summary:"Legacy example"},_setupAccess:{kind:"share",token}};assert.ok(!renderToStaticMarkup(createElement(AnalysisReport,{data:legacy,nfa:"Research"})).includes(token));
+});
 
 test("web and Telegram Mini App render the same aligned Spot plan for both tiers",()=>{for(const tier of ["quick","pro"] as const){const report=globalDesignFixture(tier);for(const html of [renderToStaticMarkup(createElement(GlobalResearchReport,{report})),renderToStaticMarkup(createElement(TelegramResearchReport,{report})),renderToStaticMarkup(createElement(AnalysisReport,{data:{global:report},nfa:"Research"}))]){assert.match(html,/data-global-version="pulse-global-v3"/);assert.match(html,/data-setup-state="watching"/);assert.match(html,/117.3/);assert.match(html,/120.56/);assert.match(html,/124.8/);assert.match(html,/113.12/);assert.match(html,/Pending the observed retest/);assert.ok(html.indexOf("global-spot-card")>html.indexOf("global-chart-stage"));assert.equal(html.includes("Regression 120"),tier==="pro");assert.equal(html.includes("Confirmed pivots"),tier==="pro");assert.ok(!html.includes("Manual trade selected"));}}});
 test("inactive canonical reports cannot preload Market or Limit orders",()=>{for(const state of ["watching","cancelled","expired","none"] as const){const report=globalDesignFixture();report.setup.state=state;for(const orderType of ["market","limit"] as const)assert.throws(()=>buildReportBuyIntent({global:report},orderType),/not ready/);}});

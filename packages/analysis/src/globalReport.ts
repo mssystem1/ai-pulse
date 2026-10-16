@@ -1,5 +1,5 @@
 import type { SpotMarketContext } from "@pulse/market";
-import { deriveGlobalTradePlan, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence } from "@pulse/domain";
+import { deriveGlobalTradePlan, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence, globalLocalLevels, globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalTradePlanTitle, globalTradePlanLines } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
 
 export const GLOBAL_HISTORY_LIMIT = 520;
@@ -133,14 +133,14 @@ export function evaluateGlobalSetup(report: GlobalReport, costsBps: number | nul
   if(evidence.failure&&!evidence.confirmation)return {...setup,state:"cancelled",confirmationTs:evidence.failedConfirmation?.ts??null,expiresAt:evidence.failedConfirmation?evidence.failedConfirmation.ts+interval*4:null};
   const confirmationIndex = evidence.confirmation ? candles.indexOf(evidence.confirmation) : -1;
   if (confirmationIndex < 0) return { ...setup, missing: ["trigger", "retest", ...(path.targetIds.length ? [] : ["targets" as const])] };
-  const confirmation = candles[confirmationIndex], expiry = confirmation.ts + interval * 4;
+  const confirmation = candles[confirmationIndex], expiry = evidence.expiresAt!;
   const confirmedSetup = { ...setup, confirmationTs: confirmation.ts, expiresAt: expiry };
   if (Number.isFinite(Date.parse(report.snapshot.observedAt)) && Date.parse(report.snapshot.observedAt) >= expiry) return { ...confirmedSetup, state: "expired" };
   const retest = evidence.retest;
   if (!retest) return { ...confirmedSetup, missing: ["retest"] };
   const atr = report.indicators.atr.points.find(p => p.ts === retest.ts)?.value;
   if (!atr) return { ...confirmedSetup, retestTs: retest.ts, missing: ["protection"] };
-  const protectiveStop = rounded(retest.low - atr * .2), entryZone: [number, number] = [rounded(trigger.price), rounded(retest.close)];
+  const protectiveStop = rounded((report.evaluationVersion === "completed-v2" ? Math.min(retest.low,floor.price) : retest.low) - atr * .2), entryZone: [number, number] = [rounded(trigger.price), rounded(retest.close)];
   if (candles.some(c => c.ts > retest.ts && c.low <= protectiveStop)) return { ...confirmedSetup, state:"cancelled", retestTs:retest.ts };
   const target = report.levels.find(l => l.id === path.targetIds[0]);
   if (protectiveStop <= 0 || protectiveStop >= entryZone[0] || !target || target.price <= Math.max(entryZone[1], last.close)) return { ...confirmedSetup, retestTs: retest.ts, missing: ["reward"] };
@@ -193,20 +193,22 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const recentReclaimed = pivots.filter(a => a.kind === "high" && close !== null && a.price < close && a.confirmedAt !== null
     && candles.slice(-4).some((c, j, tail = candles.slice(-4)) => j > 0 && c.ts > a.confirmedAt! && tail[j - 1].close <= a.price && c.close > a.price)).at(-1);
   const triggerUp = recentReclaimed ? levels.find(l => l.anchorIds.includes(recentReclaimed.id)) : above[0];
-  const floor = below.find(l => l.price < (triggerUp?.price ?? close ?? 0)), materialAbove=above.filter((l,i)=>i===0||l.price-(close??0)<=latestAtr*4), upTargets = materialAbove.filter(l => l.id !== triggerUp?.id && l.price > (triggerUp?.price ?? 0)).slice(0, 2);
+  const localAbove=globalLocalLevels(above,close??0,latestAtr),localBelow=globalLocalLevels(below,close??0,latestAtr);
+  const floor = below.find(l => l.price < (triggerUp?.price ?? close ?? 0)), materialAbove=localAbove, upTargets = materialAbove.filter(l => l.id !== triggerUp?.id && l.price > (triggerUp?.price ?? 0)).slice(0, 2);
   const paths: GlobalPath[] = [];
   if (triggerUp && floor && upTargets.length) paths.push({ id: "recovery", role: trend === "up" ? "main" : "alternative", direction: "up", kind: trend === "up" ? "continuation" : "recovery", state: "conditional", triggerLevelId: triggerUp.id, targetIds: upTargets.map(l => l.id), invalidationLevelId: floor.id, confirmation: "close_retest", thesis: "" });
   // A rising market with one overhead obstacle can still have a support-hold
   // plan. Do not manufacture a breakout target beyond the known resistance.
   if (!paths.some(p=>p.direction==="up") && trend==="up" && below.length>=2 && materialAbove.length) paths.push({id:"pullback",role:"main",direction:"up",kind:"pullback",state:"conditional",triggerLevelId:below[0].id,targetIds:materialAbove.slice(0,2).map(l=>l.id),invalidationLevelId:below[1].id,confirmation:"support_hold",thesis:""});
-  if (below.length >= (trend === "down" ? 1 : 2) && above.length) paths.push({ id: "correction", role: trend === "down" ? "main" : "alternative", direction: "down", kind: "correction", state: trend === "down" ? "active" : "conditional", triggerLevelId: trend === "down" ? above[0].id : below[0].id, targetIds: (trend === "down" ? below : below.slice(1)).slice(0, 2).map(l => l.id), invalidationLevelId: above[0].id, confirmation: trend === "down" ? "hold" : "close_retest", thesis: "" });
-  if(tier==="pro"){const down=paths.find(p=>p.direction==="down"),deep=down?.targetIds.at(-1),threshold=levels.find(l=>l.id===deep),stress=threshold?below.find(l=>l.price<threshold.price):null;if(down&&threshold&&stress)down.stress={triggerLevelId:threshold.id,targetIds:[stress.id]};}
+  const downTargets=(trend==="down"?localBelow:localBelow.slice(1)).slice(0,2);
+  if (downTargets.length && above.length) paths.push({ id: "correction", role: trend === "down" ? "main" : "alternative", direction: "down", kind: "correction", state: trend === "down" ? "active" : "conditional", triggerLevelId: trend === "down" ? above[0].id : below[0].id, targetIds: downTargets.map(l => l.id), invalidationLevelId: above[0].id, confirmation: trend === "down" ? "hold" : "close_retest", thesis: "" });
+  if(tier==="pro"){const down=paths.find(p=>p.direction==="down"),deep=down?.targetIds.at(-1),threshold=levels.find(l=>l.id===deep),stress=threshold?localBelow.find(l=>l.price<threshold.price):null;if(down&&threshold&&stress)down.stress={triggerLevelId:threshold.id,targetIds:[stress.id]};}
   if (trend === "range" && below.length && above.length) paths.unshift({ id: "range", role: "main", direction: "range", kind: "range", state: "active", triggerLevelId: below[0].id, targetIds: [above[0].id], invalidationLevelId: below[0].id, confirmation: "hold", thesis: "" });
   if (!paths.some(p => p.role === "main") && paths.length) paths[0].role = "main";
   paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main"));
   if (paths.length < 3 && paths.some(p => p.direction === "up") && upTargets.length === 2) {
-    const target = upTargets.at(-1)!, further = above.filter(l => l.price > target.price).slice(0, 2);
-    if (further.length && target.price-(close??0)<=latestAtr*4) paths.push({ id: "recount", role: "alternative", direction: "up", kind: "recount", state: "conditional", triggerLevelId: target.id, targetIds: further.map(l => l.id), invalidationLevelId: target.id, confirmation: "close_retest", thesis: "" });
+    const target = upTargets.at(-1)!, further = localAbove.filter(l => l.price > target.price).slice(0, 2);
+    if (further.length) paths.push({ id: "recount", role: "alternative", direction: "up", kind: "recount", state: "conditional", triggerLevelId: target.id, targetIds: further.map(l => l.id), invalidationLevelId: target.id, confirmation: "close_retest", thesis: "" });
   }
   const contextFrame = globalContextTimeframe(market.bar), contextCandles = input.contextMarket && input.contextMarket.instId === market.instId && input.contextMarket.source === market.source && input.contextMarket.bar === contextFrame && (input.contextMarket.ticker.priceCurrency ?? market.instId.split("-").at(-1)) === (market.ticker.priceCurrency ?? market.instId.split("-").at(-1)) ? completedGlobalCandles({ ...input.contextMarket, fetchedAt: market.fetchedAt }) : [];
   const contextAverage = globalSma(contextCandles, 55), contextClose = contextCandles.at(-1)?.close, contextSma = contextAverage.at(-1)?.value;
@@ -215,7 +217,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const lowAnchors = pivots.filter(a => a.kind === "low").slice(-2), highAnchors = pivots.filter(a => a.kind === "high").slice(-2);
   const precedingVolume = candles.slice(-21, -1), meanVolume = precedingVolume.length === 20 ? precedingVolume.reduce((s, c) => s + c.volume, 0) / 20 : 0;
   const report: GlobalReport = {
-    version: "pulse-global-v3", tier, lang,
+    version: "pulse-global-v3", evaluationVersion: "completed-v2", tier, lang,
     snapshot: { instId: market.instId, timeframe: market.bar, source: market.source, venue: market.source === "okx-public-spot" ? "OKX Spot" : market.source === "okx-robinhood-dex" ? "Robinhood DEX" : "Arc DEX", priceCurrency: market.ticker.priceCurrency ?? market.instId.split("-").at(-1) ?? "Unknown", observedAt: market.fetchedAt, lastCandleTs: last?.ts ?? null, price: close,
       pricePrecision: close === null ? 2 : Math.min(10, Math.max(2, 4 - Math.floor(Math.log10(close)))), completedOnly: true },
     candles, levels, waveCount, paths: paths.slice(0, 3),
@@ -238,7 +240,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
 }
 
 export function globalPromptEvidence(report: GlobalReport) {
-  return { snapshot: report.snapshot, priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:globalPrimaryAttemptEvidence(report),
+  return { snapshot: report.snapshot, eligibility:globalEligibility(report),riskMeasurement:globalRiskMeasurement(report),distantContextLevelIds:globalRemoteLevels(report).map(l=>l.id), priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:globalPrimaryAttemptEvidence(report),
     indicators: { sma: report.indicators.sma.filter(s => report.tier === "pro" || s.period === 55).map(s => ({ period: s.period, displayedByDefault: report.view.smaPeriods.includes(s.period), value: s.points.at(-1)?.value ?? null, change10Bars: s.points.length > 10 ? rounded(s.points.at(-1)!.value - s.points.at(-11)!.value) : null })), rsi14: report.tier === "pro" ? report.indicators.rsi.points.at(-1)?.value ?? null : null, atr14: report.indicators.atr.points.at(-1)?.value ?? null, volumeRatio: report.indicators.volumeRatio, fibonacci: report.indicators.fibonacci, regression: report.tier === "pro" ? { bars: report.indicators.regression?.bars, residualSigma: report.indicators.regression?.residualSigma } : null },
     context: { timeframe: report.context.timeframe, status: report.context.status, agreement: report.context.agreement, close: report.context.candles.at(-1)?.close ?? null, sma55: report.context.sma55.at(-1)?.value ?? null },
     recentCandles: report.candles.slice(-48).map(c => [c.ts, c.open, c.high, c.low, c.close, c.volume, c.confirmed]), note: "Only completed candles. All candidate anchors and level prices are supplied evidence. Projection timing is schematic." };
@@ -265,13 +267,14 @@ export function globalCompatibility(report: GlobalReport, narrative?: Pick<Globa
   const level = (id: string | null) => report.levels.find(l => l.id === id)?.price ?? null;
   const setup = report.setup, firstTarget = level(setup.targetIds[0] ?? null), entry = setup.entryZone?.[1] ?? null;
   const researchPlan=report.tradePlan;
+  const eligibility=globalEligibility(report),action=eligibility==="no_trade"?"No trade at these references; sufficient nearest-obstacle reward and valid structure are required":eligibility==="expired"||eligibility==="invalidated"?"Recheck completed candles; the old attempt does not authorize entry":eligibility==="technical_valid"?"Technical evidence observed; recheck a fresh amount-specific quote and observed protection before order review":researchPlan?.side==="short"?"Wait for rejection confirmation and a subsequent test; only owned Spot inventory can be sold":"Wait for a qualifying completed confirmation and a subsequent held retest";
   return { analysis: { ...report.narrative, bias: narrative?.bias ?? "neutral", regime: narrative?.regime ?? "transition", confidence: narrative?.confidence ?? 0,
     keyLevels: { support: report.levels.filter(l => l.role === "support").map(l => l.price), resistance: report.levels.filter(l => l.role === "resistance").map(l => l.price) },
     targets: [], invalidation: { price: level(report.waveCount.invalidationLevelId), condition: "Use the canonical path and setup cancellation conditions." },
-    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: setup.state === "ready" ? "Review a fresh execution quote" : researchPlan?.side==="short" ? "Wait for short confirmation; review a sell/reduce of owned Spot inventory" : researchPlan?.side==="long" ? "Wait for the planned support/reclaim confirmation before a Spot buy" : "Wait for usable market levels", agentChecklist: [] },
-    technical: { methodology: report.version, elliott: { status: report.waveCount.status, currentWave: report.waveCount.activeWave, direction: report.waveCount.direction, waves: report.waveCount.anchors, invalidation: level(report.waveCount.invalidationLevelId) } },
+    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: action, agentChecklist: [] },
+    technical: { methodology: report.version, eligibility, referenceRisk:globalRiskMeasurement(report), elliott: { status: report.waveCount.status, currentWave: report.waveCount.activeWave, direction: report.waveCount.direction, waves: report.waveCount.anchors, invalidation: level(report.waveCount.invalidationLevelId) } },
     executionPlan: { version: report.version, pair: report.snapshot.instId, timeframe: report.snapshot.timeframe, tier: report.tier, observedPrice: report.snapshot.price,
       researchPlan,
-      recommendation: { action: setup.state === "ready" ? "buy" : "wait", label: setup.state==="ready"?setup.state:researchPlan?.side&&researchPlan.side!=="none"?`Conditional ${researchPlan.side} · ${researchPlan.state}`:setup.state, reason: "The directional research plan supplies planned references; observed Spot protection and fresh execution costs are separate checks." },
+      recommendation: { action: setup.state === "ready" ? "buy" : "wait", status:eligibility, label:globalTradePlanTitle(report), reason:globalTradePlanLines(report).at(-1)??action },
       buy: { valid: setup.state === "ready", side: "buy", orderType: "limit", trigger: entry, entryZone: setup.entryZone, takeProfit: firstTarget, stopLoss: setup.protectiveStop, riskReward: setup.netRewardRisk }, riskExit: { trigger: level(setup.invalidationLevelId), downsideReference: null } } };
 }

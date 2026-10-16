@@ -1,5 +1,6 @@
 import { z } from "zod";
 export * from "./globalReport.js";
+export * from "./globalAssessment.js";
 export * from "./candleTimeframe.js";
 
 export const AddressSchema = z

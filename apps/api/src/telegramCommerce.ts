@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { AppConfig } from "@pulse/config";
-import { PredictionAnalysisRequestSchema, TokenScanRequestSchema } from "@pulse/schemas";
+import { PredictionAnalysisRequestSchema, TokenScanRequestSchema, type GlobalAssessment } from "@pulse/schemas";
 import { requestHash, type JobStore, type ReportStore, type PaymentReceipt } from "./jobs.js";
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -24,7 +24,7 @@ export const TELEGRAM_SERVICES = [
   { id: "prediction-pro", title: "Prediction Pro", mode: "prediction", tier: "premium", priceEnv: "TELEGRAM_STARS_PREDICTION_PRO" },
 ] as const;
 export type TelegramService = typeof TELEGRAM_SERVICES[number];
-export type TelegramCommerceDependencies = { jobs: JobStore; reports: ReportStore; wakeWorker: () => void; validateGlobal: (input: unknown) => unknown };
+export type TelegramCommerceDependencies = { jobs: JobStore; reports: ReportStore; wakeWorker: () => void; validateGlobal: (input: unknown) => unknown; recheckGlobal?:(report:unknown)=>Promise<GlobalAssessment> };
 type Identity = { id: number; first_name?: string };
 export function validateTelegramInitData(raw: string, botToken: string, now = Date.now()): Identity {
   if (!raw || raw.length > 16384) throw new Error("Open PULSE from the Telegram bot to sign in.");
@@ -216,6 +216,14 @@ export class TelegramCommerce {
     router.get(`${prefix}/orders`, asyncRoute(async (_req,res) => res.json({orders:await this.library(res.locals.telegramUser.id)})));
     router.get(`${prefix}/orders/:id`, asyncRoute(async (req,res) => { try { return res.json(await this.readOwned(res.locals.telegramUser.id,String(req.params.id))); } catch(error) { return res.status(error instanceof Error&&error.message.includes("not found")?404:503).json({error:error instanceof Error?error.message:"Report unavailable"}); } }));
     router.post(`${prefix}/orders/:id/refund`, asyncRoute(async (req,res) => { try { return res.json(await this.refundOwned(res.locals.telegramUser.id,String(req.params.id))); } catch(error) { return res.status(error instanceof Error&&error.message.includes("not found")?404:409).json({error:error instanceof Error?error.message:"Refund unavailable"}); } }));
+    router.post(`${prefix}/orders/:id/setup-assessment`,asyncRoute(async(req,res)=>{
+      if(!this.dependencies?.recheckGlobal)return res.status(503).json({error:"Setup recheck is unavailable"});
+      try{
+        const owned=await this.readOwned(res.locals.telegramUser.id,String(req.params.id));
+        if(!owned.serviceId.startsWith("global")||!owned.report||!["completed","completed_partial"].includes(owned.status))return res.status(404).json({error:"An owned, completed Global report is required"});
+        return res.json({assessment:await this.dependencies.recheckGlobal(owned.report)});
+      }catch(error){return res.status(error instanceof Error&&error.message.includes("not found")?404:503).json({error:"Setup recheck is unavailable for this report"});}
+    }));
     router.post(`${prefix}/orders/:id/handoff`, asyncRoute(async (req, res) => {
       if(this.profile.allowEvm === false) return res.status(404).json({error:"Execution handoffs are unavailable in this Mini App."});
       if (String(req.params.id).startsWith("wallet:")) {

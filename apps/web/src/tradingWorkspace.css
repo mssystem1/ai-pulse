@@ -42,3 +42,4 @@
   .trading-workspace-nav button { grid-template-columns:18px minmax(0,1fr); }
   .trading-workspace-nav button > span:last-child { display:none; }
 }
+.report-intent-strip{flex-wrap:wrap}.report-order-review{flex-basis:100%;order:3;min-width:0}.report-order-review .global-fresh-assessment{margin:8px 0}.report-order-review input{max-width:100%}

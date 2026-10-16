@@ -16,10 +16,19 @@ export function globalConfirmationEvidence(report: GlobalReport, input: {
   let failedConfirmation: GlobalCandle | undefined, failure: GlobalCandle | undefined;
   let failedRetest: GlobalCandle | undefined;
   let failureReason: "floor" | "trigger" | "stop" | undefined;
+  let disqualified: GlobalCandle | undefined;
   const interval = candleTimeframeMs(report.snapshot.timeframe);
+  const completedPolicy = report.evaluationVersion === "completed-v2";
+  const advance = (ts: number, bars: number) => {
+    for (let i = 0; i < bars; i++) ts = candleCloseTime(ts, report.snapshot.timeframe) ?? ts;
+    return ts;
+  };
+  const deadline = () => confirmation ? completedPolicy
+    ? retest ? advance(retest.ts, 3) : advance(confirmation.ts, 4)
+    : confirmation.ts + interval * 4 : null;
   if (trigger && floor && anchor?.confirmedAt != null) {
     const sign = input.side === "long" ? 1 : -1;
-    for (const c of report.candles.slice(-8).filter(c => c.ts > anchor.confirmedAt!)) {
+    for (const c of report.candles.slice(completedPolicy ? -64 : -8).filter(c => c.ts > anchor.confirmedAt!)) {
       const previous = report.candles[report.candles.indexOf(c) - 1];
       // When trigger and invalidation coincide (a resistance rejection), the
       // test must touch that line; only its failed close invalidates it.
@@ -33,19 +42,20 @@ export function globalConfirmationEvidence(report: GlobalReport, input: {
         confirmation = undefined; retest = undefined;
         continue;
       }
-      if (floorBroken || stopBroken) continue;
+      if (floorBroken || stopBroken) { disqualified = c; continue; }
       const testHolds = input.side === "long" ? c.low <= trigger.price && c.close >= trigger.price : c.high >= trigger.price && c.close <= trigger.price;
       const starts = input.condition === "close_retest"
         ? previous && sign * (previous.close - trigger.price) <= 0 && sign * (c.close - trigger.price) > 0
         : testHolds;
-      if (starts && (!confirmation || interval>0&&c.ts>=confirmation.ts+interval*4)) {
+      if (starts && (!confirmation || (deadline() !== null && c.ts >= deadline()!))) {
         confirmation = c; retest = undefined; failure = undefined; failedConfirmation = undefined; failedRetest = undefined; failureReason = undefined;
-      } else if (confirmation && c.ts > confirmation.ts && testHolds) retest ??= c;
+      } else if (confirmation && c.ts > confirmation.ts && testHolds && (!completedPolicy || advance(c.ts,1) <= advance(confirmation.ts,4))) retest ??= c;
     }
   }
-  const expiresAt = confirmation && interval > 0 ? confirmation.ts + interval * 4 : null;
+  const expiresAt = confirmation && (interval > 0 || completedPolicy) ? deadline() : null;
+  const retestDeadline = confirmation && completedPolicy ? advance(confirmation.ts,4) : expiresAt;
   const expired = expiresAt !== null && Date.parse(report.snapshot.observedAt) >= expiresAt;
-  return { confirmation, retest, failedConfirmation, failedRetest, failure, failureReason, expiresAt, expired };
+  return { confirmation, retest, failedConfirmation, failedRetest, failure, failureReason, disqualified, retestDeadline, expiresAt, expired };
 }
 
 /** Historical event evidence for narrative grounding. It never restores the

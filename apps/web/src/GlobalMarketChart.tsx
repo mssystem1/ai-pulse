@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, type UTCTimestamp, type AutoscaleInfo, type Time } from "lightweight-charts";
-import { parseCandleTimeframe, globalChartAnnotations, globalReportChartSvg, globalFibonacciAnchors, globalLabel, globalPrice, globalTimeframeLabel, globalTradePlan, type GlobalReport, type GlobalChartLayers } from "@pulse/domain";
+import { parseCandleTimeframe, globalChartAnnotations, globalReportChartSvg, globalFibonacciAnchors, globalLabel, globalPrice, globalTimeframeLabel, globalTradePlan, globalSetupMap, globalSetupWindow, type GlobalReport, type GlobalChartLayers } from "@pulse/domain";
 import { downloadGlobalChart } from "./globalChartDownload";
 
 const stamp = (ts: number) => Math.floor(ts / 1000) as UTCTimestamp;
@@ -23,18 +23,19 @@ function ContextChart({ report }: { report: GlobalReport }) {
 
 export function GlobalMarketChart({ report, selectedPathId }: { report: GlobalReport; selectedPathId: string | null }) {
   const ref = useRef<HTMLDivElement>(null), reset = useRef<() => void>(() => {}),focus = useRef<() => void>(() => {}),history = useRef<() => void>(() => {});
+  const [chartView,setChartView]=useState<"setup"|"structure"|"history">("setup");
   const pro = report.tier === "pro", [layers, setLayers] = useState<GlobalChartLayers>({ channel: true });
   const layerState=useRef(layers);layerState.current=layers;
   const updateLayers=useRef<(value:GlobalChartLayers)=>void>(()=>{});
   const [overlay, setOverlay] = useState({ svg: "", width: 0, height: 0 }), [readout, setReadout] = useState(""),[inspect,setInspect]=useState(false);
   const selection=useRef(selectedPathId);selection.current=selectedPathId;
   const fibAnchors = globalFibonacciAnchors(report);
-  const overview=useMemo(()=>{const svg=globalReportChartSvg(report,{layers,selectedPathId}),height=pro?709:530;return svg?.replace(/height="\d+" viewBox="0 0 1300 \d+"/,`height="${height}" viewBox="0 65 1300 ${height}"`)??"";},[report,layers,selectedPathId,pro]);
+  const overview=useMemo(()=>{const svg=globalReportChartSvg(report,{layers,selectedPathId,structure:chartView==="structure",fullHistory:chartView==="history"}),height=pro?709:530;return svg?.replace(/height="\d+" viewBox="0 0 1300 \d+"/,`height="${height}" viewBox="0 65 1300 ${height}"`)??"";},[report,layers,selectedPathId,pro,chartView]);
   useEffect(() => {
     if (!ref.current || report.candles.length < 2) return;
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
     const chart = createChart(ref.current, { ...chartOptions, localization:{locale:report.lang==="zh"?"zh-CN":"en-US"}, height: pro ? 660 : 540, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
-    const plan=globalTradePlan(report),values = [...report.view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(plan.referenceEntry ?? []),...(plan.referenceStop===null?[]:[plan.referenceStop])];
+    const plan=globalTradePlan(report),values = [...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(plan.referenceEntry ?? []),...(plan.referenceStop===null?[]:[plan.referenceStop])];
     const candles = chart.addSeries(CandlestickSeries, { upColor: "#35d0aa", downColor: "#ef6b85", wickUpColor: "#35d0aa", wickDownColor: "#ef6b85", borderVisible: false, priceFormat: { type: "price", precision: report.snapshot.pricePrecision, minMove: 10 ** -report.snapshot.pricePrecision }, autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => { const info = base(), latestX = chart.timeScale().timeToCoordinate(lastTime), plotWidth = chart.timeScale().width(); if (info?.priceRange && values.length && latestX !== null && latestX >= 8 && latestX + 70 < plotWidth - 145) { info.priceRange.minValue = Math.min(info.priceRange.minValue, ...values); info.priceRange.maxValue = Math.max(info.priceRange.maxValue, ...values); } return info; } });
     const data = report.candles, last = data.at(-1)!, interval = data.length > 1 ? last.ts - data.at(-2)!.ts : 3600000;
     candles.setData([...data.map(c => ({ time: stamp(c.ts), open: c.open, high: c.high, low: c.low, close: c.close })), ...Array.from({ length: 300 }, (_, i) => ({ time: stamp(last.ts + interval * (i + 1)) }))]);
@@ -44,7 +45,7 @@ export function GlobalMarketChart({ report, selectedPathId }: { report: GlobalRe
     const visibility: Array<(value:GlobalChartLayers)=>void> = [];
     const addLine = (points: Array<{ ts: number; value: number }>, color: string, pane = 0, width:1|2=1) => { const series=chart.addSeries(LineSeries, { color, lineWidth: width, priceLineVisible: false, lastValueVisible: false,...(pane>0?{autoscaleInfoProvider:()=>({priceRange:{minValue:0,maxValue:100}})}:{}) }, pane);series.setData(points.map(p => ({ time: stamp(p.ts), value: p.value })));if(pane>0)series.priceScale().applyOptions({scaleMargins:{top:0,bottom:0}}); };
     const study=(points:Array<{ts:number;value:number}>,color:string,enabled:(value:GlobalChartLayers)=>boolean,width:1|2=1)=>{
-      const series=chart.addSeries(LineSeries,{color,lineWidth:width,priceLineVisible:false,lastValueVisible:false,visible:enabled(layerState.current)});
+      const series=chart.addSeries(LineSeries,{color,lineWidth:width,priceLineVisible:false,lastValueVisible:false,autoscaleInfoProvider:()=>null,visible:enabled(layerState.current)});
       series.setData(points.map(p=>({time:stamp(p.ts),value:p.value})));visibility.push(value=>series.applyOptions({visible:enabled(value)}));
     };
     report.indicators.sma.forEach((s,i)=>study(s.points,palette[i],value=>s.period===55||Boolean(pro&&value.allSmas),s.period===55?2:1));
@@ -58,10 +59,10 @@ export function GlobalMarketChart({ report, selectedPathId }: { report: GlobalRe
     }
     // fitContent excludes trailing whitespace in Quick. An explicit logical
     // range reserves the same future scenario space in both tiers.
-    const resetView=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:Math.max(-5,data.length-180),to:data.length+180});};
+    const resetView=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:Math.max(-5,data.length-globalSetupWindow(report)),to:data.length+Math.ceil(globalSetupWindow(report)*.85)});};
     resetView(); reset.current = resetView;
-    history.current=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:-5,to:data.length+data.length});};
-    focus.current=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:Math.max(0,data.length-64),to:data.length+64});};
+    history.current=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:-5,to:data.length+Math.ceil(data.length*.85)});};
+    focus.current=()=>{chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleLogicalRange({from:Math.max(0,data.length-180),to:data.length+153});};
     chart.subscribeCrosshairMove(event => { const candle = event.seriesData.get(candles); if (candle && "open" in candle) setReadout(`O ${globalPrice(report, candle.open)}  H ${globalPrice(report, candle.high)}  L ${globalPrice(report, candle.low)}  C ${globalPrice(report, candle.close)}`); });
     let frame = 0, prior = "", firstFrame=true;
     let previousWidth = chart.chartElement().clientWidth, previousRange = chart.timeScale().getVisibleLogicalRange();
@@ -91,7 +92,7 @@ export function GlobalMarketChart({ report, selectedPathId }: { report: GlobalRe
   // complete map visible; the native view remains available for candle inspection.
   const controls: Array<[keyof GlobalChartLayers, string]> = [["channel",report.lang==="zh"?"摆动通道":"Swing channel"],["allSmas", "SMA 21/55/89/144/233"], ["regression", report.lang==="zh"?"120 根回归 ±2σ":"Regression 120 ±2σ"], ["fibonacci", "Fibonacci retracement"], ["vwap", report.lang==="zh"?"锚定 VWAP":"Anchored VWAP"], ["pivots", report.lang==="zh"?"已确认转折点":"Confirmed pivots"], ["atr", "ATR14"]];
   const presets:Array<{name:string;zh:string;layers:GlobalChartLayers}>=[{name:"Setup",zh:"计划",layers:{channel:true}},{name:"Trend",zh:"趋势",layers:{channel:false,allSmas:true,regression:true}},{name:"Fibonacci",zh:"斐波那契",layers:{channel:false,fibonacci:true}}];
-  return <><div className="global-chart-toolbar"><div><strong>{report.snapshot.instId.split("-")[0]} · {pro?(report.lang==="zh"?"Pro 结构与计划证据":"Pro structure and setup evidence"):(report.lang==="zh"?"Quick 波浪结构与后续走势":"Quick Elliott structure and next move")}</strong><small>{report.candles.length} {report.lang === "zh" ? "根完整 K 线" : "completed candles"} · {globalLabel(pro?"proDepth":"quickDepth",report.lang)}</small></div><button onClick={() => reset.current()}>{report.lang === "zh" ? "重置视图" : "Reset view"}</button><button onClick={()=>{setInspect(true);history.current();}}>{report.lang==="zh"?"全部历史":"Full history"}</button><button onClick={()=>{setInspect(true);focus.current();}}>{report.lang==="zh"?"聚焦计划":"Zoom to setup"}</button><button onClick={() => downloadGlobalChart(report, layers)}>{report.lang === "zh" ? "下载原图 PNG" : "Download chart PNG"}</button></div>
+  return <><div className="global-chart-toolbar"><div><strong>{report.snapshot.instId.split("-")[0]} · {pro?(report.lang==="zh"?"Pro 结构与计划证据":"Pro structure and setup evidence"):(report.lang==="zh"?"Quick 波浪结构与后续走势":"Quick Elliott structure and next move")}</strong><small>{report.candles.length} {report.lang === "zh" ? "根完整 K 线" : "completed candles"} · {globalLabel(pro?"proDepth":"quickDepth",report.lang)}</small></div><button onClick={() => {setChartView("setup");reset.current();}}>{report.lang === "zh" ? "重置视图" : "Reset view"}</button><button onClick={()=>{setInspect(true);setChartView("history");history.current();}}>{report.lang==="zh"?"全部历史":"Full history"}</button><button onClick={()=>{setInspect(true);setChartView("structure");focus.current();}}>{report.lang==="zh"?"结构视图":"Structure view"}</button><button onClick={() => downloadGlobalChart(report, layers, {structure:chartView==="structure",fullHistory:chartView==="history"})}>{report.lang === "zh" ? "下载原图 PNG" : "Download chart PNG"}</button></div>
     {pro && <><div className="global-chart-presets" aria-label="Chart views">{presets.map(preset=><button key={preset.name} disabled={preset.name==="Fibonacci"&&!fibAnchors} onClick={()=>setLayers(preset.layers)}>{report.lang==="zh"?preset.zh:preset.name}</button>)}<span>{report.lang==="zh"?"先看计划，再逐项查看证据。":"Start with the setup; add evidence one study at a time."}</span></div><details className="global-study-options"><summary>{report.lang==="zh"?"指标设置":"Indicator settings"}</summary><div className="global-layer-controls">{controls.map(([key,label])=><button key={key} aria-pressed={Boolean(layers[key])} disabled={key==="fibonacci"&&!fibAnchors||key==="vwap"&&!report.indicators.vwap} onClick={()=>setLayers(current=>({...current,[key]:!current[key]}))}>{label}</button>)}</div></details></>}
     {pro&&layers.fibonacci&&fibAnchors&&<p className="global-fib-readings">Fibonacci A {globalPrice(report,fibAnchors.a.price)} → B {globalPrice(report,fibAnchors.b.price)} · {report.lang==="zh"?"已确认摆动 · 0 = B，1 = A":"confirmed swing · 0 = B, 1 = A"}</p>}
     <div className="global-chart-readout">{readout || `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.snapshot.timeframe}`} · {report.lang === "zh" ? "条件走势 · 时间仅为示意" : "Conditional moves · timing is schematic"}</div>

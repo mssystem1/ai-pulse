@@ -1,5 +1,6 @@
 import { TelegramGuide } from './TelegramGuide';
 import { GlobalChartGuide } from "./GlobalChartGuide";
+import { GlobalSpotReview } from "./GlobalSpotReview";
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -1290,6 +1291,17 @@ export function SpotWorkspace({
   const quoteContextRef = useRef(quoteContext);
   quoteContextRef.current = quoteContext;
   const quoteRequestRef = useRef(0);
+  const [reportReview,setReportReview]=useState<{expiresAt:number;setupExpiresAt:number;context:string}|null>(null);
+  const [manualReportOverride,setManualReportOverride]=useState(false);
+  useEffect(()=>{setReportReview(null);setManualReportOverride(false);},[incomingTrade]);
+  const reportReviewContext=JSON.stringify([quoteContext,executionMode,limitTrigger,limitMinOut,limitAbove,takeProfit,stopLoss,protectAfterFill]);
+  const reportReviewRequired=initialTrade?.reportSetupMode==="assessment"&&!manualReportOverride;
+  const reportReviewValid=reportReview?.context===reportReviewContext&&Date.now()<reportReview.expiresAt;
+  const latestReportReview=useRef({context:reportReviewContext,review:reportReview});
+  latestReportReview.current={context:reportReviewContext,review:reportReview};
+  const assertReportReviewCurrent=()=>{if(reportReviewRequired){const latest=latestReportReview.current;if(latest.context!==reportReviewContext||!latest.review||latest.review.context!==reportReviewContext||Date.now()>=latest.review.expiresAt)throw new Error("Report quote review expired or the ticket changed. Recheck before wallet approval; any completed token approval remains onchain.");}};
+
+
 
   function selectSpotPair(nextPair: string, scrollToTicket = false) {
     onPairSelected?.(nextPair);
@@ -1824,6 +1836,7 @@ export function SpotWorkspace({
   }
 
   async function execute() {
+    if(reportReviewRequired&&!reportReviewValid)return setMessage("Recheck the report and size-specific quote before review, or explicitly choose a manual ticket.");
     if (!wallet)
       return setMessage("Connect the wallet you want to trade with.");
     if (insufficientBalance)
@@ -1841,6 +1854,7 @@ export function SpotWorkspace({
       const protectionAccount = protectAfterFill
         ? await ensureProtectionAccount()
         : null;
+      assertReportReviewCurrent();
       const response = await apiPost("/v1/trading/prepare-swap", {
         network: networkKey,
         fromTokenAddress: fromToken,
@@ -1878,6 +1892,7 @@ export function SpotWorkspace({
         prepared.approvalAddress,
         amount,
       );
+      assertReportReviewCurrent();
       const hash = await sendPrepared(networkKey, wallet, { ...tx, spendToken: fromToken, spendAmount: amount });
       if (approvalHash)
         await apiPost("/v1/trading/activity", {
@@ -2166,6 +2181,7 @@ export function SpotWorkspace({
   }
 
   async function createLimitOrder() {
+    if(reportReviewRequired&&!reportReviewValid)return setMessage("Recheck the report and size-specific quote before review, or explicitly choose a manual ticket.");
     const useBracket = protectAfterFill && side === "buy";
     if (!wallet || !ADDRESS.test(fromToken) || !ADDRESS.test(toToken))
       return setMessage(
@@ -2224,7 +2240,8 @@ export function SpotWorkspace({
       );
       const oracleBase = limitAbove ? fromToken : toToken;
       const oracleQuote = limitAbove ? toToken : fromToken;
-      const expiry = BigInt(Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60);
+      assertReportReviewCurrent();
+      const expiry = BigInt(reportReviewRequired&&reportReview?.setupExpiresAt?Math.floor(reportReview.setupExpiresAt/1000):Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60);
       const data = useBracket
         ? encodeFunctionData({
             abi: bracketAccountAbi,
@@ -2797,6 +2814,7 @@ export function SpotWorkspace({
             </strong>
             <p>{initialTrade.rationale}</p>
           </div>
+          {initialTrade.reportAccess&&<div className="report-order-review"><GlobalSpotReview intent={initialTrade} context={reportReviewContext} protectionEnabled={protectAfterFill&&side==="buy"} trade={{network:networkKey,fromTokenAddress:fromToken,toTokenAddress:toToken,amount,userWalletAddress:wallet??undefined,slippagePercent:Number(slippage),slippageMode,maxAutoSlippagePercent:Number(slippage),orderType:executionMode,...(executionMode==="limit"&&Number(limitTrigger)>0?{limitPrice:Number(limitTrigger),minimumOutputAmount:limitMinOut}:{}),...(Number(takeProfit)>0?{takeProfit:Number(takeProfit)}:{}),...(Number(stopLoss)>0?{stopLoss:Number(stopLoss)}:{})}} onReview={setReportReview} onProtection={(assessment,levels)=>{if(assessment.permittedEntry&&assessment.observedStop!==null){setLimitTrigger(String(levels?.referenceEntry??assessment.lastCompletedClose??assessment.permittedEntry[0]));setTakeProfit(String(levels?.takeProfit??assessment.targets[0]));setStopLoss(String(levels?.stopLoss??assessment.observedStop));setProtectAfterFill(true);setMessage("Fresh observed levels loaded. Recheck for this amount before wallet review.");}}}/>{reportReviewRequired&&<button onClick={()=>{setManualReportOverride(true);setMessage("Explicit manual ticket selected. Research readiness is not an execution guarantee; review your amount and protection before signing.");}}>Use a manual ticket · my risk</button>}</div>}
           <div className="intent-levels">
             <span>
               Entry <b>{initialTrade.entryPrice ?? "live market"}</b>

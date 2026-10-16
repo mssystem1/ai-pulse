@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "./api";
+import { withSetupAccess } from "./globalSetupClient";
 import { reportTierLabel } from "./reportLabels";
 import { forgetJobRecovery, listJobRecoveries, type JobRecoveryScope } from "./jobRecovery";
 import type { WebNetworkKey } from "./networks";
@@ -61,7 +62,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
       const response = await fetch(`${API_BASE}/v1/report-history/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${sessionToken}`, "Cache-Control": "no-cache" }, cache: "no-store" });
       const body = await response.json() as { report?: Record<string, unknown>; error?: string };
       if (!response.ok || !body.report) throw new Error(body.error || `Report recovery failed (${response.status})`);
-      if (current.current) { onOpen(body.report); setMessage("Your saved report is open. No new payment was needed."); }
+      if (current.current) { onOpen(withSetupAccess(body.report,{kind:"history",id:jobId,token:sessionToken})); setMessage("Your saved report is open. No new payment was needed."); }
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }
@@ -96,7 +97,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
       if (!response.ok) throw new Error(`Report recovery failed (${response.status})`);
       const body = await response.json() as { report?: Record<string, unknown> };
       if (!body.report) throw new Error("Stored report payload is unavailable");
-      if (current.current) { onOpen(body.report); setMessage("Report restored without a new payment."); }
+      if (current.current) { onOpen(withSetupAccess(body.report,{kind:"job",id:jobId,token:recoveryToken})); setMessage("Report restored without a new payment."); }
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }

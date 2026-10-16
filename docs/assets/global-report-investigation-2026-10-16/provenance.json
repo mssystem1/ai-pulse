@@ -1,0 +1,33 @@
+[
+  {
+    "frame": "1D",
+    "source": "2026-10-16T10:45:59.901Z",
+    "sourceCandles": 520,
+    "shownCandles": 32,
+    "originalPricesPreserved": true,
+    "kind": "View-only proposal; neither a revised analysis nor a production change",
+    "omittedRemotePrices": [
+      126200
+    ]
+  },
+  {
+    "frame": "4H",
+    "source": "2026-10-16T11:03:31.611Z",
+    "sourceCandles": 520,
+    "shownCandles": 48,
+    "originalPricesPreserved": true,
+    "kind": "View-only proposal; neither a revised analysis nor a production change",
+    "omittedRemotePrices": [
+      62268.5
+    ]
+  },
+  {
+    "frame": "1W",
+    "source": "2026-10-16T10:51:03.147Z",
+    "sourceCandles": 470,
+    "shownCandles": 24,
+    "originalPricesPreserved": true,
+    "kind": "View-only proposal; neither a revised analysis nor a production change",
+    "omittedRemotePrices": []
+  }
+]

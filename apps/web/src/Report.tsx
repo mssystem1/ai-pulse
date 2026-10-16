@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildReportBuyIntent } from "./reportTradeHandoff";
 import { GlobalResearchReport, readGlobalReport } from "./GlobalResearchReport";
+import type { GlobalAssessment } from "@pulse/domain";
+import type { GlobalReportAccess, GlobalAssessmentAccess } from "./globalSetupClient";
 
 type AnyRec = Record<string, unknown>;
 
@@ -17,7 +19,9 @@ export type ReportTradeIntent = {
   downsideReference?: number;
   rationale: string;
   sourceTier: string;
-  reportSetupMode?: "confirmed" | "manual";
+  reportSetupMode?: "confirmed" | "manual" | "assessment";
+  reportAccess?: GlobalReportAccess;
+  assessment?: GlobalAssessment;
 };
 
 function gradeClass(grade: string): string {
@@ -263,9 +267,10 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
   );
 }
 
-export function AnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {
+export function AnalysisReport({ data, nfa, onTrade, assessmentAccess }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void; assessmentAccess?:GlobalAssessmentAccess }) {
   const global = readGlobalReport(data);
-  return global ? <GlobalResearchReport report={global} onTrade={onTrade} /> : <LegacyAnalysisReport data={data} nfa={nfa} onTrade={onTrade} />;
+  const {_setupAccess,...displayData}=data;
+  return global ? <GlobalResearchReport key={`${global.snapshot.instId}:${global.snapshot.timeframe}:${global.snapshot.observedAt}`} report={global} onTrade={onTrade} assessmentAccess={assessmentAccess??_setupAccess as GlobalReportAccess|undefined} /> : <LegacyAnalysisReport data={displayData} nfa={nfa} onTrade={onTrade} />;
 }
 
 function LegacyAnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {

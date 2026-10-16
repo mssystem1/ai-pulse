@@ -47,6 +47,7 @@ export const GlobalIndicatorsSchema = z.object({
 });
 export const GlobalReportSchema = z.object({
   version: z.literal("pulse-global-v3"), tier: z.enum(["quick", "pro"]), lang: z.enum(["en", "zh"]),
+  evaluationVersion: z.literal("completed-v2").optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
   candles: z.array(GlobalCandleSchema), levels: z.array(GlobalLevelSchema), waveCount: GlobalWaveSchema, paths: z.array(GlobalPathSchema).max(3),
