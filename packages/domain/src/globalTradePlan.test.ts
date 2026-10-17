@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {GlobalReportSchema} from "@pulse/schemas";
+import {GlobalReportSchema,candleCloseTime} from "@pulse/schemas";
 import {globalDesignFixture} from "./globalReport.fixtures.js";
 import {globalTradePlan,deriveGlobalTradePlan} from "./globalTradePlan.js";
 import {globalConfirmationEvidence} from "./globalConfirmation.js";
@@ -62,6 +62,14 @@ test("a structural wick breach invalidates a prior confirmation even without rea
   report.setup={...report.setup,state:"cancelled",confirmationTs:tail[5].ts,retestTs:null};
   const event=globalSetupAttemptEvidence(report)!;assert.equal(event.retestObservedBeforeFailure,true);assert.equal(event.retestTs,tail[6].ts);assert.equal(event.failure?.reason,"floor");assert.equal(event.activeObservedProtection,false);
   assert.match(globalSetupFailureLines(report).join("\n"),/A held retest was observed/);
+  for(const timeframe of ["1H","4H","1D","1W","1Mutc"])for(const lang of ["en","zh"] as const){
+    const copy=structuredClone(report);copy.snapshot.timeframe=timeframe;copy.lang=lang;copy.evaluationVersion="completed-v2";
+    const lines=globalSetupFailureLines(copy),failureClosed=new Date(candleCloseTime(event.failure!.candleTs,timeframe)!).toISOString(),retestClosed=new Date(candleCloseTime(event.retestTs!,timeframe)!).toISOString();
+    assert.ok(lines[0].includes(failureClosed),`${timeframe}/${lang} failure must identify its closing time`);
+    assert.ok(!lines[0].includes(new Date(event.failure!.candleTs).toISOString()),"Opening time must not be labelled as the failure's closing time");
+    assert.ok(lines[1].includes(retestClosed),`${timeframe}/${lang} held-retest evidence must identify its closing time`);
+    assert.ok(lines.every(line=>line.includes(lang==="zh"?"收盘":"bar closed")));
+  }
   report.tradePlan={...plan,state:"conditional",confirmationTs:tail[5].ts,retestTs:tail[6].ts,blockers:["entry_price"]};const before=structuredClone(report);
   assert.equal(globalTradePlan(report).state,"avoid");assert.ok(globalTradePlan(report).blockers.includes("confirmation"));assert.deepEqual(report,before,"Stored purchases must stay immutable");
   assert.match(globalConfirmationCorrection(report)!,/Confirmation review/,"A genuine historical downgrade still needs its notice");
