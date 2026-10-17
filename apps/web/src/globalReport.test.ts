@@ -8,8 +8,17 @@ import { TelegramResearchReport } from "./TelegramResearchReport";
 import { AnalysisReport } from "./Report";
 import { buildReportBuyIntent, buildReportManualBuyIntent, buildReportSellIntent, buildTelegramReportBuyIntent } from "./reportTradeHandoff";
 import {qualifiedGlobalFixture} from "../../../packages/analysis/src/globalAssessment.fixtures.js";
+import {strategyFixture} from "../../../packages/analysis/src/globalStrategy.fixtures.js";
 import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
+
+for(const [frame,name,holding,entry] of [["15m","FAST","minutes to hours","5m"],["1H","INTRADAY","hours / current session","15m"],["4H","SWING","days to weeks","1H"],["1Dutc","POSITION","weeks to months","4H"],["1Wutc","MACRO","months and longer","1D (UTC)"]])test(`${frame}: web and Telegram show the strategy horizon and distinct entry timing`,()=>{
+  const {report}=strategyFixture(frame);
+  for(const Component of [GlobalResearchReport,TelegramResearchReport]){
+    const html=renderToStaticMarkup(createElement(Component,{report}));
+    assert.ok(html.includes(name));assert.ok(html.includes(holding));assert.ok(html.includes("determines structure, protection and objectives"));assert.ok(html.includes(`${entry} refines entry timing`));
+  }
+});
 
 test("recheck capabilities stay out of rendered/exported reports and are not attached to unrelated services",()=>{
   const report=globalDesignFixture(),token="private-browser-recheck-capability",data=withSetupAccess({global:report},{kind:"share",token});

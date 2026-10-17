@@ -33,7 +33,9 @@ export function reviewGlobalOrder(a:GlobalAssessment,q:GlobalQuoteEvidence,now:n
   if(!costKnown)blockers.push("costs");
   const notional=q.entry*q.quantity,cost=costKnown?q.roundTripLoss!+q.networkFees!+notional*q.slippageBps/10_000:null;
   const risk=stop!==null?(q.entry-stop)*q.quantity:null,reward=target!==null?(target-q.entry)*q.quantity:null;
-  const net=risk!==null&&risk>0&&reward!==null&&cost!==null?(reward-cost)/(risk+cost):null;
+  const checkpoint=target===null?null:(a.checkpointTargets??[]).filter(p=>p>q.entry&&p<target).sort((a,b)=>a-b)[0]??target;
+  const gateReward=checkpoint===null?null:(checkpoint-q.entry)*q.quantity;
+  const net=risk!==null&&risk>0&&gateReward!==null&&cost!==null?(gateReward-cost)/(risk+cost):null;
   if(net!==null&&(!Number.isFinite(net)||net<1.5))blockers.push("net_reward");
   if(risk===null||risk<=0||reward===null||reward<=0||target===null)blockers.push("protection");
   const explanations:Record<string,string>={technical:"A fresh observed long setup is required.",owned_spot_only:"Short research only supports a manual sell of owned Spot inventory.",assessment_stale:"Recheck technical evidence; the assessment is stale.",attempt_expired:"The observed entry window has expired.",quote_stale:"Refresh the size-specific quote; quotes last at most 30 seconds.",quote_invalid:"The route returned invalid amounts.",representation:"Token representation or research-currency conversion is unverified.",balance:"Available settlement-token balance is insufficient or unknown.",entry_price:"The fresh quote is outside the observed, reward-constrained entry range; do not chase.",costs:"Complete route/network cost evidence is unavailable; fees cannot be assumed zero.",net_reward:"Modeled net R:R to the nearest obstacle is below 1.50.",protection:"Observed protection and a correctly ordered nearest target are required."};

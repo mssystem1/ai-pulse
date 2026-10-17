@@ -24,4 +24,5 @@ export * from "./globalCoverage.js";
 export * from "./globalRange.js";
 export * from "./globalScenarioEvidence.js";
 export * from "./globalViewport.js";
+export * from "./globalStrategy.js";
 export { GlobalAssessmentSchema, type GlobalAssessment } from "@pulse/schemas";

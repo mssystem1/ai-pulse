@@ -25,13 +25,14 @@ export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalRepo
         ?zh?`${displayTf} 在 ${price(trigger)} 反弹被拒绝，随后另一根测试无法收复时卖出。`:`Sell after a ${displayTf} ${p.side==="long"?"support reaction":"resistance rejection"} at ${price(trigger)} and a later failed reclaim.`
         :zh?`${displayTf} 完整收盘${p.side==="short"?"跌破":"收复"} ${price(trigger)}，随后另一根回测守住该方向后${p.side==="short"?"卖出":"买入"}。`:`${verb} after a completed ${displayTf} close ${p.side==="short"?"below":"above"} ${price(trigger)} and a later held retest.`;
   if(p.method?.startsWith("structure-"))entryInstruction=`${verb}: ${globalEntryCondition(report,p)}.`;
-  if(p.blockers.includes("reward"))entryInstruction=zh?`${verb}入场需要更好的收益空间：首目标仅 ${p.grossRewardRisk?.toFixed(2)??"—"}R；须新的有依据结构，不能仅靠再次确认。`:`${verb} entry needs better reward: ${p.grossRewardRisk?.toFixed(2)??"—"}R to the first objective; a new supported structure is required.`;
+  if(p.blockers.includes("reward"))entryInstruction=zh?`${verb}入场需要更好的收益空间：首目标仅 ${(p.firstObstacleRewardRisk??p.grossRewardRisk)?.toFixed(2)??"—"}R；须新的有依据结构，不能仅靠再次确认。`:`${verb} entry needs better reward: ${(p.firstObstacleRewardRisk??p.grossRewardRisk)?.toFixed(2)??"—"}R to the first objective; a new supported structure is required.`;
   else if(p.side==="none")entryInstruction=zh?`缺少可用的 ${displayTf} 入场证据或有依据价位。`:`A supported entry needs available ${displayTf} evidence and mapped levels.`;
   else if(signalObserved){const ts=p.retestTs?candleCloseTime(p.retestTs,tf):null;entryInstruction=zh?`${verb}信号已于 ${displayTf} ${ts?new Date(ts).toISOString():""} 收盘观察到；${qualified?"复核新报价和费用":"其余入场条件见下方"}。`:`${verb} signal observed on ${displayTf}${ts?` at ${new Date(ts).toISOString()}`:""}; ${qualified?"review a fresh quote and costs":"complete the remaining entry conditions below"}.`;}
+  if(p.strategyId&&p.blockers.includes("reward"))entryInstruction=zh?`${verb}入场到最近关口仅 ${(p.firstObstacleRewardRisk??p.grossRewardRisk)?.toFixed(2)??"—"}R；需要新的有依据结构。`:`${verb} entry has ${(p.firstObstacleRewardRisk??p.grossRewardRisk)?.toFixed(2)??"—"}R before the nearest checkpoint; a new supported structure is required.`;
   if(mixed&&!planningValid)entryInstruction=zh?"买卖两侧的参考均不满足入场要求；新反应须同时支持止损和首目标收益。":"Neither BUY nor SELL reference qualifies for entry; a new reaction must support both protection and first-obstacle reward.";
   const range=report.range;
   const heading=direction==="RANGE"?(range?`RANGE · ${price(range.lower[0])}–${price(range.upper[1])}`:zh?"RANGE · 支撑与阻力":"RANGE · Support and resistance")
     :mixed?zh?"BUY / SELL · 混合结构；入场条件见下方":"BUY / SELL · Mixed structure; entry conditions below"
     :`${direction}${planningValid?"":" SCENARIO"} · ${qualified?`${verb} ${zh?"信号已确认":"signal confirmed"}`:planningValid?`${verb} ${pattern}`:p.blockers.includes("reward")?zh?"入场收益不足":"Entry needs better reward":zh?"需要入场证据":"Entry evidence needed"}`;
-  return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
+  return {direction,heading:report.strategy?`${report.strategy.name.toUpperCase()} · ${heading}`:heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
 }

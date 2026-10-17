@@ -15,6 +15,7 @@ export const GlobalAssessmentSchema = z.object({
   grossRewardRisk: z.number().finite().nullable(), stopDistancePercent: z.number().finite().nullable(), stopDistanceAtr: z.number().finite().nullable(),
   context: z.enum(["supports","conflicts","neutral","unknown"]),
   analysisTimeframe:z.string().optional(),entryTimeframe:z.string().optional(),family:z.string().optional(),
+  strategyId:z.string().optional(),structureConfirmationTs:z.number().finite().nullable().optional(),checkpointTargets:z.array(z.number().finite().positive()).optional(),firstObstacleRewardRisk:z.number().finite().nullable().optional(),
   blockers: z.array(z.string()), lines: z.array(z.string()),
 });
 export type GlobalAssessment = z.infer<typeof GlobalAssessmentSchema>;

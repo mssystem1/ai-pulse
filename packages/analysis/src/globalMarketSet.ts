@@ -1,7 +1,7 @@
 import {parseCandleTimeframe} from "@pulse/schemas";
 import type {SpotMarketContext} from "@pulse/market";
 import {globalContextTimeframe,GLOBAL_HISTORY_LIMIT} from "./globalReport.js";
-import {globalEntryTimeframe} from "@pulse/domain";
+import {globalEntryTimeframe,globalStrategyProfile} from "@pulse/domain";
 
 /** New reports use one calendar convention; old saved reports keep theirs. */
 export function globalCanonicalTimeframe(timeframe:string):string {
@@ -10,7 +10,7 @@ export function globalCanonicalTimeframe(timeframe:string):string {
 }
 export async function loadGlobalMarketSet(input:{instId:string;timeframe:string},load:(input:{instId:string;timeframe:string;candleLimit:number;completedOnly:boolean})=>Promise<SpotMarketContext>,observedAt=new Date().toISOString()) {
   const timeframe=globalCanonicalTimeframe(input.timeframe),contextFrame=globalContextTimeframe(timeframe);
-  const frames=[...new Set([timeframe,"1Wutc","1Dutc","4H","1H",globalEntryTimeframe(timeframe),...(contextFrame?[contextFrame]:[])])];
+  const frames=[...new Set([timeframe,"1Wutc","1Dutc","4H","1H",globalStrategyProfile(timeframe)?.entryTimeframe??globalEntryTimeframe(timeframe),...(contextFrame?[contextFrame]:[])])];
   const fetched=await Promise.allSettled(frames.map(async frame=>{
     const market=await load({instId:input.instId,timeframe:frame,candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true});
     if(market.instId!==input.instId||market.bar!==frame)throw new Error("Global market timeframe or instrument mismatch");

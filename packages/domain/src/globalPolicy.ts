@@ -25,7 +25,8 @@ export function globalRemoteLevels(report: GlobalReport) {
   if(close===null||!atr)return [];
   const nearest=new Set([report.levels.filter(l=>l.price>close).sort((a,b)=>a.price-b.price)[0]?.id,
     report.levels.filter(l=>l.price<close).sort((a,b)=>b.price-a.price)[0]?.id]);
-  return report.levels.filter(l=>Math.abs(l.price-close)>GLOBAL_LOCAL_ATR*atr&&!nearest.has(l.id));
+  const structural=new Set(report.strategy?.routes.flatMap(r=>[r.protectionLevelId,...r.objectiveIds,...r.checkpointIds])??[]);
+  return report.levels.filter(l=>Math.abs(l.price-close)>GLOBAL_LOCAL_ATR*atr&&!nearest.has(l.id)&&!structural.has(l.id));
 }
 /** Presentation-only compatibility filter. Purchased prices/paths are immutable. */
 export function globalSetupMap(report:GlobalReport):GlobalReport {
@@ -53,10 +54,10 @@ export function globalEligibility(report:GlobalReport):GlobalEligibility {
   return "technical_valid";
 }
 export function globalRiskMeasurement(report:GlobalReport) {
-  const p=globalTradePlan(report),atr=p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
+  const p=globalTradePlan(report),atr=p.method==="structure-v4"?report.indicators.atr.points.at(-1)?.value:p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
   if(!p.referenceEntry||p.referenceStop===null)return null;
   const entry=p.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],distance=Math.abs(entry-p.referenceStop);
-  return {entry,distance,percent:distance/entry*100,atr:atr?distance/atr:null,timeframe:p.entryTimeframe??report.snapshot.timeframe};
+  return {entry,distance,percent:distance/entry*100,atr:atr?distance/atr:null,timeframe:p.method==="structure-v4"?report.snapshot.timeframe:p.entryTimeframe??report.snapshot.timeframe};
 }
 /** Keep execution structure readable; Structure/Full history retains older
  * Elliott anchors. Do not widen a setup view to fit an ancient wave origin. */

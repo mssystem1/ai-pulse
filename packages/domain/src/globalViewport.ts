@@ -19,7 +19,7 @@ export function globalMeasuredFib(report:GlobalReport){
 /** Fit the evidence that defines this structure, rather than cropping to its
  * last two labels. Full history / Fib anchors remain explicit larger views. */
 export function globalStructuralWindow(report:GlobalReport,fitFib=false){
-  const count=report.candles.length,minimum=/[WM]/.test(report.snapshot.timeframe)?120:/D/.test(report.snapshot.timeframe)?90:96;
+  const count=report.candles.length,minimum=report.strategy?Math.min(260,report.strategy.lookbackBars):/[WM]/.test(report.snapshot.timeframe)?120:/D/.test(report.snapshot.timeframe)?90:96;
   const times=[...(report.indicators.channels??[]).map(c=>c.startTs),...report.waveCount.anchors.map(a=>a.ts),...(report.range?[report.range.startTs]:[])];
   if(fitFib){const fib=globalMeasuredFib(report);if(fib)times.push(fib.a.ts,fib.b.ts);}
   const earliest=Math.min(...times),index=report.candles.findIndex(c=>c.ts>=earliest),needed=index<0?minimum:count-index+6;

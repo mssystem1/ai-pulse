@@ -1,3 +1,4 @@
+import {globalStrategyLines} from "./globalStrategy.js";
 import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
@@ -150,14 +151,14 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
 /** Compact next-setup detail; old prices remain identifiable as references. */
 export function globalNextSetupLines(report:GlobalReport):string[] {
   const d=globalDecision(report),p=globalTradePlan(report),zh=report.lang==="zh";
-  const target=p.targetIds.map((id,i)=>`${d.planningValid?`TP${i+1}`:zh?`目标 ${i+1}`:`Objective ${i+1}`} ${globalLevelPrice(report,id)}`).join(" → ");
+  const target=p.targetIds.map((id,i)=>`${p.strategyId?`${report.strategy?.name} objective ${i+1}`:d.planningValid?`TP${i+1}`:zh?`目标 ${i+1}`:`Objective ${i+1}`} ${globalLevelPrice(report,id)}`).join(" → ");
   const observed=d.signalObserved,valid=d.planningValid;
   const latest=report.entryStudy?.candles.at(-1),closed=latest?candleCloseTime(latest.ts,d.entryTimeframe):null;
   return [d.nextCondition,`${zh?"结构":"Structure"}: ${globalFrameReference(report.snapshot.timeframe)} · ${zh?"入场":"Entry"}: ${globalFrameReference(d.entryTimeframe)}`,
     ...(latest?[`${globalFrameReference(d.entryTimeframe)} ${zh?"最后完整收盘":"last completed close"}: ${globalPrice(report,latest.close)}${closed?` · ${new Date(closed).toISOString()}`:""}`]:[]),
     ...(valid&&p.referenceEntry?[`${observed?zh?"已观察入场区间":"Observed entry zone":zh?"观察区域（尚非入场）":"Watch area (entry unobserved)"}: ${p.referenceEntry.map(n=>globalPrice(report,n)).join("–")}`]:[]),
     ...(valid&&p.referenceStop?[`${observed?zh?"已观察止损参考":"Observed SL reference":zh?"暂定止损示例":"Provisional SL example"}: ${globalPrice(report,p.referenceStop)}${p.stopBasis?` · ${globalHumanText(report,p.stopBasis)}`:""}`]:[]),
-    ...(!observed&&valid?[zh?"须实际测试确定保护和最终收益风险比；观察区域不是订单入场区间。":"The actual reaction must establish protection and final R:R; the watch area is not an order-entry band."]:[]),...(target?[target]:[]),d.rewardLine,d.changeView].filter(Boolean);
+    ...(!observed&&valid?[zh?"须实际测试确定保护和最终收益风险比；观察区域不是订单入场区间。":"The actual reaction must establish protection and final R:R; the watch area is not an order-entry band."]:[]),...((p.checkpointIds??[]).length?[`${zh?"沿途关口（非策略止盈）":"Checkpoints (not strategy take-profits)"}: ${p.checkpointIds!.map(id=>globalLevelPrice(report,id)).join(" → ")}`]:[]),...(target?[target]:[]),d.rewardLine,d.changeView].filter(Boolean);
 }
 export function globalMissingLabel(report: GlobalReport, key: GlobalReport["setup"]["missing"][number]): string {
   if(key === "context" && (report.context.status !== "available" || report.context.agreement === "unknown")) return report.lang === "zh" ? "独立高周期背景不可用，继续观察" : "Independent context unavailable; keep watching";
@@ -205,6 +206,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
   const { lang } = report,d=globalDecision(report),zh=lang==="zh";
   return [
     {title:zh?"当前决策":"Current decision",lines:globalDecisionLines(report),featured:true},
+    ...(report.strategy?[{title:zh?"交易策略与持有周期":"Strategy and holding horizon",lines:globalStrategyLines(report),featured:true}]:[]),
     {title:zh?"下一步条件":"Next condition",lines:d.checklist,featured:true},
     {title:zh?"买卖入场证据":"BUY / SELL entry evidence",lines:d.scenarios.map(s=>s.line)},
     {title:zh?"计划参考":"Setup references",lines:globalNextSetupLines(report),featured:true},

@@ -1,3 +1,5 @@
+import {applyGlobalStrategyMap,globalStrategyPivots} from "./globalStrategyMap.js";
+import {globalStrategyProfile} from "@pulse/domain";
 import type { SpotMarketContext } from "@pulse/market";
 import { deriveGlobalTradePlan, selectGlobalTradePlan, globalPlanCandidates, globalDecision, globalContextRelation, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence, globalLocalLevels, globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalTradePlanTitle, globalTradePlanLines } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
@@ -169,13 +171,15 @@ export function globalFrameEvidence(source:SpotMarketContext,observedAt=source.f
 }
 
 /** Calculate a saved market map before prompting. No generic TA fallback is used. */
-export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "base" | "premium"; lang?: "en" | "zh"; contextMarket?: SpotMarketContext | null; hierarchyMarkets?:SpotMarketContext[]; executionCostsBps?: number; decisionVersion?:"decision-v2"|"decision-v3" }): GlobalReport {
+export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "base" | "premium"; lang?: "en" | "zh"; contextMarket?: SpotMarketContext | null; hierarchyMarkets?:SpotMarketContext[]; executionCostsBps?: number; decisionVersion?:"decision-v2"|"decision-v3"|"decision-v4" }): GlobalReport {
   const { market } = input, candles = completedGlobalCandles(market), last = candles.at(-1), close = last?.close ?? null, tier = input.tier === "premium" ? "pro" : "quick", lang = input.lang ?? "en";
   const { atr, rsi } = globalWilderIndicators(candles), latestAtr = atr.at(-1)?.value ?? (close ?? 1) * .01;
   // Pivot confirmation uses only local completed bars, not today's ATR applied
   // retrospectively to older swings.
-  const pivots = globalConfirmedPivots(candles), levels: GlobalLevel[] = [];
-  let waveCount = globalWaveCandidate(candles,pivots,atr);
+  const decisionVersion=input.decisionVersion??(globalStrategyProfile(market.bar)?"decision-v4":"decision-v3");
+  const pivots = globalConfirmedPivots(candles), levels: GlobalLevel[] = [],strategyPivots=decisionVersion==="decision-v4"?globalStrategyPivots(candles,pivots,atr,market.bar):pivots;
+  let waveCount = globalWaveCandidate(candles,strategyPivots,atr);
+  if(decisionVersion==="decision-v4"&&waveCount.status==="candidate")waveCount.swingScaleAtr=Math.max(waveCount.swingScaleAtr??0,globalStrategyProfile(market.bar)!.majorSwingAtr);
   const origin=waveCount.anchors[0];
   if(origin&&candles.some(c=>c.ts>origin.ts&&(waveCount.direction==="up"?c.close<=origin.price:c.close>=origin.price)))waveCount={...waveCount,id:"unclear",status:"unclear",structure:"unclear",direction:"unclear",activeWave:"unclear",anchors:[],invalidationLevelId:null,validation:["origin_invalidated_by_completed_close"]};
   const addLevel = (anchor: GlobalAnchor, basis: GlobalLevel["basis"] = "swing", ratio?: number, anchors = [anchor.id]) => {
@@ -188,7 +192,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   if (candles.length) for (const kind of ["low", "high"] as const) { const c = candles.reduce((best, c) => kind === "low" ? c.low < best.low ? c : best : c.high > best.high ? c : best, candles[0]);
     addLevel({ id: `range-${c.ts}-${kind}`, ts: c.ts, price: c[kind], kind, confirmedAt: null }); }
   if (waveCount.anchors.length) waveCount.invalidationLevelId = addLevel(waveCount.anchors[0]);
-  const leg = waveCount.anchors.length >= 6 ? [waveCount.anchors[0], waveCount.anchors[5]] : waveCount.anchors.length>=3 ? [waveCount.anchors[0],waveCount.anchors[waveCount.anchors.length===3?1:3]] : pivots.length >= 2 ? pivots.slice(-2) : [];
+  const leg = waveCount.anchors.length >= 6 ? [waveCount.anchors[0], waveCount.anchors[5]] : waveCount.anchors.length>=3 ? [waveCount.anchors[0],waveCount.anchors[waveCount.anchors.length===3?1:3]] : strategyPivots.length >= 2 ? strategyPivots.slice(-2) : [];
   const fibonacci: GlobalReport["indicators"]["fibonacci"] = [];
   if (leg.length === 2 && Math.abs(leg[1].price - leg[0].price) >= latestAtr * 2) {
     const [a, b] = leg, delta = b.price - a.price;
@@ -200,7 +204,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   }
   const sma = [21, 55, 89, 144, 233].map(period => ({ period, points: globalSma(candles, period) })), average = sma.find(s => s.period === 55)!.points;
   const slope = average.length >= 11 ? average.at(-1)!.value - average.at(-11)!.value : 0;
-  const decisionVersion=input.decisionVersion??"decision-v3";
+
   const trend = decisionVersion==="decision-v2"?(close === null || !average.length ? "range" : close < average.at(-1)!.value && slope < 0 ? "down" : close > average.at(-1)!.value && slope > 0 ? "up" : "range"):globalFrameEvidence(market,market.fetchedAt).bias;
   const structures=globalPriceStructures(candles,pivots,latestAtr,market.bar);
   // A projection is explanatory evidence, not an automatically tested support
@@ -233,7 +237,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   // serialization/display slot; consumers use the evidenced market bias.
   if (!paths.some(p => p.role === "main") && paths.length) (decisionVersion==="decision-v2"?paths[0]:paths.find(p=>p.direction==="down")??paths[0]).role = "main";
   paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main"));
-  if (paths.length < 3 && paths.some(p => p.direction === "up") && upTargets.length === 2) {
+  if (decisionVersion!=="decision-v4" && paths.length < 3 && paths.some(p => p.direction === "up") && upTargets.length === 2) {
     const target = upTargets.at(-1)!, further = localAbove.filter(l => l.price > target.price).slice(0, 2);
     if (further.length) paths.push({ id: "recount", role: "alternative", direction: "up", kind: "recount", state: "conditional", triggerLevelId: target.id, targetIds: further.map(l => l.id), invalidationLevelId: target.id, confirmation: "close_retest", thesis: "" });
   }
@@ -249,7 +253,7 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
     if(!source)return {timeframe,status:"unavailable" as const,source:null,observedAt:market.fetchedAt,completedAt:null,price:null,sma55:null,smaChange:null,structure:"mixed" as const,bias:"mixed" as const,candles:0};
     return globalFrameEvidence(source,market.fetchedAt);
   });
-  const entryFrame=globalEntryTimeframe(market.bar),entrySource=[market,...(input.hierarchyMarkets??[])].find(m=>m.bar===entryFrame&&m.source===market.source&&m.instId===market.instId&&(m.ticker.priceCurrency??m.instId.split("-").at(-1))===(market.ticker.priceCurrency??market.instId.split("-").at(-1)));
+  const entryFrame=decisionVersion==="decision-v4"?globalStrategyProfile(market.bar)!.entryTimeframe:globalEntryTimeframe(market.bar),entrySource=[market,...(input.hierarchyMarkets??[])].find(m=>m.bar===entryFrame&&m.source===market.source&&m.instId===market.instId&&(m.ticker.priceCurrency??m.instId.split("-").at(-1))===(market.ticker.priceCurrency??market.instId.split("-").at(-1)));
   const entryBars=entrySource?completedGlobalCandles({...entrySource,fetchedAt:market.fetchedAt}):[],entryAtr=globalWilderIndicators(entryBars).atr;
   const entryClosed=entryBars.length?candleCloseTime(entryBars.at(-1)!.ts,entryFrame):null,entryNext=entryClosed===null?null:candleCloseTime(entryClosed,entryFrame);
   const entryStudy:NonNullable<GlobalReport["entryStudy"]>={timeframe:entryFrame,source:entrySource?.source??null,status:entryBars.length>=55&&entryNext!==null&&Date.parse(market.fetchedAt)<=entryNext+60000?"available":"unavailable",observedAt:market.fetchedAt,candles:entryBars,pivots:globalConfirmedPivots(entryBars),atr:entryAtr};
@@ -263,8 +267,9 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
     indicators: { sma, atr: { period: 14, points: atr }, rsi: { period: 14, points: rsi }, volumeRatio: meanVolume > 0 && last ? rounded(last.volume / meanVolume) : null, regression: regression(candles), fibonacci, vwap: vwapAnchor && vwap.length ? { anchorId: vwapAnchor.id, points: vwap } : null, pivots, channel:null,channels:structures.channels },
     context: { timeframe: contextFrame, status: contextAverage.length ? "available" : "unavailable", source: contextAverage.length ? input.contextMarket!.source : null, candles:contextCandles,sma55:contextAverage,agreement:contextClose === undefined || contextSma === undefined ? "unknown" : contextClose < contextSma ? "conflicts" : contextClose > contextSma ? "supports" : "neutral" },
     narrative: { headline: "", summary: "", reasons: [], riskNotes: [], limitations: [], disclaimer: "" },
-    view: { levelIds: [], pathIds: [], smaPeriods: tier==="pro"&&decisionVersion==="decision-v3"?[21,55,89,144,233]:[55], defaultLayers: tier === "pro" ? ["sma", "channel", "regression", "fibonacci", "rsi", "context"] : ["sma", "channel"] },
+    view: { levelIds: [], pathIds: [], smaPeriods: tier==="pro"&&["decision-v3","decision-v4"].includes(decisionVersion)?[21,55,89,144,233]:[55], defaultLayers: tier === "pro" ? ["sma", "channel", "regression", "fibonacci", "rsi", "context"] : ["sma", "channel"] },
   };
+  if(decisionVersion==="decision-v4")applyGlobalStrategyMap(report);
   const observedBias=hierarchy.find(r=>r.timeframe===market.bar)?.bias,marketMain=observedBias==="up"||observedBias==="down"?report.paths.find(p=>p.direction===observedBias):undefined;
   if(marketMain&&!report.range){report.paths.forEach(p=>p.role=p.id===marketMain.id?"main":"alternative");report.paths.sort((a,b)=>Number(b.role==="main")-Number(a.role==="main"));}
   // Structure-v2 has one directional calculator. The legacy buy-only setup
@@ -275,13 +280,14 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   if (selected && !includedPaths.includes(selected)) includedPaths[includedPaths.length - 1] = selected;
   report.view.pathIds = includedPaths.map(p => p.id);
   report.view.levelIds = [...new Set(includedPaths.flatMap(p => [p.triggerLevelId, p.invalidationLevelId, ...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]).filter((id): id is string => id !== null))];
+  if(report.strategy)report.view.levelIds=[...new Set([...report.view.levelIds,...report.strategy.routes.flatMap(r=>[r.protectionLevelId,...r.objectiveIds,...r.checkpointIds]).filter((id):id is string=>id!==null)])];
   report.tradePlan = selectGlobalTradePlan(report);
   report.view.levelIds = [...new Set([...report.view.levelIds,report.tradePlan.triggerLevelId,report.tradePlan.invalidationLevelId,...report.tradePlan.targetIds].filter((id):id is string=>id!==null))];
   return GlobalReportSchema.parse(report);
 }
 
 export function globalPromptEvidence(report: GlobalReport) {
-  return { snapshot: report.snapshot,decision:globalDecision(report),method:report.decisionVersion,range:report.range,channels:report.tier==="pro"?report.indicators.channels:report.indicators.channels?.filter(c=>c.scope==="broad"),entryStudy:report.entryStudy?{timeframe:report.entryStudy.timeframe,status:report.entryStudy.status,source:report.entryStudy.source,lastCompleted:report.entryStudy.candles.at(-1),atr14:report.entryStudy.atr.at(-1)?.value}:null,planCandidates:globalPlanCandidates(report),hierarchy:report.hierarchy, eligibility:globalEligibility(report),riskMeasurement:globalRiskMeasurement(report),distantContextLevelIds:globalRemoteLevels(report).map(l=>l.id), priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:["decision-v2","decision-v3"].includes(report.decisionVersion??"")?null:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:["decision-v2","decision-v3"].includes(report.decisionVersion??"")?null:globalPrimaryAttemptEvidence(report),
+  return { snapshot: report.snapshot,decision:globalDecision(report),method:report.decisionVersion,strategy:report.strategy,range:report.range,channels:report.tier==="pro"?report.indicators.channels:report.indicators.channels?.filter(c=>c.scope==="broad"),entryStudy:report.entryStudy?{timeframe:report.entryStudy.timeframe,status:report.entryStudy.status,source:report.entryStudy.source,lastCompleted:report.entryStudy.candles.at(-1),atr14:report.entryStudy.atr.at(-1)?.value}:null,planCandidates:globalPlanCandidates(report),hierarchy:report.hierarchy, eligibility:globalEligibility(report),riskMeasurement:globalRiskMeasurement(report),distantContextLevelIds:globalRemoteLevels(report).map(l=>l.id), priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:["decision-v2","decision-v3","decision-v4"].includes(report.decisionVersion??"")?null:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:["decision-v2","decision-v3","decision-v4"].includes(report.decisionVersion??"")?null:globalPrimaryAttemptEvidence(report),
     indicators: { sma: report.indicators.sma.filter(s => report.tier === "pro" || s.period === 55).map(s => ({ period: s.period, displayedByDefault: report.view.smaPeriods.includes(s.period), value: s.points.at(-1)?.value ?? null, change10Bars: s.points.length > 10 ? rounded(s.points.at(-1)!.value - s.points.at(-11)!.value) : null })), rsi14: report.tier === "pro" ? report.indicators.rsi.points.at(-1)?.value ?? null : null, atr14: report.indicators.atr.points.at(-1)?.value ?? null, volumeRatio: report.indicators.volumeRatio, fibonacci: report.indicators.fibonacci, regression: report.tier === "pro" ? { bars: report.indicators.regression?.bars, residualSigma: report.indicators.regression?.residualSigma } : null },
     context: { timeframe: report.context.timeframe, status: report.context.status, agreement: report.context.agreement, close: report.context.candles.at(-1)?.close ?? null, sma55: report.context.sma55.at(-1)?.value ?? null },
     recentCandles: report.candles.slice(-48).map(c => [c.ts, c.open, c.high, c.low, c.close, c.volume, c.confirmed]), note: "Only completed candles. All candidate anchors and level prices are supplied evidence. Projection timing is schematic." };

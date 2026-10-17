@@ -20,6 +20,12 @@ test("a missing context is retained as missing rather than replaced with another
   const set=await loadGlobalMarketSet({instId:"BTC-USDT",timeframe:"1H"},async input=>{if(input.timeframe==="4H")throw Error("provider unavailable");return market(input.timeframe);},cutoff);
   assert.equal(set.contextMarket,null);assert.ok(!set.hierarchyMarkets.some(m=>m.bar==="4H"));
 });
+
+test("Fast 15m reports load actual 5m entry candles without substituting the primary frame",async()=>{
+  const calls:string[]=[];
+  const set=await loadGlobalMarketSet({instId:"BTC-USDT",timeframe:"15m"},async input=>{calls.push(input.timeframe);return market(input.timeframe);},cutoff);
+  assert.ok(calls.includes("5m"));assert.equal(set.market.bar,"15m");assert.ok(set.hierarchyMarkets.some(m=>m.bar==="5m"));assert.equal(set.contextMarket!.bar,"1H");
+});
 test("provider timeframe and source mismatches cannot masquerade as hierarchy evidence",async()=>{
   await assert.rejects(()=>loadGlobalMarketSet({instId:"BTC-USDT",timeframe:"1D"},async()=>market("1D"),cutoff),/mismatch/);
   const set=await loadGlobalMarketSet({instId:"BTC-USDT",timeframe:"1H"},async input=>market(input.timeframe==="4H"?"1H":input.timeframe),cutoff);

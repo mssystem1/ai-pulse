@@ -1,3 +1,4 @@
+import {globalStrategyRoute} from "./globalStrategy.js";
 import {candleCloseTime,type GlobalReport,type GlobalCandle} from "@pulse/schemas";
 
 type Plan=NonNullable<GlobalReport["tradePlan"]>;
@@ -24,8 +25,8 @@ export function globalEntryGeometry(side:"long"|"short",zone:[number,number],sto
  * arbitrary two-bar entry deadline. Quote/evidence freshness remains separate. */
 export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedSide?:"long"|"short"):Plan {
   const study=report.entryStudy,path=report.paths.find(p=>(pathId?p.id===pathId:p.role==="main")&&report.view.pathIds.includes(p.id));
-  const modern=report.decisionVersion==="decision-v3";
-  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:modern?"structure-v3":"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
+  const horizon=report.decisionVersion==="decision-v4",modern=horizon||report.decisionVersion==="decision-v3";
+  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:horizon?"structure-v4":modern?"structure-v3":"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
   if(!study||study.status!=="available"||study.candles.length<55)return {...empty,blockers:["history"]};
   if(!path)return {...empty,blockers:["levels"]};
   const level=(id:string|null|undefined)=>report.levels.find(l=>l.id===id);
@@ -40,7 +41,7 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
     // First objectives are intervening primary swing clusters, never the far
     // range edge merely because it produces a larger R multiple. The original
     // range path retains the full-range objective; this entry study does not.
-    if(modern){
+    if(modern&&!horizon){
       const far=targets[0],sign=side==="long"?1:-1;
       const obstacles=report.levels.filter(l=>l.basis==="swing"&&sign*(l.price-trigger!.price)>0&&sign*(far.price-l.price)>0).sort((a,b)=>sign*(a.price-b.price));
       const distinct=obstacles.filter((l,i,all)=>i===0||Math.abs(l.price-all[i-1].price)>tick);
@@ -48,12 +49,16 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
     }
     boundary=report.levels.filter(l=>side==="long"?l.price<bottom.price:l.price>top.price).sort((a,b)=>side==="long"?b.price-a.price:a.price-b.price)[0]??trigger;
   }
+  const route=horizon?globalStrategyRoute(report,path.id,side):undefined;
+  if(horizon){targets=(route?.objectiveIds??[]).flatMap(id=>level(id)??[]);const protection=level(route?.protectionLevelId);if(!targets.length||!protection)return {...empty,blockers:["levels"],strategyId:report.strategy?.id};boundary=protection;}
   const sign=side==="long"?1:-1;
   const family:NonNullable<Plan["family"]>=path.direction==="range"?side==="long"?"range_buy":"range_sell":path.confirmation==="support_hold"?"support_bounce":path.confirmation==="hold"?"resistance_rejection":"breakout_retest";
   const condition=family==="breakout_retest"?"close_retest":side==="long"?"support_hold":"rejection";
   const sourceAnchors=report.indicators.pivots.filter(a=>trigger!.anchorIds.includes(a.id)&&a.confirmedAt!==null);
   if(!sourceAnchors.length)return {...empty,blockers:["levels"]};
-  const knownAt=Math.max(0,...sourceAnchors.map(a=>candleCloseTime(a.confirmedAt!,report.snapshot.timeframe)??Infinity));
+  const structureIds=horizon?new Set([boundary.id,...targets.map(l=>l.id),...(route?.checkpointIds??[])]):new Set<string>();
+  const knownAnchors=horizon?[...sourceAnchors,...report.indicators.pivots.filter(a=>a.confirmedAt!==null&&report.levels.some(l=>structureIds.has(l.id)&&l.anchorIds.includes(a.id)))]:sourceAnchors;
+  const knownAt=Math.max(0,...knownAnchors.map(a=>candleCloseTime(a.confirmedAt!,report.snapshot.timeframe)??Infinity));
   const rawPrices=sourceAnchors.map(a=>a.price).filter(p=>Math.abs(p-trigger!.price)<=atr*.5);
   const zone:[number,number]=[Math.min(trigger.price,...rawPrices),Math.max(trigger.price,...rawPrices)];
   const tolerance=Math.max(tick*2,atr*.1); // Profile's touch/noise allowance, disclosed in docs.
@@ -61,35 +66,39 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   if(targets.some(l=>sign*(l.price-trigger!.price)<=0))return {...empty,blockers:["levels"]};
   const anchorBefore=(at:number)=>study.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=at&&(side==="long"?a.kind==="low"&&a.price<zone[0]:a.kind==="high"&&a.price>zone[1])).at(-1);
   const recentAnchorBefore=(at:number)=>{const a=anchorBefore(at);if(!a)return undefined;const index=bars.findIndex(c=>c.ts===a.ts),current=bars.findIndex(c=>c.ts===at);return index>=0&&index>=current-32?a:undefined;};
+  const protectionAllowance=(at:number)=>horizon?Math.max(tick*2,(report.indicators.atr.points.filter(p=>(candleCloseTime(p.ts,report.snapshot.timeframe)??Infinity)<=at).at(-1)?.value??report.indicators.atr.points[0]?.value??atr)*.1):allowanceAt(at);
   const stopFor=(test:GlobalCandle|undefined,at:number)=>{
     const recent=recentAnchorBefore(at)?.price;
-    const fallback=recent===undefined&&!test?boundary.price:undefined;
+    const fallback=horizon?boundary.price:recent===undefined&&!test?boundary.price:undefined;
     const structural=side==="long"?Math.min(zone[0],test?.low??zone[0],recent??zone[0],fallback??zone[0]):Math.max(zone[1],test?.high??zone[1],recent??zone[1],fallback??zone[1]);
-    const raw=structural-sign*allowanceAt(at);
+    const raw=structural-sign*protectionAllowance(at);
     return Number(((side==="long"?Math.floor(raw/tick):Math.ceil(raw/tick))*tick).toPrecision(12));
   };
   let confirmation:GlobalCandle|undefined,signal:GlobalCandle|undefined,failure:Plan["failure"]=null,observedStop:number|undefined;
-  let signalZone:[number,number]|undefined;
+  let signalZone:[number,number]|undefined,structureConfirmationTs:number|null=null,failedStructureAt=0;
+  const structureEvents=horizon?report.candles.flatMap((c,i,all)=>{const previous=all[i-1],closed=candleCloseTime(c.ts,report.snapshot.timeframe);if(!previous||closed===null||c.ts<knownAt||boundary!.id!==trigger!.id&&(side==="long"?c.low<=boundary!.price:c.high>=boundary!.price))return [];const touch=side==="long"?c.low<=zone[1]+tolerance&&c.high>=zone[0]:c.high>=zone[0]-tolerance&&c.low<=zone[1];const holds=side==="long"?c.close>=zone[1]:c.close<=zone[0];const starts=family==="breakout_retest"?sign*(previous.close-trigger!.price)<=0&&sign*(c.close-trigger!.price)>0:touch&&holds;return starts?[{ts:c.ts,closed}]:[];}):[];
   for(let i=Math.max(1,bars.length-160);i<bars.length;i++){
     const c=bars[i],previous=bars[i-1],allowance=allowanceAt(c.ts);if(c.ts<knownAt)continue;
+    const structure=horizon?structureEvents.filter(e=>e.closed<=c.ts).at(-1):undefined;
+    if(horizon&&(!structure||structure.closed<=failedStructureAt))continue;
     if(confirmation){
       const broken=side==="long"?c.close<zone[0]-allowance:c.close>zone[1]+allowance;
       const structureBroken=boundary.id!==trigger.id&&(side==="long"?c.low<boundary.price:c.high>boundary.price);
       const stopped=signal&&observedStop!==undefined&&(side==="long"?c.low<=observedStop:c.high>=observedStop);
       const reached=signal&&(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price);
-      if(broken||structureBroken||stopped||reached){failure={ts:c.ts,reason:stopped?"stop":structureBroken?"structure":reached?"objective":"trigger"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;continue;}
+      if(broken||structureBroken||stopped||reached){failure={ts:c.ts,reason:stopped?"stop":structureBroken?"structure":reached?"objective":"trigger"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){failedStructureAt=structure!.closed;structureConfirmationTs=null;}continue;}
     }
     const touch=side==="long"?c.low<=zone[1]+allowance&&c.high>=zone[0]:c.high>=zone[0]-allowance&&c.low<=zone[1];
     const holds=side==="long"?c.close>=zone[1]:c.close<=zone[0];
-    const starts=family==="breakout_retest"?sign*(previous.close-trigger.price)<=0&&sign*(c.close-trigger.price)>0:touch&&holds;
-    if(!confirmation&&starts){confirmation=c;failure=null;continue;}
+    const starts=family==="breakout_retest"?(horizon?holds:sign*(previous.close-trigger.price)<=0&&sign*(c.close-trigger.price)>0):touch&&holds;
+    if(!confirmation&&starts){confirmation=c;failure=null;structureConfirmationTs=structure?.ts??null;continue;}
     if(confirmation&&!signal&&c.ts>confirmation.ts){
       const valid=family==="breakout_retest"?touch&&holds:side==="long"?c.close>confirmation.high:c.close<confirmation.low;
       if(valid){
         signal=c;observedStop=stopFor(family==="breakout_retest"?c:confirmation,c.ts);
         const edge=family==="breakout_retest"?trigger.price:side==="long"?confirmation.high:confirmation.low;
         signalZone=side==="long"?[edge,Math.max(edge,c.close)]:[Math.min(edge,c.close),edge];
-        if(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price){failure={ts:c.ts,reason:"objective"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;}
+        if(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price){failure={ts:c.ts,reason:"objective"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){failedStructureAt=structure!.closed;structureConfirmationTs=null;}}
       }
     }
   }
@@ -102,11 +111,14 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   if(!geometry.entry&&targets.some(l=>sign*(l.price-(side==="long"?plannedZone[1]:plannedZone[0]))<=0))return {...empty,blockers:["reward"]};
   const blockers:Plan["blockers"]=[];
   if(!confirmation)blockers.push("confirmation");if(!signal)blockers.push("retest");
-  if(!geometry.entry||geometry.rr===null||geometry.rr<1.5)blockers.push("reward");
+  const checkpoints=(route?.checkpointIds??[]).flatMap(id=>level(id)??[]).filter(l=>sign*(l.price-(side==="long"?(geometry.entry??plannedZone)[1]:(geometry.entry??plannedZone)[0]))>0&&sign*(targets[0].price-l.price)>0).sort((a,b)=>sign*(a.price-b.price));
+  const firstObstacle=checkpoints[0]??targets[0],firstGeometry=globalEntryGeometry(side,geometry.entry??plannedZone,stop,firstObstacle.price,tick);
+  if(!geometry.entry||geometry.rr===null||geometry.rr<1.5||horizon&&(!firstGeometry.entry||firstGeometry.rr===null||firstGeometry.rr<1.5))blockers.push("reward");
   if(failure)blockers.push(failure.reason==="objective"?"expired":"cancelled");
-  const entry=geometry.entry??plannedZone;
+  const entry=horizon?(firstGeometry.entry??geometry.entry??plannedZone):geometry.entry??plannedZone;
+  const objectiveRewardRisk=horizon?globalEntryGeometry(side,entry,stop,targets[0].price,tick).rr:geometry.rr;
   if(last.close<entry[0]||last.close>entry[1])blockers.push("entry_price");
   const closed=candleCloseTime(last.ts,study.timeframe),expires=closed===null?null:candleCloseTime(closed,study.timeframe);
-  const stopBasis=signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
-  return {...empty,side,pathId:path.id,state:blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:entry,referenceStop:stop,grossRewardRisk:geometry.rr,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers,zone,stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
+  const stopBasis=horizon?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
+  return {...empty,...(horizon?{strategyId:report.strategy?.id,checkpointIds:route?.checkpointIds??[],firstObstacleRewardRisk:firstGeometry.rr,structureConfirmationTs}:{}),side,pathId:path.id,state:blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:entry,referenceStop:stop,grossRewardRisk:objectiveRewardRisk,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers,zone,stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
 }
