@@ -24,7 +24,8 @@ export function globalEntryGeometry(side:"long"|"short",zone:[number,number],sto
  * arbitrary two-bar entry deadline. Quote/evidence freshness remains separate. */
 export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedSide?:"long"|"short"):Plan {
   const study=report.entryStudy,path=report.paths.find(p=>(pathId?p.id===pathId:p.role==="main")&&report.view.pathIds.includes(p.id));
-  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
+  const modern=report.decisionVersion==="decision-v3";
+  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:modern?"structure-v3":"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
   if(!study||study.status!=="available"||study.candles.length<55)return {...empty,blockers:["history"]};
   if(!path)return {...empty,blockers:["levels"]};
   const level=(id:string|null|undefined)=>report.levels.find(l=>l.id===id);
@@ -36,6 +37,15 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
     const bottom=trigger,top=targets[0];
     side=forcedSide??(last.close-bottom.price<=top.price-last.close?"long":"short");
     trigger=side==="long"?bottom:top;targets=[side==="long"?top:bottom];
+    // First objectives are intervening primary swing clusters, never the far
+    // range edge merely because it produces a larger R multiple. The original
+    // range path retains the full-range objective; this entry study does not.
+    if(modern){
+      const far=targets[0],sign=side==="long"?1:-1;
+      const obstacles=report.levels.filter(l=>l.basis==="swing"&&sign*(l.price-trigger!.price)>0&&sign*(far.price-l.price)>0).sort((a,b)=>sign*(a.price-b.price));
+      const distinct=obstacles.filter((l,i,all)=>i===0||Math.abs(l.price-all[i-1].price)>tick);
+      targets=[...distinct,far].slice(0,2);
+    }
     boundary=report.levels.filter(l=>side==="long"?l.price<bottom.price:l.price>top.price).sort((a,b)=>side==="long"?b.price-a.price:a.price-b.price)[0]??trigger;
   }
   const sign=side==="long"?1:-1;
@@ -83,7 +93,8 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
       }
     }
   }
-  const plannedZone:[number,number]=signalZone??[zone[0]-tolerance,zone[1]+tolerance];
+  const watchZone:[number,number]=modern&&family==="breakout_retest"?(side==="long"?[zone[1],zone[1]+tolerance]:[zone[0]-tolerance,zone[0]]):[zone[0]-tolerance,zone[1]+tolerance];
+  const plannedZone:[number,number]=signalZone??watchZone;
   const reaction=family!=="breakout_retest"?confirmation:undefined;
   if(observedStop===undefined&&!reaction&&!recentAnchorBefore(last.ts)&&boundary.id===trigger.id)return {...empty,blockers:["levels"]};
   const stop=observedStop??stopFor(reaction,last.ts),geometry=globalEntryGeometry(side,plannedZone,stop,targets[0].price,tick);

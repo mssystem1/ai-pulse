@@ -92,7 +92,8 @@ describe("context-first Grok analysis", () => {
     assert.equal(result.market.source, "okx-public-spot");
     // The compatibility response keeps its schema, while its public headline
     // follows the measured report rather than the provider's asserted trend.
-    assert.equal(result.analysis.headline, "BTC-USDT · 1H · RANGE · Support and resistance");
+    assert.equal(result.global.hierarchy?.find(r=>r.timeframe==="1H")?.bias,"mixed");
+    assert.equal(result.analysis.headline, "BTC-USDT · 1H · BUY / SELL · Mixed structure; entry conditions below");
     assert.equal(result.usage?.totalTokens, 120);
     assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "low" });
   });

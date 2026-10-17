@@ -34,7 +34,7 @@ export const GlobalTradePlanSchema = z.object({
   referenceEntry: z.tuple([price, price]).nullable(), referenceStop: price.nullable(), grossRewardRisk: z.number().finite().nonnegative().nullable(),
   stopBufferAtr: z.number().positive(), confirmationTs: time.nullable(), retestTs: time.nullable(),
   blockers: z.array(z.enum(["history", "levels", "confirmation", "retest", "reward", "entry_price", "cancelled", "expired"])),
-  method: z.literal("structure-v2").optional(),
+  method: z.enum(["structure-v2","structure-v3"]).optional(),
   family: z.enum(["breakout_retest","support_bounce","resistance_rejection","range_buy","range_sell"]).optional(),
   entryTimeframe: z.string().optional(), zone: z.tuple([price,price]).optional(),
   stopBasis: z.string().optional(), evidenceKind: z.enum(["held_retest","follow_through"]).optional(),
@@ -46,6 +46,7 @@ export const GlobalChannelSchema = z.object({
   base:z.tuple([GlobalAnchorSchema,GlobalAnchorSchema]),opposite:GlobalAnchorSchema,offset:z.number().finite(),
   knownAt:time,startTs:time,endTs:time,touches:z.object({lower:z.number().int().nonnegative(),upper:z.number().int().nonnegative()}),
   closeViolations:z.number().int().nonnegative(),
+  priceState:z.enum(["inside","above","below"]).optional(),breakTs:time.nullable().optional(),
 });
 export const GlobalRangeSchema = z.object({lower:z.tuple([price,price]),upper:z.tuple([price,price]),anchorIds:z.array(z.string()),startTs:time,touches:z.number().int().min(4)});
 export const GlobalEntryStudySchema = z.object({
@@ -72,7 +73,7 @@ export const GlobalFrameSchema = z.object({
 export const GlobalReportSchema = z.object({
   version: z.literal("pulse-global-v3"), tier: z.enum(["quick", "pro"]), lang: z.enum(["en", "zh"]),
   evaluationVersion: z.literal("completed-v2").optional(),
-  decisionVersion:z.enum(["decision-v1","decision-v2"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
+  decisionVersion:z.enum(["decision-v1","decision-v2","decision-v3"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
   entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
@@ -88,7 +89,7 @@ export const GlobalReportSchema = z.object({
     if(!rows.some(row=>row.timeframe===report.snapshot.timeframe)||new Set(rows.map(r=>r.timeframe)).size!==rows.length||rows.some(r=>r.observedAt!==report.snapshot.observedAt||r.source!==null&&r.source!==report.snapshot.source||r.completedAt!==null&&r.completedAt>Date.parse(report.snapshot.observedAt)||r.status==="available"&&(r.candles<55||r.price===null||r.sma55===null)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Decision hierarchy must retain one source, cutoff and evidenced completed frames"});
   }
   const ids = new Set(report.levels.map(level => level.id));
-  if(report.decisionVersion==="decision-v2"){
+  if(["decision-v2","decision-v3"].includes(report.decisionVersion??"")){
     const study=report.entryStudy;
     if(!Number.isFinite(Date.parse(report.snapshot.observedAt)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Structure-v2 needs a valid observation cutoff"});
     if(!study||study.observedAt!==report.snapshot.observedAt||study.source!==null&&study.source!==report.snapshot.source||study.candles.some((c,i)=>!c.confirmed||c.high<Math.max(c.open,c.close)||c.low>Math.min(c.open,c.close)||(candleCloseTime(c.ts,study.timeframe)??Infinity)>Date.parse(study.observedAt)||i>0&&c.ts<=study.candles[i-1].ts)||study.status==="available"&&(study.candles.length<55||!study.source))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry study must preserve source, cutoff and completed chronological evidence"});
@@ -112,19 +113,20 @@ export const GlobalReportSchema = z.object({
   if (selected && (selected.direction !== "up" || selected.triggerLevelId !== report.setup.triggerLevelId || report.setup.retestLevelId !== report.setup.triggerLevelId || selected.invalidationLevelId !== report.setup.invalidationLevelId || JSON.stringify(selected.targetIds) !== JSON.stringify(report.setup.targetIds))) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Setup must match its plotted upside path" });
   const plan = report.tradePlan;
   if (plan) {
+    if(report.decisionVersion==="decision-v3"&&plan.method!=="structure-v3"||report.decisionVersion==="decision-v2"&&plan.method==="structure-v3")ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry calculation must match its saved decision version"});
     const path = report.paths.find(p => p.id === plan.pathId), level = (id: string | null) => report.levels.find(l => l.id === id)?.price;
     if ([plan.triggerLevelId, plan.invalidationLevelId, ...plan.targetIds].some(id => id !== null && !ids.has(id)) || (plan.pathId !== null && (!path || !report.view.pathIds.includes(plan.pathId)))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan must use visible canonical levels and path"});
     if (path && ((path.direction === "up" && plan.side !== "long") || (path.direction === "down" && plan.side !== "short"))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan direction must match its path"});
     if(path&&path.direction!=="range"&&(plan.triggerLevelId!==path.triggerLevelId||plan.invalidationLevelId!==path.invalidationLevelId||JSON.stringify(plan.targetIds)!==JSON.stringify(path.targetIds)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional plan must retain its path trigger, invalidation and targets"});
-    if(plan.method==="structure-v2"&&plan.side!=="none"&&(!plan.family||!plan.zone||plan.entryTimeframe!==report.entryStudy?.timeframe||plan.zone[0]>plan.zone[1]))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Structure-v2 needs a named family, measured zone and matching entry frame"});
-    if(plan.method==="structure-v2"&&[plan.confirmationTs,plan.retestTs].some(ts=>ts!==null&&!report.entryStudy?.candles.some(c=>c.ts===ts)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry signal times must identify saved entry-study candles"});
+    if(plan.method?.startsWith("structure-")&&plan.side!=="none"&&(!plan.family||!plan.zone||plan.entryTimeframe!==report.entryStudy?.timeframe||plan.zone[0]>plan.zone[1]))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Structure-v2 needs a named family, measured zone and matching entry frame"});
+    if(plan.method?.startsWith("structure-")&&[plan.confirmationTs,plan.retestTs].some(ts=>ts!==null&&!report.entryStudy?.candles.some(c=>c.ts===ts)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry signal times must identify saved entry-study candles"});
     if (plan.side !== "none" && (!path || !plan.referenceEntry || !plan.referenceStop || !plan.targetIds.length || !plan.triggerLevelId || !plan.invalidationLevelId)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional research plan requires a path, entry, risk reference and targets"});
     if (plan.referenceEntry && plan.referenceStop) {
       const [lo,hi] = plan.referenceEntry, targets = plan.targetIds.map(id => level(id)!);
       if (lo > hi || (plan.side === "long" ? plan.referenceStop >= lo || targets.some(p => p <= hi) : plan.referenceStop <= hi || targets.some(p => p >= lo))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Research plan prices must be ordered for its side"});
     }
     if (plan.state === "confirmed" && (!plan.confirmationTs || !plan.retestTs || plan.blockers.length || plan.grossRewardRisk === null || plan.grossRewardRisk < 1.5)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Confirmed research plan requires observed confirmation and sufficient gross reward"});
-    const entryPrice=plan.method==="structure-v2"?report.entryStudy?.candles.at(-1)?.close:report.snapshot.price;
+    const entryPrice=plan.method?.startsWith("structure-")?report.entryStudy?.candles.at(-1)?.close:report.snapshot.price;
     if(plan.state==="confirmed"&&plan.referenceEntry&&(entryPrice==null||entryPrice<plan.referenceEntry[0]||entryPrice>plan.referenceEntry[1]||plan.retestTs!<=plan.confirmationTs!))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Confirmed research price must remain in its planned zone after a subsequent test"});
   }
   if (report.setup.state === "ready" && (!report.setup.entryZone || !report.setup.protectiveStop || report.setup.netRewardRisk === null || report.setup.netRewardRisk < 1.5 || report.setup.missing.length || !report.setup.retestTs || report.setup.protectiveStop >= report.setup.entryZone[0])) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Ready setup requires observed protection, net reward and complete evidence" });

@@ -57,7 +57,7 @@ test("Telegram captions keep primary support-hold/short conditions and identify 
     const caption=telegramResearchCaption(report),message=telegramResearchMessage(report);
     assert.ok(caption.length<=1024,`${lang} ${side} caption: ${caption.length}`);assert.ok(message.length<=3900);
     assert.ok(!/WAIT|INVALIDATED ·|EXPIRED ·|NO TRADE/.test(caption));
-    if(lang==="en")assert.match(caption,side==="long"?/Buy entry needs better reward/:/Sell after a 1H rejection at 117.30/);
+    if(lang==="en")assert.match(caption,side==="long"?/Buy entry needs better reward/:/Sell after a 1H resistance rejection at 117.30/);
     assert.doesNotMatch(caption,/S1 needs a completed/);
   }
 });

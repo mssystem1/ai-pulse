@@ -30,7 +30,7 @@ export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof bui
   const saved=readGlobalReport(raw);
   if(!saved)throw new Error("A saved Global report is required");
   const contextFrame=saved.decisionVersion||saved.tier==="pro"?saved.context.timeframe??globalContextTimeframe(saved.snapshot.timeframe):null;
-  const entryFrame=saved.decisionVersion==="decision-v2"?saved.entryStudy?.timeframe:null;
+  const entryFrame=["decision-v2","decision-v3"].includes(saved.decisionVersion??"")?saved.entryStudy?.timeframe:null;
   const load=(timeframe:string)=>loadMarket({instId:saved.snapshot.instId,timeframe,candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true});
   const [market,context,entry]=await Promise.all([load(saved.snapshot.timeframe),contextFrame?load(contextFrame).catch(()=>null):null,entryFrame?load(entryFrame).catch(()=>null):null]);
   return assessGlobalReport(saved,market,context,entry);

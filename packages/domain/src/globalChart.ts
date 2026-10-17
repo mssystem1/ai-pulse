@@ -1,5 +1,5 @@
 import { parseCandleTimeframe, type GlobalReport } from "@pulse/schemas";
-import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine, globalRiskLines, globalNextSetupLines } from "./globalPresentation.js";
+import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalSetupMap, globalSetupWindow, globalRiskMeasurement, globalArtifactReference, globalEligibility } from "./globalPolicy.js";
 import {globalDecision,globalDecisionTitle} from "./globalDecision.js";
@@ -8,9 +8,10 @@ import {globalChannelBounds,globalChannelLines} from "./globalChannels.js";
 import {globalEntryStudySvg} from "./globalEntryChart.js";
 import {globalFrameReference} from "./globalContext.js";
 import {globalCoverageLine} from "./globalCoverage.js";
+import {globalDefaultChartLayers,globalStructuralScaleValues,globalStructuralWindow,globalMeasuredFib,globalChannelAvailability} from "./globalViewport.js";
 
 export type GlobalChartLayers = { allSmas?: boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean; localChannel?:boolean; channelMid?:boolean };
-export type GlobalChartOptions = { layers?: GlobalChartLayers; selectedPathId?: string | null; showScenarios?: boolean; fullHistory?: boolean; structure?: boolean };
+export type GlobalChartOptions = { layers?: GlobalChartLayers; selectedPathId?: string | null; showScenarios?: boolean; fullHistory?: boolean; structure?: boolean; fitFibonacci?:boolean };
 export type GlobalChartCoordinates = { x: (ts: number) => number | null; y: (price: number) => number | null; left: number; right: number; top: number; bottom: number; historyEnd: number };
 export const escapeGlobalSvg = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]!));
 const line = (x1: number, y1: number, x2: number, y2: number, color: string, width = 1, dash = "") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ""}/>`;
@@ -23,8 +24,7 @@ export function globalFibonacciAnchors(report: GlobalReport) {
   const ids = saved[0].anchorIds, anchors = [...report.indicators.pivots, ...report.waveCount.anchors];
   const a = anchors.find(anchor => anchor.id === ids[0]), b = anchors.find(anchor => anchor.id === ids[1]);
   if (!a || !b || a.confirmedAt === null || b.confirmedAt === null || a.ts >= b.ts || a.price === b.price) return null;
-  // Older snapshots save three internal ratios. Use their same measured swing,
-  // but refuse to draw a different construction over inconsistent saved data.
+  // Preserve the exact measured swing in older saved retracements, too.
   const tolerance = Math.max(10 ** -report.snapshot.pricePrecision, Math.abs(b.price) * 1e-8);
   if (saved.some(level => level.anchorIds[0] !== a.id || level.anchorIds[1] !== b.id || Math.abs(level.price - (b.price - (b.price - a.price) * level.ratio)) > tolerance)) return null;
   return { a, b };
@@ -48,13 +48,17 @@ function channelSegment(g: GlobalChartCoordinates, a: { x: number; y: number }, 
 export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoordinates, options: GlobalChartOptions = {}): string {
   report = globalSetupMap(report);
   const { left, right, top, bottom, historyEnd } = g, future = Math.max(80, right - historyEnd), pro = report.tier === "pro", levels = report.levels;
+  options={...options,layers:{...globalDefaultChartLayers(report),...options.layers}};
   const plan=globalTradePlan(report),decision=globalDecision(report),eligibility=globalEligibility(report);
   const allPaths=report.paths.filter(p=>report.view.pathIds.includes(p.id)),main=allPaths.find(p=>p.role==="main")??allPaths[0];
-  const alternative=allPaths.find(p=>p.id===options.selectedPathId&&p.id!==main?.id)??allPaths.find(p=>p.id===plan.pathId&&p.id!==main?.id)??allPaths.find(p=>p.id!==main?.id);
-  const visiblePaths=[main,alternative].filter((p):p is NonNullable<typeof p>=>!!p),visibleIds=new Set(visiblePaths.flatMap(p=>[p.triggerLevelId,p.invalidationLevelId,...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]));
+  const alternative=allPaths.find(p=>p.id===options.selectedPathId&&p.id!==main?.id)??allPaths.find(p=>p.id===plan.pathId&&p.id!==main?.id)??allPaths.find(p=>p.id!==main?.id&&(main?.direction!=="range"||p.direction==="down"))??allPaths.find(p=>p.id!==main?.id);
+  const visiblePaths=[main,alternative].filter((p):p is NonNullable<typeof p>=>!!p),visibleIds=new Set([...visiblePaths.flatMap(p=>[p.triggerLevelId,p.invalidationLevelId,...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]),...(visiblePaths.some(p=>p.id===plan.pathId)?[plan.triggerLevelId,plan.invalidationLevelId,...plan.targetIds]:[])]);
   const find = (id: string | null) => levels.find(l => l.id === id), xFuture = (fraction: number) => historyEnd + future * fraction;
   const visible = (y: number | null): y is number => y !== null && y >= top && y <= bottom;
   let svg = text(left+8,top-9,report.lang==="zh"?"已完成价格历史":"COMPLETED PRICE HISTORY","#8d9cb3",9);
+  const parallels=(report.indicators.channels??[]).filter(c=>c.scope==="broad"?options.layers?.channel!==false:pro&&options.layers?.localChannel!==false);
+  const legend=parallels.length?`${report.lang==="zh"?"平行通道":"Parallel channel"}: ${parallels.map(c=>`${c.scope}${c.priceState&&c.priceState!=="inside"?` (price ${c.priceState})`:""}`).join(" / ")}${options.layers?.regression?" · cyan: regression 120 ±2σ":""}`:options.layers?.regression?"Regression channel · 120 bars · ±2σ; no qualifying parallel channel":"";
+  if(legend)svg+=text(left+8,top+15,legend,"#a8b4c6",10);
   if (options.showScenarios !== false) svg += `<rect x="${historyEnd+1}" y="${top}" width="${Math.max(0,right-historyEnd)}" height="${bottom-top}" fill="#142034" fill-opacity=".36"/>`+line(historyEnd, top, historyEnd, bottom, "#536175", 1, "4 5")+text(historyEnd+15,top-9,report.lang==="zh"?"有条件走势 · 时间仅为示意":"CONDITIONAL MOVES · TIMING SCHEMATIC","#99abc4",9);
   if (report.waveCount.status === "unclear") svg += text(left + 8, top + 19, globalLabel("unclear", report.lang), "#acb8cb", 12);
   const origin = report.waveCount.anchors[0];
@@ -85,6 +89,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     const measured = globalFibonacciAnchors(report);
     if (measured) {
       const { a, b } = measured;
+      svg+=text(left+8,bottom-27,`Fib A ${new Date(a.ts).toISOString().slice(0,10)} → Fib B ${new Date(b.ts).toISOString().slice(0,10)} · ${a.ts<(report.candles.at(-globalSetupWindow(report))?.ts??0)?"macro swing; fit anchors":"measured swing"}`,"#a7bed9",10);
       const pa = point(g,a.ts,a.price), pb = point(g,b.ts,b.price), start = left;
       const zero = g.y(b.price), one = g.y(a.price);
       if (zero !== null && one !== null) svg += `<g data-fibonacci="confirmed-swing"><rect x="${start}" y="${Math.max(top,Math.min(zero,one))}" width="${Math.max(0,historyEnd-start)}" height="${Math.max(0,Math.min(bottom,Math.max(zero,one))-Math.max(top,Math.min(zero,one)))}" fill="#718fc0" fill-opacity=".035"/>`;
@@ -117,7 +122,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   }
   if (origin) svg += text(left + 8, bottom - 8, `${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
   if (options.showScenarios === false) return svg;
-  const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a, b) => a.y - b.y);
+  const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a,b)=>Number(b.level.id===plan.triggerLevelId||plan.targetIds.includes(b.level.id))-Number(a.level.id===plan.triggerLevelId||plan.targetIds.includes(a.level.id))).filter((item,i,all)=>!all.slice(0,i).some(prior=>Math.abs(prior.level.price-item.level.price)<10**-report.snapshot.pricePrecision)).sort((a, b) => a.y - b.y);
   const labelPositions=labels.map((l,i)=>Math.max(l.y,top+12+i*20));
   for(let i=1;i<labelPositions.length;i++)labelPositions[i]=Math.max(labelPositions[i],labelPositions[i-1]+20);
   for(let i=labelPositions.length-1;i>=0;i--)labelPositions[i]=Math.min(labelPositions[i],i===labelPositions.length-1?bottom-3:labelPositions[i+1]-20);
@@ -142,18 +147,24 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     if (!targetPoints.length) continue;
     const startX = path.confirmation === "hold" ? historyEnd + 7 : xFuture(path.kind === "recount" ? .6 : .18), startY = path.confirmation === "hold" && visible(lastY) ? lastY : triggerY;
     const planned=primary&&decision.planningValid&&plan.referenceEntry!==null;
-    const points = planned ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.16),y:triggerY},{x:xFuture(.22),y:triggerY-(plan.side==="long"?10:-10)},{x:xFuture(.28),y:triggerY},...targetPoints] : path.direction==="range" ? [{x:historyEnd+7,y:visible(lastY)?lastY:triggerY},{x:xFuture(.2),y:targetPoints[0].y},{x:xFuture(.42),y:triggerY},{x:xFuture(.7),y:targetPoints[0].y}] : [{ x: startX, y: startY }, ...(path.confirmation !== "hold" ? [{ x: startX + 16, y: triggerY - (path.direction === "up" ? 10 : -10) }, { x: startX + 30, y: triggerY }] : []), ...targetPoints];
+    if(path.direction==="range"&&report.range){
+      const low=g.y(report.range.lower[1]),high=g.y(report.range.upper[0]);
+      if(visible(low)&&visible(high))svg+=`<g data-range-bounds="observed"><rect x="${historyEnd+2}" y="${high}" width="${future*.7}" height="${Math.max(1,low-high)}" fill="#9dabcf" fill-opacity=".035"/>${line(historyEnd,low,xFuture(.7),low,"#9dabcf",1,"4 5")}${line(historyEnd,high,xFuture(.7),high,"#9dabcf",1,"4 5")}</g>`;
+      if(!planned){scenarioLabels.push({y:triggerY+30,value:report.lang==="zh"?"区间边缘：买卖测试分别确认":"RANGE EDGES · separate BUY / SELL tests",color,size:11,dim:false});continue;}
+    }
+    // Conditional level gates are not forecasts of future oscillation turns.
+    const points = [{x:planned?xFuture(.28):startX,y:triggerY},...targetPoints];
     const d = points.map((p, i) => `${i ? "L" : "M"} ${p.x} ${p.y}`).join(" "), end = points.at(-1)!, prev = points.at(-2)!, angle = Math.atan2(end.y - prev.y, end.x - prev.x);
     const arrow = [end, { x: end.x - 11 * Math.cos(angle) + 5 * Math.sin(angle), y: end.y - 11 * Math.sin(angle) - 5 * Math.cos(angle) }, { x: end.x - 11 * Math.cos(angle) - 5 * Math.sin(angle), y: end.y - 11 * Math.sin(angle) + 5 * Math.cos(angle) }];
-    svg += `<g data-path-id="${escapeGlobalSvg(path.id)}"${planned?' data-planned-entry-route="true"':""} opacity="${dim ? .2 : 1}"><path d="${d}" fill="none" stroke="${color}" stroke-width="${path.role === "main" ? 2.5 : 2}"${path.state === "conditional" || planned&&plan.state!=="confirmed" ? ' stroke-dasharray="6 5"' : ""}/><polygon points="${arrow.map(p => `${p.x},${p.y}`).join(" ")}" fill="${color}"/>`;
-    const pathIndex=report.view.pathIds.indexOf(path.id),compactTitle=`${["①","②","③"][pathIndex]} ${globalLabel(path.role,report.lang)} · ${globalLabel(path.kind,report.lang)}`;
+    svg += `<g data-path-id="${escapeGlobalSvg(path.id)}"${planned?' data-planned-entry-route="true"':""} opacity="${dim ? .2 : 1}"><path d="${d}" fill="none" stroke="${color}" stroke-width="${path.role === "main" ? 2.5 : 2}"${!decision.qualified || path.state === "conditional" || planned&&plan.state!=="confirmed" ? ' stroke-dasharray="6 5"' : ""}/><polygon points="${arrow.map(p => `${p.x},${p.y}`).join(" ")}" fill="${color}"/>`;
+    const pathIndex=report.view.pathIds.indexOf(path.id),compactTitle=globalPathTitle(report,path);
     svg+=text(end.x+10,end.y+4,["①","②","③"][pathIndex],color,12);
     const titleY=path.kind==="recount"?Math.min(...targetPoints.map(p=>p.y))-28:primary?targetPoints[0].y-18:startY+38;
     scenarioLabels.push({ y: titleY, value: compactTitle, color, size: 11, dim: Boolean(dim) });
     if (primary&&decision.planningValid) {
       const stages = [{ x: xFuture(.28), y: triggerY, id: plan.triggerLevelId }, ...targetPoints.map((p, i) => ({ ...p, id: plan.targetIds[i] }))];
       stageRows.push(...stages.map(stage => stage.y));
-      stages.forEach((p, i) => svg += `<g ${decision.qualified?"data-stage":"data-plan-stage"}="${i?`TP${i}`:"ENTRY"}" data-level-id="${escapeGlobalSvg(p.id)}"><circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${color}"/>` + text(p.x, p.y + (i===1?-10:16), i?`TP${i}`:decision.qualified?"ENTRY":"ENTRY PLAN", color, 10, "middle") + "</g>");
+      stages.forEach((p, i) => svg += `<g ${decision.qualified?"data-stage":"data-plan-stage"}="${i?`TP${i}`:"ENTRY"}" data-level-id="${escapeGlobalSvg(p.id)}"><circle cx="${p.x}" cy="${p.y}" r="3.5" fill="${color}"/>` + text(p.x, p.y + (i===1?-10:16), i?`TP${i}`:`${plan.side==="short"?"SELL":"BUY"}${decision.qualified?"":" PLAN"} (${globalFrameReference(plan.entryTimeframe??report.snapshot.timeframe)})`, color, 10, "middle") + "</g>");
       const tested=plan.confirmationTs&&plan.retestTs&&!plan.blockers.includes("cancelled")&&!plan.blockers.includes("expired");
       const actionHint=decision.qualified?(report.lang==="zh"?"入场信号已确认 · 复核报价":"ENTRY SIGNAL CONFIRMED · CHECK QUOTE"):report.lang==="zh"?"条件入场计划":"CONDITIONAL ENTRY PLAN";
       scenarioLabels.push({ y: triggerY + 35, value: actionHint??(tested?(report.lang==="zh"?"测试已观察 · 复核入场与费用":"TEST OBSERVED · RECHECK ENTRY / QUOTE"):(report.lang === "zh" ? "需新的确认和后续测试" : "FRESH CONFIRMATION + SUBSEQUENT TEST")), color, size: 8, dim: Boolean(dim) });
@@ -177,7 +188,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   if(decision.planningValid&&plan.referenceEntry&&plan.referenceStop){
     const entry=g.y(plan.referenceEntry[0]),stop=g.y(plan.referenceStop),color=plan.side==="short"?"#f0738c":"#53dabb";
     const dim=options.selectedPathId&&options.selectedPathId!==plan.pathId;
-    for(const [value,label,price] of [[entry,report.lang==="zh"?"计划入场":"PLAN ENTRY",plan.referenceEntry[0]],[stop,report.lang==="zh"?"计划止损（参考）":"PLAN SL (reference)",plan.referenceStop]] as const)if(visible(value)){
+    for(const [value,label,price] of [[entry,decision.signalObserved?report.lang==="zh"?"已观察入场":"OBSERVED ENTRY":report.lang==="zh"?"观察区域":"WATCH AREA",plan.referenceEntry[0]],[stop,decision.signalObserved?report.lang==="zh"?"已观察止损":"OBSERVED SL":report.lang==="zh"?"暂定止损示例":"PROVISIONAL SL",plan.referenceStop]] as const)if(visible(value)){
       svg+=`<g data-plan-reference="${escapeGlobalSvg(label)}" opacity="${dim?.2:.8}">`+line(historyEnd+2,value,xFuture(.32),value,color,1,"2 4")+"</g>";
       scenarioLabels.push({y:value-9,value:`${label} ${globalPrice(report,price)}`,color,size:9,dim:Boolean(dim)});
     }
@@ -213,16 +224,16 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250), footerTop = entryTop+(entryImage?240:0);
   const decision=globalDecision(report),primary=globalTradePlan(report);
-  const footerLines=[globalDecisionTitle(report),decision.route,...decision.checklist,...globalNextSetupLines(report).slice(1,5),decision.changeView,
-    ...(decision.rewardLine?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
-    ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?globalChannelLines(report):[]),...(pro?decision.hierarchy.slice(0,4):[])];
+  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
+    ...(decision.rewardLine&&decision.direction!=="BUY / SELL"?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
+    ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?globalChannelLines(report):[])].filter(Boolean))];
   const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?100:70):(index?185:140),chars=Array.from(value),rows:string[]=[];while(chars.length)rows.push(chars.splice(0,max).join(""));return rows;});
   const footerHeight=wrapped.length*19+32,height=footerTop+footerHeight+35;
-  const layers = { channel: true, ...options.layers }, periods = pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
-  const candles = options.fullHistory?report.candles:report.candles.slice(options.structure?-180:-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
+  const layers = { ...globalDefaultChartLayers(report), ...options.layers }, periods = pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
+  const candles = options.fullHistory?report.candles:report.candles.slice(options.fitFibonacci?-globalStructuralWindow(report,true):options.structure?-Math.max(180,globalSetupWindow(report)):-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
   const refs = globalSetupMap(report).view.levelIds.flatMap(id => { const p = report.levels.find(l => l.id === id)?.price; return p === undefined ? [] : [p]; });
   const plan=globalTradePlan(report),visiblePoints=(points:Array<{ts:number;value:number}>)=>points.filter(p=>p.ts>=start&&p.ts<=end);
-  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs, ...(decision.planningValid?plan.referenceEntry??[]:[]),...(decision.planningValid&&plan.referenceStop!==null?[plan.referenceStop]:[])];
+  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers), ...(decision.planningValid?plan.referenceEntry??[]:[]),...(decision.planningValid&&plan.referenceStop!==null?[plan.referenceStop]:[])];
   const low = Math.min(...values), high = Math.max(...values), margin = Math.max(high - low, high * .01) * .1, min = Math.max(0, low - margin), max = high + margin;
   const y = (p: number) => top + (max - p) / (max - min) * (priceBottom - top), x = (ts: number) => left + (ts - start) / Math.max(1, end - start) * (historyEnd - left);
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };
@@ -266,7 +277,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   }
   if(entryImage)svg+=`<g transform="translate(25 ${entryTop})">${entryImage}</g>`;
   svg += `<rect x="25" y="${footerTop}" width="1250" height="${footerHeight}" rx="10" fill="#181c24" stroke="#695335"/>`;
-  wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?11:15));
+  wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?12:16));
   svg += text(26, height - 14, report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
   return svg + "</g></svg>";
 }

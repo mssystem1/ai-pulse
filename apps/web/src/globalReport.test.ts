@@ -67,7 +67,7 @@ test("manual review leaves unobserved, cancelled and expired trade protection bl
 test("bearish web and Mini App reports expose owned Market/Limit sells with no short protection copied",()=>{
   const report=globalDesignFixture();report.setup.state="cancelled";
   for(const Component of [GlobalResearchReport,TelegramResearchReport]){
-    const html=renderToStaticMarkup(createElement(Component,{report,onTrade:()=>{}}));assert.match(html,/data-plan-side="short"/);assert.match(html,/Market sell/);assert.match(html,/Limit sell/);assert.ok(/Planned SL/.test(html));assert.match(html,/Plan cancelled/);
+    const html=renderToStaticMarkup(createElement(Component,{report,onTrade:()=>{}}));assert.match(html,/data-plan-side="short"/);assert.match(html,/Market sell/);assert.match(html,/Limit sell/);assert.ok(/Provisional SL example/.test(html));assert.match(html,/Plan cancelled/);
   }
   for(const orderType of ["market","limit"] as const){const draft=buildReportSellIntent({global:report},orderType);assert.equal(draft.side,"sell");assert.equal(draft.orderType,orderType);for(const key of ["entryPrice","takeProfit","stopLoss"] as const)assert.equal(draft[key],undefined);assert.match(draft.rationale,/owned Spot inventory/);assert.deepEqual(buildTelegramReportBuyIntent(report,`#side=sell&orderType=${orderType}&entryPrice=1&stopLoss=2`),draft);}
   report.paths[0].role="alternative";report.paths[1].role="main";assert.equal(buildTelegramReportBuyIntent(report,"#side=sell").side,"sell","Manual owned sells remain the owner’s choice on an upward report");

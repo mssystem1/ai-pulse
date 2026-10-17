@@ -25,9 +25,16 @@ export function globalPriceStructures(candles:GlobalCandle[],pivots:GlobalAnchor
         for(const p of anchors.filter(p=>p.ts>=a.ts)){const n=index.get(p.ts)!;if(p.kind==="low"&&Math.abs(p.price-lower(n))<=tolerance){touches.lower++;}if(p.kind==="high"&&Math.abs(p.price-upper(n))<=tolerance){touches.upper++;}}
         if(touches.lower<2||touches.upper<2)continue;
         const tail=candles.slice(ia),violations=tail.filter((c,k)=>c.close<lower(ia+k)-tolerance||c.close>upper(ia+k)+tolerance).length;
-        if(violations>Math.max(1,Math.floor(tail.length*.05))||last.close<lower(candles.length-1)-tolerance||last.close>upper(candles.length-1)+tolerance)continue;
-        const channel:GlobalChannel={id:`${scope}-${a.id}-${b.id}`,type:"parallel",scope,timeframe,scale:"linear",base:[a,b],opposite,offset,knownAt:candleCloseTime(last.ts,timeframe)!,startTs:a.ts,endTs:last.ts,touches,closeViolations:violations};
-        candidates.push({channel,score:(touches.lower+touches.upper)*4+span/window*5-violations*3-(candles.length-1-ib)/window});
+        const priceState=last.close<lower(candles.length-1)-tolerance?"below":last.close>upper(candles.length-1)+tolerance?"above":"inside";
+        if(priceState!=="inside"&&Math.min(Math.abs(last.close-lower(candles.length-1)),Math.abs(last.close-upper(candles.length-1)))>atr)continue;
+        let breakIndex=candles.length;
+        if(priceState!=="inside")while(breakIndex>ia&&(priceState==="below"?candles[breakIndex-1].close<lower(breakIndex-1)-tolerance:candles[breakIndex-1].close>upper(breakIndex-1)+tolerance))breakIndex--;
+        const fitted=candles.slice(ia,breakIndex),priorViolations=fitted.filter((c,k)=>c.close<lower(ia+k)-tolerance||c.close>upper(ia+k)+tolerance).length;
+        // Keep a recently broken, previously fitted construction as context.
+        // It is labelled outside, never represented as current containment.
+        if(priceState==="inside"?violations>Math.max(1,Math.floor(tail.length*.05)):candles.length-breakIndex>12||breakIndex<=ib||fitted.length<minSpan||priorViolations>Math.max(1,Math.floor(fitted.length*.05)))continue;
+        const channel:GlobalChannel={id:`${scope}-${a.id}-${b.id}`,type:"parallel",scope,timeframe,scale:"linear",base:[a,b],opposite,offset,knownAt:candleCloseTime(last.ts,timeframe)!,startTs:a.ts,endTs:last.ts,touches,closeViolations:violations,priceState,breakTs:priceState==="inside"?null:candles[breakIndex].ts};
+        candidates.push({channel,score:(priceState==="inside"?20:0)+(touches.lower+touches.upper)*4+span/window*5-priorViolations*3-(candles.length-1-ib)/window});
       }
     }
     candidates.sort((a,b)=>b.score-a.score);

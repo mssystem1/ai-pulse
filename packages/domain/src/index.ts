@@ -22,4 +22,6 @@ export * from "./globalChannels.js";
 export * from "./globalEntryChart.js";
 export * from "./globalCoverage.js";
 export * from "./globalRange.js";
+export * from "./globalScenarioEvidence.js";
+export * from "./globalViewport.js";
 export { GlobalAssessmentSchema, type GlobalAssessment } from "@pulse/schemas";

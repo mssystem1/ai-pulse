@@ -17,7 +17,7 @@ export function assessGlobalReport(saved:GlobalReport, market:SpotMarketContext,
     throw new Error("Recheck market identity does not match the purchased report");
   const fetched=Date.parse(market.fetchedAt),original=Date.parse(saved.snapshot.observedAt);
   if(!Number.isFinite(fetched)||fetched<original)throw new Error("Recheck evidence predates the saved report");
-  if(saved.decisionVersion==="decision-v2")return assessGlobalEntryReport(saved,market,context,entryMarket);
+  if(["decision-v2","decision-v3"].includes(saved.decisionVersion??""))return assessGlobalEntryReport(saved,market,context,entryMarket);
   const fresh=completedGlobalCandles(market),last=fresh.at(-1);
   const overlapChanged=fresh.some(c=>{const old=saved.candles.find(o=>o.ts===c.ts);return old&&["open","high","low","close"].some(k=>old[k as "open"]!==c[k as "open"]);});
   const candles=[...new Map([...saved.candles,...fresh].map(c=>[c.ts,c])).values()].sort((a,b)=>a.ts-b.ts).slice(-520);

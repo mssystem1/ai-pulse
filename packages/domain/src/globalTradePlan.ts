@@ -6,7 +6,7 @@ import {deriveGlobalEntryPlan} from "./globalEntryPlan.js";
 /** A conditional plan from the saved map, independent of Elliott labels and
  * execution quotes. Its reference prices must never be copied as observed SL. */
 export function deriveGlobalTradePlan(report: GlobalReport, pathId?:string): NonNullable<GlobalReport["tradePlan"]> {
-  if(report.decisionVersion==="decision-v2")return deriveGlobalEntryPlan(report,pathId);
+  if(["decision-v2","decision-v3"].includes(report.decisionVersion??""))return deriveGlobalEntryPlan(report,pathId);
   const empty: NonNullable<GlobalReport["tradePlan"]> = {side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.2,confirmationTs:null,retestTs:null,blockers:[]};
   const path = report.paths.find(p => (pathId?p.id===pathId:p.role === "main") && report.view.pathIds.includes(p.id));
   const last = report.candles.at(-1), atr = report.indicators.atr.points.at(-1)?.value;
@@ -49,9 +49,25 @@ export function deriveGlobalTradePlan(report: GlobalReport, pathId?:string): Non
 
 /** Evaluate every visible direction before narration. Keep the market route
  * independent: a better supported alternate entry does not rewrite the trend. */
-export function globalPlanCandidates(report:GlobalReport) {return report.paths.filter(p=>p.kind!=="recount"&&report.view.pathIds.includes(p.id)).flatMap(p=>report.decisionVersion==="decision-v2"&&p.direction==="range"?[deriveGlobalEntryPlan(report,p.id,"long"),deriveGlobalEntryPlan(report,p.id,"short")]:[deriveGlobalTradePlan(report,p.id)]);}
+export function globalPlanCandidates(report:GlobalReport) {return report.paths.filter(p=>p.kind!=="recount"&&report.view.pathIds.includes(p.id)).flatMap(p=>["decision-v2","decision-v3"].includes(report.decisionVersion??"")&&p.direction==="range"?[deriveGlobalEntryPlan(report,p.id,"long"),deriveGlobalEntryPlan(report,p.id,"short")]:[deriveGlobalTradePlan(report,p.id)]);}
 export function selectGlobalTradePlan(report:GlobalReport):NonNullable<GlobalReport["tradePlan"]> {
   const plans=globalPlanCandidates(report),main=deriveGlobalTradePlan(report);
+  if(report.decisionVersion==="decision-v3"){
+    // Qualify every family symmetrically. Proximity orders *watch areas* only
+    // after structure, reward, context and observed signal have been assessed.
+    const rank=(p:typeof main)=>{
+      if(p.side==="none"||p.blockers.some(b=>["history","levels","reward"].includes(b)))return 0;
+      if(p.blockers.some(b=>["cancelled","expired"].includes(b)))return 1;
+      if(globalContextRequired(report)&&["opposing","unavailable"].includes(globalContextRelation(report,p.side)))return 2;
+      if(p.state==="confirmed")return 6;
+      if(p.retestTs)return 5;
+      if(p.confirmationTs)return 4;
+      return report.range&&p.family?.startsWith("range_")?3:2;
+    };
+    const last=report.entryStudy?.candles.at(-1)?.close??report.snapshot.price??0;
+    const distance=(p:typeof main)=>Math.abs((report.levels.find(l=>l.id===p.triggerLevelId)?.price??Infinity)-last);
+    return plans.sort((a,b)=>rank(b)-rank(a)||distance(a)-distance(b)||String(a.family).localeCompare(String(b.family)))[0]??main;
+  }
   const score=(p:typeof main)=>p.side==="none"?-100:p.blockers.some(b=>["history","levels","reward"].includes(b))?-50:p.blockers.some(b=>["cancelled","expired"].includes(b))?-30:globalContextRequired(report)&&["opposing","unavailable"].includes(globalContextRelation(report,p.side))?-20:p.state==="confirmed"?30:p.confirmationTs?20:10;
   // Never select a range boundary solely because price is close to it.
   const usable=plans.filter(p=>report.paths.find(path=>path.id===p.pathId)?.direction!=="range"||p.confirmationTs!==null);
@@ -60,7 +76,7 @@ export function selectGlobalTradePlan(report:GlobalReport):NonNullable<GlobalRep
 
 export function globalTradePlan(report: GlobalReport) {
   const saved=report.tradePlan;
-  if(saved?.method==="structure-v2")return saved;
+  if(saved?.method?.startsWith("structure-"))return saved;
   if (!saved) return deriveGlobalTradePlan(report);
   if (saved.side === "none" || !saved.triggerLevelId || !saved.invalidationLevelId) return saved;
   // Preserve purchased prices. Correct only unsafe confirmation claims from

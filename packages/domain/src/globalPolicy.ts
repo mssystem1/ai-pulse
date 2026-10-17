@@ -2,6 +2,7 @@ import { parseCandleTimeframe, type GlobalReport, type GlobalLevel } from "@puls
 import { globalTradePlan } from "./globalTradePlan.js";
 import { fnv1a } from "./hash.js";
 import {globalContextRelation,globalContextRequired} from "./globalContext.js";
+import {globalStructuralWindow} from "./globalViewport.js";
 
 export function globalArtifactReference(report:GlobalReport):string {
   return fnv1a(JSON.stringify([report.snapshot,report.tradePlan,report.levels])).toString(16).padStart(8,"0");
@@ -52,7 +53,7 @@ export function globalEligibility(report:GlobalReport):GlobalEligibility {
   return "technical_valid";
 }
 export function globalRiskMeasurement(report:GlobalReport) {
-  const p=globalTradePlan(report),atr=p.method==="structure-v2"?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
+  const p=globalTradePlan(report),atr=p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
   if(!p.referenceEntry||p.referenceStop===null)return null;
   const entry=p.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],distance=Math.abs(entry-p.referenceStop);
   return {entry,distance,percent:distance/entry*100,atr:atr?distance/atr:null,timeframe:p.entryTimeframe??report.snapshot.timeframe};
@@ -60,6 +61,7 @@ export function globalRiskMeasurement(report:GlobalReport) {
 /** Keep execution structure readable; Structure/Full history retains older
  * Elliott anchors. Do not widen a setup view to fit an ancient wave origin. */
 export function globalSetupWindow(report:GlobalReport):number {
+  if(report.decisionVersion)return globalStructuralWindow(report);
   const p=globalTradePlan(report),ids=[p.triggerLevelId,p.invalidationLevelId];
   const unit=parseCandleTimeframe(report.snapshot.timeframe)?.unit;
   const maximum=unit==="week"||unit==="month"?24:unit==="day"?32:64,minimum=maximum===24?20:32;

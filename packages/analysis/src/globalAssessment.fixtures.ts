@@ -6,7 +6,7 @@ import { prepareGlobalReport,evaluateGlobalSetup } from "./globalReport.js";
 /** Exercise readers of the original primary-only report grammar explicitly.
  * New-report integration tests must use prepareGlobalReport and real entry data. */
 export function legacyPrimaryReport(input:Parameters<typeof prepareGlobalReport>[0]){
-  const report=prepareGlobalReport(input);
+  const report=prepareGlobalReport({...input,decisionVersion:"decision-v2"});
   delete report.decisionVersion;delete report.hierarchy;delete report.entryStudy;delete report.range;
   const sma=report.indicators.sma.find(s=>s.period===55)?.points??[],up=report.paths.find(p=>p.direction==="up"&&p.kind!=="recount");
   // Old primary-only fixtures prioritized their rising-SMA pullback before

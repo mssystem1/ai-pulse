@@ -6,9 +6,11 @@ import { qualifiedGlobalFixture } from "../../../packages/analysis/dist/globalAs
 import {entryPlanFixture} from "../../../packages/analysis/dist/globalEntryPlan.fixtures.js";
 import { createGlobalAssessmentRouter } from "./globalAssessmentRoutes.js";
 import type { getOkxTradeTokens } from "./okxDex.js";
+import {deriveGlobalTradePlan} from "@pulse/domain";
 
-test("structure-v2 recheck loads the named entry frame and retains the shared geometry",async()=>{
-  const {report,market,entry,context}=entryPlanFixture(),calls:string[]=[],before=JSON.stringify(report);
+for(const version of ["decision-v2","decision-v3"] as const)test(`${version} recheck loads the named entry frame and retains the shared geometry`,async()=>{
+  const {report,market,entry,context}=entryPlanFixture(),calls:string[]=[];
+  report.decisionVersion=version;report.tradePlan=deriveGlobalTradePlan(report);const before=JSON.stringify(report);
   const app=express();app.use(express.json());app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{resolveReport:async access=>access.token==="saved-report-capability-0000"?report:null,market:async input=>{calls.push(input.timeframe);const result=[market,entry,context].find(m=>m.bar===input.timeframe);assert.ok(result);return result;}}));
   const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));
   try{
@@ -47,8 +49,9 @@ test("production-shaped saved-report recheck and quoted review reach readiness w
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
-test("structure-v2 X Layer USD₮0 Market/Limit quote review preserves observed xBTC protection without a USDC conversion",async()=>{
+for(const version of ["decision-v2","decision-v3"] as const)test(`${version} X Layer USD₮0 Market/Limit quote review preserves observed xBTC protection without a USDC conversion`,async()=>{
   const {report,market,entry,context}=entryPlanFixture("long","breakout_retest",Date.now()),network=getNetwork("xlayer"),settlement=network.paymentAsset.address!,btc="0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f";
+  report.decisionVersion=version;report.tradePlan=deriveGlobalTradePlan(report);
   let wrongChain=false;
   const app=express();app.use(express.json());
   app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{

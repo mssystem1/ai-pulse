@@ -20,7 +20,7 @@ export function telegramResearchMessage(report: unknown, context: ResearchContex
     const header=[`<b>PULSE · GLOBAL ${global.tier.toUpperCase()} · ${html(global.snapshot.instId)}</b>`,html(globalTimeframeLabel(global.snapshot.timeframe,global.lang)),html(globalCompletedPriceLine(global))];
     const blocks=[...header,"",`<b>${html(d.marketView)}</b>`,...globalDecisionLines(global).filter((_,i)=>i!==1).map(html),"",`<b>${zh?"下一步条件":"Next condition"}</b>`,...d.checklist.map(html),"",`<b>${zh?"计划参考":"Setup references"}</b>`,...globalNextSetupLines(global).slice(1).map(html)];
     let message=blocks.join("\n");
-    const optional=[...(global.tier==="pro"&&d.hierarchy.length?[`<b>${zh?"周期关系":"Timeframe map"}</b>\n${d.hierarchy.map(html).join("\n")}`]:[]),
+    const optional=[`<b>${zh?"买卖入场证据":"BUY / SELL entry evidence"}</b>\n${d.scenarios.map(s=>html(s.line)).join("\n")}`,...(global.tier==="pro"&&d.hierarchy.length?[`<b>${zh?"周期关系":"Timeframe map"}</b>\n${d.hierarchy.map(html).join("\n")}`]:[]),
       ...globalSetupMap(global).paths.filter(p=>global.view.pathIds.includes(p.id)).slice(0,2).map(p=>html(globalPathTitle(global,p))+"\n"+globalPathLines(global,p).slice(0,2).map(html).join("\n")),
       ...(d.previousAttempts.length?[`<b>${zh?"先前尝试":"Previous attempts"}</b>\n${d.previousAttempts.map(html).join("\n")}`]:[])];
     const footer=zh?"已保存快照。重新检查条件无需新报告付款；完整证据见 TXT。":"Saved snapshot. Recheck requires no new report payment. Full evidence is in the TXT.";
@@ -46,8 +46,8 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
   if(!global)return `${presentResearch(report,context).label.slice(0,400)}\nOriginal report snapshot · conditional paths, not guaranteed forecasts.`;
   const d=globalDecision(global),p=globalTradePlan(global),zh=global.lang==="zh";
   const lines=[`PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalFrameReference(global.snapshot.timeframe)}`,
-    `#${globalArtifactReference(global)} · ${global.snapshot.observedAt}`,globalCompletedPriceLine(global),globalDecisionTitle(global),d.nextCondition,
-    ...(d.planningValid?[`${zh?"计划":"Plan"} (${globalFrameReference(d.entryTimeframe)}): ${p.referenceEntry?.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,p.referenceStop)} · ${p.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),d.rewardLine,d.contextLine,
+    `#${globalArtifactReference(global)} · ${global.snapshot.observedAt}`,globalCompletedPriceLine(global),globalDecisionTitle(global),...(d.direction==="BUY / SELL"?d.scenarios.map(s=>`${s.side}: ${s.condition}; ${s.reason}.`):[d.nextCondition]),
+    ...(d.planningValid&&d.direction!=="BUY / SELL"?[`${d.signalObserved?zh?"已观察入场":"Observed entry":zh?"观察区域":"Watch area"} (${globalFrameReference(d.entryTimeframe)}): ${p.referenceEntry?.map(n=>globalPrice(global,n)).join("–")} · ${d.signalObserved?"SL":"Provisional SL"} ${globalPrice(global,p.referenceStop)} · ${p.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),...(d.direction!=="BUY / SELL"?[d.rewardLine]:[]),d.contextLine,
     ...(globalCoverageLine(global)?[globalCoverageLine(global)!]:[]),zh?"保存的行情快照；执行前复核新报价。":"Saved snapshot; recheck a fresh quote before execution."];
   const caption=lines.filter(Boolean).join("\n");if(caption.length>1024)throw Error("Global decision exceeds Telegram caption budget");return caption;
 }

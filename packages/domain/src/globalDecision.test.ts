@@ -30,7 +30,7 @@ test("a rejected buy stays a scenario with its reward reason and no entry risk b
 });
 test("ending an old entry attempt preserves its market route and puts the event in history",()=>{
   const r=qualified("short");r.candles.at(-1)!.high=117.6;r.candles.at(-1)!.close=117.5;r.snapshot.price=117.5;delete r.tradePlan;
-  const d=globalDecision(r);assert.equal(d.currentAction,"WAIT");assert.match(d.reason,/Sell after a 1H rejection/);assert.ok(d.previousAttempts.some(s=>s.includes("Earlier sell test")));
+  const d=globalDecision(r);assert.equal(d.currentAction,"WAIT");assert.match(d.reason,/Sell after a 1H resistance rejection/);assert.ok(d.previousAttempts.some(s=>s.includes("Earlier sell test")));
   assert.match(d.route,/downside references/);assert.doesNotMatch(globalDecisionTitle(r),/INVALIDATED|EXPIRED/);
 });
 test("higher context is relative to the side, and unavailable or opposing context cannot produce BUY",()=>{

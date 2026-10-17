@@ -1,3 +1,4 @@
+import {globalFrameReference} from "./globalContext.js";
 /** Public research content shared by Telegram messages, downloads and the Mini App.
  * Explicit fields keep provider payloads, candle arrays and payment metadata out of exports.
  */
@@ -26,7 +27,7 @@ export function researchServiceTitle(id: string) {
 }
 export function researchIdentity(context: ResearchContext = {}, report?: unknown): ResearchIdentity {
   const global=readGlobalReport(report);
-  if(global){const serviceId=`global-${global.tier}`,subject=global.snapshot.instId,timeframe=global.snapshot.timeframe;return {serviceId,serviceTitle:researchServiceTitle(serviceId),subject,timeframe,label:joined(subject,timeframe,researchServiceTitle(serviceId))};}
+  if(global){const serviceId=`global-${global.tier}`,subject=global.snapshot.instId,timeframe=global.snapshot.timeframe;return {serviceId,serviceTitle:researchServiceTitle(serviceId),subject,timeframe,label:joined(subject,globalFrameReference(timeframe),researchServiceTitle(serviceId))};}
   const data = researchRecord(report), input = researchRecord(context.input), execution = researchRecord(data.executionPlan);
   const primary = researchRecord(items(researchRecord(data.predictionContext).markets)[0]);
   const market = researchRecord(primary.market), token = researchRecord(data.token);

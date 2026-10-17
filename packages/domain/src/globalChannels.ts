@@ -1,4 +1,5 @@
 import type {GlobalReport,GlobalChannel} from "@pulse/schemas";
+import {globalFrameReference} from "./globalContext.js";
 
 /** A parallel channel is constructed in candle-index / linear-price space. */
 export function globalChannelBounds(report:GlobalReport,channel:GlobalChannel,ts:number){
@@ -13,6 +14,7 @@ export function globalChannelLines(report:GlobalReport):string[]{
   return (report.indicators.channels??[]).flatMap(channel=>{
     const bounds=globalChannelBounds(report,channel,last.ts);if(!bounds)return [];
     const direction=channel.base[1].price>channel.base[0].price?zh?"上升":"rising":channel.base[1].price<channel.base[0].price?zh?"下降":"falling":zh?"水平":"horizontal";
-    return [zh?`${channel.timeframe} ${channel.scope==="broad"?"宽":"局部"}${direction}平行通道：下轨 ${price(bounds.lower)}，上轨 ${price(bounds.upper)}；结构参考，非入场信号。`:`${channel.timeframe} ${channel.scope} ${direction} channel: lower ${price(bounds.lower)}, upper ${price(bounds.upper)} at the last bar; structure, not an entry signal.`];
+    const state=channel.priceState??(last.close<bounds.lower?"below":last.close>bounds.upper?"above":"inside");
+    return [zh?`${globalFrameReference(channel.timeframe)} ${channel.scope==="broad"?"宽":"局部"}${direction}平行通道：下轨 ${price(bounds.lower)}，上轨 ${price(bounds.upper)}；价格${state==="inside"?"位于通道内":state==="below"?"位于下轨之外":"位于上轨之外"}。`:`${globalFrameReference(channel.timeframe)} ${channel.scope} ${direction} parallel channel: lower ${price(bounds.lower)}, upper ${price(bounds.upper)}; price ${state==="inside"?"inside":`${state} the channel`}.`];
   });
 }

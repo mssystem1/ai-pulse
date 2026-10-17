@@ -49,7 +49,7 @@ test("Quick and Pro preserve watch prices and tier identity without promoting an
     for(const id of globalSetupMap(report).view.levelIds)assert.ok(svg.includes(report.levels.find(l=>l.id===id)!.price.toFixed(2)),id);
     assert.ok(!/data-stage=/.test(svg));assert.ok(svg.includes("ENTRY PLAN"));assert.ok(!/undefined|NaN/.test(svg));
     assert.equal(report.setup.entryZone,null);assert.equal(report.setup.protectiveStop,null);assert.equal(report.setup.netRewardRisk,null);assert.equal(report.view.pathIds.length,tier==="quick"?2:3);
-    assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),false);
+    assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),tier==="pro");
     assert.equal(globalReportChartSvg(report,{layers:{allSmas:true}})!.includes("SMA144"),tier==="pro");
     assert.ok(svg.includes("1-hour candles"));assert.ok(txt.includes("Primary chart: 1H · 1-hour candles"));
     assert.equal(svg.includes("4-hour candles"),tier==="pro");
