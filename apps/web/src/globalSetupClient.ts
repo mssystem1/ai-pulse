@@ -14,6 +14,8 @@ export async function recheckGlobalSetup(access:GlobalReportAccess,trade?:Record
   return {assessment:GlobalAssessmentSchema.parse(data.assessment),review:data.review,executionLevels:data.executionLevels};
 }
 export function assessmentTitle(a:GlobalAssessment,zh=false):string {
-  const titles={no_trade:zh?"不交易":"NO TRADE",invalidated:zh?"已失效":"INVALIDATED",expired:zh?"已过期":"EXPIRED",waiting_confirmation:zh?"等待完成确认":"WAIT · completed confirmation",waiting_retest:zh?"等待后续回测":"WAIT · subsequent retest",technical_valid:zh?"技术条件有效 · 检查报价":"TECHNICAL SETUP VALID · check quote"};
+  const side=a.side==="short"?zh?"卖出":"sell":zh?"买入":"buy";
+  const direction=a.side==="short"?"SHORT / SELL":a.side==="long"?"LONG / BUY":zh?"入场研究":"ENTRY STUDY",tf=a.entryTimeframe??a.timeframe;
+  const titles={no_trade:zh?`${direction} · ${a.blockers.includes("reward")?"需要更好的收益空间":"入场条件尚未完成"}`:`${direction} · ${a.blockers.includes("reward")?"Entry needs better reward":"Entry conditions incomplete"}`,invalidated:zh?`${direction} · 需要新的 ${tf} 测试`:`${direction} · New ${tf} test needed`,expired:zh?`${direction} · 更新 ${tf} 证据`:`${direction} · Refresh ${tf} evidence`,waiting_confirmation:zh?`${direction} · ${tf} 收盘确认条件`:`${direction} · ${tf} closing condition`,waiting_retest:zh?`${direction} · 需要后续 ${tf} ${a.family&&a.family!=="breakout_retest"?"顺势收盘":"回测"}`:`${direction} · Later ${tf} ${a.family&&a.family!=="breakout_retest"?"follow-through":"retest"} needed`,technical_valid:zh?`${direction} · 信号已确认 · 复核报价`:`${direction} · Signal confirmed · check quote`};
   return titles[a.state];
 }

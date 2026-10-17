@@ -1,23 +1,37 @@
 {
   "purpose": "Historical educational chart images; not current trading signals",
-  "snapshot": {
-    "completedOnly": true,
-    "instId": "BTC-USDT",
-    "lastCandleTs": 1791896400000,
-    "observedAt": "2026-10-13T14:42:01.787Z",
-    "price": 83276,
-    "priceCurrency": "USDT",
-    "pricePrecision": 2,
-    "source": "okx-public-spot",
-    "timeframe": "1H",
-    "venue": "OKX Spot"
-  },
-  "contextTimeframe": "4H",
-  "candles": 520,
+  "source": "packages/analysis/src/globalReport.oct16-fixtures.json",
   "renderer": "PULSE canonical saved-report renderer",
+  "snapshot": {
+    "instId": "BTC-USDT",
+    "timeframe": "1D",
+    "source": "okx-public-spot",
+    "venue": "OKX Spot",
+    "priceCurrency": "USDT",
+    "observedAt": "2026-10-16T10:45:59.901Z",
+    "lastCandleTs": 1791993600000,
+    "price": 82416.7,
+    "pricePrecision": 2,
+    "completedOnly": true
+  },
+  "contextTimeframe": "1Wutc",
+  "savedCandles": 520,
+  "shownCandles": 32,
   "examples": [
     {
       "name": "setup",
+      "layers": {
+        "channel": true
+      },
+      "box": [
+        0,
+        0,
+        1300,
+        774
+      ]
+    },
+    {
+      "name": "directional-plan",
       "layers": {
         "channel": true
       }
@@ -28,14 +42,26 @@
         "channel": false,
         "allSmas": true,
         "regression": true
-      }
+      },
+      "box": [
+        0,
+        0,
+        1300,
+        595
+      ]
     },
     {
       "name": "fibonacci",
       "layers": {
         "channel": false,
         "fibonacci": true
-      }
+      },
+      "box": [
+        0,
+        0,
+        1300,
+        595
+      ]
     },
     {
       "name": "vwap-atr-pivots",
@@ -44,26 +70,33 @@
         "vwap": true,
         "atr": true,
         "pivots": true
-      }
+      },
+      "box": [
+        0,
+        0,
+        1300,
+        595
+      ]
     },
     {
       "name": "rsi-context",
       "layers": {
         "channel": false
-      }
+      },
+      "box": [
+        40,
+        594,
+        1240,
+        169
+      ]
     }
   ],
-  "directionalPlan": {
-    "image": "directional-plan.png",
-    "source": "Public OHLCV and canonical numeric evidence from the reported BTC-USDT daily snapshot; no wallet/payment data or provider prose",
-    "observedAt": "2026-10-14T13:05:18.369Z",
-    "primaryTimeframe": "1D",
-    "contextTimeframe": "1Wutc",
-    "savedCandles": 520,
-    "shownCandles": 180,
-    "width": 2600,
-    "height": 2328,
-    "modelGenerated": false,
-    "priceReference": "Last completed 1D close; candle ended 2026-10-13T16:00:00Z. Not a live quote."
-  }
+  "additionalImages": {
+    "risk-no-trade": "oct16 Pro 1D public replay",
+    "risk-setup": "oct16 Pro 4H public replay",
+    "setup-review-flow": "Authored workflow diagram"
+  },
+  "regenerate": "node scripts/validate-global-setup.mjs --write-docs && node scripts/render-global-guide.mjs",
+  "modelCalls": 0,
+  "walletData": false
 }

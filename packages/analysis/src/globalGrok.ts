@@ -3,13 +3,14 @@ import { GlobalNarrativeSchema, SpotGeneratedAnalysisSchema, type GlobalNarrativ
 import { systemPrompt, userPromptPayload } from "./prompts.js";
 import { spotOutputTokenLimit, type GrokConfig, type AnalysisRequest, type AnalysisResult } from "./grok.js";
 import { GLOBAL_HISTORY_LIMIT, globalContextTimeframe, prepareGlobalReport, globalPromptEvidence, finishGlobalReport, globalCompatibility } from "./globalReport.js";
+import {loadGlobalMarketSet} from "./globalMarketSet.js";
 
 function narrativeJsonSchema(report: GlobalReport) {
   const ids = report.view.pathIds;
   const nullableId = (values: string[]) => ({ type: ["string", "null"], enum: [...values, null] });
   return { type: "object", additionalProperties: false, properties: {
     headline: { type: "string" }, summary: { type: "string" }, regime: { type: "string", enum: ["trend_up", "trend_down", "range", "transition"] }, bias: { type: "string", enum: ["bullish", "bearish", "neutral"] }, confidence: { type: "number", minimum: 0, maximum: 100 },
-    waveCandidateId: nullableId([report.waveCount.id]), mainPathId: nullableId(ids), setupPathId: report.setup.pathId ? {type:"string",enum:[report.setup.pathId]} : {type:"null"},
+    waveCandidateId: nullableId([report.waveCount.id]), mainPathId: nullableId(report.paths.filter(p=>p.role==="main").map(p=>p.id)), setupPathId: report.setup.pathId ? {type:"string",enum:[report.setup.pathId]} : {type:"null"},
     reasons: { type: "array", items: { type: "string" } },
     pathNotes: { type: "array", maxItems: ids.length, items: { type: "object", additionalProperties: false, properties: { pathId: { type: "string", enum: ids.length ? ids : ["unavailable"] }, thesis: { type: "string" } }, required: ["pathId", "thesis"] } },
     riskNotes: { type: "array", items: { type: "string" } }, limitations: { type: "array", items: { type: "string" } }, disclaimer: { type: "string" },
@@ -39,19 +40,14 @@ function legacyNarrative(candidate: Record<string, unknown>, prepared: GlobalRep
 }
 export async function runGrokAnalysis(cfg: GrokConfig, req: AnalysisRequest): Promise<AnalysisResult> {
   if (!cfg.apiKey) throw new Error("XAI_API_KEY not configured");
-  const timeframe = req.timeframe ?? "1H", contextFrame = globalContextTimeframe(timeframe);
-  const [primary, context] = await Promise.allSettled([
-    buildMarketContext({ instId: req.instId, timeframe, candleLimit: Math.max(GLOBAL_HISTORY_LIMIT, req.candleLimit ?? 0), completedOnly: true }),
-    req.tier === "premium" && contextFrame ? buildMarketContext({ instId: req.instId, timeframe: contextFrame, candleLimit: 300, completedOnly: true }) : Promise.resolve(null),
-  ]);
-  if (primary.status === "rejected") throw primary.reason;
-  return runPreparedSpotAnalysis(cfg, { ...req, contextMarket: context.status === "fulfilled" ? context.value : null }, primary.value);
+  const set=await loadGlobalMarketSet({instId:req.instId,timeframe:req.timeframe??"1H"},buildMarketContext);
+  return runPreparedSpotAnalysis(cfg, { ...req,contextMarket:set.contextMarket,hierarchyMarkets:set.hierarchyMarkets },set.market);
 }
 /** Every presentation consumes this saved result; reopening never calls xAI. */
 export async function runPreparedSpotAnalysis(cfg: GrokConfig, req: AnalysisRequest, market: SpotMarketContext): Promise<AnalysisResult> {
   if (!cfg.apiKey) throw new Error("XAI_API_KEY not configured");
   const lang = req.lang ?? "en", timeframe = market.bar;
-  const prepared = prepareGlobalReport({ market, tier: req.tier, lang, contextMarket: req.contextMarket });
+  const prepared = prepareGlobalReport({ market, tier: req.tier, lang, contextMarket: req.contextMarket,hierarchyMarkets:req.hierarchyMarkets });
   const sys = systemPrompt(req.tier, lang), marketJson = JSON.stringify(globalPromptEvidence(prepared));
   const user = userPromptPayload({ tier: req.tier, lang, instId: market.instId, timeframe, marketJson, hasImage: false, userNote: req.userNote });
   const estimated = Math.ceil((sys.length + user.length) / 3);

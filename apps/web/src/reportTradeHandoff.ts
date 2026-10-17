@@ -1,11 +1,11 @@
 import type { ReportTradeIntent } from "./Report";
-import { readGlobalReport, globalTradePlan } from "@pulse/domain";
+import { readGlobalReport, globalTradePlan, globalDecision } from "@pulse/domain";
 
 export function buildReportBuyIntent(data: Record<string, unknown>, orderType: "market" | "limit"): ReportTradeIntent {
   const global = readGlobalReport(data);
   if (global) {
     const s = global.setup, target = global.levels.find(l => l.id === s.targetIds[0])?.price;
-    if (s.state !== "ready" || !s.expiresAt || Date.now() >= s.expiresAt || !s.entryZone || s.protectiveStop === null || !target || s.netRewardRisk === null || s.netRewardRisk < 1.5)
+    if (globalDecision(global).currentAction!=="BUY" || s.state !== "ready" || !s.expiresAt || Date.now() >= s.expiresAt || !s.entryZone || s.protectiveStop === null || !target || s.netRewardRisk === null || s.netRewardRisk < 1.5)
       throw new Error("This saved setup is not ready. Fresh confirmation, protection and execution costs are required.");
     return { pair: global.snapshot.instId, timeframe: global.snapshot.timeframe, side: "buy", orderType, entryPrice: s.entryZone[1], observedPrice: global.snapshot.price ?? undefined, takeProfit: target, stopLoss: s.protectiveStop, rationale: "Observed report retest and protection. Recheck the current quote, costs and invalidation before wallet approval.", sourceTier: global.tier, reportSetupMode: "confirmed" };
   }
@@ -34,7 +34,7 @@ export function buildReportManualBuyIntent(data: Record<string, unknown>, orderT
     return {...buildReportBuyIntent(data,orderType),reportSetupMode:"manual"};
   }
   const s=global.setup,target=global.levels.find(l=>l.id===s.targetIds[0])?.price;
-  const observed=s.state==="watching" && s.expiresAt!==null && Date.now()<s.expiresAt && s.entryZone!==null && s.protectiveStop!==null && s.protectiveStop<s.entryZone[0] && target!==undefined && target>s.entryZone[1];
+  const observed=["watching","ready"].includes(s.state) && s.expiresAt!==null && Date.now()<s.expiresAt && s.entryZone!==null && s.protectiveStop!==null && s.protectiveStop<s.entryZone[0] && target!==undefined && target>s.entryZone[1];
   return {pair:global.snapshot.instId,timeframe:global.snapshot.timeframe,side:"buy",orderType,observedPrice:global.snapshot.price??undefined,
     ...(observed?{entryPrice:s.entryZone![1],takeProfit:target,stopLoss:s.protectiveStop!}:{}),
     rationale:`Manual trade selected with risk acceptance. Saved report setup: ${s.state}. ${observed?"Observed entry, TP and SL are loaded for review; confirmation, execution costs and current conditions still require your checks.":"The report has no current confirmed protection to copy. Configure entry, TP and SL in Spot before signing."}`,
@@ -44,8 +44,8 @@ export function buildReportManualBuyIntent(data: Record<string, unknown>, orderT
  * short TP/SL must not be attached to a Spot exit or inverted into a buy. */
 export function buildReportSellIntent(data: Record<string,unknown>,orderType:"market"|"limit"):ReportTradeIntent {
   const report=readGlobalReport(data);
-  if(!report || globalTradePlan(report).side!=="short")throw new Error("A valid bearish research plan is required to prepare an owned Spot sell.");
-  return {pair:report.snapshot.instId,timeframe:report.snapshot.timeframe,side:"sell",orderType,observedPrice:report.snapshot.price ?? undefined,sourceTier:report.tier,reportSetupMode:"manual",rationale:"Manual sell/reduce of owned Spot inventory. This research short plan does not open a leveraged short or copy short TP/SL. Choose the quantity and current execution price before signing."};
+  if(!report)throw new Error("A valid Global report is required to prepare an owned Spot sell.");
+  return {pair:report.snapshot.instId,timeframe:report.snapshot.timeframe,side:"sell",orderType,observedPrice:report.snapshot.price ?? undefined,sourceTier:report.tier,reportSetupMode:"manual",rationale:"Manual sell/reduce of owned Spot inventory, independently of the research direction. This ticket does not open a leveraged short or copy short TP/SL. Choose the quantity and current execution price before signing."};
 }
 
 /** Carry only the order-type choice; prices always come from the saved report. */

@@ -14,6 +14,7 @@ export const GlobalAssessmentSchema = z.object({
   observedStop: z.number().finite().positive().nullable(), targets: z.array(z.number().finite().positive()),
   grossRewardRisk: z.number().finite().nullable(), stopDistancePercent: z.number().finite().nullable(), stopDistanceAtr: z.number().finite().nullable(),
   context: z.enum(["supports","conflicts","neutral","unknown"]),
+  analysisTimeframe:z.string().optional(),entryTimeframe:z.string().optional(),family:z.string().optional(),
   blockers: z.array(z.string()), lines: z.array(z.string()),
 });
 export type GlobalAssessment = z.infer<typeof GlobalAssessmentSchema>;

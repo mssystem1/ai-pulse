@@ -2,6 +2,11 @@ import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalR
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
 import { globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalSetupMap, globalArtifactReference } from "./globalPolicy.js";
+import {globalDecision,globalDecisionTitle,globalDecisionLines} from "./globalDecision.js";
+import {globalFrameReference} from "./globalContext.js";
+import {globalCoverageLine} from "./globalCoverage.js";
+import {globalRangeSummary} from "./globalRange.js";
+import {globalContextLine,globalSession,globalFrameName} from "./globalContext.js";
 
 export type { GlobalReport, GlobalPath } from "@pulse/schemas";
 export const GLOBAL_PATH_COLORS = { correction: "#f0738c", recovery: "#f6c368", continuation: "#53dabb", recount: "#53dabb", range: "#9dabcf", pullback: "#f6c368" };
@@ -40,19 +45,21 @@ export function globalLevelPrice(report: GlobalReport, id: string | null | undef
 export function globalCompletedPriceLine(report: GlobalReport): string {
   const ts=report.candles.at(-1)?.ts,closed=ts===undefined?null:candleCloseTime(ts,report.snapshot.timeframe);
   const when=closed===null?"":new Date(closed).toISOString().slice(0,16).replace("T"," ")+" UTC";
-  return report.lang==="zh"?`价格参考：最后完整 ${report.snapshot.timeframe} K 线收盘 ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · 收盘时间 ${when}`:""}；非实时报价。`:`Reference: last completed ${report.snapshot.timeframe} close ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · bar closed ${when}`:""}; not a live quote.`;
+  return report.lang==="zh"?`价格参考：最后完整 ${globalFrameReference(report.snapshot.timeframe)} K 线收盘 ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · 收盘时间 ${when}`:""}；非实时报价。`:`Reference: last completed ${globalFrameReference(report.snapshot.timeframe)} close ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${when?` · bar closed ${when}`:""}; not a live quote.`;
 }
 export function globalTimeframeLabel(timeframe: string, lang: "en" | "zh"): string {
   const frame = parseCandleTimeframe(timeframe);
   if (!frame) return timeframe;
   const names = { minute: ["minute", "分钟"], hour: ["hour", "小时"], day: ["day", "天"], week: ["week", "周"], month: ["month", "个月"] } as const;
   const name = names[frame.unit];
-  return lang === "zh" ? `${timeframe} · 每根 K 线 ${frame.count} ${name[1]}` : `${timeframe} · ${frame.count}-${name[0]} candles`;
+  const session=["day","week","month"].includes(frame.unit)?` (${globalSession(timeframe)})`:"";
+  return lang === "zh" ? `${globalFrameName(timeframe)}${session} · 每根 K 线 ${frame.count} ${name[1]}` : `${globalFrameName(timeframe)}${session} · ${frame.count}-${name[0]} candles`;
 }
 /** Resolve known internal references in provider prose through the saved map.
  * Older saved narratives remain immutable; presentation never prints ID codes. */
 export function globalHumanText(report:GlobalReport,value:string):string {
-  return report.levels.filter(level=>level.id.startsWith("level-")).sort((a,b)=>b.id.length-a.id.length).reduce((text,level)=>text.split(level.id).join(`${globalPrice(report,level.price)} ${report.snapshot.priceCurrency}`),value);
+  const human=value.replace(/\b(\d+[DWM])utc\b/gi,frame=>globalFrameReference(frame));
+  return report.levels.filter(level=>level.id.startsWith("level-")).sort((a,b)=>b.id.length-a.id.length).reduce((text,level)=>text.split(level.id).join(`${globalPrice(report,level.price)} ${report.snapshot.priceCurrency}`),human);
 }
 export function globalPathTitle(report: GlobalReport, path: GlobalPath): string {
   const index = report.view.pathIds.indexOf(path.id) + 1;
@@ -61,7 +68,7 @@ export function globalPathTitle(report: GlobalReport, path: GlobalPath): string 
 export function globalPathLines(report: GlobalReport, original: GlobalPath): string[] {
   const path={...original,thesis:globalHumanText(report,original.thesis)};
   const trigger = globalLevelPrice(report, path.triggerLevelId), invalid = globalLevelPrice(report, path.invalidationLevelId), targets = path.targetIds.map(id => globalLevelPrice(report, id)).join(" → "), tf = report.snapshot.timeframe, zh = report.lang === "zh";
-  if (path.direction === "range") return [zh ? `${trigger} 至 ${targets} 区间内观察；完整收盘突破任一边界后重新评估。` : `Watch the range ${trigger}–${targets}; a completed close outside either boundary requires reassessment.`, path.thesis].filter(Boolean);
+  if (path.direction === "range") return [globalRangeSummary(report)??(zh ? `${trigger} 至 ${targets} 区间内观察；完整收盘突破任一边界后重新评估。` : `Watch the range ${trigger}–${targets}; a completed close outside either boundary requires reassessment.`), path.thesis].filter(Boolean);
   if (path.confirmation === "support_hold") return [zh ? `等待回调至 ${trigger}，${tf} 完整收盘守住支撑，然后再次回测守住：${targets}。` : `Wait for a pullback to ${trigger}, a completed ${tf} close holding support, then a subsequent held test: ${targets}.`,zh ? `完整收盘跌破 ${invalid} 时取消；不追涨。` : `Cancel on a completed close below ${invalid}; do not chase above the planned zone.`,path.thesis].filter(Boolean);
   const first=globalLevelPrice(report,path.targetIds[0]),next=path.targetIds.slice(1).map(id=>globalLevelPrice(report,id)).join(" → ");
   const stress=path.stress&&report.tier==="pro"?(zh?`压力分支：仅在 ${tf} 完整收盘跌破 ${globalLevelPrice(report,path.stress.triggerLevelId)} 后，才观察 ${path.stress.targetIds.map(id=>globalLevelPrice(report,id)).join(" → ")}。这不是现货目标。`:`Stress: only after a completed ${tf} close below ${globalLevelPrice(report,path.stress.triggerLevelId)}, watch ${path.stress.targetIds.map(id=>globalLevelPrice(report,id)).join(" → ")}. This is not a Spot target.`):"";
@@ -106,11 +113,7 @@ export function globalSetupFailureLines(report: GlobalReport): string[] {
   return [zh?"保存的先前尝试已失效；不支持当前入场。":"The saved previous attempt is inactive; it does not support entry."];
 }
 export function globalTradePlanTitle(report: GlobalReport): string {
-  const p=globalTradePlan(report),zh=report.lang==="zh";
-  const title=p.side==="long"?zh?"条件做多 / 现货买入":"Conditional long / Spot buy":p.side==="short"?zh?"条件做空 / 卖出持有的现货":"Conditional short / sell owned Spot":zh?"等待有效价格结构":"Wait for a usable price structure";
-  const state=globalEligibility(report);
-  const labels={no_trade:zh?"不交易 · 收益或结构不足":"NO TRADE · reward or structure insufficient",invalidated:zh?"已失效 · 需要新确认":"INVALIDATED · fresh confirmation required",expired:zh?"已过期 · 重新检查":"EXPIRED · recheck setup",waiting_confirmation:zh?"等待确认":"WAIT · confirmation required",waiting_retest:zh?"等待回测":"WAIT · subsequent retest required",technical_valid:zh?"技术条件有效 · 检查报价":"TECHNICAL SETUP VALID · check quote"};
-  return `${labels[state]} · ${title}`;
+  return globalDecisionTitle(report);
 }
 export function globalConfirmationCorrection(report:GlobalReport):string|null {
   const saved=report.tradePlan,shown=globalTradePlan(report);
@@ -119,6 +122,7 @@ export function globalConfirmationCorrection(report:GlobalReport):string|null {
   return report.lang==="zh"?"确认复核：保存的 K 线不支持先前确认。价位保持不变；须新的有效确认与后续测试。原始分析文字生成于此复核之前。":"Confirmation review: the saved candles do not support the previous confirmation. Prices are preserved; a fresh valid confirmation and subsequent test are required. The original narrative predates this correction.";
 }
 export function globalTradePlanLines(report: GlobalReport): string[] {
+  if(report.tradePlan?.method==="structure-v2")return [globalTradePlanTitle(report),...globalNextSetupLines(report),...globalRiskLines(report)];
   const p=globalTradePlan(report),zh=report.lang==="zh",tf=report.snapshot.timeframe;
   if(p.side==="none")return [globalTradePlanTitle(report),zh?"已保存的数据不足以确定有依据的入场、风险参考和目标。":"The saved map lacks sufficient levels or completed history to define entry, risk reference and targets."];
   const trigger=globalLevelPrice(report,p.triggerLevelId),invalid=globalLevelPrice(report,p.invalidationLevelId);
@@ -135,6 +139,13 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
     ...p.blockers.map(key=>blockers[key]),
     p.blockers.includes("reward")?zh?"新入场因收益不足而放弃；仅有确认无法弥补收益不足。减持已持有现货须单独决定并核查新报价。":"New entry is avoided for insufficient reward; confirmation alone does not repair it. Review any owned Spot reduction separately with a fresh quote.":p.side==="short"?zh?"现货操作：仅卖出或减持已持有资产；做空研究不创建杠杆空仓。":"Spot action: sell/reduce owned inventory on confirmation. Short research does not open a leveraged short.":zh?"现货操作：确认后复核买入；实际止损依据已观察回测，批准前复核实时费用。":"Spot action: review a buy after confirmation; executable SL comes from the observed retest and costs require a fresh quote."];
 }
+/** Compact next-setup detail; old prices remain identifiable as references. */
+export function globalNextSetupLines(report:GlobalReport):string[] {
+  const d=globalDecision(report),p=globalTradePlan(report),zh=report.lang==="zh";
+  const target=p.targetIds.map((id,i)=>`${d.planningValid?`TP${i+1}`:zh?`目标 ${i+1}`:`Objective ${i+1}`} ${globalLevelPrice(report,id)}`).join(" → ");
+  return [d.nextCondition,`${zh?"分析周期":"Analysis"}: ${globalFrameReference(report.snapshot.timeframe)} · ${zh?"入场周期":"Entry study"}: ${globalFrameReference(d.entryTimeframe)}`,...(p.referenceEntry?[`${zh?"计划入场区间":"Planned entry zone"}: ${p.referenceEntry.map(n=>globalPrice(report,n)).join("–")}`]:[]),
+    ...(p.referenceStop?[`${zh?"计划止损参考":"Planned SL"}: ${globalPrice(report,p.referenceStop)}${p.stopBasis?` · ${globalHumanText(report,p.stopBasis)}`:""}`]:[]),...(target?[target]:[]),d.rewardLine,d.changeView].filter(Boolean);
+}
 export function globalMissingLabel(report: GlobalReport, key: GlobalReport["setup"]["missing"][number]): string {
   if(key === "context" && (report.context.status !== "available" || report.context.agreement === "unknown")) return report.lang === "zh" ? "独立高周期背景不可用，继续观察" : "Independent context unavailable; keep watching";
   return globalLabel(key === "execution_costs" ? "costs" : key === "targets" ? "targetMissing" : key === "context" ? "contextMissing" : key, report.lang);
@@ -142,6 +153,7 @@ export function globalMissingLabel(report: GlobalReport, key: GlobalReport["setu
 export function globalRiskLines(report:GlobalReport):string[] {
   const risk=globalRiskMeasurement(report),zh=report.lang==="zh";
   if(!risk)return [];
+  if(report.tradePlan?.method==="structure-v2")return [zh?`计划风险：每单位 ${globalPrice(report,risk.distance)} · ${risk.percent.toFixed(2)}% · ${risk.atr?.toFixed(2)??"—"} × ${risk.timeframe} ATR14。`:`Planned risk per unit: ${globalPrice(report,risk.distance)} · ${risk.percent.toFixed(2)}% · ${risk.atr?.toFixed(2)??"—"} × ${risk.timeframe} ATR14.`,zh?`主图结构 ${report.snapshot.timeframe}；入场与保护依据 ${risk.timeframe} 结构及反应极值，非主图固定 ATR 止损。`:`Analysis structure: ${report.snapshot.timeframe}; entry and protection use ${risk.timeframe} structure and reaction extremes.`,...(risk.atr!==null&&risk.atr<1?[zh?"止损小于一根入场周期平均波幅；普通波动可能触发。实际仓位须根据可承受亏损和费用决定。":"The stop is inside one average entry-timeframe range; ordinary volatility can trigger it. Size the position from acceptable loss and costs."]:[]),zh?"信号确认不代表成交。重新检查证据和金额对应报价后复核订单。":"A confirmed signal is not a fill. Recheck evidence and an amount-specific quote before reviewing an order."];
   const p=globalTradePlan(report),e=p.side!=="none"&&p.triggerLevelId&&p.invalidationLevelId?globalConfirmationEvidence(report,{...p,side:p.side,triggerLevelId:p.triggerLevelId,invalidationLevelId:p.invalidationLevelId}):null;
   const failure=e?.failure;
   const cause=failure?(e.failureReason==="floor"?(zh?`${p.side==="long"?"最低":"最高"}价 ${globalPrice(report,p.side==="long"?failure.low:failure.high)} 触及或突破结构失效位 ${globalLevelPrice(report,p.invalidationLevelId)}`:`${p.side==="long"?"low":"high"} ${globalPrice(report,p.side==="long"?failure.low:failure.high)} touched/broke the structural boundary ${globalLevelPrice(report,p.invalidationLevelId)}`):e.failureReason==="trigger"?(zh?`收盘 ${globalPrice(report,failure.close)} 未守住触发位 ${globalLevelPrice(report,p.triggerLevelId)}`:`close ${globalPrice(report,failure.close)} failed the trigger ${globalLevelPrice(report,p.triggerLevelId)}`):(zh?"触及计划止损参考位":"planned reference stop was touched")):null;
@@ -160,7 +172,7 @@ export function globalRemoteLevelLines(report:GlobalReport):string[] {
   const atr=report.indicators.atr.points.at(-1)?.value,close=report.snapshot.price;
   return globalRemoteLevels(report).map(l=>{
     const anchor=l.anchorIds.map(id=>report.indicators.pivots.find(p=>p.id===id)?.ts??Number(/^range-(\d+)-/.exec(id)?.[1])).find(Number.isFinite);
-    const derived=l.basis!=="swing",kind=report.lang==="zh"?(derived?l.basis==="extension"?"计算的斐波那契扩展":"计算的斐波那契回撤":"历史价格"):(derived?l.basis==="extension"?"derived Fibonacci extension":"derived Fibonacci retracement":"historical price");
+    const derived=l.basis!=="swing",kind=report.lang==="zh"?(derived?l.basis==="extension"?(l.anchorIds.length===3?"三点斐波那契扩展":"两点摆动投射"):"计算的斐波那契回撤":"历史价格"):(derived?l.basis==="extension"?(l.anchorIds.length===3?"three-anchor Fibonacci extension":"two-anchor swing projection"):"derived Fibonacci retracement":"historical price");
     return `${globalPrice(report,l.price)} · ${kind} · ${close?((l.price/close-1)*100).toFixed(2):"—"}% · ${atr&&close?(Math.abs(l.price-close)/atr).toFixed(2):"—"} ATR${anchor?` · ${derived?(report.lang==="zh"?"锚点日期 ":"anchor date "):""}${new Date(anchor).toISOString().slice(0,10)}`:""} · ${report.lang==="zh"?"远期背景参考，不是本周期交易目标":"distant context reference, not a setup target"}`;
   });
 }
@@ -169,32 +181,32 @@ export function globalEvidenceLines(report: GlobalReport): string[] {
   const { indicators: i, context: c, lang } = report, zh = lang === "zh";
   const smas = i.sma.filter(s => report.view.smaPeriods.includes(s.period)).map(s => `SMA${s.period} ${globalPrice(report, s.points.at(-1)?.value)}`).join(" · ");
   const rsi = i.rsi.points.at(-1)?.value, atr = i.atr.points.at(-1)?.value;
-  const agreement = c.agreement === "conflicts" ? zh ? "与恢复冲突" : "conflicts with recovery" : c.agreement === "supports" ? zh ? "支持恢复" : "supports recovery" : c.agreement==="neutral"?zh?"中性":"neutral":globalLabel("unavailable", lang);
   return [smas,
     `RSI14 ${rsi === undefined ? "—" : rsi.toFixed(2)} · ATR14 ${globalPrice(report, atr)} · ${zh ? "成交量/前20根均值" : "volume / prior 20 bars"} ${i.volumeRatio === null ? "—" : `${i.volumeRatio.toFixed(2)}×`}`,
-    c.status === "available" ? `${c.timeframe} ${globalLabel("context", lang)}: ${agreement} · SMA55 ${globalPrice(report, c.sma55.at(-1)?.value)}` : `${c.timeframe ?? "—"} ${globalLabel("context", lang)}: ${globalLabel("unavailable", lang)}`,
+    `${globalContextLine(report,globalTradePlan(report).side)} · SMA55 ${globalPrice(report,c.sma55.at(-1)?.value)}`,
     zh ? "RSI 超卖本身不确认入场。SMA、波浪与斐波那契共享价格证据；不应当作独立投票。" : "Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.",
   ];
 }
 export function globalWaveEvidenceLines(report:GlobalReport):string[]{const zh=report.lang==="zh",copy:Record<string,string>={wave_2_holds_origin:zh?"浪 2 未突破起点":"Wave 2 holds the origin",wave_3_not_shortest:zh?"浪 3 不是最短推动浪":"Wave 3 is not the shortest impulse leg",wave_4_no_overlap:zh?"浪 4 未重叠浪 1":"Wave 4 does not overlap Wave 1",alternating_confirmed_pivots:zh?"转折点经右侧三根完整 K 线确认":"Alternating pivots confirmed by three subsequent completed bars",partial_count_4_5_unobserved:zh?"浪 4、5 尚未形成":"Waves 4 and 5 have not been observed",candidate_abc_after_impulse:zh?"推动浪后为候选 A–B–C 调整":"Candidate A–B–C correction follows the impulse"};return report.waveCount.validation.flatMap(key=>copy[key]?[copy[key]]:[]);}
 export function globalSections(report: GlobalReport): Array<{title: string; lines: string[]; featured?: boolean}> {
-  const { lang } = report;
+  const { lang } = report,d=globalDecision(report),zh=lang==="zh";
   return [
-    ...(globalConfirmationCorrection(report)?[{title:lang==="zh"?"保存确认复核":"Saved confirmation review",lines:[globalConfirmationCorrection(report)!],featured:true}]:[]),
+    {title:zh?"当前决策":"Current decision",lines:globalDecisionLines(report),featured:true},
+    {title:zh?"下一步条件":"Next condition",lines:d.checklist,featured:true},
+    {title:zh?"计划参考":"Setup references",lines:globalNextSetupLines(report),featured:true},
+    ...(report.tier==="pro"?[{title:zh?"周期关系":"Timeframe map",lines:d.hierarchy.length?d.hierarchy:[d.contextLine,d.relationship]}]:[]),
     { title: lang === "zh" ? "图表周期" : "Chart timeframes", lines: [
       `${lang==="zh"?"报告参考":"Report reference"}: #${globalArtifactReference(report)} · ${report.snapshot.observedAt}`,
       `${lang === "zh" ? "主图" : "Primary chart"}: ${globalTimeframeLabel(report.snapshot.timeframe, lang)}`,
+      ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),
       ...(report.tier === "pro" ? [`${globalLabel("context", lang)}: ${globalTimeframeLabel(report.context.timeframe ?? "—", lang)}${report.context.status === "available" ? "" : ` · ${globalLabel("unavailable", lang)}`}`] : []),
     ] },
-    { title: globalLabel("wave", lang), lines: [report.waveCount.status === "unclear" ? globalLabel("unclear", lang) : `${lang === "zh" ? "候选" : "Candidate"} · ${report.waveCount.structure.replaceAll("_", " ")} · ${report.waveCount.activeWave} · ${report.waveCount.direction} · ${report.waveCount.degree}`, ...globalWaveExplanationLines(report)], featured: true },
-    { title: globalLabel("moves", lang), lines: globalSetupMap(report).paths.filter(p => report.view.pathIds.includes(p.id)).flatMap(p => [globalPathTitle(report, p), ...globalPathLines(report, p)]), featured: true },
-    { title: lang==="zh"?"远期历史背景":"Distant historical context", lines: globalRemoteLevelLines(report) },
-    { title: lang==="zh"?"方向性交易计划":"Directional trade plan", lines: globalTradePlanLines(report), featured: true },
-    { title: globalLabel("setup", lang), lines: globalSetupLines(report), featured: true },
+    { title: globalLabel("moves", lang), lines: globalSetupMap(report).paths.filter(p => report.view.pathIds.includes(p.id)).flatMap(p => [globalPathTitle(report, p), ...globalPathLines(report, p).filter(line=>line!==globalHumanText(report,p.thesis)).slice(0,2)]), featured: true },
+    { title: globalLabel("wave", lang), lines: [report.waveCount.status === "unclear" ? globalLabel("unclear", lang) : `${lang === "zh" ? "候选" : "Candidate"} · ${report.waveCount.structure.replaceAll("_", " ")} · ${report.waveCount.activeWave} · ${report.waveCount.direction}`, ...globalWaveExplanationLines(report).filter(s=>s.includes("hypothesis:")||s.includes("假设：")||s.includes("Only a 1–2")||s.includes("仅有浪"))] },
     { title: globalLabel("evidence", lang), lines: globalEvidenceLines(report), featured: true },
-    { title: globalLabel("reasons", lang), lines: report.narrative.reasons.map(s=>globalHumanText(report,s)) },
-    { title: globalLabel("risks", lang), lines: report.narrative.riskNotes.map(s=>globalHumanText(report,s)), featured: true },
-    { title: globalLabel("limitations", lang), lines: report.narrative.limitations.map(s=>globalHumanText(report,s)), featured: true },
+    {title:zh?"风险参考":"Risk reference",lines:d.risk?[`${d.risk.percent.toFixed(2)}% · ${d.risk.atr?.toFixed(2)??"—"} × ${d.risk.timeframe} ATR14`,...(d.risk.atr!==null&&d.risk.atr<1?[zh?"参考止损小于一根平均 K 线波幅；实际止损需依据回测和结构确定。":"The reference stop is inside one average bar range; actual protection must follow the observed test and structure."]:[])]:[]},
+    {title:zh?"先前尝试":"Previous attempts",lines:d.previousAttempts},
+    ...(report.decisionVersion?[{title:globalLabel("reasons",lang),lines:report.narrative.reasons.map(s=>globalHumanText(report,s))}]:[]),
   ].filter(s => s.lines.length > 0);
 }
 export function globalWaveExplanationLines(report: GlobalReport): string[] {

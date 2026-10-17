@@ -1,6 +1,8 @@
 import type { SpotMarketContext } from "@pulse/market";
-import { deriveGlobalTradePlan, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence, globalLocalLevels, globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalTradePlanTitle, globalTradePlanLines } from "@pulse/domain";
+import { deriveGlobalTradePlan, selectGlobalTradePlan, globalPlanCandidates, globalDecision, globalContextRelation, globalConfirmationEvidence, globalSetupAttemptEvidence,globalPrimaryAttemptEvidence, globalLocalLevels, globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalTradePlanTitle, globalTradePlanLines } from "@pulse/domain";
 import { GlobalReportSchema, candleTimeframeMs, candleCloseTime, parseCandleTimeframe, type GlobalReport, type GlobalCandle, type GlobalAnchor, type GlobalLevel, type GlobalPath, type GlobalNarrative } from "@pulse/schemas";
+import {globalEntryTimeframe} from "@pulse/domain";
+import {globalPriceStructures,globalPriceRange} from "./globalStructures.js";
 
 export const GLOBAL_HISTORY_LIMIT = 520;
 type Point = { ts: number; value: number };
@@ -151,12 +153,23 @@ export function evaluateGlobalSetup(report: GlobalReport, costsBps: number | nul
   if (cost === null) missing.push("execution_costs");
   if (last.close < entryZone[0] || last.close > entryZone[1]) missing.push("entry_price");
   if (grossRewardRisk < 1.5 || (netRewardRisk !== null && netRewardRisk < 1.5)) missing.push("reward");
-  if (report.tier === "pro" && (report.context.status !== "available" || report.context.agreement === "conflicts" || report.context.agreement === "unknown")) missing.push("context");
+  if ((report.decisionVersion||report.tier==="pro")&&["opposing","unavailable"].includes(globalContextRelation(report,"long")))missing.push("context");
   return { ...confirmedSetup, state: missing.length ? "watching" : "ready", retestTs: retest.ts, entryZone, protectiveStop, grossRewardRisk, netRewardRisk, missing };
 }
 
+export function globalFrameEvidence(source:SpotMarketContext,observedAt=source.fetchedAt):NonNullable<GlobalReport["hierarchy"]>[number] {
+  const timeframe=source.bar,bars=completedGlobalCandles({...source,fetchedAt:observedAt}),mean=globalSma(bars,55),p=globalConfirmedPivots(bars).filter(p=>p.ts>=(bars.at(-64)?.ts??0)),hi=p.filter(p=>p.kind==="high").slice(-2),lo=p.filter(p=>p.kind==="low").slice(-2);
+  const structure=hi.length===2&&lo.length===2?(hi[1].price>hi[0].price&&lo[1].price>lo[0].price?"up":hi[1].price<hi[0].price&&lo[1].price<lo[0].price?"down":"range"):"mixed";
+  const price=bars.at(-1)?.close??null,sma55=mean.at(-1)?.value??null,smaChange=mean.length>10?mean.at(-1)!.value-mean.at(-11)!.value:null;
+  const trend=price!==null&&sma55!==null&&smaChange!==null?(price>sma55&&smaChange>0?"up":price<sma55&&smaChange<0?"down":"mixed"):"mixed";
+  const range=globalPriceRange(bars,p,globalWilderIndicators(bars).atr.at(-1)?.value??0,timeframe);
+  const bias=range?"range":structure!=="mixed"&&structure!=="range"&&(trend===structure||trend==="mixed")?structure:"mixed";
+  const completedAt=bars.length?candleCloseTime(bars.at(-1)!.ts,timeframe):null,next=completedAt===null?null:candleCloseTime(completedAt,timeframe);
+  return {timeframe,status:bars.length>=55&&next!==null&&Date.parse(observedAt)<=next+60_000?"available":"unavailable",source:source.source,observedAt,completedAt,price,sma55,smaChange,structure,bias,candles:bars.length};
+}
+
 /** Calculate a saved market map before prompting. No generic TA fallback is used. */
-export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "base" | "premium"; lang?: "en" | "zh"; contextMarket?: SpotMarketContext | null; executionCostsBps?: number }): GlobalReport {
+export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "base" | "premium"; lang?: "en" | "zh"; contextMarket?: SpotMarketContext | null; hierarchyMarkets?:SpotMarketContext[]; executionCostsBps?: number }): GlobalReport {
   const { market } = input, candles = completedGlobalCandles(market), last = candles.at(-1), close = last?.close ?? null, tier = input.tier === "premium" ? "pro" : "quick", lang = input.lang ?? "en";
   const { atr, rsi } = globalWilderIndicators(candles), latestAtr = atr.at(-1)?.value ?? (close ?? 1) * .01;
   // Pivot confirmation uses only local completed bars, not today's ATR applied
@@ -182,12 +195,16 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
     for (const ratio of [0, .236, .382, .5, .618, .786, 1]) { const price = b.price - delta * ratio; if (price > 0) fibonacci.push({ ratio, price: rounded(price), anchorIds: [a.id, b.id] }); }
     // Extension levels are measured projections of an observed leg, not
     // fabricated support, a guaranteed wave target, or a liquidity claim.
-    for (const ratio of [1.272, 1.618]) { const price = a.price + delta * ratio; if (price > 0) addLevel({ ...b, price: rounded(price) }, "extension", ratio, [a.id, b.id]); }
+    const correction=pivots.find(p=>p.ts>b.ts&&p.kind===a.kind);
+    for (const ratio of [1.272, 1.618]) { const price = (correction?.price??a.price) + delta * ratio; if (price > 0) addLevel({ ...b, price: rounded(price) }, "extension", ratio, correction?[a.id,b.id,correction.id]:[a.id,b.id]); }
   }
   const sma = [21, 55, 89, 144, 233].map(period => ({ period, points: globalSma(candles, period) })), average = sma.find(s => s.period === 55)!.points;
   const slope = average.length >= 11 ? average.at(-1)!.value - average.at(-11)!.value : 0;
   const trend = close === null || !average.length ? "range" : close < average.at(-1)!.value && slope < 0 ? "down" : close > average.at(-1)!.value && slope > 0 ? "up" : "range";
-  const below = levels.filter(l => close !== null && l.price < close).sort((a, b) => b.price - a.price), above = levels.filter(l => close !== null && l.price > close).sort((a, b) => a.price - b.price);
+  const structures=globalPriceStructures(candles,pivots,latestAtr,market.bar);
+  // A projection is explanatory evidence, not an automatically tested support
+  // or resistance level. Entries and their first obstacles use price structure.
+  const below = levels.filter(l => l.basis==="swing"&&close !== null && l.price < close).sort((a, b) => b.price - a.price), above = levels.filter(l => l.basis==="swing"&&close !== null && l.price > close).sort((a, b) => a.price - b.price);
   // A recently reclaimed swing remains the setup threshold even when it is
   // already below price. Its timestamp and confirmation must precede the break.
   const recentReclaimed = pivots.filter(a => a.kind === "high" && close !== null && a.price < close && a.confirmedAt !== null
@@ -203,7 +220,14 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   const downTargets=(trend==="down"?localBelow:localBelow.slice(1)).slice(0,2);
   if (downTargets.length && above.length) paths.push({ id: "correction", role: trend === "down" ? "main" : "alternative", direction: "down", kind: "correction", state: trend === "down" ? "active" : "conditional", triggerLevelId: trend === "down" ? above[0].id : below[0].id, targetIds: downTargets.map(l => l.id), invalidationLevelId: above[0].id, confirmation: trend === "down" ? "hold" : "close_retest", thesis: "" });
   if(tier==="pro"){const down=paths.find(p=>p.direction==="down"),deep=down?.targetIds.at(-1),threshold=levels.find(l=>l.id===deep),stress=threshold?localBelow.find(l=>l.price<threshold.price):null;if(down&&threshold&&stress)down.stress={triggerLevelId:threshold.id,targetIds:[stress.id]};}
-  if (trend === "range" && below.length && above.length) paths.unshift({ id: "range", role: "main", direction: "range", kind: "range", state: "active", triggerLevelId: below[0].id, targetIds: [above[0].id], invalidationLevelId: below[0].id, confirmation: "hold", thesis: "" });
+  if (structures.range){
+    const lows=pivots.filter(p=>structures.range!.anchorIds.includes(p.id)&&p.kind==="low"),highs=pivots.filter(p=>structures.range!.anchorIds.includes(p.id)&&p.kind==="high");
+    // Preserve the measured zone edges exactly. ATR-based display clustering
+    // must not silently move the range boundary to a nearby swing price.
+    const lowId="range-support",highId="range-resistance";
+    levels.push({id:lowId,price:rounded(structures.range.lower[1]),role:"support",basis:"swing",anchorIds:lows.map(p=>p.id)},{id:highId,price:rounded(structures.range.upper[0]),role:"resistance",basis:"swing",anchorIds:highs.map(p=>p.id)});
+    paths.forEach(p=>p.role="alternative");paths.unshift({id:"range",role:"main",direction:"range",kind:"range",state:"active",triggerLevelId:lowId,targetIds:[highId],invalidationLevelId:lowId,confirmation:"hold",thesis:""});
+  }
   if (!paths.some(p => p.role === "main") && paths.length) paths[0].role = "main";
   paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main"));
   if (paths.length < 3 && paths.some(p => p.direction === "up") && upTargets.length === 2) {
@@ -216,31 +240,45 @@ export function prepareGlobalReport(input: { market: SpotMarketContext; tier: "b
   if (vwapAnchor) for (const c of candles.filter(c => c.ts >= vwapAnchor.ts)) { pv += (c.high + c.low + c.close) / 3 * c.volume; volume += c.volume; if (volume > 0) vwap.push({ ts: c.ts, value: rounded(pv / volume) }); }
   const lowAnchors = pivots.filter(a => a.kind === "low").slice(-2), highAnchors = pivots.filter(a => a.kind === "high").slice(-2);
   const precedingVolume = candles.slice(-21, -1), meanVolume = precedingVolume.length === 20 ? precedingVolume.reduce((s, c) => s + c.volume, 0) / 20 : 0;
+  const hierarchyFrames=[...new Set(["1Wutc","1Dutc","4H","1H",market.bar,...(contextFrame?[contextFrame]:[])])];
+  const hierarchy=hierarchyFrames.map<NonNullable<GlobalReport["hierarchy"]>[number]>(timeframe=>{
+    const source=[market,...(input.hierarchyMarkets??[]),...(input.contextMarket?[input.contextMarket]:[])].find(m=>m.bar===timeframe&&m.instId===market.instId&&m.source===market.source&&(m.ticker.priceCurrency??m.instId.split("-").at(-1))===(market.ticker.priceCurrency??market.instId.split("-").at(-1)));
+    if(!source)return {timeframe,status:"unavailable" as const,source:null,observedAt:market.fetchedAt,completedAt:null,price:null,sma55:null,smaChange:null,structure:"mixed" as const,bias:"mixed" as const,candles:0};
+    return globalFrameEvidence(source,market.fetchedAt);
+  });
+  const entryFrame=globalEntryTimeframe(market.bar),entrySource=[market,...(input.hierarchyMarkets??[])].find(m=>m.bar===entryFrame&&m.source===market.source&&m.instId===market.instId&&(m.ticker.priceCurrency??m.instId.split("-").at(-1))===(market.ticker.priceCurrency??market.instId.split("-").at(-1)));
+  const entryBars=entrySource?completedGlobalCandles({...entrySource,fetchedAt:market.fetchedAt}):[],entryAtr=globalWilderIndicators(entryBars).atr;
+  const entryClosed=entryBars.length?candleCloseTime(entryBars.at(-1)!.ts,entryFrame):null,entryNext=entryClosed===null?null:candleCloseTime(entryClosed,entryFrame);
+  const entryStudy:NonNullable<GlobalReport["entryStudy"]>={timeframe:entryFrame,source:entrySource?.source??null,status:entryBars.length>=55&&entryNext!==null&&Date.parse(market.fetchedAt)<=entryNext+60000?"available":"unavailable",observedAt:market.fetchedAt,candles:entryBars,pivots:globalConfirmedPivots(entryBars),atr:entryAtr};
   const report: GlobalReport = {
     version: "pulse-global-v3", evaluationVersion: "completed-v2", tier, lang,
+    decisionVersion:"decision-v2",hierarchy,entryStudy,range:structures.range,
     snapshot: { instId: market.instId, timeframe: market.bar, source: market.source, venue: market.source === "okx-public-spot" ? "OKX Spot" : market.source === "okx-robinhood-dex" ? "Robinhood DEX" : "Arc DEX", priceCurrency: market.ticker.priceCurrency ?? market.instId.split("-").at(-1) ?? "Unknown", observedAt: market.fetchedAt, lastCandleTs: last?.ts ?? null, price: close,
       pricePrecision: close === null ? 2 : Math.min(10, Math.max(2, 4 - Math.floor(Math.log10(close)))), completedOnly: true },
     candles, levels, waveCount, paths: paths.slice(0, 3),
     setup: { state: "none", pathId: null, triggerLevelId: null, retestLevelId: null, invalidationLevelId: null, targetIds: [], entryZone: null, protectiveStop: null, grossRewardRisk: null, netRewardRisk: null, costsBps: null, confirmationTs: null, retestTs: null, expiresAt: null, missing: [] },
-    indicators: { sma, atr: { period: 14, points: atr }, rsi: { period: 14, points: rsi }, volumeRatio: meanVolume > 0 && last ? rounded(last.volume / meanVolume) : null, regression: regression(candles), fibonacci, vwap: vwapAnchor && vwap.length ? { anchorId: vwapAnchor.id, points: vwap } : null, pivots, channel: lowAnchors.length === 2 && highAnchors.length === 2 ? { lower: lowAnchors as [GlobalAnchor, GlobalAnchor], upper: highAnchors as [GlobalAnchor, GlobalAnchor] } : null },
-    context: { timeframe: contextFrame, status: tier === "quick" ? "not_requested" : contextAverage.length ? "available" : "unavailable", source: contextAverage.length ? input.contextMarket!.source : null, candles: tier === "pro" ? contextCandles : [], sma55: tier === "pro" ? contextAverage : [], agreement: tier === "quick" || contextClose === undefined || contextSma === undefined ? "unknown" : contextClose < contextSma ? "conflicts" : contextClose > contextSma ? "supports" : "neutral" },
+    indicators: { sma, atr: { period: 14, points: atr }, rsi: { period: 14, points: rsi }, volumeRatio: meanVolume > 0 && last ? rounded(last.volume / meanVolume) : null, regression: regression(candles), fibonacci, vwap: vwapAnchor && vwap.length ? { anchorId: vwapAnchor.id, points: vwap } : null, pivots, channel:null,channels:structures.channels },
+    context: { timeframe: contextFrame, status: contextAverage.length ? "available" : "unavailable", source: contextAverage.length ? input.contextMarket!.source : null, candles:contextCandles,sma55:contextAverage,agreement:contextClose === undefined || contextSma === undefined ? "unknown" : contextClose < contextSma ? "conflicts" : contextClose > contextSma ? "supports" : "neutral" },
     narrative: { headline: "", summary: "", reasons: [], riskNotes: [], limitations: [], disclaimer: "" },
     view: { levelIds: [], pathIds: [], smaPeriods: [55], defaultLayers: tier === "pro" ? ["sma", "channel", "rsi", "context"] : ["sma", "channel"] },
   };
-  report.setup = evaluateGlobalSetup(report, Number.isFinite(input.executionCostsBps) && input.executionCostsBps! >= 0 ? input.executionCostsBps! : null);
+  const observedBias=hierarchy.find(r=>r.timeframe===market.bar)?.bias,marketMain=observedBias==="up"||observedBias==="down"?report.paths.find(p=>p.direction===observedBias):undefined;
+  if(marketMain&&!report.range){report.paths.forEach(p=>p.role=p.id===marketMain.id?"main":"alternative");report.paths.sort((a,b)=>Number(b.role==="main")-Number(a.role==="main"));}
+  // Structure-v2 has one directional calculator. The legacy buy-only setup
+  // field stays empty; fresh authenticated review supplies observed protection.
   const includedPaths = report.paths.slice(0, tier === "quick" ? 2 : 3);
   // Quick must include its selected setup, not hide its corresponding path.
   const selected = report.paths.find(p => p.id === report.setup.pathId);
   if (selected && !includedPaths.includes(selected)) includedPaths[includedPaths.length - 1] = selected;
   report.view.pathIds = includedPaths.map(p => p.id);
   report.view.levelIds = [...new Set(includedPaths.flatMap(p => [p.triggerLevelId, p.invalidationLevelId, ...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]).filter((id): id is string => id !== null))];
-  report.tradePlan = deriveGlobalTradePlan(report);
+  report.tradePlan = selectGlobalTradePlan(report);
   report.view.levelIds = [...new Set([...report.view.levelIds,report.tradePlan.triggerLevelId,report.tradePlan.invalidationLevelId,...report.tradePlan.targetIds].filter((id):id is string=>id!==null))];
   return GlobalReportSchema.parse(report);
 }
 
 export function globalPromptEvidence(report: GlobalReport) {
-  return { snapshot: report.snapshot, eligibility:globalEligibility(report),riskMeasurement:globalRiskMeasurement(report),distantContextLevelIds:globalRemoteLevels(report).map(l=>l.id), priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:globalPrimaryAttemptEvidence(report),
+  return { snapshot: report.snapshot,decision:globalDecision(report),method:report.decisionVersion,range:report.range,channels:report.tier==="pro"?report.indicators.channels:report.indicators.channels?.filter(c=>c.scope==="broad"),entryStudy:report.entryStudy?{timeframe:report.entryStudy.timeframe,status:report.entryStudy.status,source:report.entryStudy.source,lastCompleted:report.entryStudy.candles.at(-1),atr14:report.entryStudy.atr.at(-1)?.value}:null,planCandidates:globalPlanCandidates(report),hierarchy:report.hierarchy, eligibility:globalEligibility(report),riskMeasurement:globalRiskMeasurement(report),distantContextLevelIds:globalRemoteLevels(report).map(l=>l.id), priceReference:{kind:"last_completed_close",price:report.snapshot.price,candleTs:report.snapshot.lastCandleTs,completedAt:report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe),liveQuote:false},waveCandidate: report.waveCount, levels: report.levels, paths: report.paths.filter(p => report.view.pathIds.includes(p.id)), setup: report.setup, setupAttemptEvidence:report.decisionVersion==="decision-v2"?null:globalSetupAttemptEvidence(report), tradePlan: report.tradePlan,primaryAttemptEvidence:report.decisionVersion==="decision-v2"?null:globalPrimaryAttemptEvidence(report),
     indicators: { sma: report.indicators.sma.filter(s => report.tier === "pro" || s.period === 55).map(s => ({ period: s.period, displayedByDefault: report.view.smaPeriods.includes(s.period), value: s.points.at(-1)?.value ?? null, change10Bars: s.points.length > 10 ? rounded(s.points.at(-1)!.value - s.points.at(-11)!.value) : null })), rsi14: report.tier === "pro" ? report.indicators.rsi.points.at(-1)?.value ?? null : null, atr14: report.indicators.atr.points.at(-1)?.value ?? null, volumeRatio: report.indicators.volumeRatio, fibonacci: report.indicators.fibonacci, regression: report.tier === "pro" ? { bars: report.indicators.regression?.bars, residualSigma: report.indicators.regression?.residualSigma } : null },
     context: { timeframe: report.context.timeframe, status: report.context.status, agreement: report.context.agreement, close: report.context.candles.at(-1)?.close ?? null, sma55: report.context.sma55.at(-1)?.value ?? null },
     recentCandles: report.candles.slice(-48).map(c => [c.ts, c.open, c.high, c.low, c.close, c.volume, c.confirmed]), note: "Only completed candles. All candidate anchors and level prices are supplied evidence. Projection timing is schematic." };
@@ -249,16 +287,18 @@ export function globalPromptEvidence(report: GlobalReport) {
 export function finishGlobalReport(prepared: GlobalReport, narrative: GlobalNarrative): GlobalReport {
   const report = structuredClone(prepared), shown = report.paths.filter(p => report.view.pathIds.includes(p.id));
   if (report.waveCount.status!=="unclear"&&narrative.waveCandidateId !== report.waveCount.id) report.waveCount = { ...report.waveCount, id: "unclear", status: "unclear", structure: "unclear", direction: "unclear", activeWave: "unclear", anchors: [], invalidationLevelId: null, validation: ["model_did_not_accept_candidate"] };
-  if (narrative.mainPathId && shown.some(p => p.id === narrative.mainPathId)) { report.paths.forEach(p => p.role = p.id === narrative.mainPathId ? "main" : "alternative"); report.paths.sort((a, b) => Number(b.role === "main") - Number(a.role === "main")); }
   report.view.pathIds=report.paths.filter(p=>report.view.pathIds.includes(p.id)).map(p=>p.id);
   // A model may explain a cancelled or unconfirmed setup, but cannot erase its
   // observed state, protection or missing evidence by selecting null.
-  report.tradePlan = deriveGlobalTradePlan(report);
+  report.tradePlan = structuredClone(prepared.tradePlan??deriveGlobalTradePlan(prepared));
   report.view.levelIds = [...new Set([...report.view.levelIds,report.tradePlan.triggerLevelId,report.tradePlan.invalidationLevelId,...report.tradePlan.targetIds].filter((id):id is string=>id!==null))];
   for (const path of report.paths) path.thesis = narrative.pathNotes.find(n => n.pathId === path.id)?.thesis ?? "";
   const missing = report.candles.length < 55 ? report.lang === "zh" ? "完整 K 线不足，SMA55 和波浪结构可能不可用。" : "Insufficient completed history for SMA55 or a defensible wave count." : "";
   const contextMissing = report.tier === "pro" && report.context.status !== "available" ? report.lang === "zh" ? "未取得同一标的、同一报价货币的独立高周期背景。" : "Independent context for this instrument and quote currency is unavailable." : "";
-  report.narrative = { headline: narrative.headline, summary: narrative.summary, reasons: narrative.reasons, riskNotes: narrative.riskNotes, limitations: [...new Set([...narrative.limitations, missing, contextMissing].filter(Boolean))], disclaimer: narrative.disclaimer };
+  const decision=globalDecision(report),unsafe=(line:string)=>/\b(?:no_trade|technical_valid|tradePlan|setup\.state|mainPathId|eligibility)\b|\b(?:buy|sell|enter) (?:now|immediately)\b|\bgo (?:long|short)\b/i.test(line);
+  const clean=(lines:string[])=>lines.filter(line=>!unsafe(line));
+  report.narrative = { headline:`${report.snapshot.instId} · ${report.snapshot.timeframe} · ${decision.heading}`, summary:`${decision.entryInstruction} ${decision.route}`,
+    reasons:clean(narrative.reasons).slice(0,report.tier==="pro"?4:2),riskNotes:clean(narrative.riskNotes), limitations: [...new Set([...clean(narrative.limitations), missing, contextMissing].filter(Boolean))], disclaimer: narrative.disclaimer };
   return GlobalReportSchema.parse(report);
 }
 
@@ -266,15 +306,17 @@ export function finishGlobalReport(prepared: GlobalReport, narrative: GlobalNarr
 export function globalCompatibility(report: GlobalReport, narrative?: Pick<GlobalNarrative, "bias" | "regime" | "confidence">) {
   const level = (id: string | null) => report.levels.find(l => l.id === id)?.price ?? null;
   const setup = report.setup, firstTarget = level(setup.targetIds[0] ?? null), entry = setup.entryZone?.[1] ?? null;
-  const researchPlan=report.tradePlan;
-  const eligibility=globalEligibility(report),action=eligibility==="no_trade"?"No trade at these references; sufficient nearest-obstacle reward and valid structure are required":eligibility==="expired"||eligibility==="invalidated"?"Recheck completed candles; the old attempt does not authorize entry":eligibility==="technical_valid"?"Technical evidence observed; recheck a fresh amount-specific quote and observed protection before order review":researchPlan?.side==="short"?"Wait for rejection confirmation and a subsequent test; only owned Spot inventory can be sold":"Wait for a qualifying completed confirmation and a subsequent held retest";
-  return { analysis: { ...report.narrative, bias: narrative?.bias ?? "neutral", regime: narrative?.regime ?? "transition", confidence: narrative?.confidence ?? 0,
+  const researchPlan=report.tradePlan,decision=globalDecision(report);
+  const eligibility=globalEligibility(report),action=globalTradePlanTitle(report);
+  const executableBuy=decision.currentAction==="BUY"&&setup.state==="ready";
+  const direction=report.paths.find(p=>p.role==="main")?.direction;
+  return { analysis: { ...report.narrative, bias: direction==="up"?"bullish":direction==="down"?"bearish":"neutral", regime: direction==="range"?"range":narrative?.regime??"transition", confidence: narrative?.confidence ?? 0,
     keyLevels: { support: report.levels.filter(l => l.role === "support").map(l => l.price), resistance: report.levels.filter(l => l.role === "resistance").map(l => l.price) },
     targets: [], invalidation: { price: level(report.waveCount.invalidationLevelId), condition: "Use the canonical path and setup cancellation conditions." },
-    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: action, agentChecklist: [] },
-    technical: { methodology: report.version, eligibility, referenceRisk:globalRiskMeasurement(report), elliott: { status: report.waveCount.status, currentWave: report.waveCount.activeWave, direction: report.waveCount.direction, waves: report.waveCount.anchors, invalidation: level(report.waveCount.invalidationLevelId) } },
+    elliottWave: { degree: report.waveCount.degree, structure: report.waveCount.structure, direction: report.waveCount.direction, currentWave: report.waveCount.activeWave, rationale: report.narrative.summary, invalidation: level(report.waveCount.invalidationLevelId), paths: report.paths.filter(p => report.view.pathIds.includes(p.id)).map(p => ({ type: p.kind, label: p.id, thesis: p.thesis, trigger: level(p.triggerLevelId), target: level(p.targetIds[0] ?? null), invalidation: level(p.invalidationLevelId), sequence: [] })) }, agentAction: action, agentChecklist: decision.checklist },
+    technical: { methodology: report.version, eligibility, currentAction:decision.currentAction,marketView:decision.marketView,hierarchy:report.hierarchy,referenceRisk:globalRiskMeasurement(report), elliott: { status: report.waveCount.status, currentWave: report.waveCount.activeWave, direction: report.waveCount.direction, waves: report.waveCount.anchors, invalidation: level(report.waveCount.invalidationLevelId) } },
     executionPlan: { version: report.version, pair: report.snapshot.instId, timeframe: report.snapshot.timeframe, tier: report.tier, observedPrice: report.snapshot.price,
       researchPlan,
-      recommendation: { action: setup.state === "ready" ? "buy" : "wait", status:eligibility, label:globalTradePlanTitle(report), reason:globalTradePlanLines(report).at(-1)??action },
-      buy: { valid: setup.state === "ready", side: "buy", orderType: "limit", trigger: entry, entryZone: setup.entryZone, takeProfit: firstTarget, stopLoss: setup.protectiveStop, riskReward: setup.netRewardRisk }, riskExit: { trigger: level(setup.invalidationLevelId), downsideReference: null } } };
+      recommendation: { action: decision.currentAction.toLowerCase(), status:eligibility, label:action, reason:decision.reason },
+      buy: { valid: executableBuy, side: "buy", orderType: "limit", trigger: executableBuy?entry:null, entryZone: executableBuy?setup.entryZone:null, takeProfit: executableBuy?firstTarget:null, stopLoss: executableBuy?setup.protectiveStop:null, riskReward: executableBuy?setup.netRewardRisk:null }, riskExit: { trigger: level(setup.invalidationLevelId), downsideReference: null } } };
 }

@@ -26,6 +26,7 @@ export type AnalysisRequest = {
   maxOutputTokens?: number;
   reasoningEffort?: AnalysisReasoningEffort;
   contextMarket?: SpotMarketContext | null;
+  hierarchyMarkets?: SpotMarketContext[];
 };
 
 export type AnalysisResult = {

@@ -6,6 +6,7 @@ export * from "./v5.js";
 export * from "./predictionContext.js";
 export * from "./technical.js";
 export * from "./globalReport.js";
+export * from "./globalMarketSet.js";
 export * from "./globalAssessment.js";
 export * from "./autopilotSignal.js";
 export * from "./tokenRisk.js";

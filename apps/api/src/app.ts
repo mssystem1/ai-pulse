@@ -37,7 +37,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, prepareGlobalReport, finishGlobalReport, globalCompatibility } from "@pulse/analysis";
+import { buildFusedAiContext, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, loadGlobalMarketSet, prepareGlobalReport, finishGlobalReport, globalCompatibility } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -1335,14 +1335,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   };
 
   const buildSpotReport = async (req: express.Request, body: z.infer<typeof AnalysisBodySchema>, tier: "base" | "premium", canonical: boolean, onContextReady?: () => Promise<void>) => {
-      const market = await observeProvider("okx", "spot_context", () => loadSpotContext({
-        instId: body.instId,
-        timeframe: body.timeframe,
-        candleLimit: GLOBAL_HISTORY_LIMIT,
-        completedOnly: true,
-      }));
-      const contextTimeframe = tier === "premium" ? globalContextTimeframe(market.bar) : null;
-      const contextMarket = contextTimeframe ? await observeProvider("okx", "global_context", () => loadSpotContext({ instId: body.instId, timeframe: contextTimeframe, candleLimit: 300, completedOnly: true })).catch(() => null) : null;
+      const {market,contextMarket,hierarchyMarkets}=await loadGlobalMarketSet({instId:body.instId,timeframe:body.timeframe},input=>observeProvider("okx","global_context",()=>loadSpotContext(input)));
       await onContextReady?.();
       if (isArc(req) && cfg.ARC_AI_MODE === "fixture") {
         const fixtureAnalysis = body.lang === "zh"
@@ -1357,7 +1350,7 @@ export function createApp(cfg: AppConfig, dependencies: {
           analysisProfile: { mode: "fixture", model: "fixture", reasoningEffort: "none" },
           usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, fixture: true,
         };
-        const prepared = prepareGlobalReport({ market, tier, lang: body.lang, contextMarket });
+        const prepared = prepareGlobalReport({ market, tier, lang: body.lang, contextMarket,hierarchyMarkets });
         const global = finishGlobalReport(prepared, { ...fixtureAnalysis, regime: "transition", bias: "neutral", confidence: 0, waveCandidateId: null, mainPathId: null, setupPathId: null, reasons: [], pathNotes: [], riskNotes: [] });
         const enhanced = { ...fixture, global, ...globalCompatibility(global), chart: { source: market.source, timeframe: market.bar, candles: global.candles } };
         return canonical ? { ...enhanced, service: `spot_analysis_${tier === "base" ? "standard" : "premium"}`, tier: tier === "base" ? "standard" : "premium" } : enhanced;
@@ -1365,7 +1358,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       if (!cfg.hasXaiKey) throw new Error("XAI_API_KEY not configured on server");
       const normalizedTier = tier === "premium" ? "premium" : "standard";
       await reserveArcAi(req, normalizedTier);
-      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(grokCfg, { ...body, tier, contextMarket, ...modelLimits(normalizedTier) }, market));
+      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(grokCfg, { ...body, tier, contextMarket,hierarchyMarkets, ...modelLimits(normalizedTier) }, market));
       if (result.usage) {
         const cost = estimateAiCostUsd(cfg, result.usage);
         recordAiUsage(result.usage.promptTokens, result.usage.completionTokens, cost, result.usage.cachedTokens, result.usage.reasoningTokens);

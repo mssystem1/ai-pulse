@@ -1,3 +1,5 @@
+import {globalDecision,globalDecisionTitle,globalDecisionLines,globalNextSetupLines,globalConfirmationEvidence} from "@pulse/domain";
+import {globalCoverageLine,globalFrameReference} from "@pulse/domain";
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
@@ -14,37 +16,16 @@ export function formatTelegramResearch(report: unknown, context: ResearchContext
 export function telegramResearchMessage(report: unknown, context: ResearchContext = {}) {
   const global=readGlobalReport(report);
   if(global){
-    const html=escapeTelegramHtml, zh=global.lang==="zh", s=global.snapshot;
-    const setup=globalSetupLines(global);
-    const header = [
-      `<b>PULSE · GLOBAL ${global.tier.toUpperCase()}</b>`,
-      `<b>${html(s.instId)} · ${html(globalTimeframeLabel(s.timeframe, global.lang))}</b>`,
-      html(`${s.venue} · ${s.priceCurrency} · ${s.observedAt}`),html(globalCompletedPriceLine(global)),
-    ].join("\n");
-    const conditions = [
-      ...(globalConfirmationCorrection(global)?[html(globalConfirmationCorrection(global)!),""]:[]),
-      `<b>${html(globalTradePlanTitle(global))}</b>`,
-      ...globalTradePlanLines(global).slice(1,7).map(html),
-      html([...globalRiskLines(global).slice(0,1),...globalTradePlanLines(global).slice(7,-1).filter(line=>!globalRiskLines(global).includes(line))].join(" · ")),"",
-      `<b>${html(global.setup.pathId ? setup[0] : `${globalLabel("setup",global.lang)} · ${setup[0]}`)}</b>`,
-      ...setup.slice(1).filter(line=>!line.startsWith("Net R:R")&&!line.startsWith("费用后")&&!global.setup.missing.some(key=>line===globalMissingLabel(global,key))).map(html), "", `<b>${globalLabel("moves",global.lang)}</b>`,
-      ...globalSetupMap(global).paths.filter(p=>global.view.pathIds.includes(p.id)).flatMap(p=>[
-        html(globalPathTitle(global,p)), ...globalPathLines(global,p).slice(0,2).map(html),
-      ]), "",
-      html(`${globalLabel("wave",global.lang)}: ${global.waveCount.status==="unclear"?globalLabel("unclear",global.lang):`${zh?"候选":"Candidate"} ${global.waveCount.activeWave}`}`),
-      ...(global.tier==="pro" ? ["", `<b>${globalLabel("evidence",global.lang)}</b>`,
-        html(`${globalLabel("context",global.lang)}: ${globalTimeframeLabel(global.context.timeframe ?? "—", global.lang)}`),
-        ...globalEvidenceLines(global).slice(0,3).map(html),
-      ] : []), "",
-      html(zh ? "原始购买快照。执行前需重新确认行情。完整证据与限制见 TXT；从‘我的报告’免费重开。" : "Original purchased snapshot. Recheck conditions before execution. Full evidence and limitations are in the TXT; reopen free from My reports."),
-    ].join("\n");
-    const mandatory = `${header}\n\n${conditions}`;
-    if(mandatory.length>3900)throw new Error("Global report conditions exceed Telegram's overview budget");
-    const remaining = 3900 - mandatory.length;
-    const headline = remaining > 80 ? `\n\n<b>${boundedHtml(globalHumanText(global,global.narrative.headline),Math.min(200,remaining-15))}</b>` : "";
-    const summaryBudget = remaining - headline.length - 2;
-    const summary = summaryBudget > 120 ? `\n${boundedHtml(globalHumanText(global,global.narrative.summary),Math.min(420,summaryBudget))}` : "";
-    return `${header}${headline}${summary}\n\n${conditions}`;
+    const d=globalDecision(global),html=escapeTelegramHtml,zh=global.lang==="zh";
+    const header=[`<b>PULSE · GLOBAL ${global.tier.toUpperCase()} · ${html(global.snapshot.instId)}</b>`,html(globalTimeframeLabel(global.snapshot.timeframe,global.lang)),html(globalCompletedPriceLine(global))];
+    const blocks=[...header,"",`<b>${html(d.marketView)}</b>`,...globalDecisionLines(global).filter((_,i)=>i!==1).map(html),"",`<b>${zh?"下一步条件":"Next condition"}</b>`,...d.checklist.map(html),"",`<b>${zh?"计划参考":"Setup references"}</b>`,...globalNextSetupLines(global).slice(1).map(html)];
+    let message=blocks.join("\n");
+    const optional=[...(global.tier==="pro"&&d.hierarchy.length?[`<b>${zh?"周期关系":"Timeframe map"}</b>\n${d.hierarchy.map(html).join("\n")}`]:[]),
+      ...globalSetupMap(global).paths.filter(p=>global.view.pathIds.includes(p.id)).slice(0,2).map(p=>html(globalPathTitle(global,p))+"\n"+globalPathLines(global,p).slice(0,2).map(html).join("\n")),
+      ...(d.previousAttempts.length?[`<b>${zh?"先前尝试":"Previous attempts"}</b>\n${d.previousAttempts.map(html).join("\n")}`]:[])];
+    const footer=zh?"已保存快照。重新检查条件无需新报告付款；完整证据见 TXT。":"Saved snapshot. Recheck requires no new report payment. Full evidence is in the TXT.";
+    for(const block of optional)if(message.length+block.length+footer.length+4<=3900)message+="\n\n"+block;
+    message+="\n\n"+footer;if(message.length>3900)throw Error("Global decision exceeds Telegram message budget");return message;
   }
   const p=presentResearch(report,context),html=escapeTelegramHtml;
   const head=`<b>PULSE · ${html(p.serviceTitle)}</b>\n<b>${boundedHtml([p.subject,p.timeframe].filter(Boolean).join(" · "),220)}</b>\n${p.generatedAt?`${html(p.generatedAt)}\n`:""}\n<b>${boundedHtml(p.headline,300)}</b>\n${boundedHtml(p.summary,700)}`;
@@ -63,27 +44,14 @@ export function telegramResearchOrder(report: unknown): Array<"chart"|"overview"
 export function telegramResearchCaption(report: unknown, context: ResearchContext = {}) {
   const global=readGlobalReport(report);
   if(!global)return `${presentResearch(report,context).label.slice(0,400)}\nOriginal report snapshot · conditional paths, not guaranteed forecasts.`;
-  const s=global.setup, zh=global.lang==="zh",plan=globalTradePlan(global);
-  return [
-    `PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalTimeframeLabel(global.snapshot.timeframe,global.lang)}`,
-    `${global.snapshot.venue} · ${global.snapshot.priceCurrency} · ${global.snapshot.observedAt} · #${globalArtifactReference(global)}`,
-    globalCompletedPriceLine(global),
-    globalTradePlanTitle(global),
-    ...(plan.referenceEntry&&plan.referenceStop?[`${zh?"计划价格（非已观察保护）":"Planned references (not observed protection)"}: ${plan.referenceEntry.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,plan.referenceStop)} · ${plan.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),
-    ...(["cancelled","expired"].includes(s.state)?[]:[`${globalLabel("setup",global.lang)}: ${globalLabel(s.state,global.lang)}`]),
-    ...(plan.side!=="none" ? [
-      globalTradePlanLines(global)[1],
-      zh ? `取消：完整收盘${plan.side==="long"?"低于":"高于"} ${globalLevelPrice(global,plan.invalidationLevelId)}；确认后结构底线失守或收盘失守触发位须重新确认。` : `Cancel: completed close ${plan.side==="long"?"below":"above"} ${globalLevelPrice(global,plan.invalidationLevelId)}; a failed structural test or trigger close resets confirmation.`,
-      ...(plan.blockers.includes("cancelled")?[zh?"先前确认已失效；等待新的确认及后续测试。":"Prior confirmation failed; wait for a fresh confirmation and subsequent test."]:[]),
-      ...(plan.blockers.includes("reward")?[zh?"最近目标的毛收益风险比低于 1.50；放弃新入场。":"Gross R:R to the nearest target is below 1.50; avoid new entry."]:[]),
-      ...(plan.blockers.includes("entry_price")?[zh?"最后完整收盘不在计划区间；核查新报价，勿追价。":"Last completed close is outside the planned zone; recheck a fresh quote; do not chase."]:[]),
-    ] : []),
-    ...(["cancelled","expired"].includes(s.state)?[globalSetupLines(global)[0]]:s.pathId?[globalSetupLines(global)[1]]:[]),
-    ...(s.expiresAt === null || ["cancelled","expired"].includes(s.state) ? [] : [`${zh ? "有效期至" : "Expires"} ${new Date(s.expiresAt).toISOString()}`]),
-    ...(global.tier === "pro" ? [`${globalLabel("context",global.lang)}: ${globalTimeframeLabel(global.context.timeframe ?? "—",global.lang)}`] : []),
-    zh ? "时间仅为示意；非保证预测。" : "Timing is schematic; conditional moves, not guaranteed forecasts.",
-  ].join("\n");
+  const d=globalDecision(global),p=globalTradePlan(global),zh=global.lang==="zh";
+  const lines=[`PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalFrameReference(global.snapshot.timeframe)}`,
+    `#${globalArtifactReference(global)} · ${global.snapshot.observedAt}`,globalCompletedPriceLine(global),globalDecisionTitle(global),d.nextCondition,
+    ...(d.planningValid?[`${zh?"计划":"Plan"} (${globalFrameReference(d.entryTimeframe)}): ${p.referenceEntry?.map(n=>globalPrice(global,n)).join("–")} · SL ${globalPrice(global,p.referenceStop)} · ${p.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),d.rewardLine,d.contextLine,
+    ...(globalCoverageLine(global)?[globalCoverageLine(global)!]:[]),zh?"保存的行情快照；执行前复核新报价。":"Saved snapshot; recheck a fresh quote before execution."];
+  const caption=lines.filter(Boolean).join("\n");if(caption.length>1024)throw Error("Global decision exceeds Telegram caption budget");return caption;
 }
+
 export function telegramHistoryLabel(order: ResearchIdentity & {status:string;createdAt:number}) {
   const date=researchDate(order.createdAt).slice(5,16);
   return `${clip(order.subject,36)}${order.timeframe?` · ${order.timeframe}`:""} · ${order.serviceTitle} · ${researchStatus(order.status)}${date?` · ${date} UTC`:""}`;

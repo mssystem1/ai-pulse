@@ -90,7 +90,9 @@ describe("context-first Grok analysis", () => {
     assert.equal(result.service, "analysis_base");
     assert.equal(result.tier, "base");
     assert.equal(result.market.source, "okx-public-spot");
-    assert.equal(result.analysis.headline, "Prepared context used");
+    // The compatibility response keeps its schema, while its public headline
+    // follows the measured report rather than the provider's asserted trend.
+    assert.equal(result.analysis.headline, "BTC-USDT · 1H · RANGE · Support and resistance");
     assert.equal(result.usage?.totalTokens, 120);
     assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "low" });
   });

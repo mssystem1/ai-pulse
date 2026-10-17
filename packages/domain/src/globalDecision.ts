@@ -1,0 +1,48 @@
+import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
+import {globalTradePlan} from "./globalTradePlan.js";
+import {globalEligibility,globalRiskMeasurement} from "./globalPolicy.js";
+import {globalPrimaryAttemptEvidence,globalSetupAttemptEvidence,globalConfirmationEvidence} from "./globalConfirmation.js";
+import {globalContextLine,globalContextRelation,globalContextRequired,globalPrimaryFrame,globalHierarchyLines,globalSessionMismatch} from "./globalContext.js";
+import {globalFrameReference} from "./globalContext.js";
+import {globalSetupLanguage} from "./globalSetupLanguage.js";
+import {globalRangeSummary} from "./globalRange.js";
+
+export type GlobalDecision = ReturnType<typeof globalDecision>;
+/** Human decisions are derived from evidence, never from a provider headline.
+ * Legacy snapshots are read without changing their stored plans or prices. */
+export function globalDecision(report:GlobalReport) {
+  const p=globalTradePlan(report),zh=report.lang==="zh",rawTf=report.snapshot.timeframe,tf=globalFrameReference(rawTf);
+  const price=(n:number|null|undefined)=>n==null?"—":n.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:Math.min(2,report.snapshot.pricePrecision),maximumFractionDigits:report.snapshot.pricePrecision});
+  const trigger=report.levels.find(l=>l.id===p.triggerLevelId)?.price,boundary=report.levels.find(l=>l.id===p.invalidationLevelId)?.price;
+  const targets=p.targetIds.flatMap(id=>report.levels.find(l=>l.id===id)??[]),side=p.side,verb=side==="short"?zh?"卖出":"sell":zh?"买入":"buy";
+  const eligibility=globalEligibility(report),relation=globalContextRelation(report,side),contextBlocks=globalContextRequired(report)&&["opposing","unavailable"].includes(relation);
+  const qualified=eligibility==="technical_valid"&&!p.blockers.includes("entry_price")&&!contextBlocks;
+  const currentAction=qualified?side==="long"?"BUY":"SELL":"WAIT";
+  const row=globalPrimaryFrame(report),path=report.paths.find(path=>path.role==="main"),last=report.snapshot.price;
+  const marketTrigger=report.levels.find(l=>l.id===path?.triggerLevelId)?.price,marketTargets=path?.targetIds.flatMap(id=>report.levels.find(l=>l.id===id)??[])??[];
+  let marketView=zh?"方向混合":"Mixed market";
+  if(path?.direction==="range"||report.range||report.decisionVersion!=="decision-v2"&&row?.bias==="range")marketView=zh?"区间运行":"Range";
+  else if(path?.direction==="up"&&marketTrigger!==undefined&&last!==null&&last<marketTrigger)marketView=zh?"恢复尚未确认":"Recovery unconfirmed";
+  else if(row?.bias==="mixed")marketView=zh?"结构与趋势方向混合":"Mixed structure and trend";
+  else if(row?.bias==="down"||path?.direction==="down")marketView=report.waveCount.direction==="up"?zh?"日内弱势中的反弹":"Bounce within intraday weakness":zh?"下行压力":"Downward pressure";
+  else if(row?.bias==="up"||path?.direction==="up")marketView=zh?"恢复中的行情":"Recovery in progress";
+  const rewardLine=p.grossRewardRisk===null?"":zh?`最近目标的毛收益风险比 ${p.grossRewardRisk.toFixed(2)}R；最低要求 1.50R，尚未扣费用。`:`First-objective reward: ${p.grossRewardRisk.toFixed(2)}R; required minimum 1.50R, before costs.`;
+  const marketBoundary=report.levels.find(l=>l.id===path?.invalidationLevelId)?.price;
+  const rangeFloor=report.range?.lower[0]??marketTrigger,rangeCeiling=report.range?.upper[1]??marketTargets[0]?.price;
+  const changeView=path?.direction==="range"&&rangeFloor!==undefined&&rangeCeiling!==undefined?zh?`${tf} 完整收盘低于 ${price(rangeFloor)} 或高于 ${price(rangeCeiling)} 时重新评估区间；持仓按实际止损保护。`:`Reassess the range after a completed ${tf} close below ${price(rangeFloor)} or above ${price(rangeCeiling)}; an entered position uses its actual stop.`:marketBoundary===undefined?(zh?"有依据的结构变化后重新评估。":"Reassess when supported structure changes."):zh?`${tf} 完整收盘${path?.direction==="down"?"收复":"跌破"} ${price(marketBoundary)} 后重新评估；入场后的实际保护按订单止损执行。`:`Reassess after a completed ${tf} close ${path?.direction==="down"?"reclaims":"below"} ${price(marketBoundary)}; an entered position uses its actual protective stop.`;
+  const route=path?.direction==="range"?globalRangeSummary(report)??(zh?`观察 ${price(marketTrigger)}–${price(marketTargets[0]?.price)} 区间。`:`Watch the ${price(marketTrigger)}–${price(marketTargets[0]?.price)} range.`):path?.direction==="down"?(zh?`${price(marketTrigger)} 下方仍有下行压力，支撑参考 ${marketTargets.map(t=>price(t.price)).join(" → ")}。`:`Below ${price(marketTrigger)}, downside references are ${marketTargets.map(t=>price(t.price)).join(" → ")}.`):path?.direction==="up"?(zh?`收复并守住 ${price(marketTrigger)} 后，恢复参考 ${marketTargets.map(t=>price(t.price)).join(" → ")}。`:`Reclaiming and holding ${price(marketTrigger)} would reopen recovery toward ${marketTargets.map(t=>price(t.price)).join(" → ")}.`):"";
+  const contextLine=globalContextLine(report,side);
+  const relationship=relation==="opposing"?(zh?`本周期${side==="short"?"下行":"恢复"}路径与高周期方向相反；不能把高周期背景当作本次入场确认。`:`The selected ${side==="short"?"downward":"recovery"} route opposes the higher-timeframe evidence; that context does not confirm this entry.`):relation==="aligned"?(zh?"高周期证据与本次方向一致；入场仍需独立的收盘确认与回测。":"Higher-timeframe evidence aligns with this direction; entry still needs its own completed confirmation and retest."):(zh?"周期之间可能出现回调或反弹；各自的确认条件独立。":"A lower-timeframe pullback or rebound can occur within the broader structure; each horizon needs its own confirmation.");
+  const history:string[]=[],attempt=p.method==="structure-v2"?null:globalPrimaryAttemptEvidence({...report,tradePlan:p});
+  if(attempt?.failure){const f=attempt.failure,when=f.completedAt===null?"—":new Date(f.completedAt).toISOString();history.push(zh?`先前${verb}测试于 ${when} 收盘时结束：${f.reason==="floor"?`触及结构边界 ${price(f.invalidationPrice)}`:f.reason==="trigger"?`收盘未守住触发位 ${price(f.triggerPrice)}`:"参考止损被触及"}。`:`Earlier ${verb} test ended at the ${when} close: ${f.reason==="floor"?`the structural boundary ${price(f.invalidationPrice)} was touched`:f.reason==="trigger"?`the close failed the trigger ${price(f.triggerPrice)}`:"the reference stop was touched"}.`);}
+  const timing=p.method!=="structure-v2"&&p.side!=="none"&&p.triggerLevelId&&p.invalidationLevelId?globalConfirmationEvidence(report,{...p,side:p.side,triggerLevelId:p.triggerLevelId,invalidationLevelId:p.invalidationLevelId}):null;
+  if(p.failure){const when=candleCloseTime(p.failure.ts,p.entryTimeframe??rawTf);history.push(zh?`先前入场测试结束于 ${when?new Date(when).toISOString():"—"}（${p.failure.reason}）。`:`Earlier entry test ended at the ${when?new Date(when).toISOString():"—"} close (${p.failure.reason}).`);}
+  if(eligibility==="expired")history.push(zh?`先前入场窗口已结束${timing?.expiresAt?`：${new Date(timing.expiresAt).toISOString()}`:""}；新尝试需要新的确认与后续测试。`:`The earlier entry window ended${timing?.expiresAt?` at ${new Date(timing.expiresAt).toISOString()}`:""}; a new attempt needs a new confirmation and later test.`);
+  if(["cancelled","expired"].includes(report.setup.state)&&report.setup.pathId!==p.pathId){const old=globalSetupAttemptEvidence(report),when=old?.failure?.completedAt;history.push(zh?`先前买入尝试已结束${when?`，收盘时间 ${new Date(when).toISOString()}`:""}；不提供当前入场或止损。`:`The earlier buy attempt ended${when?` at the ${new Date(when).toISOString()} close`:""}; it supplies no current entry or stop.`);}
+  if(globalSessionMismatch(report))history.push(zh?"本历史快照的主图与背景采用不同交易日时区；不可当作同一根日线或周线。":"Legacy session mismatch: primary and context use different calendar sessions; their daily/weekly candles are not interchangeable.");
+  const language=globalSetupLanguage(report,p,qualified);
+  const conditions=[language.entryInstruction,...(contextBlocks?[contextLine]:[]),...(p.blockers.includes("entry_price")&&!p.blockers.includes("reward")?[zh?"入场证据的最后收盘不在有依据入场区间；报价须回到同一区间。":"The entry-study close is outside the supported entry zone; a quote must be inside that same zone."]:[]),zh?"复核实际保护、首目标和金额对应的新报价后，再复核订单。":"Review observed protection, the first objective and an amount-specific fresh quote before order review."];
+  return {...language,marketView,currentAction,reason:language.entryInstruction,side,nextSetup:{pathId:p.pathId,trigger,watchArea:p.referenceEntry,planningStop:p.referenceStop,targets},nextCondition:language.entryInstruction,checklist:conditions,changeView,route,relationship,contextRelation:relation,contextLine,previousAttempts:history,rewardLine,qualified,risk:globalRiskMeasurement(report),hierarchy:globalHierarchyLines(report),snapshotAt:report.snapshot.observedAt,retestDeadline:timing?.retestDeadline??null,expiresAt:p.method==="structure-v2"?p.signalExpiresAt??null:timing?.expiresAt??null};
+}
+export function globalDecisionTitle(report:GlobalReport):string {return globalDecision(report).heading;}
+export function globalDecisionLines(report:GlobalReport):string[] {const d=globalDecision(report),zh=report.lang==="zh";return [globalDecisionTitle(report),`${zh?"市场观点":"Market view"}: ${d.marketView}`,d.route,d.nextCondition,...(d.rewardLine?[d.rewardLine]:[]),...(d.contextRelation==="unavailable"&&!globalContextRequired(report)?[]:[d.contextLine,d.relationship]),d.changeView];}

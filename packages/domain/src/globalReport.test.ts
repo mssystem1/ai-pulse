@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { globalSetupWindow, globalSetupMap } from "./globalPolicy.js";
+import {globalDecision,globalDecisionTitle} from "./globalDecision.js";
 import { GlobalReportSchema } from "@pulse/schemas";
 import { globalDesignFixture } from "./globalReport.fixtures.js";
 import { globalReportChartSvg, globalChartAnnotations } from "./globalChart.js";
@@ -41,12 +42,12 @@ test("Fibonacci is drawn from the same confirmed endpoints for rising and fallin
   }
 });
 
-test("Quick and Pro preserve canonical stage prices, pending protection and actual tier identity",()=>{
+test("Quick and Pro preserve watch prices and tier identity without promoting an unconfirmed entry",()=>{
   for(const tier of ["quick","pro"] as const){const report=globalDesignFixture(tier), svg=globalReportChartSvg(report)!,p=presentResearch(report),txt=researchText(p);
     assert.equal(p.serviceId,`global-${tier}`);assert.equal(p.subject,"SOL-USDT");
-    for(const value of ["117.3","113.12","120.56","124.8"]) assert.ok(txt.includes(value));
-    for(const id of globalSetupMap(report).view.levelIds)assert.ok(svg.includes(report.levels.find(l=>l.id===id)!.price.toString()));
-    assert.match(svg,/data-stage="ENTRY"/);assert.match(svg,/data-stage="TP1"/);assert.equal(/data-stage="TP2"/.test(svg),globalSetupMap(report).view.levelIds.includes("deeper"));assert.match(svg,/Pending the observed retest/);assert.doesNotMatch(svg,/undefined|NaN/);
+    for(const id of globalSetupMap(report).view.levelIds)assert.ok(txt.includes(report.levels.find(l=>l.id===id)!.price.toFixed(2)),id);
+    for(const id of globalSetupMap(report).view.levelIds)assert.ok(svg.includes(report.levels.find(l=>l.id===id)!.price.toFixed(2)),id);
+    assert.ok(!/data-stage=/.test(svg));assert.ok(svg.includes("ENTRY PLAN"));assert.ok(!/undefined|NaN/.test(svg));
     assert.equal(report.setup.entryZone,null);assert.equal(report.setup.protectiveStop,null);assert.equal(report.setup.netRewardRisk,null);assert.equal(report.view.pathIds.length,tier==="quick"?2:3);
     assert.equal(svg.includes("RSI14"),tier==="pro");assert.equal(svg.includes("SMA144"),false);
     assert.equal(globalReportChartSvg(report,{layers:{allSmas:true}})!.includes("SMA144"),tier==="pro");
@@ -56,18 +57,22 @@ test("Quick and Pro preserve canonical stage prices, pending protection and actu
 });
 test("canonical parsing rejects conflicting setup prices and unsupported Ready states",()=>{const report=globalDesignFixture();report.setup.triggerLevelId="floor";assert.equal(readGlobalReport(report),null);assert.equal(GlobalReportSchema.safeParse(report).success,false);const ready=globalDesignFixture();ready.setup.state="ready";assert.equal(readGlobalReport(ready),null);});
 test("the retest threshold cannot drift away from the plotted S1 level",()=>{const report=globalDesignFixture();report.setup.retestLevelId="floor";assert.equal(readGlobalReport(report),null);});
-test("chart exports retain expiry without dropping the cancellation condition",()=>{const report=globalDesignFixture();report.setup.expiresAt=Date.parse("2026-10-09T00:00:00Z");const svg=globalReportChartSvg(report)!;assert.match(svg,/Expires 2026-10-09T00:00:00.000Z/);assert.match(svg,/Cancel: completed 1H close below 113.12/);});
+test("an unrelated Spot expiry cannot become the current route's entry deadline",()=>{const report=globalDesignFixture();report.setup.expiresAt=Date.parse("2026-10-09T00:00:00Z");const svg=globalReportChartSvg(report)!;assert.ok(!svg.includes("Expires 2026-10-09"));assert.ok(svg.includes(globalDecisionTitle(report)));assert.ok(svg.includes("Reassess after a completed 1H close"));});
 
-test("inactive plans use terminal protection labels consistently in image and TXT exports",()=>{
-  for(const state of ["cancelled","expired"] as const)for(const lang of ["en","zh"] as const){const report=globalDesignFixture("pro",lang);report.setup.state=state;const expected=lang==="zh"?state==="cancelled"?"计划已取消":"计划已过期":state==="cancelled"?"Plan cancelled":"Plan expired";for(const output of [globalReportChartSvg(report)!,researchText(presentResearch(report))]){assert.ok(output.includes(expected));assert.doesNotMatch(output,/Pending the observed retest|等待实际回测/);}}
+test("inactive Spot attempts remain in saved evidence rather than becoming the image headline",()=>{
+  for(const state of ["cancelled","expired"])for(const lang of ["en","zh"]){const report=globalDesignFixture("pro",lang);report.setup.state=state;
+    const svg=globalReportChartSvg(report),txt=researchText(presentResearch(report));
+    assert.ok(!/WAIT|INVALIDATED|EXPIRED|NO TRADE/.test(svg));assert.ok(!/data-stage=|Previous Spot attempt/.test(svg));
+    assert.ok(txt.includes(lang==="zh"?"先前尝试":"PREVIOUS ATTEMPTS"));assert.equal(report.setup.state,state);
+  }
 });
 test("compressed scenarios separate primary labels from the previous inactive attempt",()=>{
   const report=globalDesignFixture("pro");report.setup.state="cancelled";
   const svg=globalChartAnnotations(report,{left:0,right:1000,top:0,bottom:450,historyEnd:700,x:()=>400,y:price=>200+(price-117)*.1});
   const rows=[...svg.matchAll(/data-scenario-label="\d+"[^]*?<text x="[^"]+" y="([^"]+)"/g)].map(match=>Number(match[1])).sort((a,b)=>a-b);
-  assert.ok(rows.length>=4);for(let i=1;i<rows.length;i++)assert.ok(rows[i]-rows[i-1]>=19);
+  assert.ok(rows.length>=1);for(let i=1;i<rows.length;i++)assert.ok(rows[i]-rows[i-1]>=19);
   assert.equal(/data-path-id="recovery"/.test(svg),globalSetupMap(report).view.pathIds.includes("recovery"));assert.doesNotMatch(svg,/Spot recovery plan · Cancelled/);
-  assert.match(globalReportChartSvg(report)!,/Previous Spot attempt · Cancelled/);
+  assert.ok(!globalReportChartSvg(report)!.includes("Previous Spot attempt · Cancelled"));
 });
 test("daily and weekly image axes retain the year of their saved history",()=>{
   for(const timeframe of ["1D","1W"]){const report=globalDesignFixture();report.snapshot.timeframe=timeframe;const svg=globalReportChartSvg(report)!;assert.ok(svg.includes(new Date(report.candles.slice(-globalSetupWindow(report))[0].ts).toISOString().slice(0,10)+" UTC"));assert.ok(svg.includes(new Date(report.candles.at(-1)!.ts).toISOString().slice(0,10)+" UTC"));}

@@ -30,7 +30,7 @@ test("canonical plan validation rejects reversed prices and mismatched chart tar
 });
 test("exports focus recent candles while retaining an explicitly requested full history",()=>{
   const report=globalDesignFixture();assert.ok(/(?:2\d|3[0-9]|[4-8]\d|9[0-6]) \/ 520 COMPLETED CANDLES/.test(globalReportChartSvg(report)!));assert.match(globalReportChartSvg(report,{fullHistory:true})!,/520 \/ 520 COMPLETED CANDLES/);
-  assert.equal(report.candles.length,520);assert.match(globalReportChartSvg(report)!,/Planned SL reference \(not observed protection\)/);
+  assert.equal(report.candles.length,520);assert.ok(!/data-stage="ENTRY"/.test(globalReportChartSvg(report)!));assert.ok(/data-risk-band="planned"/.test(globalReportChartSvg(report)!));
 });
 test("a failed support close requires a new confirmation and subsequent test",()=>{
   const report=globalDesignFixture();report.paths[0].role="alternative";report.paths[1].role="main";report.paths[1].confirmation="support_hold";
@@ -79,7 +79,7 @@ test("a structural wick breach invalidates a prior confirmation even without rea
 
 test("the displayed price reference names the completed candle close, not the fetched time or live quote",()=>{
   const report=globalDesignFixture();report.snapshot.timeframe="1D";report.candles.at(-1)!.ts=Date.parse("2026-10-12T16:00:00Z");report.snapshot.lastCandleTs=report.candles.at(-1)!.ts;report.snapshot.observedAt="2026-10-14T13:05:18.369Z";
-  assert.match(globalCompletedPriceLine(report),/last completed 1D close 115.75/);assert.match(globalCompletedPriceLine(report),/bar closed 2026-10-13 16:00 UTC/);assert.doesNotMatch(globalCompletedPriceLine(report),/13:05/);
+  assert.match(globalCompletedPriceLine(report),/last completed 1D \(UTC\+8\) close 115.75/);assert.match(globalCompletedPriceLine(report),/bar closed 2026-10-13 16:00 UTC/);assert.doesNotMatch(globalCompletedPriceLine(report),/13:05/);
   report.lang="zh";assert.match(globalCompletedPriceLine(report),/最后完整.*非实时报价/);
 });
 

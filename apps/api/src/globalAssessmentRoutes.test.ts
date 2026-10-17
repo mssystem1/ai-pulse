@@ -3,8 +3,19 @@ import assert from "node:assert/strict";
 import express from "express";
 import { getNetwork, loadConfig } from "@pulse/config";
 import { qualifiedGlobalFixture } from "../../../packages/analysis/dist/globalAssessment.fixtures.js";
+import {entryPlanFixture} from "../../../packages/analysis/dist/globalEntryPlan.fixtures.js";
 import { createGlobalAssessmentRouter } from "./globalAssessmentRoutes.js";
 import type { getOkxTradeTokens } from "./okxDex.js";
+
+test("structure-v2 recheck loads the named entry frame and retains the shared geometry",async()=>{
+  const {report,market,entry,context}=entryPlanFixture(),calls:string[]=[],before=JSON.stringify(report);
+  const app=express();app.use(express.json());app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{resolveReport:async access=>access.token==="saved-report-capability-0000"?report:null,market:async input=>{calls.push(input.timeframe);const result=[market,entry,context].find(m=>m.bar===input.timeframe);assert.ok(result);return result;}}));
+  const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));
+  try{
+    const r=await fetch(`http://127.0.0.1:${(server.address() as {port:number}).port}/v1/global/setup-assessment`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access:{kind:"job",id:"saved-report",token:"saved-report-capability-0000"}})});
+    assert.equal(r.status,200);const {assessment}=await r.json();assert.equal(assessment.state,"technical_valid");assert.deepEqual(assessment.permittedEntry,report.tradePlan!.referenceEntry);assert.equal(assessment.observedStop,report.tradePlan!.referenceStop);assert.equal(assessment.entryTimeframe,"1H");assert.deepEqual(calls.sort(),["1Dutc","1H","4H"]);assert.equal(JSON.stringify(report),before);
+  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
 
 test("production-shaped saved-report recheck and quoted review reach readiness without a payment, model or broadcast",async()=>{
   const {report,market}=qualifiedGlobalFixture(),before=JSON.stringify(report),settlement="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",base="0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",wallet="0x2222222222222222222222222222222222222222";
@@ -36,12 +47,12 @@ test("production-shaped saved-report recheck and quoted review reach readiness w
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
-test("X Layer USD₮0 settlement and the official xBTC contract qualify without a USDC conversion",async()=>{
-  const {report,market}=qualifiedGlobalFixture(),network=getNetwork("xlayer"),settlement=network.paymentAsset.address!,btc="0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f";
+test("structure-v2 X Layer USD₮0 Market/Limit quote review preserves observed xBTC protection without a USDC conversion",async()=>{
+  const {report,market,entry,context}=entryPlanFixture("long","breakout_retest",Date.now()),network=getNetwork("xlayer"),settlement=network.paymentAsset.address!,btc="0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f";
   let wrongChain=false;
   const app=express();app.use(express.json());
   app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{
-    resolveReport:async()=>report,market:async()=>market,
+    resolveReport:async()=>report,market:async input=>[market,entry,context].find(m=>m.bar===input.timeframe)!,
     tokens:(async()=>[{address:btc,symbol:"xBTC",name:"OKX Wrapped BTC",decimals:8,logoUrl:null,provider:"Synthetic OKX catalog"}]) as typeof getOkxTradeTokens,
     balance:async()=>1_000_000_000n,
     settlementRate:async()=>{throw Error("USDC conversion must not run for USD₮0");},

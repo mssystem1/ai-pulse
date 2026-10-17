@@ -56,8 +56,8 @@ test("Telegram captions keep primary support-hold/short conditions and identify 
     if(side==="long"){report.paths[0].role="alternative";report.paths[1].role="main";report.paths[1].confirmation="support_hold";}
     const caption=telegramResearchCaption(report),message=telegramResearchMessage(report);
     assert.ok(caption.length<=1024,`${lang} ${side} caption: ${caption.length}`);assert.ok(message.length<=3900);
-    assert.match(caption,lang==="en"?/Previous Spot attempt/:/先前现货尝试/);
-    if(lang==="en")assert.match(caption,side==="long"?/Pull back to 117.30; hold/:/A rally tests 117.30 and is rejected/);
+    assert.ok(!/WAIT|INVALIDATED ·|EXPIRED ·|NO TRADE/.test(caption));
+    if(lang==="en")assert.match(caption,side==="long"?/Buy entry needs better reward/:/Sell after a 1H rejection at 117.30/);
     assert.doesNotMatch(caption,/S1 needs a completed/);
   }
 });

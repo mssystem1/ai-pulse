@@ -1,11 +1,14 @@
 import { candleTimeframeMs, type GlobalReport } from "@pulse/schemas";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
+import {globalContextRequired,globalContextRelation} from "./globalContext.js";
+import {deriveGlobalEntryPlan} from "./globalEntryPlan.js";
 
 /** A conditional plan from the saved map, independent of Elliott labels and
  * execution quotes. Its reference prices must never be copied as observed SL. */
-export function deriveGlobalTradePlan(report: GlobalReport): NonNullable<GlobalReport["tradePlan"]> {
+export function deriveGlobalTradePlan(report: GlobalReport, pathId?:string): NonNullable<GlobalReport["tradePlan"]> {
+  if(report.decisionVersion==="decision-v2")return deriveGlobalEntryPlan(report,pathId);
   const empty: NonNullable<GlobalReport["tradePlan"]> = {side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.2,confirmationTs:null,retestTs:null,blockers:[]};
-  const path = report.paths.find(p => p.role === "main" && report.view.pathIds.includes(p.id));
+  const path = report.paths.find(p => (pathId?p.id===pathId:p.role === "main") && report.view.pathIds.includes(p.id));
   const last = report.candles.at(-1), atr = report.indicators.atr.points.at(-1)?.value;
   if (!last || !atr) return {...empty,blockers:["history"]};
   if (!path) return {...empty,blockers:["levels"]};
@@ -44,8 +47,20 @@ export function deriveGlobalTradePlan(report: GlobalReport): NonNullable<GlobalR
   return {side,pathId:path.id,state:blockers.includes("reward") || blockers.includes("cancelled") || blockers.includes("expired") ? "avoid" : blockers.length ? "conditional" : "confirmed",condition,triggerLevelId:trigger.id,invalidationLevelId:invalidation.id,targetIds:targets.map(l=>l.id),referenceEntry,referenceStop,grossRewardRisk,stopBufferAtr:.2,confirmationTs:confirmation?.ts ?? null,retestTs:retest?.ts ?? null,blockers};
 }
 
+/** Evaluate every visible direction before narration. Keep the market route
+ * independent: a better supported alternate entry does not rewrite the trend. */
+export function globalPlanCandidates(report:GlobalReport) {return report.paths.filter(p=>p.kind!=="recount"&&report.view.pathIds.includes(p.id)).flatMap(p=>report.decisionVersion==="decision-v2"&&p.direction==="range"?[deriveGlobalEntryPlan(report,p.id,"long"),deriveGlobalEntryPlan(report,p.id,"short")]:[deriveGlobalTradePlan(report,p.id)]);}
+export function selectGlobalTradePlan(report:GlobalReport):NonNullable<GlobalReport["tradePlan"]> {
+  const plans=globalPlanCandidates(report),main=deriveGlobalTradePlan(report);
+  const score=(p:typeof main)=>p.side==="none"?-100:p.blockers.some(b=>["history","levels","reward"].includes(b))?-50:p.blockers.some(b=>["cancelled","expired"].includes(b))?-30:globalContextRequired(report)&&["opposing","unavailable"].includes(globalContextRelation(report,p.side))?-20:p.state==="confirmed"?30:p.confirmationTs?20:10;
+  // Never select a range boundary solely because price is close to it.
+  const usable=plans.filter(p=>report.paths.find(path=>path.id===p.pathId)?.direction!=="range"||p.confirmationTs!==null);
+  return usable.sort((a,b)=>score(b)-score(a)||Number(b.pathId===main.pathId)-Number(a.pathId===main.pathId))[0]??main;
+}
+
 export function globalTradePlan(report: GlobalReport) {
   const saved=report.tradePlan;
+  if(saved?.method==="structure-v2")return saved;
   if (!saved) return deriveGlobalTradePlan(report);
   if (saved.side === "none" || !saved.triggerLevelId || !saved.invalidationLevelId) return saved;
   // Preserve purchased prices. Correct only unsafe confirmation claims from
