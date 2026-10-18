@@ -51,7 +51,7 @@ Markets move continuously, but most analysis products still require an account, 
 - Use the Opportunity Radar to shortlist markets worth analyzing without treating a score as a trade signal.
 - Discover active crypto-focused Polymarket questions in an in-page picker and explicitly select the single market used by a report.
 - Buy a Quick ($0.20) or Pro ($0.30) Global report, or a separate Quick/Pro Prediction report. Legacy API/storage names `base`/`standard` and `premium` stay compatible; they refer to the same two report depths.
-- Read deterministic Fibonacci, pivot, and Elliott-wave structure; Pro reports add an annotated chart and executable Buy-or-Wait plan.
+- Read conditional LONG / BUY and SHORT / SELL plans with Entry, SL and TP1–TP3; Pro adds deeper chart studies and independently observed higher-timeframe context.
 - Move a valid Global plan into connected-wallet Market or Limit Spot execution with route, balance, slippage, entry, TP, and SL carried forward.
 - Run a policy-bounded Autopilot that can Buy, Hold, partially Sell, fully Sell, and later Buy again only inside owner-signed limits.
 - Run network-scoped Risk Guard evidence and pre-trade checks, with source coverage disclosed for each chain, including Robinhood.
@@ -115,7 +115,23 @@ Spot navigation separates **Trade setup** and **Dashboard**. Autopilot provides 
 
 ### Global Market
 
-Choose a live OKX instrument instead of typing an arbitrary pair. Select a timeframe and PULSE fetches public ticker/OHLCV data, renders the chart locally, and sends bounded structured context—not a screenshot—to Grok. Base and Premium reports have distinct marks. Premium adds an annotated, click-to-enlarge chart with Fibonacci levels, pivots, the current Elliott candidate, its invalidation, and wave-consistent next paths. The recommendation is deliberately **Buy or Wait**; PULSE never turns a bearish report into a new short. Changing pair, timeframe, network, or request tier supersedes the earlier request so a late response cannot replace the current context.
+Choose a live OKX instrument and timeframe. PULSE fetches public ticker/OHLCV data, calculates structure from completed candles, renders the chart locally and sends bounded structured evidence to Grok. Quick provides focused candles, SMA55, volume and the main/alternative plans. Pro adds SMA21/55/89/144/233, qualifying broad/local parallel channels, regression, Fibonacci retracements, RSI14, ATR14 and independently observed higher-timeframe context. Available channels, trend studies and Fibonacci are visible by default and can be toggled individually. An incomplete Elliott count does not prevent support/resistance planning; wave labels remain hypotheses.
+
+Reports show separate **LONG / BUY** and **SHORT / SELL** plans with **Entry, SL and TP1–TP3**, their exact candle triggers and reward to TP1. Planned prices remain visible before confirmation. When neither side is confirmed, a two-sided heading keeps the market trend separate from an entry signal. SL protects the trade's entry-frame structure; it is distinct from a broader main-frame change of view. TP1 is the nearest relevant confirmed support/resistance zone. PULSE requires at least 1.50R before costs; another confirming candle cannot repair insufficient reward. A historical high is not automatically a projected TP, and the chart does not invent a future price path.
+
+| Main chart | Profile | Entry study |
+| --- | --- | --- |
+| 15m | Fast | 5m |
+| 1H | Intraday | 15m |
+| 4H | Swing | 1H |
+| 1D UTC | Position | 4H |
+| 1W UTC | Macro | 1D UTC |
+
+**Show this plan on chart** selects the same Entry/SL/TP geometry in the main drawing, entry inset and downloaded PNG. A readable price ledger preserves crowded levels without moving their lines. Report references identify the saved snapshot; completed-bar timestamps and any history limits are disclosed. Reopening and technical rechecks reuse the paid report. Text, web, mobile and Telegram exports share the saved prices.
+
+Spot SELL reduces owned inventory; SHORT research does not open leverage. Only current observed protection can prefill eligible Spot buy levels; unconfirmed plans require manual configuration and fresh review. Each order still needs a verified token representation, amount-specific quote, balance/cost checks and wallet approval. Multiple research TPs do not create an automatic exit ladder; current Spot review uses one selected TP, normally TP1. Changing pair, timeframe, network or request tier supersedes the earlier request so a late response cannot replace the current context.
+
+The in-app **Docs → Chart & indicator guide** (`/docs#docs-global-chart`) explains the workflow in English and Chinese with nine historical illustrations. See the [trade-plan methodology audit](docs/GLOBAL_BTC_TRADE_PLAN_AUDIT_2026-10-18.md) and [four-report Base validation](docs/GLOBAL_BASE_BTC_REPORT_AUDIT_2026-10-18.md), including Entry/SL/TP tables, coverage limits, receipts and export checks.
 
 ### Prediction Market
 
@@ -272,7 +288,7 @@ These three services guide the same six-step setup as the web product. The calle
 
 Prices are configured by environment variables and published through `/v1/metadata`. The overall execution-mainnet catalog has eight services; the Arc mainnet research subset has five until its three Autopilot services are activated. Legacy compatibility prices remain configurable without becoming discoverable products. A paid request is rejected before the payment challenge when its schema or required preconditions are invalid.
 
-Both Global tiers expose the same two execution choices after delivery: a prefilled wallet-signed Spot Market order or Spot Limit order. Base/Quick is the concise report; Premium/Pro adds the deeper chart, Elliott paths and broader execution context. Autopilot starts independently and does not buy or reuse either report: its own deterministic gates decide when a compact prepaid AI entry confirmation is eligible.
+Both Global tiers support wallet-signed Spot Market and Limit review. Quick is concise; Pro adds deeper studies and higher-timeframe evidence. Reports distinguish planned LONG/SHORT prices from confirmed entry signals. Only eligible observed buy protection is copied; manual BUY/SELL remains available, and SELL uses owned Spot inventory. Autopilot starts independently and does not buy or reuse either report: its own deterministic gates decide when a compact prepaid AI entry confirmation is eligible.
 
 For Global Spot and Autopilot start workflows, Agentic Wallet remains the signer and owner. PULSE prepares and verifies the route or contract interaction but never receives a private key or silently broadcasts. X Layer uses the OKX Agentic Wallet on chain 196 with zero gas; Base and Arbitrum use the caller's EVM Agentic Wallet and require native ETH for gas.
 
@@ -440,12 +456,12 @@ flowchart LR
   NORMALIZE --> MODEL[xAI structured analysis]
   TECH --> MODEL
   MODEL --> VALIDATE[Strict versioned schema validation]
-  VALIDATE --> PLAN[Quick or Pro Buy-or-Wait report]
+  VALIDATE --> PLAN[Quick or Pro conditional LONG and SHORT plans]
   PLAN --> MAP[Selected-chain identity mapping]
   MAP --> TOKEN[Exact token contract and settlement asset]
   TOKEN --> ROUTE[Fresh OKX Onchain OS route]
   TOKEN --> DEFI[Exact-contract OKX DeFi opportunities]
-  ROUTE --> ACTION[Market, Limit or Autopilot action]
+  ROUTE --> ACTION[Market or Limit Spot review]
 
   PM[Explicitly selected Polymarket question] --> GAMMA[Gamma identity and rules]
   PM --> CLOB[CLOB books, prices and history]
@@ -463,7 +479,7 @@ Key rules:
 
 - Provider payloads are normalized and bounded before model input; Grok receives structured evidence, not screenshots, wallet secrets, or arbitrary raw pages.
 - Pivot, Fibonacci, alternating swing points, Elliott candidate/invalidation, and chart paths are calculated deterministically. The report explanation must remain consistent with those values.
-- Pro Global reports expose an execution intent only when the result is a valid Buy setup. Bearish or insufficient evidence becomes Wait, never a new short recommendation.
+- Global reports keep LONG and SHORT plans visible with Entry, SL, ordered TP levels and exact confirmation conditions. An unconfirmed or reward-limited plan is not an entry signal. Spot SELL reduces owned inventory; analytical SHORT does not authorize leverage.
 - DeFi discovery first resolves the selected chain representation—for example `BTC → cbBTC` on Base or `BTC → WBTC` on Arbitrum—then accepts only products containing that exact contract.
 - Prediction Market uses one explicitly selected condition/outcome mapping. It never silently substitutes a trending market. Pro may add an independently sourced 4H underlying-asset chart, clearly separated from the prediction probability evidence.
 - The Opportunity Radar is a free technical shortlist. Its score selects what to investigate; it is not transaction authorization.
@@ -477,11 +493,11 @@ Key rules:
 | Source evidence | observed times, ticker/candles, order books/history/open interest, source availability, stale/partial flags |
 | Deterministic structure | pivot, supports/resistances, Fibonacci levels, Elliott candidate, wave points, invalidation and candidate next paths |
 | Model interpretation | tier mark, headline, summary, bias, confidence, catalyst/counter-case, limitations and disclaimer |
-| Execution intent | Buy-or-Wait, entry trigger, take-profit, stop-loss, rationale and timeframe; never a wallet authorization |
+| Trade plan and execution review | Separate LONG/SHORT Entry, SL, TP1–TP3, trigger, reward, main/entry timeframes and confirmation evidence; eligible observed Spot buy protection can prefill a ticket, while owned-Spot SELL remains manual |
 | Selected-chain extension | identity-safe execution token, settlement asset, live-route result, alternative networks and exact-token DeFi products |
 | Delivery proof | normalized settlement receipt, durable stage events, report checksum, Blob record and opaque recovery capability |
 
-The chart is rendered locally from report candles and deterministic annotations. It is not an AI-generated picture and does not require a horizontal overflow area; the same SVG opens in an accessible zoom dialog.
+The interactive chart is rendered locally from saved candles and deterministic annotations. The shared SVG supplies the mobile overview, PNG download and Telegram chart. Selecting another plan preserves its Entry/SL/TP prices across the main chart, entry study and export. Planned levels use dashed lines and a price ledger; drawings do not imply a fill or forecast arrival time.
 
 ## End-to-end workflows
 

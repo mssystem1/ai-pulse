@@ -7620,22 +7620,21 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   d="M20 178 L80 155 L135 168 L195 110 L250 132 L310 72 L365 95"
                   className="docs-price"
                 />
-                <path d="M365 95 Q420 58 478 38" className="docs-bull" />
-                <path d="M365 95 Q410 122 438 96 Q458 78 478 103" className="docs-base" />
-                <path d="M365 95 Q420 145 478 180" className="docs-bear" />
-                <text x="425" y="30">
-                  WAVE (5)
+                <path d="M310 72 H478" className="docs-bull" />
+                <path d="M310 110 H478" className="docs-base" />
+                <path d="M310 180 H478" className="docs-bear" />
+                <text x="425" y="60">
+                  TP1
                 </text>
-                <text x="402" y="88">
-                  A-B-C RESET
+                <text x="402" y="104">
+                  Entry
                 </text>
                 <text x="395" y="198">
-                  COUNT INVALID
+                  SL
                 </text>
               </svg>
-              <small>
-                Pro reports map wave-consistent continuation, correction
-                and invalidation paths—not generic up/side/down guesses.
+              <small data-no-localize>
+                {lang === "zh" ? "示意图：历史价格旁列出计划 Entry、SL 与 TP。实际报告还要求入场确认及足够收益空间。" : "Illustration: planned Entry, SL and TP beside price history. Actual reports also require entry confirmation and sufficient reward."}
               </small>
             </div>
           </section>
@@ -7679,11 +7678,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   Choose Quick for concise context or Pro for chart structure
                   and scenario depth.
                 </li>
-                <li>
-                  When the evidence supports a long spot setup, choose{" "}
-                  <b>Market buy</b> or <b>Limit buy</b> directly in the report.
-                  Agentic Wallet reviews and signs the prepared transaction.
-                  Autopilot starts separately with its own live signal policy.
+                <li data-no-localize>
+                  {lang === "zh" ? "分别阅读 LONG / BUY 与 SHORT / SELL 的 Entry、SL、TP1–TP3、触发条件和收益风险比。只有入场信号确认且满足收益要求后，再复核现货交易。卖出仅限已持有现货；钱包批准交易，Autopilot 按独立信号规则启动。" : "Read each LONG / BUY and SHORT / SELL plan's Entry, SL, TP1–TP3, trigger and reward. Confirm the entry signal and reward requirements before reviewing a Spot order. SELL uses owned inventory. Your wallet approves transactions; Autopilot starts separately with its own signal policy."}
                 </li>
               </ol>
               <div className="docs-callout">
@@ -7697,11 +7693,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               </div>
               <div className="docs-callout">
                 <b>How to read a setup</b>
-                <span>
-                  Entry is a condition—not a command. TP is the bullish scenario
-                  objective. SL is the report invalidation. Reports create buy
-                  or wait plans; selling remains an owner action for closing
-                  assets already held.
+                <span data-no-localize>
+                  {lang === "zh" ? "Entry 是计划或已观察入场区间；SL 保护入场结构，与主周期观点变化位不同。TP1 是最近相关支撑阻力，后续为 TP2、TP3。若到 TP1 的收益不足，仅新增确认不能满足入场条件。SHORT 研究不建立杠杆仓位。" : "Entry is a planned or observed zone. SL protects the entry structure and is separate from a broader change of view. TP1 is the nearest relevant support/resistance zone; later levels are TP2 and TP3. If reward to TP1 is insufficient, another confirming candle alone does not qualify entry. SHORT research does not open leverage."}
                 </span>
               </div>
               <div className="docs-callout">
@@ -7724,21 +7717,26 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   <dd>2,320</dd>
                 </div>
                 <div>
-                  <dt>Entry</dt>
+                  <dt>Entry (planned)</dt>
                   <dd>2,280–2,320</dd>
                 </div>
                 <div>
-                  <dt>TP</dt>
+                  <dt>TP1</dt>
                   <dd>2,550</dd>
                 </div>
                 <div>
-                  <dt>SL</dt>
+                  <dt>SL (planned)</dt>
                   <dd>2,067</dd>
                 </div>
+                <div>
+                  <dt>R:R → TP1</dt>
+                  <dd>0.91</dd>
+                </div>
               </dl>
-              <small>
-                Illustrative values only. Your report uses its live snapshot.
+              <small data-no-localize>
+                {lang === "zh" ? "仅为未确认示例。以 2,320 入场计算，到 TP1 的收益低于 1.50R；需要新的有依据结构。" : "Unconfirmed illustration. At 2,320 entry, reward to TP1 is below 1.50R; a new supported structure is required."}
               </small>
+              <a href="/docs#docs-global-chart">{lang === "zh" ? "阅读图表与指标指南" : "Read the chart & indicator guide"}</a>
             </div>
           </section>
 
@@ -7760,27 +7758,27 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <article>
                 <b>15m</b>
                 <span>Fast momentum</span>
-                <small>Short intraday entries; highest noise.</small>
+                <small data-no-localize>{lang === "zh" ? "数分钟至数小时 · 5m 入场研究。" : "Minutes to hours · 5m entry study."}</small>
               </article>
               <article>
                 <b>1H</b>
                 <span>Intraday trend</span>
-                <small>Session structure and tactical levels.</small>
+                <small data-no-localize>{lang === "zh" ? "数小时 / 当前交易时段 · 15m 入场研究。" : "Hours / current session · 15m entry study."}</small>
               </article>
               <article>
                 <b>4H</b>
                 <span>Swing trading</span>
-                <small>Balanced active-trading context.</small>
+                <small data-no-localize>{lang === "zh" ? "数日至数周 · 1H 入场研究。" : "Days to weeks · 1H entry study."}</small>
               </article>
               <article>
                 <b>1D</b>
                 <span>Position context</span>
-                <small>Major levels and multi-day structure.</small>
+                <small data-no-localize>{lang === "zh" ? "数周至数月 · 4H 入场研究。" : "Weeks to months · 4H entry study."}</small>
               </article>
               <article>
                 <b>1W</b>
                 <span>Macro structure</span>
-                <small>Long-cycle context, not entry timing.</small>
+                <small data-no-localize>{lang === "zh" ? "数月及更长 · 1D UTC 入场研究。" : "Months and longer · 1D UTC entry study."}</small>
               </article>
             </div>
             <div
@@ -7804,12 +7802,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
             <div className="docs-callout">
               <b>What is carried forward</b>
-              <span>
-                Pair, timeframe, Buy/Wait decision, entry condition, take
-                profit, stop loss, analysis snapshot and selected RPC context.
-                Spot re-checks token identity, live route and wallet balance.
-                Autopilot is configured separately: it does not inherit the report's
-                recommendation or use that report as its live entry signal.
+              <span data-no-localize>
+                {lang === "zh" ? "传递交易对、主周期、行情快照及所选网络。只有仍有效的已观察买入入场及 TP/SL 可以预填；未确认价格需手动配置。现货卖出为独立减持，不复制 SHORT 的 TP/SL。Spot 复核代币身份、实时路由、余额和费用；Autopilot 独立配置。" : "The pair, main timeframe, snapshot and selected network carry forward. Only current observed buy entry and TP/SL can prefill protection; unconfirmed prices need manual configuration. Spot SELL is a separate reduction of owned inventory and does not copy analytical SHORT TP/SL. Spot rechecks token identity, live route, balance and costs. Autopilot is configured independently."}
               </span>
             </div>
           </section>
