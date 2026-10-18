@@ -40,6 +40,7 @@ export function globalStructuralScaleValues(report:GlobalReport,start:number,lay
 }
 export function globalFibonacciDescription(report:GlobalReport):string[]{
   const fib=globalMeasuredFib(report);if(!fib)return [];
+  if(report.decisionVersion==="decision-v5")return [`Fibonacci · ${globalFrameReference(report.snapshot.timeframe)} · ${report.lang==="zh"?"已测量摆动":"measured swing"} ${new Date(fib.a.ts).toISOString().slice(0,10)} → ${new Date(fib.b.ts).toISOString().slice(0,10)}.`];
   const zh=report.lang==="zh",format=(p:typeof fib.a)=>`${p.price.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision})} · ${new Date(p.ts).toISOString().slice(0,16).replace("T"," ")} UTC`;
   const offscreen=fib.a.ts<(report.candles.at(-globalStructuralWindow(report))?.ts??0);
   return [`Fibonacci · ${globalFrameReference(report.snapshot.timeframe)} · Fib A ${format(fib.a)} → Fib B ${format(fib.b)}.`,zh?"0 = Fib B，1 = Fib A；与波浪字母标签不同。":"0 = Fib B, 1 = Fib A; these are separate from Elliott letter labels.",...(offscreen?[zh?"宏观摆动锚点在默认视图之外；使用斐波那契锚点视图查看。":"Macro swing anchors extend beyond the default view; use Fit Fibonacci anchors to inspect them."]:[])];

@@ -1,24 +1,38 @@
-/** Educational PNGs from public candle fixtures and the app's real renderer. */
-import fs from "node:fs";
-import {Resvg} from "@resvg/resvg-js";
-import {prepareGlobalReport} from "../packages/analysis/dist/index.js";
-import {globalReportChartSvg,globalSetupWindow} from "../packages/domain/dist/index.js";
-import {summarizeCandles} from "../packages/market/dist/index.js";
-import {globalReplayMarkets} from "./global-replay-data.mjs";
+/** Regenerate every app guide image from current, public historical replay. */
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {Resvg} from '@resvg/resvg-js';
+import {globalReportChartSvg,globalSetupWindow,globalArtifactReference} from '../packages/domain/dist/index.js';
+import {reviewedTradeReports,tradeReplaySources} from './global-trade-replay-data.mjs';
 
-const source="packages/analysis/src/globalReport.oct16-fixtures.json",rows=JSON.parse(fs.readFileSync(source,"utf8"));
-const row=rows.find(r=>r.date==="oct16"&&r.frame==="1D");
-function market(context=false){const candles=(context?row.contextCandles:row.candles).map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,volumeCcy:0,confirmed:true}));return {source:"okx-public-spot",instId:"BTC-USDT",bar:context?row.contextFrame:row.frame,candles,summary:summarizeCandles(candles),fetchedAt:row.observedAt,ticker:{instId:"BTC-USDT",priceCurrency:"USDT",last:candles.at(-1).close,open24h:0,high24h:0,low24h:0,vol24h:0,volCcy24h:0,change24hPct:0,ts:String(Date.parse(row.observedAt))}};}
-const report=prepareGlobalReport({market:market(),contextMarket:market(true),hierarchyMarkets:globalReplayMarkets(row),tier:"premium"});
-const root="apps/web/public/docs/global-chart";fs.mkdirSync(root,{recursive:true});
+const reports=reviewedTradeReports(),root='apps/web/public/docs/global-chart';
+fs.mkdirSync(root,{recursive:true});
+const render=svg=>new Resvg(svg,{font:{fontFiles:['assets/fonts/Inter.ttf','assets/fonts/NotoSansSC-Regular.otf'],loadSystemFonts:false,defaultFontFamily:'Inter'},fitTo:{mode:'zoom',value:2}}).render().asPng();
 const examples=[
-  {name:"setup",layers:{channel:true},box:[0,0,1300,774]},
-  {name:"directional-plan",layers:{channel:true}},
-  {name:"trend",layers:{channel:false,allSmas:true,regression:true},box:[0,0,1300,595]},
-  {name:"fibonacci",layers:{channel:false,fibonacci:true},box:[0,0,1300,595]},
-  {name:"vwap-atr-pivots",layers:{channel:false,vwap:true,atr:true,pivots:true},box:[0,0,1300,595]},
-  {name:"rsi-context",layers:{channel:false},box:[40,594,1240,169]},
+  {name:'directional-plan',frame:'4H'},
+  {name:'risk-no-trade',frame:'1Dutc'},
+  {name:'risk-setup',frame:'4H',options:{selectedPathId:'range-short'}},
+  {name:'setup',frame:'4H',box:[0,0,1300,774]},
+  {name:'trend',frame:'1H',box:[0,0,1300,595],options:{structure:true}},
+  {name:'fibonacci',frame:'1H',box:[0,0,1300,595],options:{structure:true}},
+  {name:'vwap-atr-pivots',frame:'4H',box:[0,0,1300,595],options:{layers:{vwap:true,atr:true,pivots:true}}},
+  {name:'rsi-context',frame:'4H'},
 ];
-for(const example of examples){let svg=globalReportChartSvg(report,{layers:example.layers,structure:["fibonacci","trend"].includes(example.name)});if(example.box){const [x,y,width,height]=example.box;svg=svg.replace(/width="1300" height="\d+" viewBox="0 0 1300 \d+"/,`width="${width}" height="${height}" viewBox="${x} ${y} ${width} ${height}"`);}const png=new Resvg(svg,{font:{fontFiles:["assets/fonts/Inter.ttf","assets/fonts/NotoSansSC-Regular.otf"],loadSystemFonts:false,defaultFontFamily:"Inter"},fitTo:{mode:"zoom",value:2}}).render().asPng();fs.writeFileSync(`${root}/${example.name}.png`,png);}
-fs.writeFileSync(`${root}/provenance.json`,JSON.stringify({purpose:"Historical educational chart images; not current trading signals",source,renderer:"PULSE canonical saved-report renderer",snapshot:report.snapshot,contextTimeframe:report.context.timeframe,savedCandles:report.candles.length,shownCandles:globalSetupWindow(report),examples,additionalImages:{"risk-no-trade":"oct16 Pro 1D public replay","risk-setup":"oct16 Pro 4H public replay","setup-review-flow":"Authored workflow diagram"},regenerate:"node scripts/validate-global-setup.mjs --write-docs && node scripts/render-global-guide.mjs",modelCalls:0,walletData:false},null,2));
-console.log(JSON.stringify({images:examples.length,source}));
+for(const e of examples){
+  let svg=globalReportChartSvg(reports[e.frame],e.options);
+  console.log(`Rendering ${e.name}`);
+  if(!svg||/NaN|Infinity/.test(svg))throw Error(`Invalid chart SVG: ${e.name}`);
+  if(e.box){const [x,y,w,h]=e.box;svg=svg.replace(/width="1300" height="\d+" viewBox="0 0 1300 \d+"/,`width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"`);}
+  fs.writeFileSync(`${root}/${e.name}.png`,render(svg));
+}
+const stages=[
+  ['1 · Choose the market and horizon','Fast 15m / Intraday 1H / Swing 4H / Position 1D / Macro 1W'],
+  ['2 · Read the LONG / BUY or SHORT / SELL plan','Entry, SL and TP1–TP3 are shown together. Planned prices are not an entry signal.'],
+  ['3 · Confirm the main condition and entry reaction','Completed main bar first; later entry-frame reaction and follow-through / held retest.'],
+  ['4 · Check SL, TP1 and position size','Use actual structural protection. PULSE requires at least 1.50R to TP1 before costs.'],
+  ['5 · Review a fresh quote and the order','Verified asset, balance and costs; net R:R to TP1 must also reach 1.50.'],
+];
+const flow=`<svg xmlns="http://www.w3.org/2000/svg" width="1300" height="820" viewBox="0 0 1300 820"><rect width="1300" height="820" rx="20" fill="#0f1826"/><g font-family="Inter,Arial" fill="#dce7f2"><text x="38" y="52" font-size="28" fill="#55dfb5">PULSE · Entry / SL / TP → Order review</text><text x="38" y="90" font-size="18">Historical examples explain the method. They are not current signals or filled orders.</text>${stages.map(([title,detail],i)=>`<rect x="38" y="${116+i*126}" width="1224" height="108" rx="10" fill="#172638" stroke="#3c6372"/><text x="63" y="${151+i*126}" font-size="24" fill="#f6c368">${title}</text><text x="63" y="${186+i*126}" font-size="18">${detail}</text>`).join('')}<text x="38" y="784" font-size="17">Signal confirmation ≠ a fill. Current Spot SELL reduces owned inventory; it does not open a leveraged short.</text></g></svg>`;
+fs.writeFileSync(`${root}/setup-review-flow.png`,render(flow));
+fs.writeFileSync(`${root}/provenance.json`,JSON.stringify({purpose:'Historical educational examples, not current trade signals',method:'decision-v5 / structure-v5 / horizon-v2',sources:tradeReplaySources.map(path=>({path,sha256:createHash('sha256').update(fs.readFileSync(path)).digest('hex')})),reports:Object.fromEntries(Object.entries(reports).map(([frame,r])=>[frame,{reference:globalArtifactReference(r),observedAt:r.snapshot.observedAt,savedCandles:r.candles.length,shownCandles:globalSetupWindow(r)}])),examples,additionalImages:{'setup-review-flow':'Authored workflow; no forecast'},regenerate:'npm run build -w @pulse/analysis && node scripts/render-global-guide.mjs',networkCalls:0,modelCalls:0,walletData:false},null,2));
+console.log(JSON.stringify({images:9,method:'structure-v5',root,networkCalls:0}));

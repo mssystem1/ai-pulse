@@ -1,3 +1,4 @@
+import {globalTradeCardLines,globalHistoricalLevelLines} from "./globalTradeDisplay.js";
 import {globalStrategyLines} from "./globalStrategy.js";
 import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
@@ -150,6 +151,7 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
 }
 /** Compact next-setup detail; old prices remain identifiable as references. */
 export function globalNextSetupLines(report:GlobalReport):string[] {
+  if(report.decisionVersion==="decision-v5")return globalTradeCardLines(report);
   const d=globalDecision(report),p=globalTradePlan(report),zh=report.lang==="zh";
   const target=p.targetIds.map((id,i)=>`${p.strategyId?`${report.strategy?.name} objective ${i+1}`:d.planningValid?`TP${i+1}`:zh?`目标 ${i+1}`:`Objective ${i+1}`} ${globalLevelPrice(report,id)}`).join(" → ");
   const observed=d.signalObserved,valid=d.planningValid;
@@ -209,7 +211,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
     ...(report.strategy?[{title:zh?"交易策略与持有周期":"Strategy and holding horizon",lines:globalStrategyLines(report),featured:true}]:[]),
     {title:zh?"下一步条件":"Next condition",lines:d.checklist,featured:true},
     {title:zh?"买卖入场证据":"BUY / SELL entry evidence",lines:d.scenarios.map(s=>s.line)},
-    {title:zh?"计划参考":"Setup references",lines:globalNextSetupLines(report),featured:true},
+    {title:zh?"交易计划 · 入场 / 止损 / 止盈":"Trade plans · Entry / SL / TP",lines:globalNextSetupLines(report),featured:true},
     ...(report.tier==="pro"?[{title:zh?"周期关系":"Timeframe map",lines:d.hierarchy.length?d.hierarchy:[d.contextLine,d.relationship]}]:[]),
     { title: lang === "zh" ? "图表周期" : "Chart timeframes", lines: [
       `${lang==="zh"?"报告参考":"Report reference"}: #${globalArtifactReference(report)} · ${report.snapshot.observedAt}`,
@@ -222,6 +224,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
     ...(report.tier==="pro"?[{title:zh?"斐波那契锚点":"Fibonacci anchors",lines:globalFibonacciDescription(report)}]:[]),
     { title: globalLabel("evidence", lang), lines: globalEvidenceLines(report), featured: true },
     {title:zh?"风险参考":"Risk reference",lines:d.risk?[`${d.risk.percent.toFixed(2)}% · ${d.risk.atr?.toFixed(2)??"—"} × ${globalFrameReference(d.risk.timeframe)} ATR14`,...(d.risk.atr!==null&&d.risk.atr<1?[zh?"参考止损小于一根平均 K 线波幅；实际止损需依据回测和结构确定。":"The reference stop is inside one average bar range; actual protection must follow the observed test and structure."]:[])]:[]},
+    ...(report.decisionVersion==="decision-v5"?[{title:zh?"历史支撑与阻力":"Historical support / resistance",lines:globalHistoricalLevelLines(report)}]:[]),
     {title:zh?"先前尝试":"Previous attempts",lines:d.previousAttempts},
     ...(report.decisionVersion?[{title:globalLabel("reasons",lang),lines:report.narrative.reasons.map(s=>globalHumanText(report,s))}]:[]),
   ].filter(s => s.lines.length > 0).map(section=>({...section,lines:section.lines.map(line=>globalHumanText(report,line))}));

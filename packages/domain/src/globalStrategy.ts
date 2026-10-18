@@ -18,6 +18,7 @@ export function globalStrategyName(report:GlobalReport){return report.strategy?.
 export function globalStrategyLines(report:GlobalReport):string[]{
   const s=report.strategy;if(!s)return [];
   const zh=report.lang==="zh",price=(id:string)=>report.levels.find(l=>l.id===id)?.price.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision})??"—";
+  if(s.version==="horizon-v2")return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,zh?`主图分析方向；${globalFrameReference(s.entryTimeframe)} 确认入场并确定实际止损。`:`${globalFrameReference(report.snapshot.timeframe)} frames the market; ${globalFrameReference(s.entryTimeframe)} confirms entry and establishes the trade SL.`];
   return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,
     zh?`主图周期决定结构、保护与目标；${globalFrameReference(s.entryTimeframe)} 仅用于入场时机。`:`${globalFrameReference(report.snapshot.timeframe)} determines structure, protection and objectives; ${globalFrameReference(s.entryTimeframe)} refines entry timing.`,
     ...s.routes.map(r=>`${r.side==="long"?"BUY":"SELL"} · ${r.objectiveIds.length?`${zh?"策略目标":"Strategy objectives"}: ${r.objectiveIds.map(price).join(" → ")}`:zh?"尚无有依据的本策略目标":"A supported objective for this strategy is not yet mapped"}${r.checkpointIds.length?` · ${zh?"沿途关口":"Intervening checkpoints"}: ${r.checkpointIds.map(price).join(" → ")}`:""}`),

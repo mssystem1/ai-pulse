@@ -1,0 +1,50 @@
+import type {GlobalReport} from "@pulse/schemas";
+import {deriveGlobalEntryPlan} from "./globalEntryPlan.js";
+import {globalTradePlan} from "./globalTradePlan.js";
+import {globalEntryCondition} from "./globalScenarioEvidence.js";
+import {globalContextRelation,globalContextRequired,globalFrameReference} from "./globalContext.js";
+
+export function globalTradeCards(report:GlobalReport){
+  const zh=report.lang==="zh",selected=globalTradePlan(report),routes=report.strategy?.routes.filter(r=>report.view.pathIds.includes(r.pathId))??[];
+  const shown=report.range?routes.filter(r=>report.paths.find(p=>p.id===r.pathId)?.kind==="range"):routes;
+  const price=(n:number)=>n.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
+  return shown.map(route=>{
+    const p=deriveGlobalEntryPlan(report,route.pathId,route.side),direction=route.side==="long"?"LONG / BUY":"SHORT / SELL";
+    const context=globalContextRelation(report,route.side),contextBlocked=globalContextRequired(report)&&["opposing","unavailable"].includes(context);
+    const confirmed=p.state==="confirmed"&&!contextBlocked;
+    const state=confirmed?zh?"入场信号已确认":"Entry signal confirmed":p.blockers.includes("reward")?zh?"TP1 收益空间不足":"Entry needs better reward to TP1":p.side==="none"?zh?"需要新的入场结构":"Entry structure needed":zh?"入场确认条件":"Entry confirmation required";
+    const entry=p.referenceEntry?`${price(p.referenceEntry[0])}–${price(p.referenceEntry[1])}`:zh?"实际反应后确定":"After a new price reaction";
+    const stop=p.referenceStop===null?zh?"实际反应后确定":"After a new price reaction":price(p.referenceStop);
+    const entryReference=p.referenceEntry?.[route.side==="long"?1:0]??null;
+    const targets=(p.side==="none"?route.objectiveIds:p.targetIds).flatMap(id=>{
+      const l=report.levels.find(l=>l.id===id);if(!l)return [];
+      const anchor=report.indicators.pivots.filter(a=>l.anchorIds.includes(a.id)&&a.confirmedAt!==null).sort((a,b)=>b.ts-a.ts)[0];
+      const source=`${globalFrameReference(report.snapshot.timeframe)} · ${anchor?zh?"已确认摆动":"confirmed swing":zh?"支撑 / 阻力":"support / resistance"}${anchor?` · ${new Date(anchor.ts).toISOString().slice(0,10)}`:""}`;
+      const movePercent=entryReference===null?null:(l.price/entryReference-1)*100;
+      return [{id,price:l.price,source,movePercent}];
+    });
+    const condition=p.side==="none"?zh?"新测试须先建立入场与止损。":"A new test must establish Entry and SL.":globalEntryCondition(report,p);
+    const risk=p.referenceEntry&&p.referenceStop?Math.abs((route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])-p.referenceStop):null;
+    const riskPercent=risk!==null&&p.referenceEntry?risk/(route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])*100:null;
+    const lines=[`${direction} · ${state}`,`${zh?"计划入场":"Entry"}${confirmed?"":" (planned)"}: ${entry} · SL${confirmed?"":" (planned)"}: ${stop}`,
+      targets.length?targets.map((t,i)=>`TP${i+1} ${price(t.price)}${t.movePercent===null?"":` (${t.movePercent>=0?"+":""}${t.movePercent.toFixed(2)}%)`}`).join(" → "):zh?"尚无有依据的 TP":"TP: a supported target is not available",
+      ...targets.map((t,i)=>`TP${i+1} ${zh?"依据":"basis"}: ${t.source}`),
+      `${zh?"触发条件":"Trigger"}: ${condition}`,
+      `${zh?"TP1 收益风险比":"R:R to TP1"}: ${p.grossRewardRisk?.toFixed(2)??"—"}${riskPercent===null?"":` · ${zh?"到止损距离":"Entry–SL"}: ${riskPercent.toFixed(2)}%`}. ${confirmed?zh?"复核当前报价和费用，尚非成交。":"Review a fresh quote and costs; no fill implied.":zh?"仅为计划，尚非当前入场信号。":"Planned prices; entry signal is not confirmed."}`,
+      ...(contextBlocked?[zh?"高周期背景缺失或与方向相反，入场尚未确认。":"Higher-timeframe evidence is unavailable or opposes this entry."]:[])];
+    return {key:`${route.pathId}-${route.side}`,pathId:route.pathId,side:route.side,direction,state,confirmed,selected:p.pathId===selected.pathId&&p.side===selected.side,entry,stop,targets,condition,riskPercent,rr:p.grossRewardRisk,plan:p,lines};
+  });
+}
+
+export function globalTradeCardLines(report:GlobalReport){return globalTradeCards(report).flatMap(c=>[...c.lines]);}
+
+/** Keep distant archive prices in context without directing a trade at them. */
+export function globalHistoricalLevelLines(report:GlobalReport){
+  const close=report.entryStudy?.candles.at(-1)?.close??report.snapshot.price;if(close===null)return [];
+  const active=new Set(report.strategy?.routes.flatMap(r=>[...r.objectiveIds,r.protectionLevelId])??[]);
+  const levels=(report.strategy?.contextLevelIds??[]).flatMap(id=>{const l=report.levels.find(l=>l.id===id);return l&&!active.has(id)&&l.basis==="swing"&&l.anchorIds.some(id=>report.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null))?[l]:[];});
+  const show=[...levels.filter(l=>l.price>close).sort((a,b)=>a.price-b.price).slice(0,3),...levels.filter(l=>l.price<close).sort((a,b)=>b.price-a.price).slice(0,3)];
+  const extremes=[levels.reduce<typeof levels[number]|undefined>((a,b)=>!a||b.price>a.price?b:a,undefined)];
+  for(const level of extremes)if(level&&!show.includes(level))show.push(level);
+  return show.map(l=>`${l.price>close?report.lang==="zh"?"历史阻力":"Historical resistance":report.lang==="zh"?"历史支撑":"Historical support"} ${l.price.toLocaleString("en-US",{maximumFractionDigits:report.snapshot.pricePrecision})} · ${globalFrameReference(report.snapshot.timeframe)} · ${report.lang==="zh"?"背景价位，非本计划 TP":"context only; not a TP in this plan"}`);
+}

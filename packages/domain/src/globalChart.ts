@@ -1,3 +1,4 @@
+import {globalTradeAnnotations} from "./globalTradeAnnotations.js";
 import { parseCandleTimeframe, type GlobalReport } from "@pulse/schemas";
 import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
@@ -59,7 +60,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   const parallels=(report.indicators.channels??[]).filter(c=>c.scope==="broad"?options.layers?.channel!==false:pro&&options.layers?.localChannel!==false);
   const legend=parallels.length?`${report.lang==="zh"?"平行通道":"Parallel channel"}: ${parallels.map(c=>`${c.scope}${c.priceState&&c.priceState!=="inside"?` (price ${c.priceState})`:""}`).join(" / ")}${options.layers?.regression?" · cyan: regression 120 ±2σ":""}`:options.layers?.regression?"Regression channel · 120 bars · ±2σ; no qualifying parallel channel":"";
   if(legend)svg+=text(left+8,top+15,legend,"#a8b4c6",10);
-  if (options.showScenarios !== false) svg += `<rect x="${historyEnd+1}" y="${top}" width="${Math.max(0,right-historyEnd)}" height="${bottom-top}" fill="#142034" fill-opacity=".36"/>`+line(historyEnd, top, historyEnd, bottom, "#536175", 1, "4 5")+text(historyEnd+15,top-9,report.lang==="zh"?"有条件走势 · 时间仅为示意":"CONDITIONAL MOVES · TIMING SCHEMATIC","#99abc4",9);
+  if (options.showScenarios !== false) svg += `<rect x="${historyEnd+1}" y="${top}" width="${Math.max(0,right-historyEnd)}" height="${bottom-top}" fill="#142034" fill-opacity=".36"/>`+line(historyEnd, top, historyEnd, bottom, "#536175", 1, "4 5")+text(historyEnd+15,top-9,report.decisionVersion==="decision-v5"?report.lang==="zh"?"交易计划 · Entry / SL / TP":"TRADE PLAN · ENTRY / SL / TP":report.lang==="zh"?"有条件走势 · 时间仅为示意":"CONDITIONAL MOVES · TIMING SCHEMATIC","#99abc4",9);
   if (report.waveCount.status === "unclear") svg += text(left + 8, top + 19, globalLabel("unclear", report.lang), "#acb8cb", 12);
   const origin = report.waveCount.anchors[0];
   for(const channel of report.indicators.channels??[]){
@@ -96,6 +97,10 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
       if (pa && pb) { const segment = channelSegment(g,pa,pb); if(segment) svg += line(segment.x1,segment.y1,segment.x2,segment.y2,"#a7bed9",1,"5 4"); }
       const rows: number[] = [];
       for(const ratio of [0,.236,.382,.5,.618,.786,1]) {
+        // Input high/low endpoints are measuring data, not projected exits.
+        // If an endpoint is independently selected as a TP, the trade drawing
+        // labels it as TP. Do not add a competing historical price marker.
+        if(report.decisionVersion==="decision-v5"&&(ratio===0||ratio===1))continue;
         const price = b.price-(b.price-a.price)*ratio, y=g.y(price); if(!visible(y)||start>=historyEnd)continue;
         const color = ratio === .618 ? "#91cbae" : ratio === .5 ? "#b6a0dc" : "#86a7c5";
         svg += `<g data-fib-ratio="${ratio}" data-anchor-a="${escapeGlobalSvg(a.id)}" data-anchor-b="${escapeGlobalSvg(b.id)}">`+line(start,y,historyEnd,y,color,ratio===0||ratio===1?1.2:.8);
@@ -122,6 +127,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   }
   if (origin) svg += text(left + 8, bottom - 8, `${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
   if (options.showScenarios === false) return svg;
+  if(report.decisionVersion==="decision-v5")return svg+globalTradeAnnotations(report,g,options);
   const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a,b)=>Number(b.level.id===plan.triggerLevelId||plan.targetIds.includes(b.level.id))-Number(a.level.id===plan.triggerLevelId||plan.targetIds.includes(a.level.id))).filter((item,i,all)=>!all.slice(0,i).some(prior=>Math.abs(prior.level.price-item.level.price)<10**-report.snapshot.pricePrecision)).sort((a, b) => a.y - b.y);
   const labelPositions=labels.map((l,i)=>Math.max(l.y,top+12+i*20));
   for(let i=1;i<labelPositions.length;i++)labelPositions[i]=Math.max(labelPositions[i],labelPositions[i-1]+20);
@@ -223,9 +229,9 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
 /** Self-contained image of a saved report. No URLs, model calls or live prices. */
 export function globalReportChartSvg(report: GlobalReport, options: GlobalChartOptions = {}): string | null {
   if (report.candles.length < 2) return null;
-  const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250), footerTop = entryTop+(entryImage?240:0);
+  const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId), footerTop = entryTop+(entryImage?240:0);
   const decision=globalDecision(report),primary=globalTradePlan(report);
-  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
+  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
     ...(decision.rewardLine&&decision.direction!=="BUY / SELL"?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
     ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?globalChannelLines(report):[])].filter(Boolean))];
   const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?100:70):(index?185:140),chars=Array.from(value),rows:string[]=[];while(chars.length)rows.push(chars.splice(0,max).join(""));return rows;});
@@ -234,7 +240,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const candles = options.fullHistory?report.candles:report.candles.slice(options.fitFibonacci?-globalStructuralWindow(report,true):options.structure?-Math.max(180,globalSetupWindow(report)):-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
   const refs = globalSetupMap(report).view.levelIds.flatMap(id => { const p = report.levels.find(l => l.id === id)?.price; return p === undefined ? [] : [p]; });
   const plan=globalTradePlan(report),visiblePoints=(points:Array<{ts:number;value:number}>)=>points.filter(p=>p.ts>=start&&p.ts<=end);
-  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers), ...(decision.planningValid?plan.referenceEntry??[]:[]),...(decision.planningValid&&plan.referenceStop!==null?[plan.referenceStop]:[])];
+  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers), ...((decision.planningValid||report.decisionVersion==="decision-v5")?plan.referenceEntry??[]:[]),...((decision.planningValid||report.decisionVersion==="decision-v5")&&plan.referenceStop!==null?[plan.referenceStop]:[])];
   const low = Math.min(...values), high = Math.max(...values), margin = Math.max(high - low, high * .01) * .1, min = Math.max(0, low - margin), max = high + margin;
   const y = (p: number) => top + (max - p) / (max - min) * (priceBottom - top), x = (ts: number) => left + (ts - start) / Math.max(1, end - start) * (historyEnd - left);
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };

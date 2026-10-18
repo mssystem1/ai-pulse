@@ -9,8 +9,22 @@ import { AnalysisReport } from "./Report";
 import { buildReportBuyIntent, buildReportManualBuyIntent, buildReportSellIntent, buildTelegramReportBuyIntent } from "./reportTradeHandoff";
 import {qualifiedGlobalFixture} from "../../../packages/analysis/src/globalAssessment.fixtures.js";
 import {strategyFixture} from "../../../packages/analysis/src/globalStrategy.fixtures.js";
+import {tradePlanFixture} from "../../../packages/analysis/src/globalTrade.fixtures.js";
+import {globalTradeCards} from "@pulse/domain";
 import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
+
+for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])for(const side of ["long","short"] as const)test(`${frame} ${side}: current report and Mini App keep Entry, SL and TP visible when reward is insufficient`,()=>{
+  const {report}=tradePlanFixture(frame,side);const route=report.strategy!.routes[0];
+  report.levels.find(l=>l.id===route.objectiveIds[0])!.price=side==="long"?100.1:99.9;
+  report.tradePlan=deriveGlobalTradePlan(report);
+  const card=globalTradeCards(report)[0];assert.equal(card.confirmed,false);assert.ok(card.plan.blockers.includes("reward"));
+  for(const Component of [GlobalResearchReport,TelegramResearchReport]){
+    const html=renderToStaticMarkup(createElement(Component,{report}));
+    for(const value of [card.direction,card.entry,card.stop,"TP1","Entry (planned)","SL (planned)","Show this plan on chart"])assert.ok(html.includes(value),value);
+    assert.ok(html.includes(`data-trade-card="${card.key}"`));assert.ok(!/OBJECTIVE|CHECKPOINT|WATCH AREA|INVALIDATED ·|EXPIRED ·/.test(html));
+  }
+});
 
 for(const [frame,name,holding,entry] of [["15m","FAST","minutes to hours","5m"],["1H","INTRADAY","hours / current session","15m"],["4H","SWING","days to weeks","1H"],["1Dutc","POSITION","weeks to months","4H"],["1Wutc","MACRO","months and longer","1D (UTC)"]])test(`${frame}: web and Telegram show the strategy horizon and distinct entry timing`,()=>{
   const {report}=strategyFixture(frame);

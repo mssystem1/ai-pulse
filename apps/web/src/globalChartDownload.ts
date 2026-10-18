@@ -1,6 +1,6 @@
 import { globalArtifactTag, globalReportChartSvg, type GlobalReport, type GlobalChartOptions, type GlobalChartLayers } from "@pulse/domain";
 
-export function downloadGlobalChart(report: GlobalReport, layers: GlobalChartLayers, options: Pick<GlobalChartOptions,"structure"|"fullHistory"|"fitFibonacci"> = {}) {
+export function downloadGlobalChart(report: GlobalReport, layers: GlobalChartLayers, options: Pick<GlobalChartOptions,"structure"|"fullHistory"|"fitFibonacci"|"selectedPathId"> = {}) {
   const svg = globalReportChartSvg(report, { layers, ...options });
   if (!svg) return;
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));

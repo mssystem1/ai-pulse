@@ -1,28 +1,67 @@
 {
-  "purpose": "Historical educational chart images; not current trading signals",
-  "source": "packages/analysis/src/globalReport.oct16-fixtures.json",
-  "renderer": "PULSE canonical saved-report renderer",
-  "snapshot": {
-    "instId": "BTC-USDT",
-    "timeframe": "1D",
-    "source": "okx-public-spot",
-    "venue": "OKX Spot",
-    "priceCurrency": "USDT",
-    "observedAt": "2026-10-16T10:45:59.901Z",
-    "lastCandleTs": 1791993600000,
-    "price": 82416.7,
-    "pricePrecision": 2,
-    "completedOnly": true
+  "purpose": "Historical educational examples, not current trade signals",
+  "method": "decision-v5 / structure-v5 / horizon-v2",
+  "sources": [
+    {
+      "path": "packages/analysis/src/globalReport.oct17-fixtures.json",
+      "sha256": "01ace8553652a48bdc6f310d76d7d2c56dcf7315d0986b135fb43d027af1ae6b"
+    },
+    {
+      "path": "packages/analysis/src/globalReport.oct17-2116-fixtures.json",
+      "sha256": "78f8f62c6afe64cfcc6737c3fa7cd5e791dd3cc3065849b112b29b2f4dfc3bdf"
+    }
+  ],
+  "reports": {
+    "1H": {
+      "reference": "1e9fd1bc",
+      "observedAt": "2026-10-17T21:16:16.779Z",
+      "savedCandles": 520,
+      "shownCandles": 123
+    },
+    "4H": {
+      "reference": "2ad0a264",
+      "observedAt": "2026-10-17T21:14:44.983Z",
+      "savedCandles": 520,
+      "shownCandles": 180
+    },
+    "1Dutc": {
+      "reference": "2f489d71",
+      "observedAt": "2026-10-17T21:10:34.259Z",
+      "savedCandles": 520,
+      "shownCandles": 260
+    },
+    "1Wutc": {
+      "reference": "12619f3a",
+      "observedAt": "2026-10-17T21:12:39.757Z",
+      "savedCandles": 457,
+      "shownCandles": 260
+    },
+    "15m": {
+      "reference": "e5f1768f",
+      "observedAt": "2026-10-17T21:16:16.779Z",
+      "savedCandles": 520,
+      "shownCandles": 96
+    }
   },
-  "contextTimeframe": "1Wutc",
-  "savedCandles": 520,
-  "shownCandles": 32,
   "examples": [
     {
+      "name": "directional-plan",
+      "frame": "4H"
+    },
+    {
+      "name": "risk-no-trade",
+      "frame": "1Dutc"
+    },
+    {
+      "name": "risk-setup",
+      "frame": "4H",
+      "options": {
+        "selectedPathId": "range-short"
+      }
+    },
+    {
       "name": "setup",
-      "layers": {
-        "channel": true
-      },
+      "frame": "4H",
       "box": [
         0,
         0,
@@ -31,72 +70,58 @@
       ]
     },
     {
-      "name": "directional-plan",
-      "layers": {
-        "channel": true
+      "name": "trend",
+      "frame": "1H",
+      "box": [
+        0,
+        0,
+        1300,
+        595
+      ],
+      "options": {
+        "structure": true
       }
     },
     {
-      "name": "trend",
-      "layers": {
-        "channel": false,
-        "allSmas": true,
-        "regression": true
-      },
-      "box": [
-        0,
-        0,
-        1300,
-        595
-      ]
-    },
-    {
       "name": "fibonacci",
-      "layers": {
-        "channel": false,
-        "fibonacci": true
-      },
+      "frame": "1H",
       "box": [
         0,
         0,
         1300,
         595
-      ]
+      ],
+      "options": {
+        "structure": true
+      }
     },
     {
       "name": "vwap-atr-pivots",
-      "layers": {
-        "channel": false,
-        "vwap": true,
-        "atr": true,
-        "pivots": true
-      },
+      "frame": "4H",
       "box": [
         0,
         0,
         1300,
         595
-      ]
+      ],
+      "options": {
+        "layers": {
+          "vwap": true,
+          "atr": true,
+          "pivots": true
+        }
+      }
     },
     {
       "name": "rsi-context",
-      "layers": {
-        "channel": false
-      },
-      "box": [
-        40,
-        594,
-        1240,
-        169
-      ]
+      "frame": "4H"
     }
   ],
   "additionalImages": {
-    "risk-no-trade": "oct16 Pro 1D public replay",
-    "risk-setup": "oct16 Pro 4H public replay",
-    "setup-review-flow": "Authored workflow diagram"
+    "setup-review-flow": "Authored workflow; no forecast"
   },
-  "regenerate": "node scripts/validate-global-setup.mjs --write-docs && node scripts/render-global-guide.mjs",
+  "regenerate": "npm run build -w @pulse/analysis && node scripts/render-global-guide.mjs",
+  "networkCalls": 0,
   "modelCalls": 0,
   "walletData": false
 }

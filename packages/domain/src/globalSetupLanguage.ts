@@ -1,6 +1,7 @@
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference} from "./globalContext.js";
 import {globalScenarioEvidence,globalEntryCondition} from "./globalScenarioEvidence.js";
+import {globalTradeCards} from "./globalTradeDisplay.js";
 
 /** Direction and an exact entry sentence, independent of internal status codes. */
 export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalReport["tradePlan"]>,qualified:boolean){
@@ -10,10 +11,19 @@ export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalRepo
   const trigger=report.levels.find(l=>l.id===p.triggerLevelId)?.price;
   const verb=p.side==="short"?zh?"卖出":"Sell":zh?"买入":"Buy";
   const signalObserved=p.retestTs!==null&&!p.failure&&!p.blockers.some(b=>["history","levels","cancelled","expired"].includes(b));
+  const planningValid=p.side!=="none"&&!p.blockers.some(b=>["reward","history","levels"].includes(b));
   const primary=report.hierarchy?.find(r=>r.timeframe===report.snapshot.timeframe);
+  if(report.decisionVersion==="decision-v5"){
+    const cards=globalTradeCards(report),mainCard=cards.find(c=>c.selected)??cards.find(c=>c.pathId===path?.id)??cards[0];
+    const bothSides=new Set(cards.map(c=>c.side)).size===2;
+    const direction=qualified?(p.side==="short"?"SHORT":"LONG"):report.range?"RANGE":bothSides||primary?.bias==="mixed"?"LONG / SHORT":p.side==="short"?"SHORT":p.side==="long"?"LONG":"LONG / SHORT";
+    const heading=`${report.strategy?.name.toUpperCase()??""} · ${direction}${direction==="RANGE"?` · ${zh?"区间边缘计划":"Range-edge plans"}`:direction==="LONG / SHORT"?` · ${zh?"分别确认入场":"Separate entry conditions"}`:` · ${qualified?zh?"信号已确认":"Entry signal confirmed":mainCard?.state??(zh?"需要新的入场结构":"Entry structure needed")}`}`;
+    const rewardBlocked=cards.length>0&&cards.every(c=>c.plan.blockers.includes("reward"));
+    const entryInstruction=qualified?zh?"信号已确认；按 Entry / SL / TP1 复核新报价及费用，尚未成交。":"Entry signal confirmed. Review Entry, SL, TP1 and a fresh quote before an order; no fill implied.":rewardBlocked?zh?"多空计划至 TP1 的收益均不足；需要新的有依据入场结构，仅新增确认不能满足入场条件。下方保留计划 Entry、SL 和 TP。":"Both LONG and SHORT plans need better reward to TP1. A new supported entry structure is required; confirmation alone does not qualify entry. Planned Entry, SL and TPs are below.":direction==="LONG / SHORT"||direction==="RANGE"?zh?"下方分别列出多空计划的 Entry、SL、TP 与触发条件；仅在实际入场确认后执行。":"The LONG and SHORT plans below list Entry, SL, TP and their triggers. Enter only after the stated signal is confirmed.":`${mainCard?.direction??direction} · ${mainCard?.condition??(zh?"需要新测试。":"A new test is needed.")}.`;
+    return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
+  }
   const mixed=Boolean(report.decisionVersion)&&primary?.bias==="mixed"&&!qualified;
   const direction=(report.range||path?.direction==="range")&&!signalObserved?"RANGE":mixed?"BUY / SELL":p.side==="short"?"SHORT":p.side==="long"?"LONG":path?.direction==="down"?"SHORT":path?.direction==="up"?"LONG":"RANGE";
-  const planningValid=p.side!=="none"&&!p.blockers.some(b=>["reward","history","levels"].includes(b));
   let pattern=zh?"突破后回测":"the breakout retest";
   if(p.family==="range_buy"||p.family==="support_bounce"||p.condition==="support_hold")pattern=zh?"支撑回调":"the support pullback";
   if(p.family==="range_sell"||p.family==="resistance_rejection"||p.condition==="rejection")pattern=zh?"阻力反弹":"the resistance rebound";

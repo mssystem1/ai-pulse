@@ -93,7 +93,7 @@ describe("context-first Grok analysis", () => {
     // The compatibility response keeps its schema, while its public headline
     // follows the measured report rather than the provider's asserted trend.
     assert.equal(result.global.hierarchy?.find(r=>r.timeframe==="1H")?.bias,"mixed");
-    assert.equal(result.analysis.headline, "BTC-USDT · 1H · INTRADAY · BUY / SELL · Mixed structure; entry conditions below");
+    assert.equal(result.analysis.headline, "BTC-USDT · 1H · INTRADAY · LONG / SHORT · Separate entry conditions");
     assert.equal(result.usage?.totalTokens, 120);
     assert.deepEqual(result.analysisProfile, { mode: "live", model: "grok-4.3", reasoningEffort: "low" });
   });

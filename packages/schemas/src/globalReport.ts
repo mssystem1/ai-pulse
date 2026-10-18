@@ -34,7 +34,7 @@ export const GlobalTradePlanSchema = z.object({
   referenceEntry: z.tuple([price, price]).nullable(), referenceStop: price.nullable(), grossRewardRisk: z.number().finite().nonnegative().nullable(),
   stopBufferAtr: z.number().positive(), confirmationTs: time.nullable(), retestTs: time.nullable(),
   blockers: z.array(z.enum(["history", "levels", "confirmation", "retest", "reward", "entry_price", "cancelled", "expired"])),
-  method: z.enum(["structure-v2","structure-v3","structure-v4"]).optional(),
+  method: z.enum(["structure-v2","structure-v3","structure-v4","structure-v5"]).optional(),
   strategyId:z.enum(["fast","intraday","swing","position","macro"]).optional(),checkpointIds:z.array(z.string()).optional(),firstObstacleRewardRisk:z.number().finite().nonnegative().nullable().optional(),structureConfirmationTs:time.nullable().optional(),
   family: z.enum(["breakout_retest","support_bounce","resistance_rejection","range_buy","range_sell"]).optional(),
   entryTimeframe: z.string().optional(), zone: z.tuple([price,price]).optional(),
@@ -74,8 +74,8 @@ export const GlobalFrameSchema = z.object({
 export const GlobalReportSchema = z.object({
   version: z.literal("pulse-global-v3"), tier: z.enum(["quick", "pro"]), lang: z.enum(["en", "zh"]),
   evaluationVersion: z.literal("completed-v2").optional(),
-  decisionVersion:z.enum(["decision-v1","decision-v2","decision-v3","decision-v4"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
-  strategy:z.object({version:z.literal("horizon-v1"),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().positive(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
+  decisionVersion:z.enum(["decision-v1","decision-v2","decision-v3","decision-v4","decision-v5"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
+  strategy:z.object({version:z.enum(["horizon-v1","horizon-v2"]),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().nonnegative(),contextLevelIds:z.array(z.string()).optional(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
   entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
@@ -91,7 +91,10 @@ export const GlobalReportSchema = z.object({
     if(!rows.some(row=>row.timeframe===report.snapshot.timeframe)||new Set(rows.map(r=>r.timeframe)).size!==rows.length||rows.some(r=>r.observedAt!==report.snapshot.observedAt||r.source!==null&&r.source!==report.snapshot.source||r.completedAt!==null&&r.completedAt>Date.parse(report.snapshot.observedAt)||r.status==="available"&&(r.candles<55||r.price===null||r.sma55===null)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Decision hierarchy must retain one source, cutoff and evidenced completed frames"});
   }
   const ids = new Set(report.levels.map(level => level.id));
-  if(report.decisionVersion==="decision-v4"&&report.strategy){
+  if(["decision-v4","decision-v5"].includes(report.decisionVersion??"")&&report.strategy){
+    const current=report.decisionVersion==="decision-v5";
+    if(report.strategy.version!==(current?"horizon-v2":"horizon-v1"))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy method must match its saved report version"});
+    if(current&&((report.strategy.contextLevelIds??[]).some(id=>!ids.has(id))||report.strategy.routes.some(r=>r.objectiveIds.length>3||r.checkpointIds.length>0)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Current trade plans require canonical context and at most three TP levels without a competing checkpoint map"});
     const profiles:Record<string,[string,string]>={"15m":["fast","5m"],"1H":["intraday","15m"],"4H":["swing","1H"],"1D":["position","4H"],"1W":["macro","1Dutc"]},expected=profiles[report.snapshot.timeframe.replace(/utc$/i,"")];
     if(!expected||report.strategy.id!==expected[0]||report.strategy.entryTimeframe!==expected[1])ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy and timing must match the primary timeframe profile"});
     if(report.candles.some(c=>(candleCloseTime(c.ts,report.snapshot.timeframe)??Infinity)>Date.parse(report.snapshot.observedAt)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy structure must use completed primary-frame evidence"});
@@ -100,8 +103,8 @@ export const GlobalReportSchema = z.object({
       if(r.objectiveIds.some(id=>r.checkpointIds.includes(id))||prices.some((p,i)=>p===undefined||i>0&&(prices[i-1]===undefined||sign*(p-prices[i-1]!)<=0))||r.objectiveIds.some(id=>{const l=report.levels.find(l=>l.id===id);return l&&(!l.anchorIds.some(id=>report.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null))||l.basis!=="swing");}))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy objectives require ordered confirmed primary swings, distinct from checkpoints"});
     }
   }
-  if(report.decisionVersion==="decision-v4"&&(!report.strategy||report.strategy.entryTimeframe!==report.entryStudy?.timeframe||report.strategy.routes.some(r=>!report.paths.some(p=>p.id===r.pathId)||[r.protectionLevelId,...r.objectiveIds,...r.checkpointIds].some(id=>id!==null&&!ids.has(id)))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy reports require a matching horizon, entry frame and canonical objective/checkpoint map"});
-  if(["decision-v2","decision-v3","decision-v4"].includes(report.decisionVersion??"")){
+  if(["decision-v4","decision-v5"].includes(report.decisionVersion??"")&&(!report.strategy||report.strategy.entryTimeframe!==report.entryStudy?.timeframe||report.strategy.routes.some(r=>!report.paths.some(p=>p.id===r.pathId)||[r.protectionLevelId,...r.objectiveIds,...r.checkpointIds].some(id=>id!==null&&!ids.has(id)))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy reports require a matching horizon, entry frame and canonical objective/checkpoint map"});
+  if(["decision-v2","decision-v3","decision-v4","decision-v5"].includes(report.decisionVersion??"")){
     const study=report.entryStudy;
     if(!Number.isFinite(Date.parse(report.snapshot.observedAt)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Structure-v2 needs a valid observation cutoff"});
     if(!study||study.observedAt!==report.snapshot.observedAt||study.source!==null&&study.source!==report.snapshot.source||study.candles.some((c,i)=>!c.confirmed||c.high<Math.max(c.open,c.close)||c.low>Math.min(c.open,c.close)||(candleCloseTime(c.ts,study.timeframe)??Infinity)>Date.parse(study.observedAt)||i>0&&c.ts<=study.candles[i-1].ts)||study.status==="available"&&(study.candles.length<55||!study.source))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry study must preserve source, cutoff and completed chronological evidence"});
@@ -125,7 +128,7 @@ export const GlobalReportSchema = z.object({
   if (selected && (selected.direction !== "up" || selected.triggerLevelId !== report.setup.triggerLevelId || report.setup.retestLevelId !== report.setup.triggerLevelId || selected.invalidationLevelId !== report.setup.invalidationLevelId || JSON.stringify(selected.targetIds) !== JSON.stringify(report.setup.targetIds))) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Setup must match its plotted upside path" });
   const plan = report.tradePlan;
   if (plan) {
-    if(report.decisionVersion==="decision-v4"&&plan.method!=="structure-v4"||report.decisionVersion==="decision-v3"&&plan.method!=="structure-v3"||report.decisionVersion==="decision-v2"&&["structure-v3","structure-v4"].includes(plan.method??""))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry calculation must match its saved decision version"});
+    if(report.decisionVersion==="decision-v5"&&plan.method!=="structure-v5"||report.decisionVersion==="decision-v4"&&plan.method!=="structure-v4"||report.decisionVersion==="decision-v3"&&plan.method!=="structure-v3"||report.decisionVersion==="decision-v2"&&["structure-v3","structure-v4","structure-v5"].includes(plan.method??""))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry calculation must match its saved decision version"});
     const path = report.paths.find(p => p.id === plan.pathId), level = (id: string | null) => report.levels.find(l => l.id === id)?.price;
     if ([plan.triggerLevelId, plan.invalidationLevelId, ...plan.targetIds].some(id => id !== null && !ids.has(id)) || (plan.pathId !== null && (!path || !report.view.pathIds.includes(plan.pathId)))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan must use visible canonical levels and path"});
     if (path && ((path.direction === "up" && plan.side !== "long") || (path.direction === "down" && plan.side !== "short"))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Trade plan direction must match its path"});
@@ -138,7 +141,7 @@ export const GlobalReportSchema = z.object({
       if (lo > hi || (plan.side === "long" ? plan.referenceStop >= lo || targets.some(p => p <= hi) : plan.referenceStop <= hi || targets.some(p => p >= lo))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Research plan prices must be ordered for its side"});
     }
     if (plan.state === "confirmed" && (!plan.confirmationTs || !plan.retestTs || plan.blockers.length || plan.grossRewardRisk === null || plan.grossRewardRisk < 1.5)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Confirmed research plan requires observed confirmation and sufficient gross reward"});
-    if(plan.method==="structure-v4"&&plan.side!=="none"){
+    if(["structure-v4","structure-v5"].includes(plan.method??"")&&plan.side!=="none"){
       const route=report.strategy?.routes.find(r=>r.pathId===plan.pathId&&r.side===plan.side);
       if(plan.strategyId!==report.strategy?.id||!route||JSON.stringify(plan.targetIds)!==JSON.stringify(route.objectiveIds)||JSON.stringify(plan.checkpointIds)!==JSON.stringify(route.checkpointIds))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy plan must retain its strategy objectives and intervening checkpoints"});
       if(plan.state==="confirmed"&&(!plan.structureConfirmationTs||!report.candles.some(c=>c.ts===plan.structureConfirmationTs)||(candleCloseTime(plan.structureConfirmationTs,report.snapshot.timeframe)??Infinity)>plan.confirmationTs!||plan.firstObstacleRewardRisk==null||plan.firstObstacleRewardRisk<1.5))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy entry requires completed primary-frame confirmation and sufficient nearest-checkpoint reward"});

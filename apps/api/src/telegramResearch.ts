@@ -1,5 +1,6 @@
 import {globalDecision,globalDecisionTitle,globalDecisionLines,globalNextSetupLines,globalConfirmationEvidence} from "@pulse/domain";
 import {globalCoverageLine,globalFrameReference} from "@pulse/domain";
+import {globalTradeCards,type GlobalReport} from "@pulse/domain";
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
@@ -9,6 +10,13 @@ export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 const clip = (value: string, max: number) => { if(value.length<=max)return value;let result="";for(const char of value){if(result.length+char.length>max-1)break;result+=char;}return result+"…"; };
 const boundedHtml = (value: string, max: number) => { let result="";for(const char of value){const safe=escapeTelegramHtml(char);if(result.length+safe.length>max-1)return result+"…";result+=safe;}return result; };
+function tradeCaption(report:GlobalReport){
+  const cards=globalTradeCards(report),zh=report.lang==="zh";
+  const lines=[`PULSE · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)} · ${report.strategy?.name??""}`,`#${globalArtifactReference(report)} · ${report.snapshot.observedAt}`,
+    ...cards.flatMap(c=>[`${c.direction} · ${c.confirmed?zh?"已确认":"confirmed":zh?"计划":"planned"}`,`Entry ${c.entry} · SL ${c.stop}`,c.targets.map((t,i)=>`TP${i+1} ${globalPrice(report,t.price)}`).join(" → "),`${zh?"触发":"Trigger"}: ${c.condition}.`]),
+    zh?"价格为保存的计划；确认后复核新报价。完整条件见 TXT。":"Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT."];
+  const caption=lines.filter(Boolean).join("\n");if(caption.length>1024)throw Error("Global trade plans exceed Telegram caption budget");return caption;
+}
 export function formatTelegramResearch(report: unknown, context: ResearchContext = {}) {
   return researchText(presentResearch(report,context));
 }
@@ -16,6 +24,12 @@ export function formatTelegramResearch(report: unknown, context: ResearchContext
 export function telegramResearchMessage(report: unknown, context: ResearchContext = {}) {
   const global=readGlobalReport(report);
   if(global){
+    if(global.decisionVersion==="decision-v5"){
+      const d=globalDecision(global),html=escapeTelegramHtml;
+      const lines=[`<b>PULSE · GLOBAL ${global.tier.toUpperCase()} · ${html(global.snapshot.instId)} · ${html(globalFrameReference(global.snapshot.timeframe))}</b>`,html(globalCompletedPriceLine(global)),`<b>${html(d.heading)}</b>`,html(d.entryInstruction),
+        ...globalTradeCards(global).flatMap(c=>["",...c.lines.map(html)]),"",html(d.changeView),"",...d.hierarchy.map(html),"",global.lang==="zh"?"现货 SELL 仅减持已有资产。信号不代表成交；完整证据见 TXT。":"Spot SELL reduces owned inventory. A signal is not a fill. Full evidence is in the TXT."];
+      const message=lines.join("\n");if(message.length>3900)throw Error("Global trade plans exceed Telegram message budget");return message;
+    }
     const d=globalDecision(global),html=escapeTelegramHtml,zh=global.lang==="zh";
     const header=[`<b>PULSE · GLOBAL ${global.tier.toUpperCase()} · ${html(global.snapshot.instId)}</b>`,html(globalTimeframeLabel(global.snapshot.timeframe,global.lang)),html(globalCompletedPriceLine(global))];
     const blocks=[...header,"",`<b>${html(d.marketView)}</b>`,...globalDecisionLines(global).filter((_,i)=>i!==1).map(html),"",`<b>${zh?"下一步条件":"Next condition"}</b>`,...d.checklist.map(html),"",`<b>${zh?"计划参考":"Setup references"}</b>`,...globalNextSetupLines(global).slice(1).map(html)];
@@ -44,6 +58,7 @@ export function telegramResearchOrder(report: unknown): Array<"chart"|"overview"
 export function telegramResearchCaption(report: unknown, context: ResearchContext = {}) {
   const global=readGlobalReport(report);
   if(!global)return `${presentResearch(report,context).label.slice(0,400)}\nOriginal report snapshot · conditional paths, not guaranteed forecasts.`;
+  if(global.decisionVersion==="decision-v5")return tradeCaption(global);
   const d=globalDecision(global),p=globalTradePlan(global),zh=global.lang==="zh";
   const lines=[`PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalFrameReference(global.snapshot.timeframe)}`,
     `#${globalArtifactReference(global)} · ${global.snapshot.observedAt}`,globalCompletedPriceLine(global),globalDecisionTitle(global),...(d.direction==="BUY / SELL"?d.scenarios.map(s=>`${s.side}: ${s.condition}; ${s.reason}.`):[d.nextCondition]),

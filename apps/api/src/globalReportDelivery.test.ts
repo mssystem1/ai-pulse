@@ -5,7 +5,20 @@ import { globalDesignFixture } from "../../../packages/domain/dist/globalReport.
 import { globalTradePlan, globalLevelPrice, globalCompletedPriceLine,globalDecision } from "@pulse/domain";
 import { formatTelegramResearch, telegramResearchMessage, telegramResearchCaption, telegramResearchOrder, renderTelegramResearchChart } from "./telegramResearch.js";
 import { fullReportDelivery } from "./reportDelivery.js";
+import {tradePlanFixture} from "../../../packages/analysis/dist/globalTrade.fixtures.js";
+import {globalTradeCards} from "@pulse/domain";
 import { configureTelegramReportReader, telegramDeliveryToken, deliverTelegramReportDurably, runTelegramDeliveryCycle } from "./telegram.js";
+
+for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])for(const lang of ["en","zh"] as const)test(`${frame} ${lang}: current Telegram delivery retains Entry, SL, TP and the complete trigger within transport limits`,()=>{
+  const {report}=tradePlanFixture(frame);report.lang=lang;
+  const card=globalTradeCards(report)[0],caption=telegramResearchCaption(report),message=telegramResearchMessage(report),txt=formatTelegramResearch(report);
+  assert.ok(caption.length<=1024);assert.ok(message.length<=3900);
+  for(const output of [caption,message,txt]){
+    for(const value of [card.entry,card.stop,"TP1"])assert.ok(output.includes(value),value);
+    assert.ok(!/OBJECTIVE|CHECKPOINT|WATCH AREA|INVALIDATED ·|EXPIRED ·/.test(output));
+  }
+  assert.ok(caption.includes(card.condition));
+});
 
 test("captions name the saved close and next condition without promoting an unused expiry",()=>{
   for(const lang of ["en","zh"] as const){const report=globalDesignFixture("pro",lang);report.setup.expiresAt=Date.parse("2026-10-09T00:00:00Z");const caption=telegramResearchCaption(report),d=globalDecision(report);assert.ok(caption.includes(globalCompletedPriceLine(report)));assert.ok(caption.includes(d.nextCondition));assert.ok(caption.includes(d.heading));assert.ok(!/WAIT|INVALIDATED|EXPIRED|NO TRADE/.test(caption));assert.ok(!caption.includes("2026-10-09T00:00:00.000Z"));assert.ok(caption.length<=1024);}

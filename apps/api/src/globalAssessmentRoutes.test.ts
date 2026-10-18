@@ -5,12 +5,13 @@ import { getNetwork, loadConfig } from "@pulse/config";
 import { qualifiedGlobalFixture } from "../../../packages/analysis/dist/globalAssessment.fixtures.js";
 import {entryPlanFixture} from "../../../packages/analysis/dist/globalEntryPlan.fixtures.js";
 import {strategyFixture} from "../../../packages/analysis/dist/globalStrategy.fixtures.js";
+import {tradePlanFixture} from "../../../packages/analysis/dist/globalTrade.fixtures.js";
 import { createGlobalAssessmentRouter } from "./globalAssessmentRoutes.js";
 import type { getOkxTradeTokens } from "./okxDex.js";
 import {deriveGlobalTradePlan} from "@pulse/domain";
 
-for(const version of ["decision-v2","decision-v3","decision-v4"] as const)test(`${version} recheck loads the named entry frame and retains the shared geometry`,async()=>{
-  const {report,market,entry,context}=version==="decision-v4"?strategyFixture():entryPlanFixture(),calls:string[]=[];
+for(const version of ["decision-v2","decision-v3","decision-v4","decision-v5"] as const)test(`${version} recheck loads the named entry frame and retains the shared geometry`,async()=>{
+  const {report,market,entry,context}=version==="decision-v5"?tradePlanFixture():version==="decision-v4"?strategyFixture():entryPlanFixture(),calls:string[]=[];
   report.decisionVersion=version;report.tradePlan=deriveGlobalTradePlan(report);const before=JSON.stringify(report);
   const app=express();app.use(express.json());app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{resolveReport:async access=>access.token==="saved-report-capability-0000"?report:null,market:async input=>{calls.push(input.timeframe);const result=[market,entry,context].find(m=>m.bar===input.timeframe);assert.ok(result);return result;}}));
   const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));
@@ -50,8 +51,8 @@ test("production-shaped saved-report recheck and quoted review reach readiness w
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
-for(const version of ["decision-v2","decision-v3","decision-v4"] as const)test(`${version} X Layer USD₮0 Market/Limit quote review preserves observed xBTC protection without a USDC conversion`,async()=>{
-  const {report,market,entry,context}=version==="decision-v4"?strategyFixture("4H","long","breakout_retest",Date.now()):entryPlanFixture("long","breakout_retest",Date.now()),network=getNetwork("xlayer"),settlement=network.paymentAsset.address!,btc="0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f";
+for(const version of ["decision-v2","decision-v3","decision-v4","decision-v5"] as const)test(`${version} X Layer USD₮0 Market/Limit quote review preserves observed xBTC protection without a USDC conversion`,async()=>{
+  const {report,market,entry,context}=version==="decision-v5"?tradePlanFixture("4H","long","breakout_retest",Date.now()):version==="decision-v4"?strategyFixture("4H","long","breakout_retest",Date.now()):entryPlanFixture("long","breakout_retest",Date.now()),network=getNetwork("xlayer"),settlement=network.paymentAsset.address!,btc="0xb7C00000bcDEeF966b20B3D884B98E64d2b06b4f";
   report.decisionVersion=version;report.tradePlan=deriveGlobalTradePlan(report);
   let wrongChain=false;
   const app=express();app.use(express.json());

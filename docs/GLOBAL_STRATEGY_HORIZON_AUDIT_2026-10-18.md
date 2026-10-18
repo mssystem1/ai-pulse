@@ -1,5 +1,7 @@
 # Global BTC reports: strategy horizons and target correction
 
+> Historical v4 implementation record. The later [BTC trade-plan audit and corrections](GLOBAL_BTC_TRADE_PLAN_AUDIT_2026-10-18.md) supersede the objective/checkpoint presentation and forced primary-frame trade protection described here. The requested five horizon names are retained.
+
 ## Finding
 
 The previous daily report used nearby daily swing levels as its first two objectives and used lower-timeframe structure for entry protection. That produced a daily LONG scenario with intraday-sized reward. The timeframe label alone did not make it a position trade. This was a methodology mismatch, rather than evidence that BTC should reach a much higher price.

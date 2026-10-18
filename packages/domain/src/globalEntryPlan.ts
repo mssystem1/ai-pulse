@@ -25,8 +25,8 @@ export function globalEntryGeometry(side:"long"|"short",zone:[number,number],sto
  * arbitrary two-bar entry deadline. Quote/evidence freshness remains separate. */
 export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedSide?:"long"|"short"):Plan {
   const study=report.entryStudy,path=report.paths.find(p=>(pathId?p.id===pathId:p.role==="main")&&report.view.pathIds.includes(p.id));
-  const horizon=report.decisionVersion==="decision-v4",modern=horizon||report.decisionVersion==="decision-v3";
-  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:horizon?"structure-v4":modern?"structure-v3":"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
+  const current=report.decisionVersion==="decision-v5",horizon=current||report.decisionVersion==="decision-v4",modern=horizon||report.decisionVersion==="decision-v3";
+  const empty:Plan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:[],method:current?"structure-v5":horizon?"structure-v4":modern?"structure-v3":"structure-v2",entryTimeframe:study?.timeframe??report.snapshot.timeframe};
   if(!study||study.status!=="available"||study.candles.length<55)return {...empty,blockers:["history"]};
   if(!path)return {...empty,blockers:["levels"]};
   const level=(id:string|null|undefined)=>report.levels.find(l=>l.id===id);
@@ -66,31 +66,38 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   if(targets.some(l=>sign*(l.price-trigger!.price)<=0))return {...empty,blockers:["levels"]};
   const anchorBefore=(at:number)=>study.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=at&&(side==="long"?a.kind==="low"&&a.price<zone[0]:a.kind==="high"&&a.price>zone[1])).at(-1);
   const recentAnchorBefore=(at:number)=>{const a=anchorBefore(at);if(!a)return undefined;const index=bars.findIndex(c=>c.ts===a.ts),current=bars.findIndex(c=>c.ts===at);return index>=0&&index>=current-32?a:undefined;};
-  const protectionAllowance=(at:number)=>horizon?Math.max(tick*2,(report.indicators.atr.points.filter(p=>(candleCloseTime(p.ts,report.snapshot.timeframe)??Infinity)<=at).at(-1)?.value??report.indicators.atr.points[0]?.value??atr)*.1):allowanceAt(at);
+  const protectionAllowance=(at:number)=>horizon&&!current?Math.max(tick*2,(report.indicators.atr.points.filter(p=>(candleCloseTime(p.ts,report.snapshot.timeframe)??Infinity)<=at).at(-1)?.value??report.indicators.atr.points[0]?.value??atr)*.1):allowanceAt(at);
   const stopFor=(test:GlobalCandle|undefined,at:number)=>{
     const recent=recentAnchorBefore(at)?.price;
-    const fallback=horizon?boundary.price:recent===undefined&&!test?boundary.price:undefined;
+    const fallback=horizon&&!current?boundary.price:recent===undefined&&!test?boundary.price:undefined;
     const structural=side==="long"?Math.min(zone[0],test?.low??zone[0],recent??zone[0],fallback??zone[0]):Math.max(zone[1],test?.high??zone[1],recent??zone[1],fallback??zone[1]);
     const raw=structural-sign*protectionAllowance(at);
     return Number(((side==="long"?Math.floor(raw/tick):Math.ceil(raw/tick))*tick).toPrecision(12));
   };
   let confirmation:GlobalCandle|undefined,signal:GlobalCandle|undefined,failure:Plan["failure"]=null,observedStop:number|undefined;
   let signalZone:[number,number]|undefined,structureConfirmationTs:number|null=null,failedStructureAt=0;
-  const structureEvents=horizon?report.candles.flatMap((c,i,all)=>{const previous=all[i-1],closed=candleCloseTime(c.ts,report.snapshot.timeframe);if(!previous||closed===null||c.ts<knownAt||boundary!.id!==trigger!.id&&(side==="long"?c.low<=boundary!.price:c.high>=boundary!.price))return [];const touch=side==="long"?c.low<=zone[1]+tolerance&&c.high>=zone[0]:c.high>=zone[0]-tolerance&&c.low<=zone[1];const holds=side==="long"?c.close>=zone[1]:c.close<=zone[0];const starts=family==="breakout_retest"?sign*(previous.close-trigger!.price)<=0&&sign*(c.close-trigger!.price)>0:touch&&holds;return starts?[{ts:c.ts,closed}]:[];}):[];
+  const structureEvents=horizon?report.candles.flatMap((c,i,all)=>{const previous=all[i-1],closed=candleCloseTime(c.ts,report.snapshot.timeframe);if(!previous||closed===null||c.ts<knownAt||boundary!.id!==trigger!.id&&(side==="long"?c.low<=boundary!.price:c.high>=boundary!.price))return [];const touch=side==="long"?c.low<=zone[1]+tolerance&&c.high>=zone[0]:c.high>=zone[0]-tolerance&&c.low<=zone[1];const holds=side==="long"?c.close>=zone[1]:c.close<=zone[0];const starts=family==="breakout_retest"?(current?holds:sign*(previous.close-trigger!.price)<=0&&sign*(c.close-trigger!.price)>0):touch&&holds;return starts?[{ts:c.ts,closed}]:[];}):[];
   for(let i=Math.max(1,bars.length-160);i<bars.length;i++){
     const c=bars[i],previous=bars[i-1],allowance=allowanceAt(c.ts);if(c.ts<knownAt)continue;
     const structure=horizon?structureEvents.filter(e=>e.closed<=c.ts).at(-1):undefined;
-    if(horizon&&(!structure||structure.closed<=failedStructureAt))continue;
+    if(current){
+      const latestPrimary=report.candles.filter(b=>(candleCloseTime(b.ts,report.snapshot.timeframe)??Infinity)<=c.ts).at(-1);
+      if(latestPrimary&&sign*(latestPrimary.close-trigger.price)<0){
+        if(confirmation)failure={ts:c.ts,reason:"trigger"};
+        confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;structureConfirmationTs=null;continue;
+      }
+    }
+    if(horizon&&(!structure||!current&&structure.closed<=failedStructureAt))continue;
     if(confirmation){
       const broken=side==="long"?c.close<zone[0]-allowance:c.close>zone[1]+allowance;
       const structureBroken=boundary.id!==trigger.id&&(side==="long"?c.low<boundary.price:c.high>boundary.price);
       const stopped=signal&&observedStop!==undefined&&(side==="long"?c.low<=observedStop:c.high>=observedStop);
       const reached=signal&&(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price);
-      if(broken||structureBroken||stopped||reached){failure={ts:c.ts,reason:stopped?"stop":structureBroken?"structure":reached?"objective":"trigger"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){failedStructureAt=structure!.closed;structureConfirmationTs=null;}continue;}
+      if(broken||structureBroken||stopped||reached){failure={ts:c.ts,reason:stopped?"stop":structureBroken?"structure":reached?"objective":"trigger"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){if(!current)failedStructureAt=structure!.closed;structureConfirmationTs=null;}continue;}
     }
     const touch=side==="long"?c.low<=zone[1]+allowance&&c.high>=zone[0]:c.high>=zone[0]-allowance&&c.low<=zone[1];
     const holds=side==="long"?c.close>=zone[1]:c.close<=zone[0];
-    const starts=family==="breakout_retest"?(horizon?holds:sign*(previous.close-trigger.price)<=0&&sign*(c.close-trigger.price)>0):touch&&holds;
+    const starts=family==="breakout_retest"?(horizon&&!(current&&failure)?holds:sign*(previous.close-trigger.price)<=0&&sign*(c.close-trigger.price)>0):touch&&holds;
     if(!confirmation&&starts){confirmation=c;failure=null;structureConfirmationTs=structure?.ts??null;continue;}
     if(confirmation&&!signal&&c.ts>confirmation.ts){
       const valid=family==="breakout_retest"?touch&&holds:side==="long"?c.close>confirmation.high:c.close<confirmation.low;
@@ -98,11 +105,11 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
         signal=c;observedStop=stopFor(family==="breakout_retest"?c:confirmation,c.ts);
         const edge=family==="breakout_retest"?trigger.price:side==="long"?confirmation.high:confirmation.low;
         signalZone=side==="long"?[edge,Math.max(edge,c.close)]:[Math.min(edge,c.close),edge];
-        if(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price){failure={ts:c.ts,reason:"objective"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){failedStructureAt=structure!.closed;structureConfirmationTs=null;}}
+        if(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price){failure={ts:c.ts,reason:"objective"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){if(!current)failedStructureAt=structure!.closed;structureConfirmationTs=null;}}
       }
     }
   }
-  const watchZone:[number,number]=modern&&family==="breakout_retest"?(side==="long"?[zone[1],zone[1]+tolerance]:[zone[0]-tolerance,zone[0]]):[zone[0]-tolerance,zone[1]+tolerance];
+  const watchZone:[number,number]=current||modern&&family==="breakout_retest"?(side==="long"?[zone[1],zone[1]+tolerance]:[zone[0]-tolerance,zone[0]]):[zone[0]-tolerance,zone[1]+tolerance];
   const plannedZone:[number,number]=signalZone??watchZone;
   const reaction=family!=="breakout_retest"?confirmation:undefined;
   if(observedStop===undefined&&!reaction&&!recentAnchorBefore(last.ts)&&boundary.id===trigger.id)return {...empty,blockers:["levels"]};
@@ -119,6 +126,6 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   const objectiveRewardRisk=horizon?globalEntryGeometry(side,entry,stop,targets[0].price,tick).rr:geometry.rr;
   if(last.close<entry[0]||last.close>entry[1])blockers.push("entry_price");
   const closed=candleCloseTime(last.ts,study.timeframe),expires=closed===null?null:candleCloseTime(closed,study.timeframe);
-  const stopBasis=horizon?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
+  const stopBasis=horizon&&!current?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
   return {...empty,...(horizon?{strategyId:report.strategy?.id,checkpointIds:route?.checkpointIds??[],firstObstacleRewardRisk:firstGeometry.rr,structureConfirmationTs}:{}),side,pathId:path.id,state:blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:entry,referenceStop:stop,grossRewardRisk:objectiveRewardRisk,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers,zone,stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
 }

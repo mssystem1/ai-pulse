@@ -14,7 +14,7 @@ function replay(frame:string,cutoff=(data.requests.find(r=>r[0]===frame)??data.r
     const candles=rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,volumeCcy:0,confirmed:true})).filter(c=>candleCloseTime(c.ts,bar)!<=Date.parse(cutoff));
     return {source:"okx-public-spot",instId:"BTC-USDT",bar,fetchedAt:cutoff,candles,summary:summarizeCandles(candles),ticker:{instId:"BTC-USDT",priceCurrency:"USDT",last:candles.at(-1)!.close,open24h:0,high24h:0,low24h:0,vol24h:0,volCcy24h:0,change24hPct:0,ts:"0"}};
   });
-  return prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium"});
+  return prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",decisionVersion:"decision-v4"});
 }
 const profiles=[["15m","fast","5m",96],["1H","intraday","15m",120],["4H","swing","1H",180],["1Dutc","position","4H",260],["1Wutc","macro","1Dutc",520]] as const;
 for(const [frame,id,entry,lookback] of profiles){
