@@ -7,6 +7,12 @@ export type GlobalAssessmentAccess=GlobalReportAccess|(()=>Promise<GlobalReportA
 export function withSetupAccess(report:Record<string,unknown>,access:GlobalReportAccess):Record<string,unknown>{
   return readGlobalReport(report)?{...report,_setupAccess:access}:report;
 }
+export async function reviewSavedGlobalTargets(access:GlobalReportAccess){
+  const response=await fetch(`${API_BASE}/v1/global/target-review`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access}),cache:"no-store",referrerPolicy:"no-referrer",signal:AbortSignal.timeout(20_000)});
+  const data=await response.json(),report=readGlobalReport(data.report);
+  if(!response.ok||!report)throw new Error(data.error||"Technical target review could not be opened. Your original report remains available.");
+  return report;
+}
 export async function recheckGlobalSetup(access:GlobalReportAccess,trade?:Record<string,unknown>):Promise<{assessment:GlobalAssessment;review?:GlobalOrderReview;executionLevels?:GlobalExecutionLevels}> {
   const response=await fetch(`${API_BASE}/v1/global/setup-assessment`,{method:"POST",headers:{"Content-Type":"application/json",Accept:"application/json"},cache:"no-store",referrerPolicy:"no-referrer",body:JSON.stringify({access,...(trade?{trade}:{})}),signal:AbortSignal.timeout(60_000)});
   const data=await response.json() as {assessment?:unknown;review?:GlobalOrderReview;executionLevels?:GlobalExecutionLevels;error?:string};

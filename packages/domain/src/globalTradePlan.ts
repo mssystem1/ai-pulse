@@ -2,6 +2,7 @@ import { candleTimeframeMs, type GlobalReport } from "@pulse/schemas";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
 import {globalContextRequired,globalContextRelation} from "./globalContext.js";
 import {deriveGlobalEntryPlan} from "./globalEntryPlan.js";
+import {selectSingleGlobalSetup} from "./globalSetupSelection.js";
 
 /** A conditional plan from the saved map, independent of Elliott labels and
  * execution quotes. Its reference prices must never be copied as observed SL. */
@@ -49,8 +50,12 @@ export function deriveGlobalTradePlan(report: GlobalReport, pathId?:string): Non
 
 /** Evaluate every visible direction before narration. Keep the market route
  * independent: a better supported alternate entry does not rewrite the trend. */
-export function globalPlanCandidates(report:GlobalReport) {return report.paths.filter(p=>p.kind!=="recount"&&report.view.pathIds.includes(p.id)).flatMap(p=>["decision-v2","decision-v3","decision-v4","decision-v5"].includes(report.decisionVersion??"")&&p.direction==="range"?[deriveGlobalEntryPlan(report,p.id,"long"),deriveGlobalEntryPlan(report,p.id,"short")]:[deriveGlobalTradePlan(report,p.id)]);}
+export function globalPlanCandidates(report:GlobalReport) {
+  if(report.setupSelection)return report.setupSelection.pathId&&report.tradePlan?[report.tradePlan]:[];
+  return report.paths.filter(p=>p.kind!=="recount"&&report.view.pathIds.includes(p.id)).flatMap(p=>["decision-v2","decision-v3","decision-v4","decision-v5"].includes(report.decisionVersion??"")&&p.direction==="range"?[deriveGlobalEntryPlan(report,p.id,"long"),deriveGlobalEntryPlan(report,p.id,"short")]:[deriveGlobalTradePlan(report,p.id)]);
+}
 export function selectGlobalTradePlan(report:GlobalReport):NonNullable<GlobalReport["tradePlan"]> {
+  if(report.strategy?.targetPolicy==="active-zones-v1")return selectSingleGlobalSetup(report).plan;
   const plans=globalPlanCandidates(report),main=deriveGlobalTradePlan(report);
   if(["decision-v3","decision-v4","decision-v5"].includes(report.decisionVersion??"")){
     // Qualify every family symmetrically. Proximity orders *watch areas* only

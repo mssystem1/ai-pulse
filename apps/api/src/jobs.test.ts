@@ -197,6 +197,13 @@ describe("paid jobs and private reports", () => {
     assert.equal(calls, 1);
   });
 
+  it("shutdown cancellation does not consume a regeneration or start another model call", async () => {
+    const store=new MemoryJobStore(),{job}=await store.acquire({idempotencyKey:"cancel",requestHash:"hash",resourceUrl:"/resource",network:"eip155:8453",mode:"spot",tier:"premium",payer:"owner",maxRegenerationAttempts:2});
+    await store.bindReceipt(job.id,receipt());const controller=new AbortController();let calls=0;
+    await assert.rejects(runReceiptBoundOperation(store,job.id,2,async()=>{calls++;controller.abort(new Error("shutdown"));throw controller.signal.reason;},controller.signal),/shutdown/);
+    assert.equal(calls,1);assert.equal((await store.get(job.id))?.regenerationAttempts,0);
+  });
+
   it("stores reports privately with integrity metadata", async () => {
     const store = new MemoryReportStore();
     const record = await store.save("0xABC", { answer: 42 });

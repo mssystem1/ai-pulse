@@ -9,15 +9,18 @@ export class DurableJobWorker {
   private maintenanceRunning = false;
   private persistenceFailures = 0;
   private lastFailureLogAt = 0;
+  private stopped = false;
+  private readonly controllers = new Map<string, AbortController>();
 
   constructor(
     private readonly store: JobStore,
     private readonly concurrency: number,
-    private readonly execute: (job: AnalysisJob) => Promise<void>,
-    private readonly leaseSeconds = 300,
+    private readonly execute: (job: AnalysisJob, signal: AbortSignal, workerId: string) => Promise<void>,
+    private readonly leaseSeconds = 60,
   ) {}
 
   async start() {
+    if(this.stopped)return;
     if (!this.maintenanceTimer) {
       this.maintenanceTimer = setInterval(() => {
         void this.maintain();
@@ -28,6 +31,15 @@ export class DurableJobWorker {
   }
 
   async notify() { await this.maintain(); }
+
+  /** A rolling restart releases only this worker's leases immediately. A hard
+   * crash is recovered by the shorter lease; neither path creates a payment. */
+  async stop() {
+    this.stopped=true;
+    if(this.maintenanceTimer)clearInterval(this.maintenanceTimer);
+    for(const controller of this.controllers.values())controller.abort(new Error("Report worker shutting down"));
+    await Promise.all([...this.controllers.keys()].map(id=>this.store.requeue(id,this.workerId,0)));
+  }
 
   private persistenceFailed(error: unknown) {
     this.persistenceFailures += 1;
@@ -44,7 +56,7 @@ export class DurableJobWorker {
   }
 
   private async maintain() {
-    if (this.maintenanceRunning) return;
+    if (this.stopped || this.maintenanceRunning) return;
     this.maintenanceRunning = true;
     try {
       await this.store.recoverExpired();
@@ -61,9 +73,10 @@ export class DurableJobWorker {
     if (this.draining) return;
     this.draining = true;
     try {
-      while (this.active < this.concurrency) {
+      while (!this.stopped && this.active < this.concurrency) {
         const job = await this.store.claim(this.workerId, this.leaseSeconds);
         if (!job) break;
+        if(this.stopped){await this.store.requeue(job.id,this.workerId,0);break;}
         this.active += 1;
         void this.run(job).finally(() => { this.active -= 1; void this.maintain(); });
       }
@@ -71,15 +84,20 @@ export class DurableJobWorker {
   }
 
   private async run(job: AnalysisJob) {
+    const controller=new AbortController();this.controllers.set(job.id,controller);
     const heartbeat = setInterval(() => {
-      void this.store.extendLease(job.id, this.workerId, this.leaseSeconds).catch((error) => this.persistenceFailed(error));
-    }, Math.max(500, Math.floor(this.leaseSeconds * 1000 / 3)));
+      void this.store.extendLease(job.id, this.workerId, this.leaseSeconds).then(owned=>{
+        if(!owned)controller.abort(new Error("Report worker lease lost"));
+      }).catch((error) => this.persistenceFailed(error));
+    }, Math.min(10_000,Math.max(500, Math.floor(this.leaseSeconds * 1000 / 3))));
     heartbeat.unref?.();
     try {
-      await this.execute(job);
+      await this.execute(job,controller.signal,this.workerId);
+      controller.signal.throwIfAborted();
       await this.store.ack(job.id, this.workerId);
     } catch (error) {
       try {
+        if(controller.signal.aborted){await this.store.requeue(job.id,this.workerId,0);return;}
         const current = await this.store.get(job.id);
         const terminal = current?.stage === "failed_terminal" || current?.stage === "manual_reconciliation";
         if (terminal) await this.store.ack(job.id, this.workerId);
@@ -91,6 +109,6 @@ export class DurableJobWorker {
         // durable lease expires and recoverExpired reclaims it after KV returns.
         this.persistenceFailed(persistenceError);
       }
-    } finally { clearInterval(heartbeat); }
+    } finally { clearInterval(heartbeat);this.controllers.delete(job.id); }
   }
 }

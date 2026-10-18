@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_BASE, apiGet, apiPost } from "./api";
+import {PaidReportProgress} from "./PaidReportProgress";
+import type {ReportProgressState,ReportJobSnapshot} from "./reportProgress";
 import { withSetupAccess } from "./globalSetupClient";
 import { formatTokenBalance } from "./format";
 import { applySiteMetadata } from "./siteMetadata";
@@ -188,7 +190,9 @@ export function App() {
   const paidMetaScope = tab === "safety" ? "risk" : "global";
   const paidMeta = paidMetaSlots[paidMetaScope];
   const setPaidMeta = (value: string | null) => setPaidMetaSlots(slots => ({ ...slots, [paidMetaScope]: value }));
-  const [spotJob, setSpotJob] = useState<{ id: string; stage: string; startedAt: number } | null>(null);
+  const [spotJob, setSpotJob] = useState<ReportProgressState | null>(null);
+  const recoveryBusyRef=useRef(false);
+  const [recoveryBusy,setRecoveryBusy]=useState(false);
   const [paymentProgress, setPaymentProgress] = useState<string | null>(null);
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [tradeIntent, setTradeIntent] = useState<ReportTradeIntent | null>(null);
@@ -513,30 +517,35 @@ export function App() {
     const status = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}?fresh=${Date.now()}`, {
       headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" },
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     });
     if (!status.ok) throw new Error(`Spot job recovery failed (${status.status})`);
-    const payload = await status.json() as { job?: { stage?: string } };
+    const payload = await status.json() as { job?: ReportJobSnapshot };
     const stage = payload.job?.stage || "";
     if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
-    setSpotJob((current) => ({ id: jobId, stage, startedAt: current?.id === jobId ? current.startedAt : Date.now() }));
+    setSpotJob((current) => ({ ...payload.job, id: jobId, stage, lastCheckedAt: Date.now(), startedAt: current?.id === jobId ? current.startedAt : Date.parse(payload.job?.createdAt||"")||Date.now() }));
     if (stage === "completed" || stage === "completed_partial") {
+      setSpotJob(current=>current?.id===jobId?{...current,stage:"opening_report",updatedAt:new Date().toISOString(),events:[...(current.events||[]),{stage:"opening_report",at:new Date().toISOString()}]}:current);
       const report = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, {
         headers: { "PULSE-RECOVERY-TOKEN": recoveryToken, "Cache-Control": "no-cache" },
         cache: "no-store",
+        signal: AbortSignal.timeout(30_000),
       });
       if (!report.ok) {
         const failure = await report.json().catch(() => ({})) as { error?: string; recoverable?: boolean };
         throw new Error(`${failure.error || `Spot report recovery failed (${report.status})`}${failure.recoverable ? ". Your paid report is safe; retry recovery." : ""}`);
       }
       const body = await report.json() as { report?: Record<string, unknown> };
-      if (body.report && isLatestRequest(reportRequestRef, requestId)) {
+      if (!isLatestRequest(reportRequestRef, requestId)) return "superseded";
+      if (!body.report || typeof body.report !== "object" || Array.isArray(body.report)) throw new Error("Saved report could not be opened. Your recovery access is retained; retry without paying.");
+      if (body.report) {
         const reportInstId = typeof body.report.instId === "string" ? body.report.instId : null;
         const reportTimeframe = typeof body.report.timeframe === "string" ? body.report.timeframe : null;
         if (reportInstId) setInstId(reportInstId);
         if (reportTimeframe) setTimeframe(reportTimeframe);
         setResult({ ...withSetupAccess(body.report,{kind:"job",id:jobId,token:recoveryToken}), service: typeof body.report.service === "string" ? body.report.service : body.report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" });
       }
-      clearJobRecovery(localStorage, recoveryNetwork, "spot");
+      if(readJobRecovery(localStorage,recoveryNetwork,"spot")?.jobId===jobId)clearJobRecovery(localStorage, recoveryNetwork, "spot");
       setSpotJob(null);
     }
     return stage;
@@ -569,15 +578,18 @@ export function App() {
   }
 
   async function retrySpotRecovery() {
+    if(recoveryBusyRef.current)return;
     const saved = readJobRecovery(localStorage, networkKey, "spot");
     if (!saved) return setRecoveryError("No recoverable paid Global report is stored in this browser for the selected network.");
     const requestId = beginLatestRequest(reportRequestRef);
+    recoveryBusyRef.current=true;setRecoveryBusy(true);
     try {
       setRecoveryError(null);
       const retry = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(saved.jobId)}/retry`, {
         method: "POST",
         headers: { "PULSE-RECOVERY-TOKEN": saved.recoveryToken, "Cache-Control": "no-cache" },
         cache: "no-store",
+        signal: AbortSignal.timeout(20_000),
       });
       if (!retry.ok) {
         const body = await retry.json().catch(() => ({})) as { error?: string };
@@ -585,7 +597,8 @@ export function App() {
       }
       await pollSpotJob(saved.jobId, saved.recoveryToken, networkKey, requestId);
     }
-    catch (failure) { setRecoveryError(failure instanceof Error ? failure.message : String(failure)); }
+    catch (failure) { if(isLatestRequest(reportRequestRef,requestId))setRecoveryError(failure instanceof Error ? failure.message : String(failure)); }
+    finally {recoveryBusyRef.current=false;setRecoveryBusy(false);}
   }
 
   function openTradeFromReport(intent: ReportTradeIntent) {
@@ -593,6 +606,13 @@ export function App() {
     setTradeIntent(intent);
     navigateTo("spot");
     window.requestAnimationFrame(() => window.scrollTo({ top: 360, behavior: "smooth" }));
+  }
+
+  function openSavedGlobalReport(report:Record<string,unknown>){
+    supersedeRequests(reportRequestRef);setSpotJob(null);setRecoveryError(null);setLoading(false);setBusyAction(null);
+    if(typeof report.instId==="string")setInstId(report.instId);
+    if(typeof report.timeframe==="string")setTimeframe(report.timeframe);
+    setResult({...report,service:typeof report.service==="string"?report.service:report.tier==="premium"?"spot_analysis_premium":"spot_analysis_standard"});
   }
 
   function selectCandidateForAnalysis(candidatePair: string, candidateTimeframe: string) {
@@ -671,11 +691,11 @@ export function App() {
         if (action === "token" || action === "preflight") {
           throw new Error("This paid Risk Guard report is already processing. Open Paid report history → Sync with wallet to recover it. Do not purchase it again.");
         }
-        const accepted = data as { job?: { id?: string; stage?: string }; recoveryToken?: string };
+        const accepted = data as { job?: ReportJobSnapshot & { id?: string }; recoveryToken?: string };
         if (!accepted.job?.id || !accepted.recoveryToken) throw new Error("Paid job response is missing its recovery capability");
         const request = body as { instId?: string; timeframe?: string };
         saveJobRecovery(localStorage, networkKey, { jobId: accepted.job.id, recoveryToken: accepted.recoveryToken, createdAt: new Date().toISOString(), label: `${request.instId || instId} · ${request.timeframe || timeframe}`, tier: action }, "spot");
-        setSpotJob({ id: accepted.job.id, stage: accepted.job.stage || "payment_settled", startedAt: Date.now() });
+        setSpotJob({ ...accepted.job, id: accepted.job.id, stage: accepted.job.stage || "payment_settled", startedAt: Date.parse(accepted.job.createdAt||"")||Date.now(),lastCheckedAt:Date.now() });
         setPaymentProgress(null);
         await pollSpotJob(accepted.job.id, accepted.recoveryToken, networkKey, requestId);
         if (!isLatestRequest(reportRequestRef, requestId)) return;
@@ -1088,7 +1108,7 @@ export function App() {
 
         <div className="card report-card">
           <div className="section">{d.report}</div>
-          {!result && <div className="report-empty"><div className="signal-orbit" aria-hidden><i /><i /><i /></div><h3>{spotJob ? spotJob.stage.replaceAll("_", " ") : paymentProgress ? "Complete the wallet step" : d.emptyTitle}</h3><p>{spotJob ? `Paid report ${spotJob.id.slice(0, 8)}… is stored with a recovery capability. PULSE polls it automatically and does not charge again.` : paymentProgress || d.emptyReport}</p>{spotJob && <div className="recovery-actions"><button type="button" className="btn btn-primary" onClick={() => void retrySpotRecovery()}>Recover report now</button><details><summary>How recovery works</summary><p>PULSE keeps the job ID and an opaque recovery key only in this browser, separated by network. It resumes polling automatically; Recover restarts a stopped job from its settled receipt without another payment.</p></details></div>}{recoveryError && <div className="recovery-error"><strong>Recovery status</strong><span>{recoveryError}</span><button type="button" onClick={() => void retrySpotRecovery()}>Retry without paying</button></div>}</div>}
+          {!result && (spotJob ? <PaidReportProgress job={spotJob} lang={lang} onRecover={()=>void retrySpotRecovery()} recovering={recoveryBusy} error={recoveryError}/> : <div className="report-empty"><div className="signal-orbit" aria-hidden><i/><i/><i/></div><h3>{paymentProgress ? "Complete the wallet step" : d.emptyTitle}</h3><p>{paymentProgress || d.emptyReport}</p>{recoveryError&&<div className="recovery-error">{recoveryError}</div>}</div>)}
 
           {result && service === "token_scan" && <SafetyTokenReport data={result} />}
           {result && service === "preflight" && <SafetyPreflightReport data={result} />}
@@ -1118,7 +1138,7 @@ export function App() {
               <pre className="raw">{JSON.stringify(result, (key,value)=>key==="_setupAccess"?undefined:value, 2)}</pre>
             </details>
           )}
-          {tab === "analyze" && <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={(report) => { const reportInstId = typeof report.instId === "string" ? report.instId : null; const reportTimeframe = typeof report.timeframe === "string" ? report.timeframe : null; if (reportInstId) setInstId(reportInstId); if (reportTimeframe) setTimeframe(reportTimeframe); setResult({ ...report, service: typeof report.service === "string" ? report.service : report.tier === "premium" ? "spot_analysis_premium" : "spot_analysis_standard" }); }} />}
+          {tab === "analyze" && <ReportHistory networkKey={networkKey} scope="spot" wallet={wallet} onOpen={openSavedGlobalReport} />}
         </div>
       </div>}
       </main>

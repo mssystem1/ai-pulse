@@ -2,7 +2,7 @@ import { Router, type Request } from "express";
 import { z } from "zod";
 import { erc20Abi, formatUnits } from "viem";
 import { getNetwork, type AppConfig } from "@pulse/config";
-import { assessGlobalReport, globalContextTimeframe, GLOBAL_HISTORY_LIMIT } from "@pulse/analysis";
+import { assessGlobalReport, globalContextTimeframe, GLOBAL_HISTORY_LIMIT, reviewGlobalTargetReport } from "@pulse/analysis";
 import { readGlobalReport, reviewGlobalOrder, type GlobalExecutionLevels } from "@pulse/domain";
 import { getTicker, type buildMarketContext } from "@pulse/market";
 import { executionPublicClient } from "./onchainDiscovery.js";
@@ -27,8 +27,9 @@ type Dependencies={
 };
 
 export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof buildMarketContext){
-  const saved=readGlobalReport(raw);
-  if(!saved)throw new Error("A saved Global report is required");
+  const original=readGlobalReport(raw);
+  if(!original)throw new Error("A saved Global report is required");
+  const saved=reviewGlobalTargetReport(original);
   const contextFrame=saved.decisionVersion||saved.tier==="pro"?saved.context.timeframe??globalContextTimeframe(saved.snapshot.timeframe):null;
   const entryFrame=["decision-v2","decision-v3","decision-v4","decision-v5"].includes(saved.decisionVersion??"")?saved.entryStudy?.timeframe:null;
   const load=(timeframe:string)=>loadMarket({instId:saved.snapshot.instId,timeframe,candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true});
@@ -43,6 +44,14 @@ export function createGlobalAssessmentRouter(cfg:AppConfig,deps:Dependencies){
   const quote=deps.quote??(input=>getGenericOkxQuote(cfg,input)),tokens=deps.tokens??getOkxTradeTokens;
   const balance=deps.balance??(async(network,token,wallet)=>executionPublicClient(network).readContract({address:token as `0x${string}`,abi:erc20Abi,functionName:"balanceOf",args:[wallet as `0x${string}`]}));
   const body=z.object({access:GlobalAccessSchema,trade:TradeSchema.extend({takeProfit:z.number().positive().optional(),stopLoss:z.number().positive().optional(),orderType:z.enum(["market","limit"]).default("market"),limitPrice:z.number().positive().optional(),minimumOutputAmount:z.string().regex(/^[1-9]\d{0,77}$/).optional()}).strict().optional()}).strict();
+  router.post("/v1/global/target-review",asyncRoute(async(req,res)=>{
+    res.setHeader("Cache-Control","private, no-store");
+    const parsed=z.object({access:GlobalAccessSchema}).strict().safeParse(req.body);
+    if(!parsed.success)return res.status(400).json({error:"Valid saved-report access is required"});
+    const saved=readGlobalReport(await deps.resolveReport(parsed.data.access,req));
+    if(!saved)return res.status(404).json({error:"An accessible saved Global report is required"});
+    return res.json({report:reviewGlobalTargetReport(saved),paymentRequired:false,modelCalls:0});
+  }));
   router.post("/v1/global/setup-assessment",asyncRoute(async(req,res)=>{
     res.setHeader("Cache-Control","private, no-store");
     const parsed=body.safeParse(req.body);

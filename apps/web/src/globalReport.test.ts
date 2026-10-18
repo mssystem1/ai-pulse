@@ -13,10 +13,15 @@ import {tradePlanFixture} from "../../../packages/analysis/src/globalTrade.fixtu
 import {globalTradeCards} from "@pulse/domain";
 import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
+import {globalWilderIndicators} from "../../../packages/analysis/src/globalReport.js";
 
 for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])for(const side of ["long","short"] as const)test(`${frame} ${side}: current report and Mini App keep Entry, SL and TP visible when reward is insufficient`,()=>{
-  const {report}=tradePlanFixture(frame,side);const route=report.strategy!.routes[0];
-  report.levels.find(l=>l.id===route.objectiveIds[0])!.price=side==="long"?100.1:99.9;
+  const {report}=tradePlanFixture(frame,side,"reaction");const route=report.strategy!.routes[0];
+  // Keep a genuine, unconsumed target beyond the current completed close.
+  // A price below that close would be an invalid target, not weak reward.
+  const target=report.levels.find(l=>l.id===route.objectiveIds[0])!,price=side==="long"?100.9:99.1;
+  target.price=price;const anchor=report.indicators.pivots.find(a=>target.anchorIds.includes(a.id))!;anchor.price=price;
+  report.candles.find(c=>c.ts===anchor.ts)![side==="long"?"high":"low"]=price;report.indicators.atr.points=globalWilderIndicators(report.candles).atr;
   report.tradePlan=deriveGlobalTradePlan(report);
   const card=globalTradeCards(report)[0];assert.equal(card.confirmed,false);assert.ok(card.plan.blockers.includes("reward"));
   for(const Component of [GlobalResearchReport,TelegramResearchReport]){

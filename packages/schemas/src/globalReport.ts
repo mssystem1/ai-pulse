@@ -75,7 +75,9 @@ export const GlobalReportSchema = z.object({
   version: z.literal("pulse-global-v3"), tier: z.enum(["quick", "pro"]), lang: z.enum(["en", "zh"]),
   evaluationVersion: z.literal("completed-v2").optional(),
   decisionVersion:z.enum(["decision-v1","decision-v2","decision-v3","decision-v4","decision-v5"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
-  strategy:z.object({version:z.enum(["horizon-v1","horizon-v2"]),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().nonnegative(),contextLevelIds:z.array(z.string()).optional(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
+  targetReviewOf:z.string().regex(/^[0-9a-f]{8}$/).optional(),
+  setupSelection:z.object({version:z.enum(["single-setup-v1","single-setup-v2"]),assessment:z.enum(["long","short","sideways"]),regime:z.enum(["trend","recovery","range","transition"]),rule:z.enum(["trend_continuation","structural_reversal","structure_break","range_reaction","none"]),pathId:z.string().nullable(),side:z.enum(["long","short","none"]),evidence:z.array(z.string()),limitations:z.array(z.string())}).optional(),
+  strategy:z.object({version:z.enum(["horizon-v1","horizon-v2"]),targetPolicy:z.enum(["active-zones-v1","legacy-pivots-v1"]).optional(),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().nonnegative(),contextLevelIds:z.array(z.string()).optional(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
   entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
@@ -91,6 +93,13 @@ export const GlobalReportSchema = z.object({
     if(!rows.some(row=>row.timeframe===report.snapshot.timeframe)||new Set(rows.map(r=>r.timeframe)).size!==rows.length||rows.some(r=>r.observedAt!==report.snapshot.observedAt||r.source!==null&&r.source!==report.snapshot.source||r.completedAt!==null&&r.completedAt>Date.parse(report.snapshot.observedAt)||r.status==="available"&&(r.candles<55||r.price===null||r.sma55===null)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Decision hierarchy must retain one source, cutoff and evidenced completed frames"});
   }
   const ids = new Set(report.levels.map(level => level.id));
+  if(report.setupSelection){
+    const selected=report.setupSelection;
+    if(selected.pathId===null?selected.side!=="none"||selected.rule!=="none":selected.side==="none"||selected.rule==="none")ctx.addIssue({code:z.ZodIssueCode.custom,message:"A selected setup requires a side and strategy; unavailable setups have neither"});
+    if(selected.assessment!=="sideways"&&selected.side!=="none"&&selected.assessment!==selected.side||selected.regime==="range"&&selected.assessment!=="sideways")ctx.addIssue({code:z.ZodIssueCode.custom,message:"Market assessment must agree with the selected strategy direction"});
+    if(selected.pathId===null?(report.paths.length>0||report.view.pathIds.length>0||Boolean(report.strategy?.routes.length)):(report.paths.length!==1||report.paths[0].id!==selected.pathId||report.view.pathIds.length!==1||report.view.pathIds[0]!==selected.pathId||report.strategy?.routes.length!==1||report.strategy.routes[0].pathId!==selected.pathId||report.strategy.routes[0].side!==selected.side))ctx.addIssue({code:z.ZodIssueCode.custom,message:"A selected strategy publishes at most one path, one route and one setup"});
+    if(report.tradePlan?.side!=="none"&&report.tradePlan&&(report.tradePlan.side!==selected.side||report.tradePlan.pathId!==selected.pathId))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry plan must match the single selected strategy"});
+  }
   if(["decision-v4","decision-v5"].includes(report.decisionVersion??"")&&report.strategy){
     const current=report.decisionVersion==="decision-v5";
     if(report.strategy.version!==(current?"horizon-v2":"horizon-v1"))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy method must match its saved report version"});
@@ -101,6 +110,11 @@ export const GlobalReportSchema = z.object({
     for(const r of report.strategy.routes){
       const sign=r.side==="long"?1:-1,prices=r.objectiveIds.map(id=>report.levels.find(l=>l.id===id)?.price);
       if(r.objectiveIds.some(id=>r.checkpointIds.includes(id))||prices.some((p,i)=>p===undefined||i>0&&(prices[i-1]===undefined||sign*(p-prices[i-1]!)<=0))||r.objectiveIds.some(id=>{const l=report.levels.find(l=>l.id===id);return l&&(!l.anchorIds.some(id=>report.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null))||l.basis!=="swing");}))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy objectives require ordered confirmed primary swings, distinct from checkpoints"});
+      if(report.strategy.targetPolicy==="active-zones-v1")for(const id of r.objectiveIds){
+        const level=report.levels.find(l=>l.id===id);if(!level)continue;
+        const tick=10**-report.snapshot.pricePrecision,anchors=report.indicators.pivots.filter(a=>level.anchorIds.includes(a.id));
+        if(!anchors.length||anchors.some(a=>a.kind!==(r.side==="long"?"high":"low")||a.confirmedAt===null||(candleCloseTime(a.confirmedAt,report.snapshot.timeframe)??Infinity)>Date.parse(report.snapshot.observedAt)||report.candles.some(c=>c.ts>=(candleCloseTime(a.confirmedAt!,report.snapshot.timeframe)??Infinity)&&sign*(c.close-a.price)>tick*.5))||Math.abs(level.price-(r.side==="long"?Math.min(...anchors.map(a=>a.price)):Math.max(...anchors.map(a=>a.price))))>tick*.5)ctx.addIssue({code:z.ZodIssueCode.custom,message:"Active targets require unconsumed, confirmed same-side pivots and the nearest zone edge"});
+      }
     }
   }
   if(["decision-v4","decision-v5"].includes(report.decisionVersion??"")&&(!report.strategy||report.strategy.entryTimeframe!==report.entryStudy?.timeframe||report.strategy.routes.some(r=>!report.paths.some(p=>p.id===r.pathId)||[r.protectionLevelId,...r.objectiveIds,...r.checkpointIds].some(id=>id!==null&&!ids.has(id)))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Strategy reports require a matching horizon, entry frame and canonical objective/checkpoint map"});

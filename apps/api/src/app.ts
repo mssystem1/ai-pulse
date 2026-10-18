@@ -1334,8 +1334,10 @@ export function createApp(cfg: AppConfig, dependencies: {
     await arcBudget.reserve({ wallet, ip: req.ip || req.socket.remoteAddress || "unknown", estimatedCostMicrousd });
   };
 
-  const buildSpotReport = async (req: express.Request, body: z.infer<typeof AnalysisBodySchema>, tier: "base" | "premium", canonical: boolean, onContextReady?: () => Promise<void>) => {
+  const buildSpotReport = async (req: express.Request, body: z.infer<typeof AnalysisBodySchema>, tier: "base" | "premium", canonical: boolean, onContextReady?: () => Promise<void>, onEnriching?: () => Promise<void>, signal?: AbortSignal, onGenerating?:()=>Promise<void>) => {
+      signal?.throwIfAborted();
       const {market,contextMarket,hierarchyMarkets}=await loadGlobalMarketSet({instId:body.instId,timeframe:body.timeframe},input=>observeProvider("okx","global_context",()=>loadSpotContext(input)));
+      signal?.throwIfAborted();
       await onContextReady?.();
       if (isArc(req) && cfg.ARC_AI_MODE === "fixture") {
         const fixtureAnalysis = body.lang === "zh"
@@ -1358,7 +1360,10 @@ export function createApp(cfg: AppConfig, dependencies: {
       if (!cfg.hasXaiKey) throw new Error("XAI_API_KEY not configured on server");
       const normalizedTier = tier === "premium" ? "premium" : "standard";
       await reserveArcAi(req, normalizedTier);
-      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(grokCfg, { ...body, tier, contextMarket,hierarchyMarkets, ...modelLimits(normalizedTier) }, market));
+      const analysisCfg = signal ? { ...grokCfg, fetchImpl: ((input, init) => fetch(input, { ...init, signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) })) as typeof fetch } : grokCfg;
+      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(analysisCfg, { ...body, tier, contextMarket,hierarchyMarkets, ...modelLimits(normalizedTier) }, market,onGenerating));
+      signal?.throwIfAborted();
+      await onEnriching?.();
       if (result.usage) {
         const cost = estimateAiCostUsd(cfg, result.usage);
         recordAiUsage(result.usage.promptTokens, result.usage.completionTokens, cost, result.usage.cachedTokens, result.usage.reasoningTokens);
@@ -1499,8 +1504,6 @@ export function createApp(cfg: AppConfig, dependencies: {
     fixture: isArc(req) && cfg.ARC_AI_MODE === "fixture",
     ...modelLimits(tier),
   });
-  const withReceiptBoundRegeneration = <T>(jobId: string, operation: () => Promise<T>) =>
-    runReceiptBoundOperation(persistence.jobs, jobId, cfg.PAID_REGENERATION_MAX_ATTEMPTS, operation);
   const aiCost = (analysis: { usage?: { promptTokens: number; completionTokens: number; totalTokens: number; cachedTokens?: number; reasoningTokens?: number } }) => {
     const usage = analysis.usage || { promptTokens: 0, completionTokens: 0, totalTokens: 0, cachedTokens: 0, reasoningTokens: 0 };
     const configured = cfg.XAI_INPUT_COST_PER_MILLION_USD > 0 || cfg.XAI_OUTPUT_COST_PER_MILLION_USD > 0;
@@ -1696,21 +1699,26 @@ export function createApp(cfg: AppConfig, dependencies: {
     } catch (error) { console.error("Telegram report delivery failed", error); }
   };
 
-  const executePersistedJob = async (claimed: AnalysisJob) => {
+  const executePersistedJob = async (claimed: AnalysisJob, signal: AbortSignal, workerId: string) => {
+    const phase = async (stage: Parameters<typeof persistence.jobs.transition>[1], detail?: string) => {
+      signal.throwIfAborted();
+      return persistence.jobs.transition(claimed.id, stage, detail, workerId);
+    };
+    const regenerate = <T>(operation: () => Promise<T>) => runReceiptBoundOperation(persistence.jobs, claimed.id, cfg.PAID_REGENERATION_MAX_ATTEMPTS, operation, signal);
     const current = await persistence.jobs.get(claimed.id);
     if (!current || current.reportId || current.stage === "completed" || current.stage === "completed_partial") return;
     if (!current.receiptId || current.receipt?.settlementResult !== "settled") {
-      await persistence.jobs.transition(current.id, "manual_reconciliation", "worker refused an item without a settled receipt");
+      await phase("manual_reconciliation", "worker refused an item without a settled receipt");
       throw new Error("Durable worker requires a settled receipt");
     }
     const req = jobRequest(current);
     if (current.networkKey === "arc-testnet") {
-      await persistence.jobs.transition(current.id, "manual_reconciliation", "Arc testnet retired; receipt cannot be migrated to mainnet");
+      await phase("manual_reconciliation", "Arc testnet retired; receipt cannot be migrated to mainnet");
       return;
     }
     const tier = current.tier || "standard";
     try {
-      await persistence.jobs.transition(current.id, "fetching_context", "claimed by durable worker");
+      await phase("fetching_context", "claimed by durable worker");
       let report: unknown;
       let partial = false;
 
@@ -1718,16 +1726,16 @@ export function createApp(cfg: AppConfig, dependencies: {
         const body = current.input as { tokenAddress?: string; address?: string; toToken?: string; fromToken?: string; lang?: "en" | "zh" };
         const address = body.tokenAddress || body.address || body.toToken || body.fromToken;
         if (!address) throw new Error("Risk Guard requires the exact token address");
-        await persistence.jobs.transition(current.id, "generating_analysis");
-        report = await withReceiptBoundRegeneration(current.id, () => buildPaidTokenRisk(req, address, body.lang || "en"));
+        await phase("generating_analysis");
+        report = await regenerate(() => buildPaidTokenRisk(req, address, body.lang || "en"));
       } else if (current.mode === "spot") {
         const body = AnalysisBodySchema.parse(current.input);
-        report = await withReceiptBoundRegeneration(current.id, () => buildSpotReport(
+        report = await regenerate(() => buildSpotReport(
           req, body, tier === "premium" ? "premium" : "base", true,
           async () => {
-            await persistence.jobs.transition(current.id, "calculating_features");
-            await persistence.jobs.transition(current.id, "generating_analysis");
+            await phase("calculating_features");
           },
+          async () => { await phase("enriching_report"); }, signal,async()=>{await phase("generating_analysis");},
         ));
         const global = (report as { global?: { candles: unknown[]; tier: string; context: { status: string } } }).global;
         partial = Boolean(global && (global.candles.length < GLOBAL_HISTORY_LIMIT || global.tier === "pro" && global.context.status !== "available"));
@@ -1737,9 +1745,9 @@ export function createApp(cfg: AppConfig, dependencies: {
           ...body, source: polymarket,
           maxSelected: tier === "premium" ? cfg.POLYMARKET_PREMIUM_MAX_SELECTED : cfg.POLYMARKET_STANDARD_MAX_SELECTED,
         });
-        await persistence.jobs.transition(current.id, "calculating_features");
-        await persistence.jobs.transition(current.id, "generating_analysis");
-        const analysis = await withReceiptBoundRegeneration(current.id, async () => {
+        await phase("calculating_features");
+        await phase("generating_analysis");
+        const analysis = await regenerate(async () => {
           const limits = predictionModelLimits(tier);
           await reserveArcAi(req, tier, limits);
           return observeProvider("xai", `prediction_${tier}`, () => runPreparedV5Analysis(grokCfg, {
@@ -1764,9 +1772,9 @@ export function createApp(cfg: AppConfig, dependencies: {
       } else if (current.mode === "fused") {
         const body = FusedAnalysisRequestSchema.parse(current.input);
         const prepared = await prepareFused(body, tier);
-        await persistence.jobs.transition(current.id, "calculating_features");
-        await persistence.jobs.transition(current.id, "generating_analysis");
-        const analysis = await withReceiptBoundRegeneration(current.id, async () => {
+        await phase("calculating_features");
+        await phase("generating_analysis");
+        const analysis = await regenerate(async () => {
           await reserveArcAi(req, tier);
           return observeProvider("xai", `fused_${tier}`, () => runPreparedV5Analysis(grokCfg, {
             mode: "fused", tier, lang: body.lang, userNote: body.userNote,
@@ -1784,7 +1792,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       } else if (current.mode === "divergence") {
         const body = DivergenceAnalysisRequestSchema.parse(current.input);
         const prepared = await prepareFused(body, "standard");
-        await persistence.jobs.transition(current.id, "calculating_features");
+        await phase("calculating_features");
         report = DivergenceAnalysisResponseSchema.parse({
           service: "divergence_analysis", instId: body.instId, timeframe: body.timeframe,
           ...prepared, methodology_version: "pulse-v3.0.0", generatedAt: new Date().toISOString(),
@@ -1796,7 +1804,7 @@ export function createApp(cfg: AppConfig, dependencies: {
         const predictionContext = await preparePredictionContext({
           ...body, source: polymarket, maxSelected: cfg.POLYMARKET_STANDARD_MAX_SELECTED,
         });
-        await persistence.jobs.transition(current.id, "calculating_features");
+        await phase("calculating_features");
         const feature = predictionContext.markets[0]?.outcomes[0]?.features;
         if (!feature) throw new Error("Primary event-risk features are unavailable");
         const reasons: string[] = [];
@@ -1817,19 +1825,22 @@ export function createApp(cfg: AppConfig, dependencies: {
         partial = predictionContext.partial;
       }
 
-      await persistence.jobs.transition(current.id, "validating_report");
+      await phase("validating_report");
       report = { ...(report as Record<string, unknown>), lang: (current.input as { lang?: string }).lang || "en" };
+      await phase("saving_report");
       const stored = await persistence.reports.save(current.payer, report);
+      signal.throwIfAborted();
+      const completed = await persistence.jobs.attachReport(current.id, stored.id, partial, workerId);
       await notifyReportDelivery(current, stored.id, report);
-      const completed = await persistence.jobs.attachReport(current.id, stored.id, partial);
       const profile = report as { fixture?: boolean; analysisProfile?: { mode?: string } };
       if (cfg.NODE_ENV !== "test" && !profile.fixture && profile.analysisProfile?.mode === "live") observeDelivery(jobResearchDelivery(completed));
       recordJob(completed.stage, completed.network);
       recordReport(partial ? "partial" : "completed");
     } catch (error) {
+      if (signal.aborted || error instanceof Error && error.message === "Report worker lease lost") throw error;
       const latest = await persistence.jobs.get(current.id);
       if (latest?.stage !== "manual_reconciliation") {
-        const failed = await persistence.jobs.transition(current.id, "failed_terminal", error instanceof Error ? error.message : String(error));
+        const failed = await phase("failed_terminal", error instanceof Error ? error.message : String(error));
         recordJob(failed.stage, failed.network);
       } else {
         recordJob("manual_reconciliation", current.network);
@@ -1844,6 +1855,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     cfg.JOB_WORKER_CONCURRENCY,
     executePersistedJob,
   );
+  app.locals.stopReportWorker = () => durableWorker!.stop();
   if (shouldRunDurableWorker) {
     void durableWorker.start().catch((error) => console.error("Durable job worker failed to start", error));
   }

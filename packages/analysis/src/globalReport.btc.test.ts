@@ -42,9 +42,10 @@ for(const row of rows)test(`Legacy ${row.frame} map retains directional prices w
 test("Quick and Pro provider inputs distinguish rising SMA21 from the falling default SMA55 on the weekly BTC snapshot",async()=>{
   const row=rows.find(r=>r.frame==="1W")!;
   for(const tier of ["base","premium"] as const)for(const lang of ["en","zh"] as const){
-    const input=market(row),before=structuredClone(input);let calls=0;
+    const input=market(row),before=structuredClone(input);let calls=0,prepared=false;
     const result=await runPreparedSpotAnalysis({apiKey:"test",baseUrl:"https://xai.invalid/v1",model:"grok-4.5",fetchImpl:async(_url,init)=>{
       calls++;
+      assert.equal(prepared,true,"AI stage starts only after deterministic preparation");
       const request=JSON.parse(String(init?.body));
       const block=request.messages[1].content.match(/<saved_market_map>\s*([\s\S]*?)\s*<\/saved_market_map>/);
       assert.ok(block,"The provider must receive the saved map");
@@ -54,7 +55,7 @@ test("Quick and Pro provider inputs distinguish rising SMA21 from the falling de
       if(tier==="premium"){const optional=sma.find((s:{period:number})=>s.period===21);assert.equal(optional.displayedByDefault,true);assert.ok(optional.change10Bars>0);}else assert.deepEqual(sma.map((s:{period:number})=>s.period),[55]);
       assert.ok(evidence.waveCandidate.validation.includes("swing_pattern_only_subdivisions_unverified"));
       return Response.json({choices:[{message:{content:JSON.stringify({headline:lang==="zh"?"候选推动浪之后的条件区间":"Conditional range after a candidate impulse",summary:lang==="zh"?"SMA55 下行；仍须确认。":"SMA55 fell over ten completed bars; confirmation remains required.",regime:"range",bias:"neutral",confidence:50,waveCandidateId:evidence.waveCandidate.id,mainPathId:evidence.paths.find((p:{role:string})=>p.role==="main")?.id??null,setupPathId:evidence.setup.pathId,reasons:[],pathNotes:[],riskNotes:[],limitations:[],disclaimer:"Research only"})}}]});
-    }},{instId:input.instId,timeframe:row.frame,tier,lang,reasoningEffort:tier==="premium"?"medium":"low",maxInputTokens:32000,contextMarket:market(row,true)},input);
+    }},{instId:input.instId,timeframe:row.frame,tier,lang,reasoningEffort:tier==="premium"?"medium":"low",maxInputTokens:32000,contextMarket:market(row,true)},input,async()=>{prepared=true;});
     assert.equal(calls,1);assert.deepEqual(input,before,"Prompt evidence must not change market data");
     assert.equal(result.global.lang,lang);assert.equal(result.global.waveCount.status,"candidate");assert.deepEqual(result.global.candles,prepareGlobalReport({market:input,tier,lang}).candles);
   }

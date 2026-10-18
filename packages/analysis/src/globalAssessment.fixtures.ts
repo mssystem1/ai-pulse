@@ -25,7 +25,7 @@ export function qualifiedGlobalFixture(frame="1H",now=Date.now()) {
   const candles=Array.from({length:180},(_,i)=>({ts:end-(180-i)*interval,open:99,high:99.5,low:98.5,close:99,volume:100,volumeCcy:9900,confirmed:true}));
   for(const [offset,open,high,low,close] of [[3,99,100.6,98.9,100.4],[2,100.4,100.6,99.95,100.3],[1,100.3,100.7,100.2,100.4]])Object.assign(candles[candles.length-offset],{open,high,low,close});
   const market:SpotMarketContext={source:"okx-public-spot",instId:"BTC-USDT",bar:frame,candles,summary:summarizeCandles(candles),fetchedAt:new Date(now).toISOString(),ticker:{instId:"BTC-USDT",last:100.4,open24h:99,high24h:101,low24h:98,vol24h:100,volCcy24h:10000,change24hPct:0,ts:String(now),priceCurrency:"USDT"}};
-  const report=prepareGlobalReport({market,tier:"base"});
+  const report=prepareGlobalReport({market,tier:"base",decisionVersion:"decision-v2"});
   // This fixture models the original primary-only purchased grammar. New
   // decision-v1 context requirements are exercised separately.
   delete report.decisionVersion;delete report.hierarchy;

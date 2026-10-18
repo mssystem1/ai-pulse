@@ -1,6 +1,6 @@
 {
   "purpose": "Historical educational examples, not current trade signals",
-  "method": "decision-v5 / structure-v5 / horizon-v2",
+  "method": "decision-v5 / structure-v5 / horizon-v2 / active-zones-v1 / single-setup-v2",
   "sources": [
     {
       "path": "packages/analysis/src/globalReport.oct17-fixtures.json",
@@ -13,31 +13,31 @@
   ],
   "reports": {
     "1H": {
-      "reference": "1e9fd1bc",
+      "reference": "7ca4b817",
       "observedAt": "2026-10-17T21:16:16.779Z",
       "savedCandles": 520,
       "shownCandles": 123
     },
     "4H": {
-      "reference": "2ad0a264",
+      "reference": "cdedf642",
       "observedAt": "2026-10-17T21:14:44.983Z",
       "savedCandles": 520,
       "shownCandles": 180
     },
     "1Dutc": {
-      "reference": "2f489d71",
+      "reference": "58d5a1d0",
       "observedAt": "2026-10-17T21:10:34.259Z",
       "savedCandles": 520,
       "shownCandles": 260
     },
     "1Wutc": {
-      "reference": "12619f3a",
+      "reference": "43fc2e3e",
       "observedAt": "2026-10-17T21:12:39.757Z",
       "savedCandles": 457,
       "shownCandles": 260
     },
     "15m": {
-      "reference": "e5f1768f",
+      "reference": "f64efbc3",
       "observedAt": "2026-10-17T21:16:16.779Z",
       "savedCandles": 520,
       "shownCandles": 96
@@ -54,10 +54,7 @@
     },
     {
       "name": "risk-setup",
-      "frame": "4H",
-      "options": {
-        "selectedPathId": "range-short"
-      }
+      "frame": "1Wutc"
     },
     {
       "name": "setup",

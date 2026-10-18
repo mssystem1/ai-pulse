@@ -70,7 +70,9 @@ describe("V5 paid job E2E", () => {
   let server: Server;
   let origin = "";
   before(async () => {
-    const cfg = { ...loadConfig(), NODE_ENV: "test" as const, X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "fixture" as const, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true, enabledNetworks: ["xlayer", "base", "arbitrum", "arc"] as const };
+    // A developer's .env API key must not turn this fixture-only suite into a
+    // live Risk Guard model request. Production configuration is unchanged.
+    const cfg = { ...loadConfig(), hasXaiKey: false, XAI_API_KEY: "", NODE_ENV: "test" as const, X402_MOCK: true, paymentMode: "mock" as const, ARC_AI_MODE: "fixture" as const, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true, FEATURE_PREDICTION_ANALYSIS: true, enabledNetworks: ["xlayer", "base", "arbitrum", "arc"] as const };
     const app = createApp(cfg, { polymarket: fakePolymarket, spotContext: fakeSpotContext, spotInstrumentExists: async () => true, persistence: { jobs: new MemoryJobStore(), reports: new MemoryReportStore() } });
     await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", resolve); });
     const address = server.address();

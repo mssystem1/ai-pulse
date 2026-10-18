@@ -1,5 +1,9 @@
 # Four fresh BTC Global Pro reports on Base — 18 October 2026
 
+**Single-setup correction:** the [current strategy audit](GLOBAL_SINGLE_SETUP_STRATEGY_2026-10-18.md) supersedes the dual LONG/SHORT presentation below. Each timeframe now publishes one LONG, SHORT or SIDEWAYS assessment and one supported setup with its conditional chart projection.
+
+**Target-policy correction:** a later user-reported daily snapshot exposed consumed historical pivots being reused as TPs. Price consistency in this audit did not establish target validity. The [target and recovery incident audit](GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md) supersedes the target-selection conclusions below and links a free corrected review. Original purchased snapshots and receipts remain unchanged.
+
 Completed the unfinished request from `codex://threads/01a12ffe-8eea-7900-bdbb-c07ce7377efb`: generate BTC-USDT Pro reports for 1H, 4H, 1D UTC and 1W UTC using `TEST_WALLET_ADDRESS` on Base, then inspect the actual text, charts, Entry, SL and TP levels. The earlier chat explicitly authorized these purchases.
 
 The updated **local API** generated the reports with normal application configuration, Redis persistence, live public OKX Spot candles and **Grok 4.5 / medium** reasoning. Each report cost **0.30 USDC**, exactly **1.20 USDC total**. No trading orders were placed. All subsequent recovery, re-export and recheck work reused these purchases.

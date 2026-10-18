@@ -9,6 +9,7 @@ import {globalChannelBounds,globalChannelLines} from "./globalChannels.js";
 import {globalEntryStudySvg} from "./globalEntryChart.js";
 import {globalFrameReference} from "./globalContext.js";
 import {globalCoverageLine} from "./globalCoverage.js";
+import {globalWavePhase} from "./globalSetupSelection.js";
 import {globalDefaultChartLayers,globalStructuralScaleValues,globalStructuralWindow,globalMeasuredFib,globalChannelAvailability} from "./globalViewport.js";
 
 export type GlobalChartLayers = { allSmas?: boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean; localChannel?:boolean; channelMid?:boolean };
@@ -53,7 +54,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   const plan=globalTradePlan(report),decision=globalDecision(report),eligibility=globalEligibility(report);
   const allPaths=report.paths.filter(p=>report.view.pathIds.includes(p.id)),main=allPaths.find(p=>p.role==="main")??allPaths[0];
   const alternative=allPaths.find(p=>p.id===options.selectedPathId&&p.id!==main?.id)??allPaths.find(p=>p.id===plan.pathId&&p.id!==main?.id)??allPaths.find(p=>p.id!==main?.id&&(main?.direction!=="range"||p.direction==="down"))??allPaths.find(p=>p.id!==main?.id);
-  const visiblePaths=[main,alternative].filter((p):p is NonNullable<typeof p>=>!!p),strategyRoutes=report.strategy?.routes.filter(r=>visiblePaths.some(p=>p.id===r.pathId))??[],visibleIds=new Set([...visiblePaths.flatMap(p=>[p.triggerLevelId,p.invalidationLevelId,...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]),...strategyRoutes.flatMap(r=>[...r.objectiveIds,...r.checkpointIds]),...(visiblePaths.some(p=>p.id===plan.pathId)?[plan.triggerLevelId,plan.invalidationLevelId,...plan.targetIds,...(plan.checkpointIds??[])]:[])]);
+  const visiblePaths=(report.decisionVersion==="decision-v5"?[allPaths.find(p=>p.id===(report.setupSelection?.pathId??plan.pathId))]:[main,alternative]).filter((p):p is NonNullable<typeof p>=>!!p),strategyRoutes=report.strategy?.routes.filter(r=>visiblePaths.some(p=>p.id===r.pathId))??[],visibleIds=new Set([...visiblePaths.flatMap(p=>[p.triggerLevelId,p.invalidationLevelId,...p.targetIds,...(p.stress?[p.stress.triggerLevelId,...p.stress.targetIds]:[])]),...strategyRoutes.flatMap(r=>[...r.objectiveIds,...r.checkpointIds]),...(visiblePaths.some(p=>p.id===plan.pathId)?[plan.triggerLevelId,plan.invalidationLevelId,...plan.targetIds,...(plan.checkpointIds??[])]:[])]);
   const find = (id: string | null) => levels.find(l => l.id === id), xFuture = (fraction: number) => historyEnd + future * fraction;
   const visible = (y: number | null): y is number => y !== null && y >= top && y <= bottom;
   let svg = text(left+8,top-9,report.lang==="zh"?"已完成价格历史":"COMPLETED PRICE HISTORY","#8d9cb3",9);
@@ -125,7 +126,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     waveLabels.push(label);
     svg += `<g data-wave-label="${escapeGlobalSvg(a.id)}">` + (Math.abs(label.x-p.x)>2 || Math.abs(label.y-desiredY)>2 ? line(p.x, p.y, label.x, label.y - 5, "#a38ebd", .7) : "") + `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#d0b7f7"/><rect x="${label.x-13}" y="${label.y-14}" width="26" height="20" rx="5" fill="#202036"/>` + text(label.x, label.y, a.label, "#e6d5ff", 13, "middle") + "</g>";
   }
-  if (origin) svg += text(left + 8, bottom - 8, `${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
+  if (origin) svg += text(left + 8, bottom - 8, globalWavePhase(report).recovered?(report.lang==="zh"?"C 后恢复 · 历史 ABC 候选":"POST-C RECOVERY · HISTORICAL ABC CANDIDATE"):`${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
   if (options.showScenarios === false) return svg;
   if(report.decisionVersion==="decision-v5")return svg+globalTradeAnnotations(report,g,options);
   const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a,b)=>Number(b.level.id===plan.triggerLevelId||plan.targetIds.includes(b.level.id))-Number(a.level.id===plan.triggerLevelId||plan.targetIds.includes(a.level.id))).filter((item,i,all)=>!all.slice(0,i).some(prior=>Math.abs(prior.level.price-item.level.price)<10**-report.snapshot.pricePrecision)).sort((a, b) => a.y - b.y);
@@ -285,6 +286,6 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if(entryImage)svg+=`<g transform="translate(25 ${entryTop})">${entryImage}</g>`;
   svg += `<rect x="25" y="${footerTop}" width="1250" height="${footerHeight}" rx="10" fill="#181c24" stroke="#695335"/>`;
   wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?12:16));
-  svg += text(26, height - 14, report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
+  svg += text(26, height - 14, report.targetReviewOf ? report.lang === "zh" ? `原快照 #${report.targetReviewOf} 的技术目标复核 · 相同 K 线 · 未调用新 AI · 研究用途` : `Technical target review of #${report.targetReviewOf} · same saved candles · no new AI · research only` : report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
   return svg + "</g></svg>";
 }

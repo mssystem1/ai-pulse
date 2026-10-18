@@ -9,6 +9,29 @@ import {tradePlanFixture} from "../../../packages/analysis/dist/globalTrade.fixt
 import { createGlobalAssessmentRouter } from "./globalAssessmentRoutes.js";
 import type { getOkxTradeTokens } from "./okxDex.js";
 import {deriveGlobalTradePlan} from "@pulse/domain";
+import {readFileSync} from "node:fs";
+import {prepareGlobalReport} from "@pulse/analysis";
+import {summarizeCandles,type SpotMarketContext} from "@pulse/market";
+
+test("authenticated target correction uses saved candles only and retains the original",async()=>{
+  const fixture=JSON.parse(readFileSync(new URL("../../../packages/analysis/src/globalTargets.oct18-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
+  const markets=Object.entries(fixture.frames).map(([bar,rows]):SpotMarketContext=>{
+    const candles=rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,volumeCcy:0,confirmed:true}));
+    return {instId:"BTC-USDT",bar,source:"okx-public-spot",fetchedAt:fixture.observedAt,candles,summary:summarizeCandles(candles),ticker:{instId:"BTC-USDT",last:candles.at(-1)!.close,priceCurrency:"USDT",open24h:0,high24h:0,low24h:0,vol24h:0,volCcy24h:0,change24hPct:0,ts:"0"}};
+  });
+  const saved=prepareGlobalReport({market:markets.find(m=>m.bar==="1Dutc")!,contextMarket:markets.find(m=>m.bar==="1Wutc"),hierarchyMarkets:markets,tier:"premium",targetPolicy:"legacy-pivots-v1"}),before=JSON.stringify(saved);
+  const app=express();app.use(express.json());app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test"},{resolveReport:async access=>access.token==="saved-report-capability-0000"?saved:null,market:async()=>{throw Error("Target review must not fetch markets");}}));
+  const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));
+  try{
+    const url=`http://127.0.0.1:${(server.address() as {port:number}).port}/v1/global/target-review`;
+    const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access:{kind:"job",id:"saved",token:"saved-report-capability-0000"}})});
+    assert.equal(response.status,200);const data=await response.json();assert.equal(data.paymentRequired,false);assert.equal(data.modelCalls,0);assert.ok(data.report.targetReviewOf);
+    assert.equal(data.report.strategy.routes.length,1);assert.equal(data.report.paths.length,1);assert.equal(data.report.setupSelection.side,"short");
+    const route=data.report.strategy.routes[0];assert.deepEqual(route.objectiveIds.map((id:string)=>data.report.levels.find((l:{id:string;price:number})=>l.id===id).price),[80400,74955.5,62521.8]);
+    assert.equal(JSON.stringify(saved),before);
+    const denied=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access:{kind:"job",id:"saved",token:"incorrect-capability-0000"}})});assert.equal(denied.status,404);
+  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
 
 for(const version of ["decision-v2","decision-v3","decision-v4","decision-v5"] as const)test(`${version} recheck loads the named entry frame and retains the shared geometry`,async()=>{
   const {report,market,entry,context}=version==="decision-v5"?tradePlanFixture():version==="decision-v4"?strategyFixture():entryPlanFixture(),calls:string[]=[];

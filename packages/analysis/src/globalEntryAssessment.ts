@@ -1,6 +1,6 @@
 import {candleCloseTime,GlobalAssessmentSchema,type GlobalReport} from "@pulse/schemas";
 import type {SpotMarketContext} from "@pulse/market";
-import {deriveGlobalEntryPlan,globalArtifactReference,globalContextRelation,globalEntryCondition,globalFrameReference} from "@pulse/domain";
+import {deriveGlobalEntryPlan,globalArtifactReference,globalContextRelation,globalEntryCondition,globalFrameReference,selectSingleGlobalSetup} from "@pulse/domain";
 import {completedGlobalCandles,globalConfirmedPivots,globalFrameEvidence,globalSma,globalWilderIndicators} from "./globalReport.js";
 
 export function assessGlobalEntryReport(saved:GlobalReport,market:SpotMarketContext,context:SpotMarketContext|null|undefined,entry:SpotMarketContext|null|undefined){
@@ -19,13 +19,24 @@ export function assessGlobalEntryReport(saved:GlobalReport,market:SpotMarketCont
   if(["decision-v4","decision-v5"].includes(saved.decisionVersion??"")){report.candles=[...new Map([...saved.candles,...completedGlobalCandles(market)].map(c=>[c.ts,c])).values()].sort((a,b)=>a.ts-b.ts).slice(-520);report.indicators={...report.indicators,atr:{period:14,points:globalWilderIndicators(report.candles).atr}};const primary=report.candles.at(-1);report.snapshot={...report.snapshot,price:primary?.close??null,lastCandleTs:primary?.ts??null};}
   const original=saved.tradePlan??deriveGlobalEntryPlan(saved),plan=deriveGlobalEntryPlan(report,original.pathId??undefined,original.side==="none"?undefined:original.side);
   const blockers:string[]=[...plan.blockers];
+  if(saved.setupSelection){
+    const measuredPrimary=globalWilderIndicators(report.candles);
+    report.indicators={...report.indicators,pivots:globalConfirmedPivots(report.candles),sma:report.indicators.sma.map(s=>({...s,points:globalSma(report.candles,s.period)})),rsi:{...report.indicators.rsi,points:measuredPrimary.rsi}};
+    report.hierarchy=[...(report.hierarchy??[]).filter(r=>r.timeframe!==market.bar),globalFrameEvidence(market,at)];
+    const current=selectSingleGlobalSetup(report).selection;
+    if(current.side!==saved.setupSelection.side||current.rule!==saved.setupSelection.rule||current.pathId!==saved.setupSelection.pathId)blockers.push("strategy_changed");
+  }
   const primaryBars=completedGlobalCandles(market),primaryClosed=primaryBars.length?candleCloseTime(primaryBars.at(-1)!.ts,market.bar):null,primaryNext=primaryClosed===null?null:candleCloseTime(primaryClosed,market.bar);
+  // Rechecking must not revive a target consumed since the purchased snapshot.
+  // Preserve the map; require new structure instead of advertising spent reward.
+  const firstTarget=saved.levels.find(l=>l.id===original.targetIds[0]);
+  if(saved.strategy?.targetPolicy==="active-zones-v1"&&firstTarget&&original.side!=="none"&&primaryBars.some(c=>c.ts>(saved.snapshot.lastCandleTs??Infinity)&&(original.side==="long"?1:-1)*(c.close-firstTarget.price)>10**-saved.snapshot.pricePrecision*.5))blockers.push("target_reached");
   if(primaryBars.length<55||primaryNext===null||cutoff>primaryNext+60000)blockers.push("history");
   if(["unavailable","opposing"].includes(globalContextRelation(report,plan.side)))blockers.push("context");
   const revised=(before:GlobalReport["candles"],after:GlobalReport["candles"])=>after.some(c=>{const old=before.find(o=>o.ts===c.ts);return old&&["open","high","low","close"].some(k=>old[k as "open"]!==c[k as "open"]);});
   if(revised(saved.candles,completedGlobalCandles(market))||revised(saved.entryStudy!.candles,candles))blockers.push("source_revised");
   if(candles.slice(-64).some((c,i,tail)=>i>0&&candleCloseTime(tail[i-1].ts,expected)!==c.ts))blockers.push("history");
-  const state=blockers.some(b=>["history","levels","reward","source_revised"].includes(b))?"no_trade":blockers.includes("cancelled")?"invalidated":blockers.includes("expired")?"expired":!plan.confirmationTs?"waiting_confirmation":!plan.retestTs?"waiting_retest":blockers.includes("context")||blockers.includes("entry_price")?"no_trade":"technical_valid";
+  const state=blockers.some(b=>["history","levels","reward","source_revised","target_reached","strategy_changed"].includes(b))?"no_trade":blockers.includes("cancelled")?"invalidated":blockers.includes("expired")?"expired":!plan.confirmationTs?"waiting_confirmation":!plan.retestTs?"waiting_retest":blockers.includes("context")||blockers.includes("entry_price")?"no_trade":"technical_valid";
   const qualified=state==="technical_valid",targets=plan.targetIds.flatMap(id=>saved.levels.find(l=>l.id===id)?.price??[]);
   const entryZone=qualified?plan.referenceEntry:null,stop=qualified?plan.referenceStop:null,atr=plan.method==="structure-v4"?report.indicators.atr.points.at(-1)?.value:measured.atr.at(-1)?.value;
   const worst=entryZone?(plan.side==="long"?entryZone[1]:entryZone[0]):null,distance=worst!==null&&stop!==null?Math.abs(worst-stop):null;
@@ -34,6 +45,8 @@ export function assessGlobalEntryReport(saved:GlobalReport,market:SpotMarketCont
     qualified?`${verb} ${zh?"信号已确认；需金额对应的新报价。":"signal confirmed; review an amount-specific fresh quote."}`:blockers.includes("reward")?(zh?"本次入场到 TP1 的收益不足；需要新的有依据结构。":`Entry needs better reward to ${saved.decisionVersion==="decision-v5"?"TP1":"the first objective"}; a new supported structure is required.`):blockers.includes("context")?(zh?"高周期背景缺失或与本次方向相反。":"Higher-timeframe evidence is unavailable or opposes this setup."):blockers.includes("entry_price")?(zh?"当前入场收盘已离开有依据区间；报价须回到同一区间。":"The entry-study close is outside the supported zone; the quote must be inside that same zone."):(zh?`需要在 ${trigger??"—"} 形成新的 ${globalFrameReference(expected)} 入场证据。`:`A new ${globalFrameReference(expected)} ${plan.family==="breakout_retest"?"break and held retest":"rejection and follow-through"} is needed at ${trigger??"—"}.`),
     zh?"主图价位保持不变；计划、重新检查和报价使用同一入场算法。":"The purchased price map is unchanged. Report, recheck and quote review use the same entry calculation."];
   if(!qualified)lines.push(globalEntryCondition(saved,plan));
+  if(blockers.includes("strategy_changed"))lines.push(zh?"新完整 K 线不再支持已保存的策略；需要重新分析，不会自动切换到相反方向。":"New completed candles no longer support the saved strategy. A new analysis is required; the recheck does not automatically switch direction.");
+  if(blockers.includes("target_reached"))lines.push(zh?"原映射的 TP1 已被新完整收盘突破；不能重复使用已消耗收益，须有新的支撑阻力结构。":"New completed candles have crossed the saved TP1. That target cannot be reused as fresh reward; new support/resistance structure is required.");
   if(next!==null)lines.push(zh?`入场证据须于下一次 ${globalFrameReference(expected)} 收盘后刷新：${new Date(next).toISOString()}。`:`Refresh entry evidence after the next ${globalFrameReference(expected)} close: ${new Date(next).toISOString()}.`);
   if(plan.failure)lines.push(zh?`先前测试结束于 ${new Date(candleCloseTime(plan.failure.ts,expected)!).toISOString()}。`:`An earlier test ended at the ${new Date(candleCloseTime(plan.failure.ts,expected)!).toISOString()} close.`);
   return GlobalAssessmentSchema.parse({version:"pulse-global-assessment-v1",sourceRef:globalArtifactReference(saved),sourceObservedAt:saved.snapshot.observedAt,assessedAt:at,instId:saved.snapshot.instId,priceCurrency:saved.snapshot.priceCurrency,timeframe:saved.snapshot.timeframe,analysisTimeframe:saved.snapshot.timeframe,entryTimeframe:expected,family:plan.family,strategyId:plan.strategyId,structureConfirmationTs:plan.structureConfirmationTs,checkpointTargets:plan.checkpointIds?.flatMap(id=>saved.levels.find(l=>l.id===id)?.price??[]),firstObstacleRewardRisk:plan.firstObstacleRewardRisk,state,side:plan.side,pathId:plan.pathId,lastCompletedClose:last?.close??null,lastCompletedAt:closed,confirmationTs:plan.confirmationTs,retestTs:plan.retestTs,retestDeadline:null,expiresAt:plan.signalExpiresAt??null,permittedEntry:entryZone,observedStop:stop,targets,grossRewardRisk:plan.grossRewardRisk,stopDistancePercent:distance!==null&&worst?distance/worst*100:null,stopDistanceAtr:distance!==null&&atr?distance/atr:null,context:report.context.agreement,blockers:[...new Set(blockers)],lines});

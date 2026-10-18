@@ -3,8 +3,8 @@ import type {GlobalChartCoordinates,GlobalChartOptions} from "./globalChart.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
 
 const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
-/** One position drawing: exact horizontal prices, a price ledger and a risk /
- * reward box. No invented future price path or displaced price-axis labels. */
+/** One position drawing and one conditional route through saved entry/target
+ * prices. Future horizontal spacing is illustrative, never a target date. */
 export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions){
   const cards=globalTradeCards(report),card=cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];
   if(!card)return "";
@@ -14,6 +14,13 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const entry=card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0];
   const rows=[{role:"Entry",price:entry,color:"#ffcb76"},{role:"SL",price:p.referenceStop,color:"#f0738c"},...card.targets.map((t,i)=>({role:`TP${i+1}`,price:t.price,color:"#53dabb"}))];
   let svg=`<g data-trade-plan="${escape(card.key)}" data-confirmed="${card.confirmed}" data-price-labels="exact">`;
+  const last=report.candles.at(-1),projectionColor=card.side==="long"?"#53dabb":"#f0738c";
+  const projection=[...(last?[{x:g.historyEnd,y:g.y(last.close)}]:[]),{x:g.historyEnd+future*.18,y:g.y(entry)},...card.targets.map((t,i)=>({x:g.historyEnd+future*(.43+i*.19),y:g.y(t.price)}))].filter((p):p is {x:number;y:number}=>p.y!==null&&p.y>=g.top&&p.y<=g.bottom);
+  if(options.showScenarios!==false&&projection.length>=3){
+    const end=projection.at(-1)!,prior=projection.at(-2)!,angle=Math.atan2(end.y-prior.y,end.x-prior.x);
+    const arrow=[end,{x:end.x-10*Math.cos(angle)+4*Math.sin(angle),y:end.y-10*Math.sin(angle)-4*Math.cos(angle)},{x:end.x-10*Math.cos(angle)-4*Math.sin(angle),y:end.y-10*Math.sin(angle)+4*Math.cos(angle)}];
+    svg+=`<g data-scenario-projection="conditional" data-projection-side="${card.side}" data-projection-path="${escape(card.pathId)}"><path d="${projection.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="${projectionColor}" stroke-width="2.3" stroke-dasharray="7 5"/><polygon points="${arrow.map(p=>`${p.x},${p.y}`).join(' ')}" fill="${projectionColor}"/>${txt(g.historyEnd+12,g.top+24,zh?"条件走势 · 时间仅为示意":"CONDITIONAL MOVE · TIMING SCHEMATIC",projectionColor,8)}</g>`;
+  }
   const entryY=g.y(entry),stopY=g.y(p.referenceStop),targetY=g.y(card.targets[0]?.price??entry);
   if(entryY!==null&&stopY!==null&&targetY!==null){
     for(const [a,b,color,kind] of [[entryY,stopY,"#f0738c","risk"],[entryY,targetY,"#53dabb","reward"]] as const){

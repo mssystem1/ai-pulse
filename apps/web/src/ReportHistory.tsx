@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { API_BASE } from "./api";
 import { withSetupAccess } from "./globalSetupClient";
 import { reportTierLabel } from "./reportLabels";
+import {reportStageLabel} from "./reportProgress";
 import { forgetJobRecovery, listJobRecoveries, type JobRecoveryScope } from "./jobRecovery";
 import type { WebNetworkKey } from "./networks";
 import { switchWalletNetwork } from "./networks";
@@ -24,11 +25,21 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
   const items = (() => { try { return listJobRecoveries(localStorage, networkKey, scope); } catch { return []; } })();
 
   async function loadWalletHistory(token: string) {
-    const response = await fetch(`${API_BASE}/v1/report-history?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" }, cache: "no-store" });
-    if (!response.ok) throw new Error(response.status === 401 ? "Wallet history session expired. Sign again to continue." : `Wallet history failed (${response.status})`);
+    const response = await fetch(`${API_BASE}/v1/report-history?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${token}`, "Cache-Control": "no-cache" }, cache: "no-store",signal:AbortSignal.timeout(20_000) });
+    if (!response.ok) { if(response.status===401&&current.current)setSessionToken("");throw new Error(response.status === 401 ? "Wallet history session expired. Sign again to continue." : `Wallet history failed (${response.status})`); }
     const body = await response.json() as { reports?: RemoteReport[] };
-    setRemote((body.reports || []).filter((item) => item.mode === scope));
+    if(current.current)setRemote((body.reports || []).filter((item) => item.mode === scope));
   }
+  const hasPending=remote.some(item=>!item.ready&&!TERMINAL_REPORT_STAGES.has(item.stage));
+  useEffect(()=>{
+    if(!sessionToken||!hasPending)return;
+    let stopped=false,inFlight=false;
+    const timer=setInterval(()=>{
+      if(inFlight||stopped)return;inFlight=true;
+      void loadWalletHistory(sessionToken).catch(error=>{if(!stopped&&current.current)setMessage(error instanceof Error?error.message:String(error));}).finally(()=>{inFlight=false;});
+    },5000);
+    return()=>{stopped=true;clearInterval(timer);};
+  },[sessionToken,hasPending]);
 
   async function syncWalletHistory() {
     if (!wallet) return setMessage("Connect the report-paying wallet first.");
@@ -59,7 +70,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
     if (!sessionToken) return setMessage("Sign in to wallet history again.");
     setBusy(jobId); setMessage("");
     try {
-      const response = await fetch(`${API_BASE}/v1/report-history/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${sessionToken}`, "Cache-Control": "no-cache" }, cache: "no-store" });
+      const response = await fetch(`${API_BASE}/v1/report-history/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { Authorization: `Bearer ${sessionToken}`, "Cache-Control": "no-cache" }, cache: "no-store",signal:AbortSignal.timeout(30_000) });
       const body = await response.json() as { report?: Record<string, unknown>; error?: string };
       if (!response.ok || !body.report) throw new Error(body.error || `Report recovery failed (${response.status})`);
       if (current.current) { onOpen(withSetupAccess(body.report,{kind:"history",id:jobId,token:sessionToken})); setMessage("Your saved report is open. No new payment was needed."); }
@@ -75,11 +86,12 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
         method: "POST",
         headers: { Authorization: `Bearer ${sessionToken}`, "Cache-Control": "no-cache" },
         cache: "no-store",
+        signal:AbortSignal.timeout(20_000),
       });
       const body = await response.json() as { error?: string };
       if (!response.ok) throw new Error(body.error || `Report retry failed (${response.status})`);
       await loadWalletHistory(sessionToken);
-      setMessage("Recovery restarted from the settled receipt. No new payment was created; refresh wallet history when generation completes.");
+      setMessage("Recovery resumed from the settled receipt. This list updates automatically; no new payment was created.");
     } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
     finally { setBusy(""); }
   }
@@ -88,12 +100,12 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
     setBusy(jobId); setMessage("");
     try {
       const headers = { "PULSE-RECOVERY-TOKEN": recoveryToken };
-      const status = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}?fresh=${Date.now()}`, { headers: { ...headers, "Cache-Control": "no-cache" }, cache: "no-store" });
+      const status = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}?fresh=${Date.now()}`, { headers: { ...headers, "Cache-Control": "no-cache" }, cache: "no-store",signal:AbortSignal.timeout(20_000) });
       if (!status.ok) throw new Error(`History lookup failed (${status.status})`);
       const statusBody = await status.json() as { job?: { stage?: string } };
       const stage = statusBody.job?.stage || "unknown";
       if (stage !== "completed" && stage !== "completed_partial") throw new Error(`Report is ${stage.replaceAll("_", " ")}; retry when processing completes.`);
-      const response = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { ...headers, "Cache-Control": "no-cache" }, cache: "no-store" });
+      const response = await fetch(`${API_BASE}/v1/jobs/${encodeURIComponent(jobId)}/report?fresh=${Date.now()}`, { headers: { ...headers, "Cache-Control": "no-cache" }, cache: "no-store",signal:AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`Report recovery failed (${response.status})`);
       const body = await response.json() as { report?: Record<string, unknown> };
       if (!body.report) throw new Error("Stored report payload is unavailable");
@@ -108,7 +120,7 @@ function ReportHistoryContent({ networkKey, scope, wallet, onOpen }: { networkKe
     {remote.length ? <div className="report-history-list remote-history">{remote.map((item) => {
       const retryable = TERMINAL_REPORT_STAGES.has(item.stage);
       return <article key={item.id}>
-        <div><strong>{item.label}</strong><span>{reportTierLabel(item.tier)} · {new Date(item.createdAt).toLocaleString()} · {item.stage.replaceAll("_", " ")}</span></div>
+        <div><strong>{item.label}</strong><span>{reportTierLabel(item.tier)} · {new Date(item.createdAt).toLocaleString()} · {item.ready ? "Completed" : reportStageLabel(item.stage)}</span></div>
         <button type="button" disabled={Boolean(busy) || (!item.ready && !retryable)} onClick={() => void (retryable ? retryRemote(item.id) : openRemote(item.id))}>{busy === item.id ? (retryable ? "Restarting…" : "Opening…") : item.ready ? "Open" : retryable ? "Retry" : "Processing"}</button>
       </article>;
     })}</div> : <div className="report-history-empty">{wallet ? "Sign once to load reports purchased by this wallet on the selected network." : "Connect the wallet that paid for the reports."}</div>}

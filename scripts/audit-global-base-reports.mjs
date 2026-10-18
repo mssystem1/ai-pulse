@@ -1,5 +1,6 @@
 /** Four bounded BTC Pro purchases against the updated local API.
- * Defaults to quotes only. --execute spends at most 1.20 USDC on Base.
+ * Defaults to quotes only. --network base|xlayer; --execute is bounded to four
+ * 0.30 payments in that network's settlement asset (1.20 total).
  * Accepted jobs and authorizations remain in gitignored .tmp; reruns recover
  * accepted jobs without paying again. --render-only audits saved deliveries.
  */
@@ -15,22 +16,28 @@ import {globalArtifactTag, globalArtifactReference, globalTradeCards, globalDeci
 import {formatTelegramResearch, telegramResearchMessage, telegramResearchCaption,
   renderTelegramResearchChart} from '../apps/api/dist/telegramResearch.js';
 import {fullReportDelivery} from '../apps/api/dist/reportDelivery.js';
+import {reviewGlobalTargetReport,globalCompatibility} from '../packages/analysis/dist/index.js';
 
 const cfg=loadConfig(), frames=['1H','4H','1D','1W'];
-const root='.tmp/global-base-audit-2026-10-18', origin=cfg.BASE_URL.replace(/\/$/,'');
+const networkArg=process.argv.indexOf('--network'),network=networkArg<0?'base':process.argv[networkArg+1];
+assert.ok(['base','xlayer'].includes(network),'Only the authorized Base/X Layer test matrices are supported');
+const root=`.tmp/global-${network}-audit-2026-10-18`, origin=cfg.BASE_URL.replace(/\/$/,'');
 const recover=process.argv.includes('--recover');
-const execute=process.argv.includes('--execute')||recover, renderOnly=process.argv.includes('--render-only');
+const technicalReview=process.argv.includes('--technical-review');
+const execute=process.argv.includes('--execute')||recover, renderOnly=process.argv.includes('--render-only')||technicalReview;
+assert.ok(!(technicalReview&&execute),'Technical reviews are offline; do not combine them with payment flags');
+const artifactRoot=`${root}/${technicalReview?'reviewed-deliverables':'deliverables'}`;
 const wallet=process.env.TEST_WALLET_ADDRESS, key=process.env.TEST_WALLET_PRIVATE_KEY;
-const net=getNetwork('base'), price=300000n, results=[];
+const net=getNetwork(network), price=300000n, results=[];
 const cli=process.env.ONCHAINOS_EXECUTABLE || `${process.env.USERPROFILE}/.local/bin/onchainos.exe`;
 assert.ok(['localhost','127.0.0.1'].includes(new URL(origin).hostname));
 assert.equal(cfg.X402_MOCK,false);
 assert.match(wallet||'',/^0x[\da-f]{40}$/i);
 assert.equal(privateKeyToAccount(key).address.toLowerCase(),wallet.toLowerCase());
-fs.mkdirSync(`${root}/private`,{recursive:true}); fs.mkdirSync(`${root}/deliverables`,{recursive:true});
-const client=createPublicClient({transport:http(process.env.BASE_RPC_URL||net.rpcUrls[0],{timeout:20000,retryCount:0})});
-const persist=()=>fs.writeFileSync(`${root}/results.json`,JSON.stringify({checkedAt:new Date().toISOString(),origin,
-  wallet,network:'Base',chainId:8453,maximumUSDC:1.2,results},null,2));
+fs.mkdirSync(`${root}/private`,{recursive:true}); fs.mkdirSync(artifactRoot,{recursive:true});
+const client=createPublicClient({transport:http((network==='base'?process.env.BASE_RPC_URL:process.env.XLAYER_RPC_URL)||net.rpcUrls[0],{timeout:20000,retryCount:0})});
+const persist=()=>fs.writeFileSync(`${root}/${technicalReview?'reviewed-results':'results'}.json`,JSON.stringify({checkedAt:new Date().toISOString(),origin,technicalReview,networkCalls:renderOnly?0:undefined,modelCalls:0,newPayments:renderOnly?0:undefined,
+  wallet,network:net.label,chainId:net.chainId,asset:net.paymentAsset.symbol,maximumSettlementAmount:1.2,results},null,2));
 const states=new Map();
 const fileFor=frame=>`${root}/private/${frame}.json`;
 // Windows scanners/readers can briefly lock a file. Publish a complete journal
@@ -47,7 +54,7 @@ const get=async(url,headers={})=>{
 };
 
 if(!renderOnly){
-  assert.equal(await client.getChainId(),8453);
+  assert.equal(await client.getChainId(),net.chainId);
   const health=await(await get(origin+'/healthz')).json(); assert.equal(health.mockPayments,false);
   const meta=await(await get(origin+'/v1/meta')).json();
   assert.equal(meta.routes.find(r=>r.route==='POST /v1/analysis/spot/premium').priceUsd,.3);
@@ -55,10 +62,10 @@ if(!renderOnly){
   const remaining=frames.filter(frame=>!fs.existsSync(fileFor(frame))||!JSON.parse(fs.readFileSync(fileFor(frame),'utf8')).accepted).length;
   if(recover)assert.equal(remaining,0,'--recover requires four accepted jobs and never makes new purchases');
   assert.ok(balance>=BigInt(remaining)*price,'Insufficient balance for remaining reports');
-  console.log(JSON.stringify({network:'Base',wallet,balanceUSDC:formatUnits(balance,6),reports:frames,maximumUSDC:1.2,execute}));
+  console.log(JSON.stringify({network:net.label,wallet,balance:formatUnits(balance,6),asset:net.paymentAsset.symbol,reports:frames,maximumSettlementAmount:1.2,execute}));
 
   for(const frame of frames){
-    const url=origin+'/base/v1/analysis/spot/premium', business={instId:'BTC-USDT',timeframe:frame,lang:'en'};
+    const url=origin+`/${network}/v1/analysis/spot/premium`, business={instId:'BTC-USDT',timeframe:frame,lang:'en'};
     const state=fs.existsSync(fileFor(frame))?JSON.parse(fs.readFileSync(fileFor(frame),'utf8')):{frame,url,business};
     states.set(frame,state); assert.equal(state.url,url); assert.deepEqual(state.business,business);
     if(state.accepted){console.log(JSON.stringify({frame,resuming:state.accepted.job.id}));continue;}
@@ -81,7 +88,7 @@ if(!renderOnly){
     assert.equal(a.asset.toLowerCase(),net.paymentAsset.address.toLowerCase());
     assert.equal(a.payTo.toLowerCase(),cfg.PAY_TO_ADDRESS.toLowerCase());
     state.challenge=challenge;save(frame,state);
-    console.log(JSON.stringify({frame,quoteUSDC:.3,network:8453,payee:a.payTo}));
+    console.log(JSON.stringify({frame,quote:.3,asset:net.paymentAsset.symbol,network:net.chainId,payee:a.payTo}));
     if(!execute)continue;
     const signed=JSON.parse(execFileSync(cli,['payment','pay-local','--payload',raw],
       {env:{...process.env,EVM_PRIVATE_KEY:key},encoding:'utf8',timeout:45000,windowsHide:true,stdio:['ignore','pipe','pipe']}));
@@ -133,16 +140,18 @@ async function deliver(frame){
       if(log.address.toLowerCase()!==net.paymentAsset.address.toLowerCase())return false;
       try{const d=decodeEventLog({abi:erc20Abi,data:log.data,topics:log.topics});return d.eventName==='Transfer'&&
         d.args.from.toLowerCase()===wallet.toLowerCase()&&d.args.to.toLowerCase()===cfg.PAY_TO_ADDRESS.toLowerCase()&&d.args.value===price;}catch{return false;}
-    });assert.ok(exactTransfer,'Missing exact .30 USDC settlement');
+    });assert.ok(exactTransfer,'Missing exact .30 settlement-asset transfer');
     state.transferVerified=true;state.transaction=receipt.transaction;save(frame,state);
   }
-  const delivery=JSON.parse(fs.readFileSync(deliveredFile,'utf8')),report=delivery.report,g=GlobalReportSchema.parse(report.global);
+  const delivery=JSON.parse(fs.readFileSync(deliveredFile,'utf8')),original=delivery.report,g=technicalReview?reviewGlobalTargetReport(GlobalReportSchema.parse(original.global)):GlobalReportSchema.parse(original.global);
+  const report=technicalReview?{...original,global:g,...globalCompatibility(g)}:original;
+  if(technicalReview)fs.writeFileSync(`${root}/private/${frame}-reviewed-delivery.json`,JSON.stringify({report,reportMarkdown:fullReportDelivery(report).reportMarkdown},null,2));
   const text=researchText(presentResearch(report)),telegramText=formatTelegramResearch(report),message=telegramResearchMessage(report),caption=telegramResearchCaption(report);
   const svg=globalReportChartSvg(g),png=renderTelegramResearchChart(report),cards=globalTradeCards(g),name=`BTC-${frame}-${globalArtifactTag(g)}`;
   const markdown=fullReportDelivery(report).reportMarkdown;
   for(const [ext,value]of [['json',JSON.stringify(g,null,2)],['txt',text],['telegram.txt',telegramText],['telegram-message.txt',message],
     ['telegram-caption.txt',caption],['md',markdown],['original.md',delivery.reportMarkdown],['svg',svg],['png',png]]){
-    if(value)fs.writeFileSync(`${root}/deliverables/${name}.${ext}`,value);
+    if(value)fs.writeFileSync(`${artifactRoot}/${name}.${ext}`,value);
   }
   const findings=[],warnings=[],check=(condition,issue)=>{if(!condition)findings.push(issue);};
   check(g.decisionVersion==='decision-v5','Unexpected decision version');check(g.tradePlan?.method==='structure-v5','Unexpected entry method');
@@ -157,18 +166,22 @@ async function deliver(frame){
   check(text===telegramText,'TXT and Telegram file mismatch');check(caption.length<=1024&&message.length<=3900,'Telegram limits exceeded');
   check(svg&&!svg.includes('NaN')&&png?.length>10000,'Chart rendering failed');
   check(!/CHECKPOINT|OBJECTIVE|WATCH AREA|anchor, not TP|>124,500</i.test(svg||''),'Confusing chart wording or rejected archive level');
-  check(cards.length>=2&&new Set(cards.map(c=>c.side)).size===2,'Missing LONG or SHORT plan');
-  for(const section of presentResearch(report).sections)check(delivery.reportMarkdown.includes('## '+section.title),`Missing Markdown section: ${section.title}`);
+  check(g.setupSelection?.version==='single-setup-v2','Single-setup selector missing');
+  check(['LONG','SHORT','SIDEWAYS'].includes(globalDecision(g).direction),'Invalid market assessment');
+  check(cards.length===1&&g.paths.length===1&&g.strategy.routes.length===1,'Expected one supported setup, path and route');
+  check((svg?.match(/data-scenario-projection=/g)||[]).length===1,'Missing single conditional projected move');
+  for(const section of presentResearch(report).sections)check((technicalReview?markdown:delivery.reportMarkdown).includes('## '+section.title),`Missing Markdown section: ${section.title}`);
   for(const card of cards){
     const p=card.plan,sign=card.side==='long'?1:-1,entry=p.referenceEntry?.[card.side==='long'?1:0];
     check(entry>0&&p.referenceStop>0,`${card.key}: missing Entry/SL`);
     check(sign*(entry-p.referenceStop)>0,`${card.key}: SL on wrong side`);
+    if(g.range&&!p.retestTs)check(card.side==='long'?p.referenceStop<g.range.lower[0]:p.referenceStop>g.range.upper[1],`${card.key}: provisional range stop is inside the full boundary`);
     check(card.targets.length>0&&card.targets.every((t,i)=>sign*(t.price-(i?card.targets[i-1].price:entry))>0),`${card.key}: TP ordering`);
     const calculated=sign*(card.targets[0]?.price-entry)/Math.abs(entry-p.referenceStop);
     check(Math.abs(calculated-card.rr)<1e-7,`${card.key}: R:R calculation`);
     if(card.confirmed)check(card.rr>=1.5&&p.confirmationTs&&p.retestTs,`${card.key}: unqualified confirmed entry`);
     const selectedSvg=globalReportChartSvg(g,{selectedPathId:card.key});
-    fs.writeFileSync(`${root}/deliverables/${name}-${card.side}.svg`,selectedSvg);
+    fs.writeFileSync(`${artifactRoot}/${name}-${card.side}.svg`,selectedSvg);
     for(const output of [text,message,caption]){
       check(output.includes(card.entry)&&output.includes(card.stop),`${card.key}: Entry/SL mismatch`);
       check(output.includes(card.condition),`${card.key}: missing full trigger`);
@@ -179,8 +192,9 @@ async function deliver(frame){
     }
   }
   const decision=globalDecision(g);
-  if(!decision.qualified&&!g.range&&new Set(cards.map(c=>c.side)).size===2)check(decision.direction==='LONG / SHORT','Unconfirmed headline hides an opposite-side plan');
-  const result={frame,ok:findings.length===0,findings,warnings,jobId:state.accepted.job.id,transaction:state.transaction,paidUSDC:.3,
+  const event=stage=>state.job?.events?.find(e=>e.stage===stage)?.at;
+  const durationMs=state.job?.createdAt&&event('completed')?Date.parse(event('completed'))-Date.parse(state.job.createdAt):state.job?.createdAt?Date.parse(state.job.updatedAt)-Date.parse(state.job.createdAt):null;
+  const result={frame,ok:findings.length===0,findings,warnings,jobId:state.accepted.job.id,transaction:state.transaction,paidAmount:.3,asset:net.paymentAsset.symbol,durationMs,selection:g.setupSelection,originalReference:globalArtifactReference(GlobalReportSchema.parse(original.global)),technicalReview,
     transferVerified:state.transferVerified,model:report.model,reasoning:report.analysisProfile?.reasoningEffort,
     generatedAt:report.generatedAt,observedAt:g.snapshot.observedAt,reference:globalArtifactReference(g),
     primaryCandles:g.candles.length,entryFrame:g.entryStudy?.timeframe,entryCandles:g.entryStudy?.candles.length,
@@ -194,7 +208,7 @@ await Promise.all(frames.map(async frame=>{
 }));
 if(!renderOnly){
   const balance=await client.readContract({address:net.paymentAsset.address,abi:erc20Abi,functionName:'balanceOf',args:[wallet]});
-  console.log(JSON.stringify({remainingUSDC:formatUnits(balance,6)}));
+  console.log(JSON.stringify({remainingBalance:formatUnits(balance,6),asset:net.paymentAsset.symbol}));
 }
 console.log(JSON.stringify({reports:results.length,passed:results.filter(r=>r.ok).length,output:root}));
 process.exitCode=results.some(r=>!r.ok)?1:0;

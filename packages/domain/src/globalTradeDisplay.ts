@@ -4,12 +4,12 @@ import {globalTradePlan} from "./globalTradePlan.js";
 import {globalEntryCondition} from "./globalScenarioEvidence.js";
 import {globalContextRelation,globalContextRequired,globalFrameReference} from "./globalContext.js";
 
-export function globalTradeCards(report:GlobalReport){
+export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:string;side:"long"|"short"}){
   const zh=report.lang==="zh",selected=globalTradePlan(report),routes=report.strategy?.routes.filter(r=>report.view.pathIds.includes(r.pathId))??[];
   const shown=report.range?routes.filter(r=>report.paths.find(p=>p.id===r.pathId)?.kind==="range"):routes;
   const price=(n:number)=>n.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
-  return shown.map(route=>{
-    const p=deriveGlobalEntryPlan(report,route.pathId,route.side),direction=route.side==="long"?"LONG / BUY":"SHORT / SELL";
+  return shown.filter(route=>!only||route.pathId===only.pathId&&route.side===only.side).map(route=>{
+    const p=selected.pathId===route.pathId&&selected.side===route.side?selected:deriveGlobalEntryPlan(report,route.pathId,route.side),direction=route.side==="long"?"LONG / BUY":"SHORT / SELL";
     const context=globalContextRelation(report,route.side),contextBlocked=globalContextRequired(report)&&["opposing","unavailable"].includes(context);
     const confirmed=p.state==="confirmed"&&!contextBlocked;
     const state=confirmed?zh?"入场信号已确认":"Entry signal confirmed":p.blockers.includes("reward")?zh?"TP1 收益空间不足":"Entry needs better reward to TP1":p.side==="none"?zh?"需要新的入场结构":"Entry structure needed":zh?"入场确认条件":"Entry confirmation required";
@@ -28,12 +28,20 @@ export function globalTradeCards(report:GlobalReport){
     const riskPercent=risk!==null&&p.referenceEntry?risk/(route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])*100:null;
     const lines=[`${direction} · ${state}`,`${zh?"计划入场":"Entry"}${confirmed?"":" (planned)"}: ${entry} · SL${confirmed?"":" (planned)"}: ${stop}`,
       targets.length?targets.map((t,i)=>`TP${i+1} ${price(t.price)}${t.movePercent===null?"":` (${t.movePercent>=0?"+":""}${t.movePercent.toFixed(2)}%)`}`).join(" → "):zh?"尚无有依据的 TP":"TP: a supported target is not available",
+      ...(report.strategy?.targetPolicy==="active-zones-v1"&&targets.length>0&&targets.length<3?[zh?`TP${targets.length+1}${targets.length===1?" / TP3":""}：本快照无更多有依据的目标`:`TP${targets.length+1}${targets.length===1?" / TP3":""}: no further supported target in this snapshot`]:[]),
       ...targets.map((t,i)=>`TP${i+1} ${zh?"依据":"basis"}: ${t.source}`),
       `${zh?"触发条件":"Trigger"}: ${condition}`,
       `${zh?"TP1 收益风险比":"R:R to TP1"}: ${p.grossRewardRisk?.toFixed(2)??"—"}${riskPercent===null?"":` · ${zh?"到止损距离":"Entry–SL"}: ${riskPercent.toFixed(2)}%`}. ${confirmed?zh?"复核当前报价和费用，尚非成交。":"Review a fresh quote and costs; no fill implied.":zh?"仅为计划，尚非当前入场信号。":"Planned prices; entry signal is not confirmed."}`,
       ...(contextBlocked?[zh?"高周期背景缺失或与方向相反，入场尚未确认。":"Higher-timeframe evidence is unavailable or opposes this entry."]:[])];
     return {key:`${route.pathId}-${route.side}`,pathId:route.pathId,side:route.side,direction,state,confirmed,selected:p.pathId===selected.pathId&&p.side===selected.side,entry,stop,targets,condition,riskPercent,rr:p.grossRewardRisk,plan:p,lines};
   });
+}
+
+/** Every visible report has one setup. Archived maps retain their stored
+ * candidates, but their saved selected entry is the only published setup. */
+export function globalTradeCards(report:GlobalReport){
+  const p=globalTradePlan(report),selection=report.setupSelection,pathId=selection?.pathId??p.pathId,side=selection?.side??p.side;
+  return pathId&&side!=="none"?globalTradeCandidateCards(report,{pathId,side}).slice(0,1):[];
 }
 
 export function globalTradeCardLines(report:GlobalReport){return globalTradeCards(report).flatMap(c=>[...c.lines]);}

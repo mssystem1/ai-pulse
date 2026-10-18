@@ -27,3 +27,4 @@ export * from "./globalViewport.js";
 export * from "./globalStrategy.js";
 export * from "./globalTradeDisplay.js";
 export { GlobalAssessmentSchema, type GlobalAssessment } from "@pulse/schemas";
+export * from "./globalSetupSelection.js";

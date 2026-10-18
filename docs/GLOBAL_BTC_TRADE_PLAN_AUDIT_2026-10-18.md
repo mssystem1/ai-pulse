@@ -1,5 +1,9 @@
 # BTC Pro report audit and corrections — 18 October 2026
 
+**Single-setup correction:** the [current strategy audit](GLOBAL_SINGLE_SETUP_STRATEGY_2026-10-18.md) supersedes the dual LONG/SHORT presentation below. Each timeframe now publishes one LONG, SHORT or SIDEWAYS assessment and one supported setup with its conditional chart projection.
+
+**Later correction:** the nearest-historical-pivot target policy described here missed consumed support/resistance. The [target and recovery incident audit](GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md) supersedes that policy and records corrected daily targets, free saved-report review and the processing delay. Historical snapshot reproductions below retain their original identity.
+
 The uploaded 17 October reports had substantive planning and presentation defects. Passing software checks did not make the previous design usable. This revision replaces the objective/checkpoint presentation with LONG / BUY and SHORT / SELL plans containing Entry, SL and TP1–TP3. It preserves the requested strategy horizons and the evidence behind archived reports.
 
 ## Evidence

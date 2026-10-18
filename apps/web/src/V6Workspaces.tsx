@@ -7679,7 +7679,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   and scenario depth.
                 </li>
                 <li data-no-localize>
-                  {lang === "zh" ? "分别阅读 LONG / BUY 与 SHORT / SELL 的 Entry、SL、TP1–TP3、触发条件和收益风险比。只有入场信号确认且满足收益要求后，再复核现货交易。卖出仅限已持有现货；钱包批准交易，Autopilot 按独立信号规则启动。" : "Read each LONG / BUY and SHORT / SELL plan's Entry, SL, TP1–TP3, trigger and reward. Confirm the entry signal and reward requirements before reviewing a Spot order. SELL uses owned inventory. Your wallet approves transactions; Autopilot starts separately with its own signal policy."}
+                  {lang === "zh" ? "每个周期只有 LONG、SHORT 或 SIDEWAYS 一个判断，并显示一个有依据的计划。横盘只选择一个区间边界反应。阅读 Entry、SL、可用 TP 及条件走势；确认信号并满足收益要求后，再复核交易。现货卖出仅减持已有资产；Autopilot 独立启动。" : "Each timeframe gives one LONG, SHORT or SIDEWAYS assessment and one supported setup. A sideways market selects one range-edge reaction. Read Entry, SL, available TPs and the conditional chart projection. Confirm the signal and reward before reviewing a Spot order. SELL reduces owned inventory; Autopilot starts independently."}
                 </li>
               </ol>
               <div className="docs-callout">
@@ -7694,7 +7694,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <div className="docs-callout">
                 <b>How to read a setup</b>
                 <span data-no-localize>
-                  {lang === "zh" ? "Entry 是计划或已观察入场区间；SL 保护入场结构，与主周期观点变化位不同。TP1 是最近相关支撑阻力，后续为 TP2、TP3。若到 TP1 的收益不足，仅新增确认不能满足入场条件。SHORT 研究不建立杠杆仓位。" : "Entry is a planned or observed zone. SL protects the entry structure and is separate from a broader change of view. TP1 is the nearest relevant support/resistance zone; later levels are TP2 and TP3. If reward to TP1 is insufficient, another confirming candle alone does not qualify entry. SHORT research does not open leverage."}
+                  {lang === "zh" ? "先按结构、均线趋势和 RSI 动能选择策略，再判断入场。Entry 是计划或已观察区间；SL 保护入场结构。TP 只使用仍有效的确认支撑阻力，缺少后续目标时不编造。虚线走势时间仅为示意。旧快照可免费复核为单一计划与有效目标；SHORT 研究不建立杠杆仓位。" : "Structure, moving-average trend and RSI momentum select the strategy before entry qualification. Entry is planned or observed; SL protects entry structure. TPs use active confirmed support/resistance, with fewer targets when evidence ends. The dashed projected move has schematic timing. Older snapshots offer a free setup and target review. SHORT research does not open leverage."}
                 </span>
               </div>
               <div className="docs-callout">

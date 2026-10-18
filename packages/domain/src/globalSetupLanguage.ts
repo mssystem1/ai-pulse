@@ -14,12 +14,11 @@ export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalRepo
   const planningValid=p.side!=="none"&&!p.blockers.some(b=>["reward","history","levels"].includes(b));
   const primary=report.hierarchy?.find(r=>r.timeframe===report.snapshot.timeframe);
   if(report.decisionVersion==="decision-v5"){
-    const cards=globalTradeCards(report),mainCard=cards.find(c=>c.selected)??cards.find(c=>c.pathId===path?.id)??cards[0];
-    const bothSides=new Set(cards.map(c=>c.side)).size===2;
-    const direction=qualified?(p.side==="short"?"SHORT":"LONG"):report.range?"RANGE":bothSides||primary?.bias==="mixed"?"LONG / SHORT":p.side==="short"?"SHORT":p.side==="long"?"LONG":"LONG / SHORT";
-    const heading=`${report.strategy?.name.toUpperCase()??""} · ${direction}${direction==="RANGE"?` · ${zh?"区间边缘计划":"Range-edge plans"}`:direction==="LONG / SHORT"?` · ${zh?"分别确认入场":"Separate entry conditions"}`:` · ${qualified?zh?"信号已确认":"Entry signal confirmed":mainCard?.state??(zh?"需要新的入场结构":"Entry structure needed")}`}`;
-    const rewardBlocked=cards.length>0&&cards.every(c=>c.plan.blockers.includes("reward"));
-    const entryInstruction=qualified?zh?"信号已确认；按 Entry / SL / TP1 复核新报价及费用，尚未成交。":"Entry signal confirmed. Review Entry, SL, TP1 and a fresh quote before an order; no fill implied.":rewardBlocked?zh?"多空计划至 TP1 的收益均不足；需要新的有依据入场结构，仅新增确认不能满足入场条件。下方保留计划 Entry、SL 和 TP。":"Both LONG and SHORT plans need better reward to TP1. A new supported entry structure is required; confirmation alone does not qualify entry. Planned Entry, SL and TPs are below.":direction==="LONG / SHORT"||direction==="RANGE"?zh?"下方分别列出多空计划的 Entry、SL、TP 与触发条件；仅在实际入场确认后执行。":"The LONG and SHORT plans below list Entry, SL, TP and their triggers. Enter only after the stated signal is confirmed.":`${mainCard?.direction??direction} · ${mainCard?.condition??(zh?"需要新测试。":"A new test is needed.")}.`;
+    const cards=globalTradeCards(report),card=cards[0],selection=report.setupSelection;
+    const direction=selection?.assessment==="sideways"?"SIDEWAYS":selection?.assessment==="long"?"LONG":selection?.assessment==="short"?"SHORT":p.side==="long"?"LONG":p.side==="short"?"SHORT":"SIDEWAYS";
+    const label=qualified?(zh?"入场信号已确认":"Entry signal confirmed"):card?.state??(zh?"暂无有效入场":"No validated entry");
+    const heading=`${report.strategy?.name.toUpperCase()??""} · ${direction} · ${label}`;
+    const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到 TP1 的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry."):card?`${card.direction} · ${card.condition}.`:(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
     return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
   }
   const mixed=Boolean(report.decisionVersion)&&primary?.bias==="mixed"&&!qualified;

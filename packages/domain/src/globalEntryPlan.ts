@@ -70,7 +70,11 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   const stopFor=(test:GlobalCandle|undefined,at:number)=>{
     const recent=recentAnchorBefore(at)?.price;
     const fallback=horizon&&!current?boundary.price:recent===undefined&&!test?boundary.price:undefined;
-    const structural=side==="long"?Math.min(zone[0],test?.low??zone[0],recent??zone[0],fallback??zone[0]):Math.max(zone[1],test?.high??zone[1],recent??zone[1],fallback??zone[1]);
+    // Until a range entry is confirmed, protect the full known support or
+    // resistance zone. A minor lower-frame pivot inside it is not a defensible
+    // planned range stop and must not manufacture a spectacular R multiple.
+    const rangeBoundary=current&&report.strategy?.targetPolicy==="active-zones-v1"&&path.direction==="range"&&!signal?(side==="long"?report.range?.lower[0]:report.range?.upper[1]):undefined;
+    const structural=side==="long"?Math.min(zone[0],test?.low??zone[0],recent??zone[0],fallback??zone[0],rangeBoundary??zone[0]):Math.max(zone[1],test?.high??zone[1],recent??zone[1],fallback??zone[1],rangeBoundary??zone[1]);
     const raw=structural-sign*protectionAllowance(at);
     return Number(((side==="long"?Math.floor(raw/tick):Math.ceil(raw/tick))*tick).toPrecision(12));
   };
@@ -126,6 +130,6 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   const objectiveRewardRisk=horizon?globalEntryGeometry(side,entry,stop,targets[0].price,tick).rr:geometry.rr;
   if(last.close<entry[0]||last.close>entry[1])blockers.push("entry_price");
   const closed=candleCloseTime(last.ts,study.timeframe),expires=closed===null?null:candleCloseTime(closed,study.timeframe);
-  const stopBasis=horizon&&!current?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
+  const stopBasis=current&&report.strategy?.targetPolicy==="active-zones-v1"&&path.direction==="range"&&!signal?`${report.snapshot.timeframe} full range boundary + ${study.timeframe} ATR allowance`:horizon&&!current?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
   return {...empty,...(horizon?{strategyId:report.strategy?.id,checkpointIds:route?.checkpointIds??[],firstObstacleRewardRisk:firstGeometry.rr,structureConfirmationTs}:{}),side,pathId:path.id,state:blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:entry,referenceStop:stop,grossRewardRisk:objectiveRewardRisk,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers,zone,stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
 }

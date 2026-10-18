@@ -59,12 +59,12 @@ for(const r of reports)test(`${r.snapshot.timeframe}: enabled channel pairs fit 
   }
   assert.ok(!/NaN|Infinity|WAIT|EXPIRED|INVALIDATED|NO TRADE/.test(svg));
 });
-test("weekly: daily entry rules, newer entry close, downward C leg and macro Fib dates are explicit",()=>{
+test("weekly: daily entry rules, newer entry close, post-C recovery and macro Fib dates are explicit",()=>{
   const r=reports.find(r=>r.snapshot.timeframe==="1Wutc")!,d=globalDecision(r),buy=d.scenarios.find(s=>s.plan.side==="long")!;
   assert.equal(d.structureTimeframe,"1Wutc");assert.equal(d.entryTimeframe,"1Dutc");assert.match(buy.condition,/1D \(UTC\) close above 82,842/);
   assert.ok(globalPathLines(r,r.paths.find(p=>p.id===buy.plan.pathId)!).some(s=>s.includes(buy.condition)));
   assert.match(globalNextSetupLines(r).join("\n"),/81,617.50/);
-  assert.match(globalWaveExplanationLines(r).join("\n"),/Prior impulse: up; current candidate C\? leg: down/);
+  assert.match(globalWaveExplanationLines(r).join("\n"),/current hypothesis is post-C recovery/);
   assert.match(globalFibonacciDescription(r).join("\n"),/2023-08-14.*2025-08-11/);
   assert.ok(!/\b\d+[DWM]utc\b/.test(globalTradePlanLines(r).join("\n")));
   for(const p of globalPlanCandidates(r).filter(p=>p.family==="breakout_retest"&&p.side!=="none")){

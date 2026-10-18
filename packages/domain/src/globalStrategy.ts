@@ -18,6 +18,10 @@ export function globalStrategyName(report:GlobalReport){return report.strategy?.
 export function globalStrategyLines(report:GlobalReport):string[]{
   const s=report.strategy;if(!s)return [];
   const zh=report.lang==="zh",price=(id:string)=>report.levels.find(l=>l.id===id)?.price.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision})??"—";
+  if(report.setupSelection){
+    const selected=report.setupSelection,names={trend_continuation:zh?"趋势延续":"Trend continuation",structural_reversal:zh?"结构恢复 / 反转":"Structural recovery / reversal",range_reaction:zh?"区间边界反应":"Range-edge reaction",none:zh?"尚无有效入场":"No validated entry"};
+    return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,`${zh?"所选策略":"Selected strategy"}: ${selected.rule==="structure_break"?(zh?"确认结构突破":"Confirmed structure break"):names[selected.rule]}`,...selected.evidence,...selected.limitations,zh?`${globalFrameReference(s.entryTimeframe)} 确认入场并确定交易 SL。`:`${globalFrameReference(s.entryTimeframe)} confirms entry and establishes the trade SL.`];
+  }
   if(s.version==="horizon-v2")return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,zh?`主图分析方向；${globalFrameReference(s.entryTimeframe)} 确认入场并确定实际止损。`:`${globalFrameReference(report.snapshot.timeframe)} frames the market; ${globalFrameReference(s.entryTimeframe)} confirms entry and establishes the trade SL.`];
   return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,
     zh?`主图周期决定结构、保护与目标；${globalFrameReference(s.entryTimeframe)} 仅用于入场时机。`:`${globalFrameReference(report.snapshot.timeframe)} determines structure, protection and objectives; ${globalFrameReference(s.entryTimeframe)} refines entry timing.`,

@@ -1,6 +1,7 @@
 import type {GlobalReport} from "@pulse/schemas";
 import {globalPlanCandidates} from "./globalTradePlan.js";
 import {globalContextRelation,globalFrameReference} from "./globalContext.js";
+import {globalTradePlan} from "./globalTradePlan.js";
 
 export function globalEntryCondition(report:GlobalReport,p:NonNullable<GlobalReport["tradePlan"]>){
   const zh=report.lang==="zh",frame=globalFrameReference(p.entryTimeframe??report.snapshot.timeframe),value=report.levels.find(l=>l.id===p.triggerLevelId)?.price;
@@ -22,7 +23,8 @@ export function globalEntryCondition(report:GlobalReport,p:NonNullable<GlobalRep
  * Kept inspectable even when neither direction supplies an entry. */
 export function globalScenarioEvidence(report:GlobalReport){
   const zh=report.lang==="zh";
-  return globalPlanCandidates(report).filter(p=>p.side!=="none").map(p=>{
+  const selected=globalTradePlan(report);
+  return globalPlanCandidates(report).filter(p=>p.side!=="none"&&(report.decisionVersion!=="decision-v5"||p.pathId===selected.pathId&&p.side===selected.side)).map(p=>{
     const side=p.side==="long"?"BUY / LONG":"SELL / SHORT";
     const family=p.family?.startsWith("range_")?zh?"区间边缘":"range edge":report.range?zh?"区间内部价位":"internal range level":zh?"摆动价位":"swing level";
     const condition=globalEntryCondition(report,p);

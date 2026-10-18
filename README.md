@@ -115,9 +115,11 @@ Spot navigation separates **Trade setup** and **Dashboard**. Autopilot provides 
 
 ### Global Market
 
-Choose a live OKX instrument and timeframe. PULSE fetches public ticker/OHLCV data, calculates structure from completed candles, renders the chart locally and sends bounded structured evidence to Grok. Quick provides focused candles, SMA55, volume and the main/alternative plans. Pro adds SMA21/55/89/144/233, qualifying broad/local parallel channels, regression, Fibonacci retracements, RSI14, ATR14 and independently observed higher-timeframe context. Available channels, trend studies and Fibonacci are visible by default and can be toggled individually. An incomplete Elliott count does not prevent support/resistance planning; wave labels remain hypotheses.
+Choose a live OKX instrument and timeframe. PULSE fetches public ticker/OHLCV data, calculates structure from completed candles, renders the chart locally and sends bounded structured evidence to Grok. Quick provides focused candles, SMA55, volume and one selected setup. Pro adds SMA21/55/89/144/233, qualifying broad/local parallel channels, regression, Fibonacci retracements, RSI14, ATR14 and independently observed higher-timeframe context. Available channels, trend studies and Fibonacci are visible by default and can be toggled individually. An incomplete Elliott count does not prevent support/resistance planning; wave labels remain hypotheses.
 
-Reports show separate **LONG / BUY** and **SHORT / SELL** plans with **Entry, SL and TP1–TP3**, their exact candle triggers and reward to TP1. Planned prices remain visible before confirmation. When neither side is confirmed, a two-sided heading keeps the market trend separate from an entry signal. SL protects the trade's entry-frame structure; it is distinct from a broader main-frame change of view. TP1 is the nearest relevant confirmed support/resistance zone. PULSE requires at least 1.50R before costs; another confirming candle cannot repair insufficient reward. A historical high is not automatically a projected TP, and the chart does not invent a future price path.
+Every timeframe publishes one assessment: **LONG**, **SHORT** or **SIDEWAYS**, with one supported setup and its **Entry, SL and available TP1–TP3**. SIDEWAYS means a bounded range with one floor-bounce or ceiling-rejection setup. Strategy selection uses completed price structure, SMA trend and RSI momentum before entry qualification. A completed structure break can invalidate a stale opposite pivot sequence; reward/risk cannot select the opposite direction. Missing evidence is explained without fabricated prices. A historical Elliott ABC is a candidate pattern; reclaiming B after C is described as a recovery hypothesis rather than a perpetual C-leg forecast.
+
+The chart combines the selected setup with a dashed conditional move through saved entry and supported targets. Horizontal spacing is schematic, not an arrival forecast. The same setup feeds Web, TXT, PNG and Telegram presentation. SL protects entry-frame structure. TP1 is the nearest active confirmed resistance zone for LONG or support zone for SHORT. Later completed closes through a pivot consume its old role; nearby active zones use their nearest price edge, and unsupported later targets are omitted. A real nearby barrier cannot be skipped to inflate reward. PULSE requires at least 1.50R before costs and a fresh entry reaction; a low reward plan remains unqualified. These are PULSE research settings, not TradingView mandates or profitability claims. Older v5 purchases offer a free setup and target review using the same saved candles, with no new payment or AI call. See the [strategy rules and source audit](docs/GLOBAL_SINGLE_SETUP_STRATEGY_2026-10-18.md) and [target/recovery incident](docs/GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md).
 
 | Main chart | Profile | Entry study |
 | --- | --- | --- |
@@ -456,7 +458,7 @@ flowchart LR
   NORMALIZE --> MODEL[xAI structured analysis]
   TECH --> MODEL
   MODEL --> VALIDATE[Strict versioned schema validation]
-  VALIDATE --> PLAN[Quick or Pro conditional LONG and SHORT plans]
+  VALIDATE --> PLAN[Quick or Pro: one strategy and setup]
   PLAN --> MAP[Selected-chain identity mapping]
   MAP --> TOKEN[Exact token contract and settlement asset]
   TOKEN --> ROUTE[Fresh OKX Onchain OS route]
@@ -479,7 +481,7 @@ Key rules:
 
 - Provider payloads are normalized and bounded before model input; Grok receives structured evidence, not screenshots, wallet secrets, or arbitrary raw pages.
 - Pivot, Fibonacci, alternating swing points, Elliott candidate/invalidation, and chart paths are calculated deterministically. The report explanation must remain consistent with those values.
-- Global reports keep LONG and SHORT plans visible with Entry, SL, ordered TP levels and exact confirmation conditions. An unconfirmed or reward-limited plan is not an entry signal. Spot SELL reduces owned inventory; analytical SHORT does not authorize leverage.
+- Global reports publish one LONG, SHORT or SIDEWAYS assessment and one supported setup with Entry, SL, ordered TP levels, exact confirmation conditions and a conditional chart projection. An unconfirmed or reward-limited plan is not an entry signal. Spot SELL reduces owned inventory; analytical SHORT does not authorize leverage.
 - DeFi discovery first resolves the selected chain representation—for example `BTC → cbBTC` on Base or `BTC → WBTC` on Arbitrum—then accepts only products containing that exact contract.
 - Prediction Market uses one explicitly selected condition/outcome mapping. It never silently substitutes a trending market. Pro may add an independently sourced 4H underlying-asset chart, clearly separated from the prediction probability evidence.
 - The Opportunity Radar is a free technical shortlist. Its score selects what to investigate; it is not transaction authorization.
@@ -534,6 +536,10 @@ sequenceDiagram
 ```
 
 The payment authorization is bound to network, asset, amount, payee, resource URL, and request hash. Replaying one authorization resolves to one idempotent job. A settled job whose deliverable failed can be retried within policy without a second payment. A five-minute wallet challenge creates a separate 15-minute report-history session for cross-device retrieval and receipt-bound recovery; that signature cannot create a payment or trade.
+
+Global report progress follows persisted stages: market data, structure, AI analysis, asset-context checks, verification, saving and opening. The animated step list shows elapsed time and the last successful status check, respects reduced motion, and does not invent completion percentages. Pending wallet-history rows refresh automatically. Report fetches have deadlines, and failed or superseded downloads retain recovery access. Workers renew 60-second leases every 10 seconds; graceful shutdown aborts and releases their own work immediately. A replacement after a hard crash still depends on the lease, queue schedule and available capacity. Publication checks lease ownership atomically so an old worker cannot replace a completed report.
+
+Older Global v5 snapshots offer **Review saved targets · free**. This creates a separately referenced technical correction from the same saved candles, without payment, model calls or rewriting the original. Rechecks use the corrected target policy too. The [October 18 target and processing incident audit](docs/GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md) explains the stale-pivot defect, the five-minute abandoned lease, and the validation. Offline review: `node scripts/review-global-targets.mjs <saved-delivery.json> <output-directory>`.
 
 ### Manual Spot and automatic protection
 

@@ -4,7 +4,7 @@ import { put as putBlob } from "@vercel/blob";
 
 export const JOB_STAGES = [
   "payment_authorized", "payment_verified", "payment_settled", "fetching_context",
-  "calculating_features", "generating_analysis", "validating_report", "completed",
+  "calculating_features", "generating_analysis", "enriching_report", "validating_report", "saving_report", "completed",
   "completed_partial", "failed_retriable", "failed_terminal", "manual_reconciliation",
 ] as const;
 
@@ -86,10 +86,10 @@ export interface JobStore {
   acquire(input: JobCreateInput): Promise<{ job: AnalysisJob; created: boolean; recoveryToken?: string }>;
   get(jobId: string): Promise<AnalysisJob | null>;
   listByPayer(payer: string, networkKey: AnalysisJob["networkKey"], limit?: number): Promise<AnalysisJob[]>;
-  transition(jobId: string, stage: JobStage, detail?: string): Promise<AnalysisJob>;
+  transition(jobId: string, stage: JobStage, detail?: string, workerId?: string): Promise<AnalysisJob>;
   bindReceipt(jobId: string, receipt: PaymentReceipt): Promise<AnalysisJob>;
   bindReceiptAndEnqueue(jobId: string, receipt: PaymentReceipt): Promise<AnalysisJob>;
-  attachReport(jobId: string, reportId: string, partial?: boolean): Promise<AnalysisJob>;
+  attachReport(jobId: string, reportId: string, partial?: boolean, workerId?: string): Promise<AnalysisJob>;
   grantRegeneration(jobId: string): Promise<AnalysisJob>;
   enqueue(jobId: string): Promise<void>;
   claim(workerId: string, leaseSeconds: number): Promise<AnalysisJob | null>;
@@ -110,12 +110,16 @@ export async function runReceiptBoundOperation<T>(
   jobId: string,
   maxRegenerationAttempts: number,
   operation: () => Promise<T>,
+  signal?: AbortSignal,
 ): Promise<T> {
   let lastError: unknown;
   for (let attempt = 0; attempt <= maxRegenerationAttempts; attempt += 1) {
     try {
+      signal?.throwIfAborted();
       return await operation();
     } catch (error) {
+      signal?.throwIfAborted();
+      if (error instanceof Error && error.message === "Report worker lease lost") throw error;
       lastError = error;
       if (attempt >= maxRegenerationAttempts) break;
       await store.transition(jobId, "failed_retriable", error instanceof Error ? error.message : String(error));
@@ -242,9 +246,11 @@ export class MemoryJobStore implements JobStore {
       .sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)).slice(0, limit);
   }
 
-  async transition(jobId: string, stage: JobStage, detail?: string) {
+  async transition(jobId: string, stage: JobStage, detail?: string, workerId?: string) {
     const current = this.jobs.get(jobId);
     if (!current) throw new Error("Job not found");
+    if (current.reportId) return current;
+    if (workerId && (this.leased.get(jobId)?.workerId !== workerId || this.leased.get(jobId)!.expiresAt <= Date.now())) throw new Error("Report worker lease lost");
     const at = nowIso();
     const failureStage = stage === "failed_retriable" || stage === "failed_terminal" || stage === "manual_reconciliation";
     const receipt = current.receipt && failureStage
@@ -258,9 +264,11 @@ export class MemoryJobStore implements JobStore {
     return next;
   }
 
-  async attachReport(jobId: string, reportId: string, partial = false) {
+  async attachReport(jobId: string, reportId: string, partial = false, workerId?: string) {
     const current = this.jobs.get(jobId);
     if (!current) throw new Error("Job not found");
+    if (current.reportId) return current;
+    if (workerId && (this.leased.get(jobId)?.workerId !== workerId || this.leased.get(jobId)!.expiresAt <= Date.now())) throw new Error("Report worker lease lost");
     const completedAt = nowIso();
     const stage = partial ? "completed_partial" as const : "completed" as const;
     const receipt = current.receipt ? Object.freeze({ ...current.receipt, reportId, completedAt }) : null;
@@ -319,7 +327,7 @@ export class MemoryJobStore implements JobStore {
 
   async extendLease(jobId: string, workerId: string, leaseSeconds: number) {
     const lease = this.leased.get(jobId);
-    if (!lease || lease.workerId !== workerId) return false;
+    if (!lease || lease.workerId !== workerId || lease.expiresAt <= Date.now()) return false;
     this.leased.set(jobId, { workerId, expiresAt: Date.now() + leaseSeconds * 1000 });
     return true;
   }
@@ -410,26 +418,22 @@ export class RedisJobStore implements JobStore {
     return job;
   }
 
-  async transition(jobId: string, stage: JobStage, detail?: string) {
-    const current = await this.get(jobId);
-    if (!current) throw new Error("Job not found");
+  async transition(jobId: string, stage: JobStage, detail?: string, workerId?: string) {
     const at = nowIso();
-    const failureStage = stage === "failed_retriable" || stage === "failed_terminal" || stage === "manual_reconciliation";
-    const receipt = current.receipt && failureStage
-      ? Object.freeze({ ...current.receipt, failureState: Object.freeze({ stage, ...(detail ? { detail } : {}), at }) })
-      : current.receipt;
-    return this.save(Object.freeze({
-      ...current, stage, receipt, updatedAt: at,
-      events: Object.freeze([...current.events, Object.freeze({ stage, at, ...(detail ? { detail } : {}) })]),
-    }));
+    const encoded = await this.redis.eval<string[], string | AnalysisJob>(
+      "local raw=redis.call('GET',KEYS[1]); if not raw then return redis.error_reply('Job not found') end; local j=cjson.decode(raw); if j.reportId and j.reportId~=cjson.null then return raw end; if ARGV[3]~='' and redis.call('GET',KEYS[2])~=ARGV[3] then return redis.error_reply('Report worker lease lost') end; local e=cjson.decode(ARGV[1]); j.stage=e.stage; j.updatedAt=e.at; if (e.stage=='failed_retriable' or e.stage=='failed_terminal' or e.stage=='manual_reconciliation') and j.receipt and j.receipt~=cjson.null then j.receipt.failureState=e end; table.insert(j.events,e); local out=cjson.encode(j); redis.call('SET',KEYS[1],out,'EX',ARGV[2]); return out",
+      [this.jobKey(jobId), this.leaseOwnerKey(jobId)],
+      [JSON.stringify({stage,at,...(detail?{detail}:{})}), String(this.retentionSeconds), workerId || ""],
+    );
+    return decodedJob(encoded);
   }
 
-  async attachReport(jobId: string, reportId: string, partial = false) {
+  async attachReport(jobId: string, reportId: string, partial = false, workerId?: string) {
     const completedAt = nowIso();
     const stage = partial ? "completed_partial" : "completed";
-    const encoded = await this.redis.eval<[string, string, string, string], string | AnalysisJob>(
-      "local raw=redis.call('GET',KEYS[1]); if not raw then return redis.error_reply('Job not found') end; local j=cjson.decode(raw); j.reportId=ARGV[1]; j.stage=ARGV[2]; j.updatedAt=ARGV[3]; if j.receipt and j.receipt~=cjson.null then j.receipt.reportId=ARGV[1]; j.receipt.completedAt=ARGV[3] end; table.insert(j.events,{stage=ARGV[2],at=ARGV[3]}); local out=cjson.encode(j); redis.call('SET',KEYS[1],out,'EX',ARGV[4]); return out",
-      [this.jobKey(jobId)], [reportId, stage, completedAt, String(this.retentionSeconds)],
+    const encoded = await this.redis.eval<string[], string | AnalysisJob>(
+      "local raw=redis.call('GET',KEYS[1]); if not raw then return redis.error_reply('Job not found') end; local j=cjson.decode(raw); if j.reportId and j.reportId~=cjson.null then return raw end; if ARGV[5]~='' and redis.call('GET',KEYS[2])~=ARGV[5] then return redis.error_reply('Report worker lease lost') end; j.reportId=ARGV[1]; j.stage=ARGV[2]; j.updatedAt=ARGV[3]; if j.receipt and j.receipt~=cjson.null then j.receipt.reportId=ARGV[1]; j.receipt.completedAt=ARGV[3] end; table.insert(j.events,{stage=ARGV[2],at=ARGV[3]}); local out=cjson.encode(j); redis.call('SET',KEYS[1],out,'EX',ARGV[4]); return out",
+      [this.jobKey(jobId), this.leaseOwnerKey(jobId)], [reportId, stage, completedAt, String(this.retentionSeconds), workerId || ""],
     );
     return decodedJob(encoded);
   }

@@ -67,3 +67,38 @@ test("temporary persistence loss does not stop the worker from recovering", asyn
   assert.equal(executions, 1);
   assert.equal((await store.get(acquired.job.id))?.stage, "completed");
 });
+
+test("shutdown aborts generation and releases its receipt-bound job immediately", async () => {
+  const store=new MemoryJobStore(),{job}=await store.acquire(input("shutdown"));await store.enqueue(job.id);
+  let signal:AbortSignal|undefined;
+  const worker=new DurableJobWorker(store,1,async (_job,activeSignal)=>{signal=activeSignal;await new Promise<void>((_,reject)=>activeSignal.addEventListener("abort",()=>reject(activeSignal.reason),{once:true}));});
+  await worker.start();await worker.stop();
+  assert.equal(signal?.aborted,true);
+  const replacement=await store.claim("replacement",60);assert.equal(replacement?.id,job.id);
+  assert.equal(replacement?.regenerationAttempts,0);
+  await worker.notify();assert.equal((await store.queueStats()).leased,1);
+});
+
+test("a worker that lost its lease cannot publish over its replacement", async () => {
+  const store=new MemoryJobStore(),{job}=await store.acquire(input("fenced"));await store.enqueue(job.id);
+  await store.claim("old",0);await store.recoverExpired();await store.claim("replacement",60);
+  await assert.rejects(store.attachReport(job.id,"stale-report",false,"old"),/lease lost/);
+  await assert.rejects(store.transition(job.id,"generating_analysis",undefined,"old"),/lease lost/);
+  await store.attachReport(job.id,"correct-report",false,"replacement");
+  assert.equal((await store.attachReport(job.id,"stale-report",false,"old")).reportId,"correct-report");
+  assert.equal((await store.transition(job.id,"failed_terminal")).stage,"completed");
+});
+
+test("a lost heartbeat aborts in-flight work without releasing another owner's lease", async () => {
+  const store=new MemoryJobStore(),{job}=await store.acquire(input("lost-heartbeat"));await store.enqueue(job.id);
+  store.extendLease=async()=>false;
+  let aborted!:()=>void,observedAbort=false;const didAbort=new Promise<void>(resolve=>{aborted=resolve;});
+  const worker=new DurableJobWorker(store,1,async (_job,signal)=>{
+    await new Promise<void>((_,reject)=>signal.addEventListener("abort",()=>{observedAbort=true;aborted();reject(signal.reason);},{once:true}));
+  },1.5);
+  await worker.start();
+  // Keep the test alive; the production heartbeat deliberately uses unref().
+  const timeout=setTimeout(()=>aborted(),2000);
+  await didAbort;clearTimeout(timeout);assert.equal(observedAbort,true);await worker.stop();
+  assert.equal((await store.get(job.id))?.stage,"payment_authorized");
+});

@@ -44,7 +44,7 @@ export async function runGrokAnalysis(cfg: GrokConfig, req: AnalysisRequest): Pr
   return runPreparedSpotAnalysis(cfg, { ...req,contextMarket:set.contextMarket,hierarchyMarkets:set.hierarchyMarkets },set.market);
 }
 /** Every presentation consumes this saved result; reopening never calls xAI. */
-export async function runPreparedSpotAnalysis(cfg: GrokConfig, req: AnalysisRequest, market: SpotMarketContext): Promise<AnalysisResult> {
+export async function runPreparedSpotAnalysis(cfg: GrokConfig, req: AnalysisRequest, market: SpotMarketContext, onPrepared?:()=>Promise<void>): Promise<AnalysisResult> {
   if (!cfg.apiKey) throw new Error("XAI_API_KEY not configured");
   const lang = req.lang ?? "en", timeframe = market.bar;
   const prepared = prepareGlobalReport({ market, tier: req.tier, lang, contextMarket: req.contextMarket,hierarchyMarkets:req.hierarchyMarkets });
@@ -53,6 +53,7 @@ export async function runPreparedSpotAnalysis(cfg: GrokConfig, req: AnalysisRequ
   const estimated = Math.ceil((sys.length + user.length) / 3);
   if (req.maxInputTokens && estimated > req.maxInputTokens) throw new Error(`Prepared AI context exceeds input budget (${estimated} > ${req.maxInputTokens} estimated tokens)`);
   const maxOutputTokens = spotOutputTokenLimit(req.tier, req.maxOutputTokens), reasoningEffort = req.reasoningEffort ?? (req.tier === "premium" ? "medium" : "low");
+  await onPrepared?.();
   const res = await (cfg.fetchImpl ?? fetch)(`${cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
     method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${cfg.apiKey}` }, signal: AbortSignal.timeout(90_000),
     body: JSON.stringify({ model: cfg.model, temperature: .2, reasoning_effort: reasoningEffort, max_tokens: maxOutputTokens,
