@@ -4,7 +4,7 @@ import {globalTradeCards,type GlobalReport} from "@pulse/domain";
 import { Resvg } from "@resvg/resvg-js";
 import { fileURLToPath } from "node:url";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
-import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine, globalRiskLines, globalSetupMap, globalArtifactTag, globalArtifactReference } from "@pulse/domain";
+import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine, globalRiskLines, globalSetupMap, globalArtifactTag } from "@pulse/domain";
 
 export { type ResearchContext } from "@pulse/domain";
 export const escapeTelegramHtml = (text: string) => text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
@@ -12,8 +12,9 @@ const clip = (value: string, max: number) => { if(value.length<=max)return value
 const boundedHtml = (value: string, max: number) => { let result="";for(const char of value){const safe=escapeTelegramHtml(char);if(result.length+safe.length>max-1)return result+"…";result+=safe;}return result; };
 function tradeCaption(report:GlobalReport){
   const cards=globalTradeCards(report),zh=report.lang==="zh";
-  const lines=[`PULSE · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)} · ${report.strategy?.name??""}`,`#${globalArtifactReference(report)} · ${report.snapshot.observedAt}`,
+  const lines=[`PULSE · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)} · ${report.strategy?.name??""}`,report.snapshot.observedAt,globalCompletedPriceLine(report),globalDecisionTitle(report),
     ...cards.flatMap(c=>[`${c.direction} · ${c.confirmed?zh?"已确认":"confirmed":zh?"计划":"planned"}`,`Entry ${c.entry} · SL ${c.stop}`,c.targets.map((t,i)=>`TP${i+1} ${globalPrice(report,t.price)}`).join(" → "),`${zh?"触发":"Trigger"}: ${c.condition}.`]),
+    ...(!cards.length?[globalDecision(report).entryInstruction]:[]),
     zh?"价格为保存的计划；确认后复核新报价。完整条件见 TXT。":"Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT."];
   const caption=lines.filter(Boolean).join("\n");if(caption.length>1024)throw Error("Global trade plans exceed Telegram caption budget");return caption;
 }
@@ -61,7 +62,7 @@ export function telegramResearchCaption(report: unknown, context: ResearchContex
   if(global.decisionVersion==="decision-v5")return tradeCaption(global);
   const d=globalDecision(global),p=globalTradePlan(global),zh=global.lang==="zh";
   const lines=[`PULSE · GLOBAL ${global.tier.toUpperCase()} · ${global.snapshot.instId} · ${globalFrameReference(global.snapshot.timeframe)}`,
-    `#${globalArtifactReference(global)} · ${global.snapshot.observedAt}`,globalCompletedPriceLine(global),globalDecisionTitle(global),...(d.direction==="BUY / SELL"?d.scenarios.map(s=>`${s.side}: ${s.condition}; ${s.reason}.`):[d.nextCondition]),
+    global.snapshot.observedAt,globalCompletedPriceLine(global),globalDecisionTitle(global),...(d.direction==="BUY / SELL"?d.scenarios.map(s=>`${s.side}: ${s.condition}; ${s.reason}.`):[d.nextCondition]),
     ...(d.planningValid&&d.direction!=="BUY / SELL"?[`${d.signalObserved?zh?"已观察入场":"Observed entry":zh?"观察区域":"Watch area"} (${globalFrameReference(d.entryTimeframe)}): ${p.referenceEntry?.map(n=>globalPrice(global,n)).join("–")} · ${d.signalObserved?"SL":"Provisional SL"} ${globalPrice(global,p.referenceStop)} · ${p.targetIds.map((id,i)=>`TP${i+1} ${globalLevelPrice(global,id)}`).join(" → ")}`]:[]),...(d.direction!=="BUY / SELL"?[d.rewardLine]:[]),d.contextLine,
     ...(globalCoverageLine(global)?[globalCoverageLine(global)!]:[]),zh?"保存的行情快照；执行前复核新报价。":"Saved snapshot; recheck a fresh quote before execution."];
   const caption=lines.filter(Boolean).join("\n");if(caption.length>1024)throw Error("Global decision exceeds Telegram caption budget");return caption;

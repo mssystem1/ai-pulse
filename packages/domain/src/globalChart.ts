@@ -2,7 +2,7 @@ import {globalTradeAnnotations} from "./globalTradeAnnotations.js";
 import { parseCandleTimeframe, type GlobalReport } from "@pulse/schemas";
 import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
-import { globalSetupMap, globalSetupWindow, globalRiskMeasurement, globalArtifactReference, globalEligibility } from "./globalPolicy.js";
+import { globalSetupMap, globalSetupWindow, globalRiskMeasurement, globalEligibility } from "./globalPolicy.js";
 import {globalDecision,globalDecisionTitle} from "./globalDecision.js";
 import {globalContextLine} from "./globalContext.js";
 import {globalChannelBounds,globalChannelLines} from "./globalChannels.js";
@@ -62,7 +62,7 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   const legend=parallels.length?`${report.lang==="zh"?"平行通道":"Parallel channel"}: ${parallels.map(c=>`${c.scope}${c.priceState&&c.priceState!=="inside"?` (price ${c.priceState})`:""}`).join(" / ")}${options.layers?.regression?" · cyan: regression 120 ±2σ":""}`:options.layers?.regression?"Regression channel · 120 bars · ±2σ; no qualifying parallel channel":"";
   if(legend)svg+=text(left+8,top+15,legend,"#a8b4c6",10);
   if (options.showScenarios !== false) svg += `<rect x="${historyEnd+1}" y="${top}" width="${Math.max(0,right-historyEnd)}" height="${bottom-top}" fill="#142034" fill-opacity=".36"/>`+line(historyEnd, top, historyEnd, bottom, "#536175", 1, "4 5")+text(historyEnd+15,top-9,report.decisionVersion==="decision-v5"?report.lang==="zh"?"交易计划 · Entry / SL / TP":"TRADE PLAN · ENTRY / SL / TP":report.lang==="zh"?"有条件走势 · 时间仅为示意":"CONDITIONAL MOVES · TIMING SCHEMATIC","#99abc4",9);
-  if (report.waveCount.status === "unclear") svg += text(left + 8, top + 19, globalLabel("unclear", report.lang), "#acb8cb", 12);
+  if (report.waveCount.status === "unclear") svg += text(left + 8, top + (legend?36:19), globalLabel("unclear", report.lang), "#acb8cb", 12);
   const origin = report.waveCount.anchors[0];
   for(const channel of report.indicators.channels??[]){
     if(channel.scope==="broad"?options.layers?.channel===false:!pro||options.layers?.localChannel===false)continue;
@@ -246,7 +246,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const y = (p: number) => top + (max - p) / (max - min) * (priceBottom - top), x = (ts: number) => left + (ts - start) / Math.max(1, end - start) * (historyEnd - left);
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" rx="16" fill="#0f1826"/><g font-family="Inter, Noto Sans SC, Arial, sans-serif">`;
-  svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)} · #${globalArtifactReference(report)}`, "#55dfb5", 20);
+  svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)}`, "#55dfb5", 20);
   svg += text(25, 54, `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.lang==="zh"?"获取":"Fetched"} ${report.snapshot.observedAt} · ${globalCompletedPriceLine(report)}`, "#a5b7cd", 10);
   svg += text(left, 77, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}${report.strategy?` · ${report.strategy.holding}`:""}`, "#b9c6d8", 12);
   svg += text(left,101,`${decision.marketView} · ${globalDecisionTitle(report)}`,"#cce8f2",14);
@@ -286,6 +286,6 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if(entryImage)svg+=`<g transform="translate(25 ${entryTop})">${entryImage}</g>`;
   svg += `<rect x="25" y="${footerTop}" width="1250" height="${footerHeight}" rx="10" fill="#181c24" stroke="#695335"/>`;
   wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?12:16));
-  svg += text(26, height - 14, report.targetReviewOf ? report.lang === "zh" ? `原快照 #${report.targetReviewOf} 的技术目标复核 · 相同 K 线 · 未调用新 AI · 研究用途` : `Technical target review of #${report.targetReviewOf} · same saved candles · no new AI · research only` : report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
+  svg += text(26, height - 14, report.targetReviewOf ? report.lang === "zh" ? "原快照技术复核 · 相同 K 线 · 未调用新 AI · 研究用途" : "Technical review of saved snapshot · same saved candles · no new AI · research only" : report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
   return svg + "</g></svg>";
 }

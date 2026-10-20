@@ -9,18 +9,24 @@ export function activeGlobalTargetZones(report:GlobalReport,side:"long"|"short",
   const sign=side==="long"?1:-1,tick=10**-report.snapshot.pricePrecision;
   const atr=report.indicators.atr.points.at(-1)?.value??0,width=Math.max(tick*2,atr*.2);
   const anchors=report.indicators.pivots.filter(a=>{
-    if(a.confirmedAt===null||a.ts<first||a.kind!==(side==="long"?"high":"low")||sign*(a.price-trigger)<=0)return false;
+    if(a.confirmedAt===null||a.kind!==(side==="long"?"high":"low")||sign*(a.price-trigger)<=0)return false;
     const knownAt=candleCloseTime(a.confirmedAt,report.snapshot.timeframe)??Infinity;
     if(knownAt>Date.parse(report.snapshot.observedAt))return false;
     return !report.candles.some(c=>c.ts>=knownAt&&sign*(c.close-a.price)>tick*.5);
   });
   const sorted=[...anchors].sort((a,b)=>sign*(a.price-b.price)),zones:GlobalAnchor[][]=[];
   for(const a of sorted){const zone=zones.at(-1);if(zone&&Math.abs(a.price-zone[0].price)<=width)zone.push(a);else zones.push([a]);}
-  return zones.flatMap(zone=>{
+  const mapped=zones.flatMap(zone=>{
     const knownAt=Math.max(...zone.map(a=>candleCloseTime(a.confirmedAt!,report.snapshot.timeframe)??Infinity));
     // A confirmed unconsumed swing remains a real barrier when also used as a
     // Fibonacci measurement endpoint. Do not skip it for a farther reward.
     // Derived Fibonacci prices without a confirmed swing never enter this list.
     return [{price:zone[0].price,anchors:zone,knownAt}];
   });
+  const local=mapped.filter(z=>z.anchors.some(a=>a.ts>=first));
+  // Old unconsumed barriers before the horizon's objectives cannot be skipped.
+  // With no local objective, retain the nearest older barrier as TP1 without
+  // filling TP2/TP3 with increasingly remote archive levels.
+  const far=local.slice(0,3).at(-1);
+  return far?mapped.filter(z=>sign*(far.price-z.price)>=0):mapped.slice(0,1);
 }

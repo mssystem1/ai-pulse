@@ -1,0 +1,36 @@
+{
+  "auditDate": "2026-10-20",
+  "tests": {
+    "command": "npm test",
+    "passed": 943,
+    "skipped": 1,
+    "failed": 0,
+    "skippedCase": "local Redis-compatible TCP/Lua: concurrent dedupe, exact volume and cold-reader persistence"
+  },
+  "build": {
+    "command": "npm run build",
+    "passed": true
+  },
+  "exports": {
+    "script": "scripts/audit-global-oct20-reports.mjs",
+    "cases": 16,
+    "passed": true
+  },
+  "browser": {
+    "script": "scripts/audit-global-oct20-browser.mjs",
+    "cases": 32,
+    "passed": true,
+    "runtimeErrors": 0,
+    "applicationMutations": 0,
+    "remoteRequestsBlocked": true
+  },
+  "guideImages": 9,
+  "modelCalls": 0,
+  "walletPayments": 0,
+  "telegramSends": 0,
+  "release": {
+    "requestedAction": "Local commit only; owner deploys manually",
+    "pushed": false,
+    "deployed": false
+  }
+}

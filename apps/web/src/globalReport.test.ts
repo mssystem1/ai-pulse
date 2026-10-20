@@ -15,6 +15,16 @@ import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
 import {globalWilderIndicators} from "../../../packages/analysis/src/globalReport.js";
 
+test("saved v2 reports offer the free correction while current v3 reports show the entry location",()=>{
+  const {report}=tradePlanFixture("4H");
+  assert.equal(report.setupSelection!.version,"single-setup-v3");
+  const current=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
+  assert.ok(!current.includes('class="global-target-review"'));assert.ok(current.includes("planned entry is"));
+  report.setupSelection!.version="single-setup-v2";
+  const old=renderToStaticMarkup(createElement(GlobalResearchReport,{report,assessmentAccess:{kind:"share",token:"test-review-capability"}}));
+  assert.ok(old.includes("Review setup and targets · free"));assert.ok(!old.includes("test-review-capability"));
+});
+
 for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])for(const side of ["long","short"] as const)test(`${frame} ${side}: current report and Mini App keep Entry, SL and TP visible when reward is insufficient`,()=>{
   const {report}=tradePlanFixture(frame,side,"reaction");const route=report.strategy!.routes[0];
   // Keep a genuine, unconsumed target beyond the current completed close.

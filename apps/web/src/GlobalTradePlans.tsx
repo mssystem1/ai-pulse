@@ -11,6 +11,7 @@ export function GlobalTradePlans({report,onSelect}:{report:GlobalReport;onSelect
       <header><strong>{c.direction}</strong><span>{c.state}</span></header>
       <dl><dt>Entry{c.confirmed?"":" (planned)"}</dt><dd>{c.entry}</dd><dt>SL{c.confirmed?"":" (planned)"}</dt><dd>{c.stop}</dd>{c.targets.map((t,i)=><div className="global-trade-target" key={t.id}><dt>TP{i+1}</dt><dd>{t.price.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision})}{t.movePercent!==null&&<> ({t.movePercent>=0?"+":""}{t.movePercent.toFixed(2)}%)</>}<small className="global-meta" style={{display:"block"}}>{t.source}</small></dd></div>)}</dl>
       <p><b>{zh?"触发条件":"Trigger"}:</b> {c.condition}</p>
+      {c.location&&<p>{c.location}</p>}
       <p>R:R → TP1: {c.rr?.toFixed(2)??"—"}{c.riskPercent===null?"":` · Entry–SL: ${c.riskPercent.toFixed(2)}%`}</p>
       <p className="global-meta">{zh?"主图":"Analysis"}: {globalFrameReference(report.snapshot.timeframe)} · {zh?"入场":"Entry"}: {globalFrameReference(report.entryStudy?.timeframe??report.snapshot.timeframe)}</p>
       <button onClick={()=>onSelect(c.key)}>{zh?"在图表上查看此计划":"Show this plan on chart"}</button>

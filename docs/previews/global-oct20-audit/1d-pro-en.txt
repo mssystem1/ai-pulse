@@ -1,0 +1,97 @@
+PULSE research report
+BTC-USDT · 1D (UTC) · Global Pro
+2026-10-20 17:38 UTC
+
+POSITION · BIAS SIDEWAYS · Watch only · pullback required
+Watch only · pullback required. 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high. 4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R). Range 79,775.10–87,399.00; support zone 79,775.10–80,400.00, resistance zone 87,238.30–87,399.00.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+• Reference: last completed 1D (UTC) close 81,943.80 USDT · bar closed 2026-10-20 00:00 UTC; not a live quote.
+
+CURRENT DECISION
+• POSITION · BIAS SIDEWAYS · Watch only · pullback required
+• Market view: Sideways range
+• Range 79,775.10–87,399.00; support zone 79,775.10–80,400.00, resistance zone 87,238.30–87,399.00.
+• Watch only · pullback required. 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high. 4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R).
+• LONG · R:R to TP1: 4.89; minimum 1.50 before costs.
+• 1W (UTC) · aligned
+• Higher-timeframe evidence aligns with this direction; entry still needs its own completed confirmation and retest.
+• Reassess the range after a completed 1D (UTC) close below 79,775.10 or above 87,399.00; an entered position uses its actual stop.
+
+STRATEGY AND HOLDING HORIZON
+• POSITION · 1D (UTC) · weeks to months
+• Selected strategy: Range-edge reaction
+• Confirmed range 79,775.1–87,399; no later completed close has broken its boundaries.
+• One support-bounce watch setup; the opposite edge is an exit reference.
+• Watch only: price is between range boundaries. Entry requires a fresh edge reaction and follow-through; price may never revisit that edge.
+• Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes.
+• 4H confirms entry and establishes the trade SL.
+
+NEXT CONDITION
+• Watch only · pullback required. 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high. 4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R).
+• The entry-study close is outside the supported entry zone; a quote must be inside that same zone.
+• Before order review, verify the entry signal, SL, TP1 and current quote costs.
+
+SELECTED ENTRY EVIDENCE
+• BUY / LONG · 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high. Entry confirmation required.
+
+SELECTED SETUP · ENTRY / SL / TP
+• LONG / BUY · Watch only · pullback required
+• Entry (planned): 80,400.00–80,483.84 · SL (planned): 79,691.25
+• TP1 84,361.60 (+4.82%) → TP2 87,238.30 (+8.39%)
+• TP3: no further supported target in this snapshot
+• TP1 basis: 1D (UTC) · confirmed swing · 2026-10-12
+• TP2 basis: 1D (UTC) · confirmed swing · 2026-10-02
+• 4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R).
+• Trigger: 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high
+• R:R to TP1: 4.89 · Entry–SL: 0.98%. Planned prices; entry signal is not confirmed.
+
+TIMEFRAME MAP
+• 1W (UTC) · Up · closed 2026-10-19T00:00:00.000Z
+• 1D (UTC) · Range · closed 2026-10-20T00:00:00.000Z
+• 4H (UTC) · Range · closed 2026-10-20T16:00:00.000Z
+• 1H (UTC) · Mixed · closed 2026-10-20T17:00:00.000Z
+
+CHART TIMEFRAMES
+• Snapshot captured: 2026-10-20T17:38:13.365Z
+• Primary chart: 1D (UTC) · 1-day candles
+• Context: 1W (UTC) · 1-week candles
+
+POSSIBLE MOVES
+• ① Main · Range
+• Range 79,775.10–87,399.00; support zone 79,775.10–80,400.00, resistance zone 87,238.30–87,399.00.
+• Entry: 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high. Entry confirmation required.
+
+ELLIOTT HYPOTHESIS
+• Candidate · impulse · A?
+• Wave 2 holds the origin
+• Wave 3 is not the shortest impulse leg
+• Wave 4 does not overlap Wave 1
+• Alternating pivots confirmed by three subsequent completed bars
+• Local 1D (UTC) swings; 3 × ATR deviation measured at confirmation, not an assigned theoretical Elliott degree.
+• Swing-pattern hypothesis only; internal subwaves are unverified, so this is not a fully confirmed Elliott count.
+
+FIBONACCI ANCHORS
+• Fibonacci · 1D (UTC) · measured swing 2026-07-01 → 2026-09-21.
+
+PRO EVIDENCE
+• SMA21 83,324.82 · SMA55 81,255.35 · SMA89 75,629.98 · SMA144 71,161.44 · SMA233 72,153.19
+• RSI14 48.16 · ATR14 2,071.36 · volume / prior 20 bars 0.91×
+• 1W (UTC) · aligned · SMA55 80,026.75
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+RISK REFERENCE
+• 0.98% · 0.95 × 4H ATR14
+• The reference stop is inside one average bar range; actual protection must follow the observed test and structure.
+
+HISTORICAL SUPPORT / RESISTANCE
+• Historical resistance 82,842 · 1D (UTC) · context only; not a TP in this plan
+• Historical resistance 84,361.6 · 1D (UTC) · context only; not a TP in this plan
+• Historical resistance 87,238.3 · 1D (UTC) · context only; not a TP in this plan
+• Historical support 82,556.6 · 1D (UTC) · context only; not a TP in this plan
+• Historical support 82,473.6 · 1D (UTC) · context only; not a TP in this plan
+• Historical support 82,285 · 1D (UTC) · context only; not a TP in this plan
+• Historical resistance 87,399 · 1D (UTC) · context only; not a TP in this plan
+
+DISCLAIMER

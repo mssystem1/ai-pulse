@@ -1,0 +1,93 @@
+PULSE research report
+BTC-USDT · 1H · Global Pro
+2026-10-20 17:42 UTC
+
+INTRADAY · BIAS LONG · Watch only · pullback required
+Watch only · pullback required. Completed 1H close above 82,291.1; then a later 15m retest holding that level. 15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R). Reclaiming and holding 82,291.10 would reopen recovery toward 83,858.20.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+• Reference: last completed 1H close 82,770.10 USDT · bar closed 2026-10-20 17:00 UTC; not a live quote.
+
+CURRENT DECISION
+• INTRADAY · BIAS LONG · Watch only · pullback required
+• Market view: Bullish structure break
+• Reclaiming and holding 82,291.10 would reopen recovery toward 83,858.20.
+• Watch only · pullback required. Completed 1H close above 82,291.1; then a later 15m retest holding that level. 15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R).
+• LONG · R:R to TP1: 1.50; minimum 1.50 before costs.
+• 4H (UTC) · mixed
+• A lower-timeframe pullback or rebound can occur within the broader structure; each horizon needs its own confirmation.
+• Reassess after a completed 1H close below 82,072.40; an entered position uses its actual protective stop.
+
+STRATEGY AND HOLDING HORIZON
+• INTRADAY · 1H · hours / current session
+• Selected strategy: Confirmed structure break
+• Completed close 82,770.1 has broken both recent confirmed highs; price is above rising SMA55 81,996.18, with RSI14 60.82.
+• The break changes the prior swing structure before a new opposite pivot sequence is confirmed. A later held retest is still required; a break is not an entry fill.
+• SMA21 has not turned with the break. Its lag is disclosed; follow-through and entry protection remain necessary.
+• Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes.
+• 15m confirms entry and establishes the trade SL.
+
+NEXT CONDITION
+• Watch only · pullback required. Completed 1H close above 82,291.1; then a later 15m retest holding that level. 15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R).
+• The entry-study close is outside the supported entry zone; a quote must be inside that same zone.
+• Before order review, verify the entry signal, SL, TP1 and current quote costs.
+
+SELECTED ENTRY EVIDENCE
+• BUY / LONG · Completed 1H close above 82,291.1; then a later 15m retest holding that level. Entry confirmation required.
+
+SELECTED SETUP · ENTRY / SL / TP
+• LONG / BUY · Watch only · pullback required
+• Entry (planned): 82,291.10–82,311.90 · SL (planned): 81,281.04
+• TP1 83,858.20 (+1.88%)
+• TP2 / TP3: no further supported target in this snapshot
+• TP1 basis: 1H · confirmed swing · 2026-10-13
+• 15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R).
+• Trigger: Completed 1H close above 82,291.1; then a later 15m retest holding that level
+• R:R to TP1: 1.50 · Entry–SL: 1.25%. Planned prices; entry signal is not confirmed.
+
+TIMEFRAME MAP
+• 1W (UTC) · Up · closed 2026-10-19T00:00:00.000Z
+• 1D (UTC) · Range · closed 2026-10-20T00:00:00.000Z
+• 4H (UTC) · Range · closed 2026-10-20T16:00:00.000Z
+• 1H (UTC) · Mixed · closed 2026-10-20T17:00:00.000Z
+
+CHART TIMEFRAMES
+• Snapshot captured: 2026-10-20T17:42:42.267Z
+• Primary chart: 1H · 1-hour candles
+• Context: 4H · 4-hour candles
+
+POSSIBLE MOVES
+• ① BUY · Recovery
+• 1H structure route: above 82,291.10, references 83,858.20.
+• Entry: Completed 1H close above 82,291.1; then a later 15m retest holding that level. Entry confirmation required.
+
+ELLIOTT HYPOTHESIS
+• Candidate · impulse · 2?
+• Wave 2 holds the origin
+• Alternating pivots confirmed by three subsequent completed bars
+• Up impulse hypothesis: wave 1 rises and wave 2 retraces down; a later rebound does not yet confirm wave 3.
+• Only a 1–2 hypothesis; waves 3, 4 and 5 have not been observed.
+• Local 1H swings; 1 × ATR deviation measured at confirmation, not an assigned theoretical Elliott degree.
+• Swing-pattern hypothesis only; internal subwaves are unverified, so this is not a fully confirmed Elliott count.
+
+FIBONACCI ANCHORS
+• Fibonacci · 1H · measured swing 2026-10-20 → 2026-10-20.
+
+PRO EVIDENCE
+• SMA21 81,964.54 · SMA55 81,996.18 · SMA89 81,844.01 · SMA144 81,812.15 · SMA233 82,353.58
+• RSI14 60.82 · ATR14 494.02 · volume / prior 20 bars 1.37×
+• 4H (UTC) · mixed · SMA55 82,338.07
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+RISK REFERENCE
+• 1.25% · 3.26 × 15m ATR14
+
+HISTORICAL SUPPORT / RESISTANCE
+• Historical resistance 82,928.5 · 1H · context only; not a TP in this plan
+• Historical resistance 83,168.2 · 1H · context only; not a TP in this plan
+• Historical support 82,291.1 · 1H · context only; not a TP in this plan
+• Historical support 81,822.4 · 1H · context only; not a TP in this plan
+• Historical support 81,743.2 · 1H · context only; not a TP in this plan
+
+DISCLAIMER

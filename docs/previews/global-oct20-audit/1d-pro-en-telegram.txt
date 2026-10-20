@@ -1,0 +1,9 @@
+PULSE · BTC-USDT · 1D (UTC) · Position
+2026-10-20T17:38:13.365Z
+Reference: last completed 1D (UTC) close 81,943.80 USDT · bar closed 2026-10-20 00:00 UTC; not a live quote.
+POSITION · BIAS SIDEWAYS · Watch only · pullback required
+LONG / BUY · planned
+Entry 80,400.00–80,483.84 · SL 79,691.25
+TP1 84,361.60 → TP2 87,238.30
+Trigger: 1D (UTC) support test and close holding 80,400; then a new 4H reaction and a later close above its high.
+Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT.

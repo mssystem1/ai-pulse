@@ -1,0 +1,96 @@
+PULSE research report
+BTC-USDT · 4H · Global Pro
+2026-10-20 17:40 UTC
+
+SWING · BIAS SIDEWAYS · Watch only · rebound required
+Watch only · rebound required. 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low. 1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R). Range 80,680.50–84,166.30; support zone 80,680.50–81,200.00, resistance zone 84,147.10–84,166.30.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+• Reference: last completed 4H close 82,610.40 USDT · bar closed 2026-10-20 16:00 UTC; not a live quote.
+
+CURRENT DECISION
+• SWING · BIAS SIDEWAYS · Watch only · rebound required
+• Market view: Sideways range
+• Range 80,680.50–84,166.30; support zone 80,680.50–81,200.00, resistance zone 84,147.10–84,166.30.
+• Watch only · rebound required. 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low. 1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R).
+• SHORT · R:R to TP1: 24.55; minimum 1.50 before costs.
+• 1D (UTC) · mixed
+• A lower-timeframe pullback or rebound can occur within the broader structure; each horizon needs its own confirmation.
+• Reassess the range after a completed 4H close below 80,680.50 or above 84,166.30; an entered position uses its actual stop.
+
+STRATEGY AND HOLDING HORIZON
+• SWING · 4H · days to weeks
+• Selected strategy: Range-edge reaction
+• Confirmed range 80,680.5–84,166.3; no later completed close has broken its boundaries.
+• One resistance-rejection watch setup; the opposite edge is an exit reference.
+• Watch only: price is between range boundaries. Entry requires a fresh edge reaction and follow-through; price may never revisit that edge.
+• Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes.
+• 1H confirms entry and establishes the trade SL.
+
+NEXT CONDITION
+• Watch only · rebound required. 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low. 1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R).
+• The entry-study close is outside the supported entry zone; a quote must be inside that same zone.
+• Before order review, verify the entry signal, SL, TP1 and current quote costs.
+
+SELECTED ENTRY EVIDENCE
+• SELL / SHORT · 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low. Entry confirmation required.
+
+SELECTED SETUP · ENTRY / SL / TP
+• SHORT / SELL · Watch only · rebound required
+• Entry (planned): 84,097.70–84,147.10 · SL (planned): 84,215.71
+• TP1 81,200.00 (-3.45%)
+• TP2 / TP3: no further supported target in this snapshot
+• TP1 basis: 4H · confirmed swing · 2026-10-20
+• 1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R).
+• Trigger: 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low
+• R:R to TP1: 24.55 · Entry–SL: 0.14%. Planned prices; entry signal is not confirmed.
+
+TIMEFRAME MAP
+• 1W (UTC) · Up · closed 2026-10-19T00:00:00.000Z
+• 1D (UTC) · Range · closed 2026-10-20T00:00:00.000Z
+• 4H (UTC) · Range · closed 2026-10-20T16:00:00.000Z
+• 1H (UTC) · Mixed · closed 2026-10-20T17:00:00.000Z
+
+CHART TIMEFRAMES
+• Snapshot captured: 2026-10-20T17:40:51.719Z
+• Primary chart: 4H · 4-hour candles
+• Context: 1D (UTC) · 1-day candles
+
+POSSIBLE MOVES
+• ① Main · Range
+• Range 80,680.50–84,166.30; support zone 80,680.50–81,200.00, resistance zone 84,147.10–84,166.30.
+• Entry: 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low. Entry confirmation required.
+
+ELLIOTT HYPOTHESIS
+• Candidate · impulse · 2?
+• Wave 2 holds the origin
+• Alternating pivots confirmed by three subsequent completed bars
+• Up impulse hypothesis: wave 1 rises and wave 2 retraces down; a later rebound does not yet confirm wave 3.
+• Only a 1–2 hypothesis; waves 3, 4 and 5 have not been observed.
+• Local 4H swings; 2 × ATR deviation measured at confirmation, not an assigned theoretical Elliott degree.
+• Swing-pattern hypothesis only; internal subwaves are unverified, so this is not a fully confirmed Elliott count.
+
+FIBONACCI ANCHORS
+• Fibonacci · 4H · measured swing 2026-10-18 → 2026-10-19.
+
+PRO EVIDENCE
+• SMA21 81,847.35 · SMA55 82,338.07 · SMA89 82,766.86 · SMA144 83,425.39 · SMA233 82,359.29
+• RSI14 55.87 · ATR14 838.48 · volume / prior 20 bars 3.97×
+• 1D (UTC) · mixed · SMA55 81,255.35
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+RISK REFERENCE
+• 0.14% · 0.24 × 1H ATR14
+• The reference stop is inside one average bar range; actual protection must follow the observed test and structure.
+
+HISTORICAL SUPPORT / RESISTANCE
+• Historical resistance 82,800 · 4H · context only; not a TP in this plan
+• Historical resistance 82,874.5 · 4H · context only; not a TP in this plan
+• Historical resistance 82,902.8 · 4H · context only; not a TP in this plan
+• Historical support 82,556.6 · 4H · context only; not a TP in this plan
+• Historical support 82,291.1 · 4H · context only; not a TP in this plan
+• Historical support 81,200 · 4H · context only; not a TP in this plan
+• Historical resistance 87,399 · 4H · context only; not a TP in this plan
+
+DISCLAIMER

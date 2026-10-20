@@ -17,8 +17,8 @@ export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalRepo
     const cards=globalTradeCards(report),card=cards[0],selection=report.setupSelection;
     const direction=selection?.assessment==="sideways"?"SIDEWAYS":selection?.assessment==="long"?"LONG":selection?.assessment==="short"?"SHORT":p.side==="long"?"LONG":p.side==="short"?"SHORT":"SIDEWAYS";
     const label=qualified?(zh?"入场信号已确认":"Entry signal confirmed"):card?.state??(zh?"暂无有效入场":"No validated entry");
-    const heading=`${report.strategy?.name.toUpperCase()??""} · ${direction} · ${label}`;
-    const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到 TP1 的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry."):card?`${card.direction} · ${card.condition}.`:(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
+    const heading=`${report.strategy?.name.toUpperCase()??""} · ${zh?"观点":"BIAS"} ${direction} · ${label}`;
+    const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到 TP1 的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry."):card?`${card.state}. ${card.condition}. ${card.location}`:(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
     return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
   }
   const mixed=Boolean(report.decisionVersion)&&primary?.bias==="mixed"&&!qualified;

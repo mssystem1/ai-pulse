@@ -1,0 +1,92 @@
+PULSE research report
+BTC-USDT · 1W (UTC) · Global Pro
+2026-10-20 17:44 UTC
+
+MACRO · BIAS LONG · Entry needs better reward to TP1
+The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry. Reclaiming and holding 82,842.00 would reopen recovery toward 87,399.00 → 97,925.40 → 124,500.00.
+
+MARKET SNAPSHOT
+• OKX Spot · USDT · okx-public-spot
+• Reference: last completed 1W (UTC) close 82,109.30 USDT · bar closed 2026-10-19 00:00 UTC; not a live quote.
+
+CURRENT DECISION
+• MACRO · BIAS LONG · Entry needs better reward to TP1
+• Market view: Structural recovery
+• Reclaiming and holding 82,842.00 would reopen recovery toward 87,399.00 → 97,925.40 → 124,500.00.
+• The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry.
+• LONG · R:R to TP1: 1.25; minimum 1.50 before costs.
+• 1M (UTC) · mixed
+• A lower-timeframe pullback or rebound can occur within the broader structure; each horizon needs its own confirmation.
+• Reassess after a completed 1W (UTC) close below 80,636.30; an entered position uses its actual protective stop.
+
+STRATEGY AND HOLDING HORIZON
+• MACRO · 1W (UTC) · months and longer
+• Selected strategy: Structural recovery / reversal
+• Structural recovery; close 82,109.3 above rising SMA21 71,678.23, RSI14 57.24.
+• SMA55 has not turned with the recovery. This is a reversal hypothesis, not an established long-term trend.
+• 1D (UTC) confirms entry and establishes the trade SL.
+
+NEXT CONDITION
+• The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry.
+• Before order review, verify the entry signal, SL, TP1 and current quote costs.
+
+SELECTED ENTRY EVIDENCE
+• BUY / LONG · Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. R:R to TP1 1.25; minimum 1.50 before costs.
+
+SELECTED SETUP · ENTRY / SL / TP
+• LONG / BUY · Entry needs better reward to TP1
+• Entry (planned): 82,842.00–83,049.14 · SL (planned): 79,567.96
+• TP1 87,399.00 (+5.24%) → TP2 97,925.40 (+17.91%) → TP3 124,500.00 (+49.91%)
+• TP1 basis: 1W (UTC) · confirmed swing · 2026-09-21
+• TP2 basis: 1W (UTC) · confirmed swing · 2026-01-12
+• TP3 basis: 1W (UTC) · confirmed swing · 2025-08-11
+• 1D (UTC) last completed close 81,943.80; planned entry is 1.35% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.30R before costs (minimum 1.50R).
+• Trigger: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level
+• R:R to TP1: 1.25 · Entry–SL: 4.19%. Planned prices; entry signal is not confirmed.
+
+TIMEFRAME MAP
+• 1W (UTC) · Up · closed 2026-10-19T00:00:00.000Z
+• 1D (UTC) · Range · closed 2026-10-20T00:00:00.000Z
+• 4H (UTC) · Range · closed 2026-10-20T16:00:00.000Z
+• 1H (UTC) · Mixed · closed 2026-10-20T17:00:00.000Z
+• 1M (UTC) · Mixed · closed 2026-10-01T00:00:00.000Z
+
+CHART TIMEFRAMES
+• Snapshot captured: 2026-10-20T17:44:09.991Z
+• Primary chart: 1W (UTC) · 1-week candles
+• History coverage: 458 of 520 requested completed 1W (UTC) candles returned by the source. Earlier history is unavailable in this response; this coverage limit is retained.
+• Context: 1M (UTC) · 1-month candles
+
+POSSIBLE MOVES
+• ① Main · Continuation
+• 1W (UTC) structure route: above 82,842.00, references 87,399.00 → 97,925.40 → 124,500.00.
+• Entry: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. R:R to TP1 1.25; minimum 1.50 before costs.
+
+ELLIOTT HYPOTHESIS
+• Count unclear
+• Recent confirmed swings do not match the implemented impulse rules.
+• Support and resistance still support conditional trade planning.
+• Swing-pattern hypothesis only; internal subwaves are unverified, so this is not a fully confirmed Elliott count.
+
+FIBONACCI ANCHORS
+• Fibonacci · 1W (UTC) · measured swing 2026-06-29 → 2026-09-21.
+
+PRO EVIDENCE
+• SMA21 71,678.23 · SMA55 80,026.75 · SMA89 88,641.43 · SMA144 81,519.45 · SMA233 60,459.20
+• RSI14 57.24 · ATR14 6,142.71 · volume / prior 20 bars 0.79×
+• 1M (UTC) · mixed · SMA55 59,493.97
+• Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
+
+RISK REFERENCE
+• 4.19% · 1.68 × 1D (UTC) ATR14
+
+HISTORICAL SUPPORT / RESISTANCE
+• Historical resistance 82,842 · 1W (UTC) · context only; not a TP in this plan
+• Historical resistance 87,399 · 1W (UTC) · context only; not a TP in this plan
+• Historical resistance 89,111 · 1W (UTC) · context only; not a TP in this plan
+• Historical support 76,011.8 · 1W (UTC) · context only; not a TP in this plan
+• Historical support 74,955.5 · 1W (UTC) · context only; not a TP in this plan
+• Historical support 74,501.6 · 1W (UTC) · context only; not a TP in this plan
+• Historical resistance 124,500 · 1W (UTC) · context only; not a TP in this plan
+
+DISCLAIMER

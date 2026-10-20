@@ -3,7 +3,7 @@ import {globalStrategyLines} from "./globalStrategy.js";
 import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
-import { globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalSetupMap, globalArtifactReference } from "./globalPolicy.js";
+import { globalEligibility, globalRiskMeasurement, globalRemoteLevels, globalSetupMap } from "./globalPolicy.js";
 import {globalDecision,globalDecisionTitle,globalDecisionLines} from "./globalDecision.js";
 import {globalFrameReference} from "./globalContext.js";
 import {globalCoverageLine} from "./globalCoverage.js";
@@ -214,7 +214,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
     {title:report.decisionVersion==="decision-v5"?(zh?"所选计划 · 入场 / 止损 / 止盈":"Selected setup · Entry / SL / TP"):(zh?"交易计划 · 入场 / 止损 / 止盈":"Trade plans · Entry / SL / TP"),lines:globalNextSetupLines(report),featured:true},
     ...(report.tier==="pro"?[{title:zh?"周期关系":"Timeframe map",lines:d.hierarchy.length?d.hierarchy:[d.contextLine,d.relationship]}]:[]),
     { title: lang === "zh" ? "图表周期" : "Chart timeframes", lines: [
-      `${lang==="zh"?"报告参考":"Report reference"}: #${globalArtifactReference(report)} · ${report.snapshot.observedAt}`,
+      `${lang==="zh"?"快照时间":"Snapshot captured"}: ${report.snapshot.observedAt}`,
       `${lang === "zh" ? "主图" : "Primary chart"}: ${globalTimeframeLabel(report.snapshot.timeframe, lang)}`,
       ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),
       ...(report.tier === "pro" ? [`${globalLabel("context", lang)}: ${globalTimeframeLabel(report.context.timeframe ?? "—", lang)}${report.context.status === "available" ? "" : ` · ${globalLabel("unavailable", lang)}`}`] : []),

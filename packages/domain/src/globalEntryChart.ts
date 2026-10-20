@@ -30,6 +30,6 @@ export function globalEntryStudySvg(report:GlobalReport,width=660,selectedPathId
 
   const closed=candleCloseTime(last.ts,study.timeframe),date=(ts:number)=>new Date(ts).toISOString().slice(5,16).replace("T"," ");
   svg+=txt(left,193,`${date(bars[0].ts)} → ${closed?date(closed):"—"} UTC · ${zh?"最后收盘":"last close"} ${price(last.close)}`,"#a5b7cd",10);
-  const note=(card?signal:d.qualified)?zh?"信号已确认；执行前复核报价与费用，尚非成交。":"Signal confirmed; recheck quote and costs before execution. No fill implied.":zh?"计划入场条件尚未全部完成；虚线仅为计划。":"Entry conditions are incomplete; dashed levels describe the plan.";
+  const note=(card?signal:d.qualified)?zh?"信号已确认；执行前复核报价与费用，尚非成交。":"Signal confirmed; recheck quote and costs before execution. No fill implied.":!cards.length&&tradeView?zh?"暂无受支持计划；须新结构、保护和目标。":"No supported setup; new structure, protection and targets are required.":card?`${card.state}. ${zh?"虚线是条件价位，价格可能不再回到该位。":"Dashed levels are conditional; price may never revisit them."}`:zh?"计划入场条件尚未全部完成；虚线仅为计划。":"Entry conditions are incomplete; dashed levels describe the plan.";
   return svg+txt(left,213,note,"#c4d4e5",10)+"</g></svg>";
 }

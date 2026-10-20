@@ -4,7 +4,7 @@ import {globalContextRelation} from "./globalContext.js";
 
 type Plan=NonNullable<GlobalReport["tradePlan"]>;
 export type GlobalSetupSelection={
-  version:"single-setup-v2";assessment:"long"|"short"|"sideways";
+  version:"single-setup-v3";assessment:"long"|"short"|"sideways";
   regime:"trend"|"recovery"|"range"|"transition";
   rule:"trend_continuation"|"structural_reversal"|"structure_break"|"range_reaction"|"none";
   pathId:string|null;side:"long"|"short"|"none";evidence:string[];limitations:string[];
@@ -50,16 +50,16 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
       const allowance=(report.indicators.atr.points.at(-1)?.value??0)*.1;
       if(last.low<=range.lower[1]+allowance&&last.close>range.lower[1]&&rsi>previousRsi)side="long";
       else if(last.high>=range.upper[0]-allowance&&last.close<range.upper[0]&&rsi<previousRsi)side="short";
-      // A planned edge reaction can be watched before it occurs. The central
-      // 20% supplies no preferred edge; the entry algorithm still requires an
-      // actual rejection and later follow-through at the selected boundary.
-      else if(last.close<=range.lower[1]+(range.upper[0]-range.lower[1])*.4)side="long";
-      else if(last.close>=range.upper[0]-(range.upper[0]-range.lower[1])*.4)side="short";
     }
-    if(side!=="none"){
-      rule="range_reaction";
-      evidence.push(say(`One ${side==="long"?"support-bounce":"resistance-rejection"} setup; the opposite edge is an exit reference.`,`仅选择一个${side==="long"?"支撑反弹":"阻力回落"}入场；另一边界为退出参考。`));
-    }else limitations.push(say("Price has not supplied a qualifying edge reaction. The middle of a range is not an entry.","尚无合格边界反应；区间中部不构成入场。"));
+    // Keep one explicit watch plan even in the centre. Proximity selects a
+    // boundary to monitor, never a signal, direction assessment or market fill.
+    if(side==="none"){
+      const latest=report.entryStudy?.status==="available"?report.entryStudy.candles.at(-1)?.close:undefined,reference=latest??last.close;
+      side=Math.abs(reference-range.lower[1])<=Math.abs(range.upper[0]-reference)?"long":"short";
+      limitations.push(say("Watch only: price is between range boundaries. Entry requires a fresh edge reaction and follow-through; price may never revisit that edge.","仅观察：价格位于区间边界之间；入场须新的边界反应与后续确认，价格可能不再回到该边界。"));
+    }
+    rule="range_reaction";
+    evidence.push(say(`One ${side==="long"?"support-bounce":"resistance-rejection"} watch setup; the opposite edge is an exit reference.`,`仅观察一个${side==="long"?"支撑反弹":"阻力回落"}计划；另一边界为退出参考。`));
   }else if(trendUp||trendDown){
     side=trendUp?"long":"short";assessment=side;regime="trend";rule="trend_continuation";
     evidence.push(say(`${row!.structure==="up"?"Higher highs and higher lows":"Lower highs and lower lows"}; close ${price(last!.close)} is ${side==="long"?"above a rising":"below a falling"} SMA55 ${price(ma55!)}.`,`${row!.structure==="up"?"高点与低点抬升":"高点与低点下移"}；收盘 ${price(last!.close)} 位于${side==="long"?"上行 SMA55 上方":"下行 SMA55 下方"} ${price(ma55!)}。`));
@@ -86,7 +86,7 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
   const known=(c:typeof candidates[number])=>Math.max(0,...pivots.filter(a=>report.levels.find(l=>l.id===c.path.triggerLevelId)?.anchorIds.includes(a.id)).map(a=>a.confirmedAt!));
   mapped.sort((a,b)=>Number(b.plan.state==="confirmed"&&!b.plan.failure)-Number(a.plan.state==="confirmed"&&!a.plan.failure)||(b.plan.retestTs??0)-(a.plan.retestTs??0)||known(b)-known(a)||a.path.id.localeCompare(b.path.id));
   const chosen=mapped[0];
-  if(side!=="none"&&!chosen)limitations.push(say("No supported target/protection map is available for this direction. Entry is unavailable.","此方向没有受支持目标与保护映射，入场不可用。"));
+  if(side!=="none"&&!chosen)limitations.unshift(say("No supported target/protection map is available for this direction. Entry is unavailable.","此方向没有受支持目标与保护映射，入场不可用。"));
   if(chosen&&["opposing","unavailable"].includes(globalContextRelation(report,side)))limitations.push(say("Higher-timeframe context blocks entry until it is available and compatible.","高周期背景缺失或相反，入场须等待背景可用且相容。"));
-  return {selection:{version:"single-setup-v2",assessment,regime,rule:chosen?rule:"none",pathId:chosen?.path.id??null,side:chosen?.route.side??"none",evidence,limitations},plan:chosen?.plan??empty};
+  return {selection:{version:"single-setup-v3",assessment,regime,rule:chosen?rule:"none",pathId:chosen?.path.id??null,side:chosen?.route.side??"none",evidence,limitations},plan:chosen?.plan??empty};
 }

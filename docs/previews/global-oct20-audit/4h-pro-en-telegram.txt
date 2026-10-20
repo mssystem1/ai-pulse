@@ -1,0 +1,9 @@
+PULSE · BTC-USDT · 4H · Swing
+2026-10-20T17:40:51.719Z
+Reference: last completed 4H close 82,610.40 USDT · bar closed 2026-10-20 16:00 UTC; not a live quote.
+SWING · BIAS SIDEWAYS · Watch only · rebound required
+SHORT / SELL · planned
+Entry 84,097.70–84,147.10 · SL 84,215.71
+TP1 81,200.00
+Trigger: 4H resistance test and close rejecting 84,147.1; then a new 1H reaction and a later close below its low.
+Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT.

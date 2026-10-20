@@ -166,7 +166,7 @@ async function deliver(frame){
   check(text===telegramText,'TXT and Telegram file mismatch');check(caption.length<=1024&&message.length<=3900,'Telegram limits exceeded');
   check(svg&&!svg.includes('NaN')&&png?.length>10000,'Chart rendering failed');
   check(!/CHECKPOINT|OBJECTIVE|WATCH AREA|anchor, not TP|>124,500</i.test(svg||''),'Confusing chart wording or rejected archive level');
-  check(g.setupSelection?.version==='single-setup-v2','Single-setup selector missing');
+  check(g.setupSelection?.version==='single-setup-v3','Single-setup selector missing');
   check(['LONG','SHORT','SIDEWAYS'].includes(globalDecision(g).direction),'Invalid market assessment');
   check(cards.length===1&&g.paths.length===1&&g.strategy.routes.length===1,'Expected one supported setup, path and route');
   check((svg?.match(/data-scenario-projection=/g)||[]).length===1,'Missing single conditional projected move');

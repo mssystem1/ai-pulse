@@ -14,12 +14,14 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const entry=card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0];
   const rows=[{role:"Entry",price:entry,color:"#ffcb76"},{role:"SL",price:p.referenceStop,color:"#f0738c"},...card.targets.map((t,i)=>({role:`TP${i+1}`,price:t.price,color:"#53dabb"}))];
   let svg=`<g data-trade-plan="${escape(card.key)}" data-confirmed="${card.confirmed}" data-price-labels="exact">`;
-  const last=report.candles.at(-1),projectionColor=card.side==="long"?"#53dabb":"#f0738c";
-  const projection=[...(last?[{x:g.historyEnd,y:g.y(last.close)}]:[]),{x:g.historyEnd+future*.18,y:g.y(entry)},...card.targets.map((t,i)=>({x:g.historyEnd+future*(.43+i*.19),y:g.y(t.price)}))].filter((p):p is {x:number;y:number}=>p.y!==null&&p.y>=g.top&&p.y<=g.bottom);
-  if(options.showScenarios!==false&&projection.length>=3){
+  // Start at the conditional entry. Connecting today's close to a remote entry
+  // invents an unsupported pullback/rebound forecast, even with a dashed line.
+  const projectionColor=card.side==="long"?"#53dabb":"#f0738c";
+  const projection=[{x:g.historyEnd+future*.18,y:g.y(entry)},...card.targets.map((t,i)=>({x:g.historyEnd+future*(.43+i*.19),y:g.y(t.price)}))].filter((p):p is {x:number;y:number}=>p.y!==null&&p.y>=g.top&&p.y<=g.bottom);
+  if(options.showScenarios!==false&&projection.length>=2){
     const end=projection.at(-1)!,prior=projection.at(-2)!,angle=Math.atan2(end.y-prior.y,end.x-prior.x);
     const arrow=[end,{x:end.x-10*Math.cos(angle)+4*Math.sin(angle),y:end.y-10*Math.sin(angle)-4*Math.cos(angle)},{x:end.x-10*Math.cos(angle)-4*Math.sin(angle),y:end.y-10*Math.sin(angle)+4*Math.cos(angle)}];
-    svg+=`<g data-scenario-projection="conditional" data-projection-side="${card.side}" data-projection-path="${escape(card.pathId)}"><path d="${projection.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="${projectionColor}" stroke-width="2.3" stroke-dasharray="7 5"/><polygon points="${arrow.map(p=>`${p.x},${p.y}`).join(' ')}" fill="${projectionColor}"/>${txt(g.historyEnd+12,g.top+24,zh?"条件走势 · 时间仅为示意":"CONDITIONAL MOVE · TIMING SCHEMATIC",projectionColor,8)}</g>`;
+    svg+=`<g data-scenario-projection="conditional" data-projection-origin="entry" data-projection-side="${card.side}" data-projection-path="${escape(card.pathId)}"><path d="${projection.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="${projectionColor}" stroke-width="2.3" stroke-dasharray="7 5"/><polygon points="${arrow.map(p=>`${p.x},${p.y}`).join(' ')}" fill="${projectionColor}"/>${txt(g.historyEnd+12,g.top+24,zh?"仅入场后 · 时间为示意":"ONLY AFTER ENTRY · TIMING SCHEMATIC",projectionColor,8)}</g>`;
   }
   const entryY=g.y(entry),stopY=g.y(p.referenceStop),targetY=g.y(card.targets[0]?.price??entry);
   if(entryY!==null&&stopY!==null&&targetY!==null){
@@ -40,7 +42,7 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
     svg+="</g>";
   });
   const ledgerHeight=44+rows.length*18,mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;
-  const ledgerY=mean>(g.top+g.bottom)/2?g.top+18:g.bottom-ledgerHeight-14,lx=g.historyEnd+14,lw=Math.max(100,future-30);
+  const ledgerY=mean>(g.top+g.bottom)/2?g.top+42:g.bottom-ledgerHeight-14,lx=g.historyEnd+14,lw=Math.max(100,future-30);
   svg+=`<g data-trade-price-ledger="${escape(card.key)}"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
   svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"} · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`,card.side==="long"?"#53dabb":"#f0738c",11);
   rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,row.role==="Entry"?card.entry:price(row.price),row.color,10,"end");});

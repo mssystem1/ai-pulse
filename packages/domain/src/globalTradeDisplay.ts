@@ -6,13 +6,17 @@ import {globalContextRelation,globalContextRequired,globalFrameReference} from "
 
 export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:string;side:"long"|"short"}){
   const zh=report.lang==="zh",selected=globalTradePlan(report),routes=report.strategy?.routes.filter(r=>report.view.pathIds.includes(r.pathId))??[];
-  const shown=report.range?routes.filter(r=>report.paths.find(p=>p.id===r.pathId)?.kind==="range"):routes;
+  const rangeSelected=report.setupSelection?report.setupSelection.regime==="range":Boolean(report.range);
+  const shown=rangeSelected?routes.filter(r=>report.paths.find(p=>p.id===r.pathId)?.kind==="range"):routes;
   const price=(n:number)=>n.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
   return shown.filter(route=>!only||route.pathId===only.pathId&&route.side===only.side).map(route=>{
     const p=selected.pathId===route.pathId&&selected.side===route.side?selected:deriveGlobalEntryPlan(report,route.pathId,route.side),direction=route.side==="long"?"LONG / BUY":"SHORT / SELL";
     const context=globalContextRelation(report,route.side),contextBlocked=globalContextRequired(report)&&["opposing","unavailable"].includes(context);
     const confirmed=p.state==="confirmed"&&!contextBlocked;
-    const state=confirmed?zh?"入场信号已确认":"Entry signal confirmed":p.blockers.includes("reward")?zh?"TP1 收益空间不足":"Entry needs better reward to TP1":p.side==="none"?zh?"需要新的入场结构":"Entry structure needed":zh?"入场确认条件":"Entry confirmation required";
+    const latest=report.entryStudy?.status==="available"?report.entryStudy.candles.at(-1):undefined;
+    const outside=Boolean(latest&&p.referenceEntry&&(latest.close<p.referenceEntry[0]||latest.close>p.referenceEntry[1]));
+    const pullback=Boolean(latest&&p.referenceEntry&&(route.side==="long"?latest.close>p.referenceEntry[1]:latest.close<p.referenceEntry[0]));
+    const state=confirmed?zh?"入场信号已确认":"Entry signal confirmed":p.blockers.includes("reward")?zh?"TP1 收益空间不足":"Entry needs better reward to TP1":p.side==="none"?zh?"需要新的入场结构":"Entry structure needed":p.blockers.includes("cancelled")?zh?"先前计划失效；须新反应":"Prior setup invalidated; new reaction needed":p.blockers.includes("expired")?zh?"先前计划已结束；须新反应":"Prior setup ended; new reaction needed":contextBlocked?zh?"高周期背景阻止入场":"Entry blocked by higher timeframe":outside?pullback?route.side==="long"?(zh?"仅观察；等待回调":"Watch only · pullback required"):(zh?"仅观察；等待反弹":"Watch only · rebound required"):route.side==="long"?(zh?"仅观察；等待收复":"Watch only · reclaim required"):(zh?"仅观察；等待跌破":"Watch only · breakdown required"):zh?"入场确认条件":"Entry confirmation required";
     const entry=p.referenceEntry?`${price(p.referenceEntry[0])}–${price(p.referenceEntry[1])}`:zh?"实际反应后确定":"After a new price reaction";
     const stop=p.referenceStop===null?zh?"实际反应后确定":"After a new price reaction":price(p.referenceStop);
     const entryReference=p.referenceEntry?.[route.side==="long"?1:0]??null;
@@ -26,14 +30,19 @@ export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:stri
     const condition=p.side==="none"?zh?"新测试须先建立入场与止损。":"A new test must establish Entry and SL.":globalEntryCondition(report,p);
     const risk=p.referenceEntry&&p.referenceStop?Math.abs((route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])-p.referenceStop):null;
     const riskPercent=risk!==null&&p.referenceEntry?risk/(route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])*100:null;
+    const distance=latest&&p.referenceEntry?((route.side==="long"?p.referenceEntry[1]:p.referenceEntry[0])/latest.close-1)*100:null;
+    const sign=route.side==="long"?1:-1,currentRisk=latest&&p.referenceStop!==null?sign*(latest.close-p.referenceStop):null,currentReward=latest&&targets[0]?sign*(targets[0].price-latest.close):null;
+    const currentRewardRisk=currentRisk!==null&&currentRisk>0&&currentReward!==null&&currentReward>0?currentReward/currentRisk:null;
+    const currentRewardLine=outside&&currentRewardRisk!==null?zh?` 按该收盘价及同一 SL/TP1 计算，扣费前仅 ${currentRewardRisk.toFixed(2)}R（门槛 1.50R）。`:` At that close, the same SL/TP1 gives ${currentRewardRisk.toFixed(2)}R before costs (minimum 1.50R).`:"";
+    const location=(latest&&distance!==null?zh?`${globalFrameReference(report.entryStudy!.timeframe)} 最近完整收盘 ${price(latest.close)}；计划入场${distance<0?"低于":"高于"}该收盘 ${Math.abs(distance).toFixed(2)}%。${outside?"须重新进入该区间并完成所列确认；价格可能不再回到该位。":"仍须满足全部入场条件。"}`:`${globalFrameReference(report.entryStudy!.timeframe)} last completed close ${price(latest.close)}; planned entry is ${Math.abs(distance).toFixed(2)}% ${distance<0?"below":"above"} it. ${outside?"Price must revisit the zone and satisfy the stated confirmation; it may never return.":"All entry conditions must still be met."}`:"")+currentRewardLine;
     const lines=[`${direction} · ${state}`,`${zh?"计划入场":"Entry"}${confirmed?"":" (planned)"}: ${entry} · SL${confirmed?"":" (planned)"}: ${stop}`,
       targets.length?targets.map((t,i)=>`TP${i+1} ${price(t.price)}${t.movePercent===null?"":` (${t.movePercent>=0?"+":""}${t.movePercent.toFixed(2)}%)`}`).join(" → "):zh?"尚无有依据的 TP":"TP: a supported target is not available",
       ...(report.strategy?.targetPolicy==="active-zones-v1"&&targets.length>0&&targets.length<3?[zh?`TP${targets.length+1}${targets.length===1?" / TP3":""}：本快照无更多有依据的目标`:`TP${targets.length+1}${targets.length===1?" / TP3":""}: no further supported target in this snapshot`]:[]),
       ...targets.map((t,i)=>`TP${i+1} ${zh?"依据":"basis"}: ${t.source}`),
-      `${zh?"触发条件":"Trigger"}: ${condition}`,
+      ...(location?[location]:[]),`${zh?"触发条件":"Trigger"}: ${condition}`,
       `${zh?"TP1 收益风险比":"R:R to TP1"}: ${p.grossRewardRisk?.toFixed(2)??"—"}${riskPercent===null?"":` · ${zh?"到止损距离":"Entry–SL"}: ${riskPercent.toFixed(2)}%`}. ${confirmed?zh?"复核当前报价和费用，尚非成交。":"Review a fresh quote and costs; no fill implied.":zh?"仅为计划，尚非当前入场信号。":"Planned prices; entry signal is not confirmed."}`,
       ...(contextBlocked?[zh?"高周期背景缺失或与方向相反，入场尚未确认。":"Higher-timeframe evidence is unavailable or opposes this entry."]:[])];
-    return {key:`${route.pathId}-${route.side}`,pathId:route.pathId,side:route.side,direction,state,confirmed,selected:p.pathId===selected.pathId&&p.side===selected.side,entry,stop,targets,condition,riskPercent,rr:p.grossRewardRisk,plan:p,lines};
+    return {key:`${route.pathId}-${route.side}`,pathId:route.pathId,side:route.side,direction,state,confirmed,selected:p.pathId===selected.pathId&&p.side===selected.side,entry,stop,targets,condition,location,riskPercent,rr:p.grossRewardRisk,plan:p,lines};
   });
 }
 

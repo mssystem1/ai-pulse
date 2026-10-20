@@ -29,6 +29,8 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
       const sign=side==="long"?1:-1;
       const trigger=report.levels.find(l=>l.id===(path.direction==="range"&&side==="short"?originalTargets[0]:path.triggerLevelId));if(!trigger)continue;
       const edge=path.direction==="range"?report.levels.find(l=>l.id===(side==="long"?originalTargets[0]:path.triggerLevelId)):undefined;
+      // A display/strategy lookback does not expire an unconsumed price barrier.
+      // Search all saved completed history, retaining the nearest obstacle.
       const candidates=targetPolicy==="legacy-pivots-v1"?report.levels.filter(l=>l.basis==="swing"&&l.anchorIds.some(id=>confirmed.has(id))&&sign*(l.price-trigger.price)>0&&(!edge||sign*(edge.price-l.price)>=0)).sort((a,b)=>sign*(a.price-b.price)):activeGlobalTargetZones(report,side,trigger.price,first).filter(z=>!edge||sign*(edge.price-z.price)>=0).map(z=>{
         const id=`target-zone-${side}-${z.anchors.map(a=>a.id).join("-")}`;
         let level=report.levels.find(l=>l.id===id);
@@ -63,14 +65,14 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
 /** Explicit, free technical correction. Stored reports and original model prose
  * remain untouched; a review has its own artifact reference and provenance. */
 export function reviewGlobalTargetReport(saved:GlobalReport):GlobalReport {
-  if(saved.decisionVersion!=="decision-v5"||saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v2")return saved;
+  if(saved.decisionVersion!=="decision-v5"||saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v3")return saved;
   const report=rebuildSavedGlobalCandidates(saved),sourceRef=globalArtifactReference(saved);
   report.targetReviewOf=sourceRef;
   applyGlobalTradeMap(report);
   report.view.levelIds=[...new Set([...report.view.levelIds,...report.strategy!.routes.flatMap(r=>[r.protectionLevelId,...r.objectiveIds]).filter((id):id is string=>id!==null)])];
   applySingleGlobalSetup(report);
   const d=globalDecision(report),zh=report.lang==="zh";
-  report.narrative={headline:`${report.snapshot.instId} · ${d.heading}`,summary:`${d.entryInstruction} ${d.route}`,reasons:[],riskNotes:[],limitations:[zh?`原始快照 #${sourceRef} 的技术目标复核；使用相同已保存 K 线，未调用新的 AI 分析。已排除被后续收盘突破的历史价位；没有依据的后续 TP 不会生成。`:`Technical target review of original snapshot #${sourceRef}, using the same saved candles and no new AI analysis. Consumed historical levels are excluded; unsupported later TPs are not invented.`],disclaimer:saved.narrative.disclaimer};
+  report.narrative={headline:`${report.snapshot.instId} · ${d.heading}`,summary:`${d.entryInstruction} ${d.route}`,reasons:[],riskNotes:[],limitations:[zh?"原始快照技术复核；使用相同已保存 K 线，未调用新的 AI 分析。已排除被后续收盘突破的历史价位；没有依据的后续 TP 不会生成。":"Technical review of the original snapshot, using the same saved candles and no new AI analysis. Consumed historical levels are excluded; unsupported later TPs are not invented."],disclaimer:saved.narrative.disclaimer};
   return GlobalReportSchema.parse(report);
 }
 
