@@ -1,9 +1,9 @@
 PULSE · BTC-USDT · 1W (UTC) · Macro
 2026-10-20T17:44:09.991Z
 Reference: last completed 1W (UTC) close 82,109.30 USDT · bar closed 2026-10-19 00:00 UTC; not a live quote.
-MACRO · BIAS LONG · Entry needs better reward to TP1
+MACRO · BIAS LONG · Watch structure · Entry and SL not established
 LONG / BUY · planned
-Entry 82,842.00–83,049.14 · SL 79,567.96
+Entry After a new price reaction · SL After a new price reaction
 TP1 87,399.00 → TP2 97,925.40 → TP3 124,500.00
 Trigger: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level.
 Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT.

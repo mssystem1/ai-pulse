@@ -26,7 +26,7 @@ for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])test(`${frame}: Quick, Pro 
     assert.ok(["LONG","SHORT","SIDEWAYS"].includes(d.direction));assert.equal(r.paths.length,cards.length);assert.equal(r.strategy!.routes.length,cards.length);assert.ok(cards.length<=1);assert.equal(GlobalReportSchema.safeParse(r).success,true);
     const drawable=cards.filter(c=>c.plan.referenceEntry&&c.plan.referenceStop);
     assert.equal((svg.match(/data-trade-price-ledger=/g)??[]).length,drawable.length);
-    assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,drawable.length);
+    assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,cards.filter(c=>c.confirmed).length);
     for(const card of cards){
       assert.ok(r.tradePlan!.side==="none"||card.side===r.tradePlan!.side);assert.equal(card.pathId,selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
       if(!card.plan.referenceEntry||!card.plan.referenceStop)continue;
@@ -54,15 +54,18 @@ test("trend direction cannot switch merely because the opposite candidate offers
   primary.structure="down";fast.points=fast.points.map((p,i)=>({...p,value:r.snapshot.price!+200-i}));
   assert.equal(selectSingleGlobalSetup(r).selection.assessment,"short");
 });
-test("sideways watches one floor or ceiling reaction; the centre retains a watch plan without forcing a trade",()=>{
+test("range proximity alone cannot choose a direction at 20%, 50% or 80% of the range",()=>{
   const r=make("4H","premium","en",true),range=r.range!,last=r.candles.at(-1)!;
   r.indicators.rsi.points=r.indicators.rsi.points.map(p=>({...p,value:50}));
   const put=(close:number)=>{Object.assign(last,{open:close,high:close+1,low:close-1,close});r.entryStudy!.candles.at(-1)!.close=close;};
-  put(range.lower[1]+(range.upper[0]-range.lower[1])*.2);let s=selectSingleGlobalSetup(r);assert.equal(s.selection.assessment,"sideways");assert.equal(s.selection.side,"long");assert.equal(s.selection.rule,"range_reaction");assert.notEqual(s.plan.state,"confirmed");
-  put(range.lower[1]+(range.upper[0]-range.lower[1])*.8);s=selectSingleGlobalSetup(r);assert.equal(s.selection.assessment,"sideways");assert.equal(s.selection.side,"short");
-  put((range.lower[1]+range.upper[0])/2);s=selectSingleGlobalSetup(r);assert.equal(s.selection.assessment,"sideways");assert.notEqual(s.selection.side,"none");assert.notEqual(s.plan.state,"confirmed");assert.ok(s.selection.limitations.some(l=>l.includes("Watch only")));
+  for(const fraction of [.2,.5,.8]){
+    put(range.lower[1]+(range.upper[0]-range.lower[1])*fraction);const selected=selectSingleGlobalSetup(r);
+    assert.equal(selected.selection.assessment,"sideways");assert.equal(selected.selection.side,"none");
+    assert.equal(selected.plan.referenceEntry,null);assert.equal(selected.plan.referenceStop,null);assert.equal(selected.plan.grossRewardRisk,null);
+    assert.match(selected.selection.limitations[0],/Distance.*does not predict/);
+  }
   put(range.upper[1]+1000);r.hierarchy!.find(row=>row.timeframe===r.snapshot.timeframe)!.structure="mixed";r.indicators.sma.forEach(ma=>ma.points.forEach(p=>p.value=last.close));
-  s=selectSingleGlobalSetup(r);assert.notEqual(s.selection.regime,"range");assert.equal(s.selection.side,"none");
+  const s=selectSingleGlobalSetup(r);assert.notEqual(s.selection.regime,"range");assert.equal(s.selection.side,"none");
 });
 test("the schema rejects publishing a second setup or a side inconsistent with the selection",()=>{
   const r=make("1Wutc");r.paths.push({...r.paths[0],id:"second"});assert.equal(GlobalReportSchema.safeParse(r).success,false);
@@ -93,10 +96,10 @@ test("a v1 report with discarded paths can be reviewed from saved bars, without 
   original.setupSelection={version:"single-setup-v1",assessment:"sideways",regime:"transition",rule:"none",pathId:null,side:"none",evidence:[],limitations:[]};
   original.tradePlan={side:"none",pathId:null,state:"none",condition:"close_retest",triggerLevelId:null,invalidationLevelId:null,targetIds:[],referenceEntry:null,referenceStop:null,grossRewardRisk:null,stopBufferAtr:.1,confirmationTs:null,retestTs:null,blockers:["levels"],method:"structure-v5",entryTimeframe:"15m"};
   assert.equal(GlobalReportSchema.safeParse(original).success,true);const before=JSON.stringify(original),review=reviewGlobalTargetReport(original);
-  assert.equal(JSON.stringify(original),before);assert.equal(review.setupSelection!.version,"single-setup-v3");assert.equal(review.setupSelection!.side,"short");assert.equal(review.paths.length,1);assert.deepEqual(review.candles,original.candles);assert.equal(reviewGlobalTargetReport(review),review);
+  assert.equal(JSON.stringify(original),before);assert.equal(review.setupSelection!.version,"single-setup-v4");assert.equal(review.setupSelection!.side,"short");assert.equal(review.paths.length,1);assert.deepEqual(review.candles,original.candles);assert.equal(reviewGlobalTargetReport(review),review);
 });
-test("a planned range stop protects the full known boundary rather than a minor pivot inside its zone",()=>{
+test("a range without a reaction cannot publish a numerical stop or a manufactured R multiple",()=>{
   const frames=markets(breakSource.frames,breakSource.observedAt),market=frames.find(m=>m.bar==="4H")!;
   const r=prepareGlobalReport({market,hierarchyMarkets:frames,tier:"premium"}),p=r.tradePlan!;
-  assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(p.side,"long");assert.equal(p.retestTs,null);assert.ok(p.referenceStop!<r.range!.lower[0]);assert.ok(p.grossRewardRisk!<15);
+  assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(p.side,"none");assert.equal(p.retestTs,null);assert.equal(p.referenceStop,null);assert.equal(p.grossRewardRisk,null);
 });

@@ -28,12 +28,12 @@ test("reported daily BTC: consumed May swing is excluded; October resistance bec
   assert.equal(current.strategy?.targetPolicy,"active-zones-v1");
   assert.deepEqual(card.plan.referenceEntry,before.plan.referenceEntry);
   assert.equal(card.plan.referenceStop,before.plan.referenceStop);
-  assert.ok(card.targets[0].movePercent!>2.4);
-  assert.ok(card.rr!>1.23&&card.rr!<1.24);
-  assert.equal(card.confirmed,false);assert.ok(card.plan.blockers.includes("reward"));
+  assert.equal(card.targets[0].movePercent,null,"No entry reaction exists from which to measure an objective return");
+  assert.equal(card.rr,null);assert.equal(card.plan.watchOnly,true);
+  assert.equal(card.confirmed,false);assert.equal(card.plan.referenceEntry,null);assert.equal(card.plan.referenceStop,null);
   assert.equal(GlobalReportSchema.safeParse(current).success,true);
   const svg=globalReportChartSvg(current,{selectedPathId:card.key})!;
-  assert.ok(svg.includes('data-trade-role="TP1" data-price="84361.6"'));
+  assert.ok(svg.includes('data-setup-status="unavailable"'));
   assert.ok(!svg.includes('data-trade-role="TP3"'));
   assert.ok(globalTradeCardLines(current).some(line=>line.includes("84,361.60")));
 });

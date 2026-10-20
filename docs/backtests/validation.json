@@ -1,0 +1,182 @@
+{
+  "dataHashesVerified": true,
+  "dailyOhlcComparisons": 457,
+  "cases": [
+    {
+      "label": "baseline",
+      "frame": "1H",
+      "side": "long",
+      "tradesChecked": 17,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 7
+    },
+    {
+      "label": "baseline",
+      "frame": "1H",
+      "side": "short",
+      "tradesChecked": 20,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 6
+    },
+    {
+      "label": "baseline",
+      "frame": "4H",
+      "side": "long",
+      "tradesChecked": 7,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 1
+    },
+    {
+      "label": "baseline",
+      "frame": "4H",
+      "side": "short",
+      "tradesChecked": 2,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "baseline",
+      "frame": "1Dutc",
+      "side": "long",
+      "tradesChecked": 3,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "baseline",
+      "frame": "1Dutc",
+      "side": "short",
+      "tradesChecked": 2,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "baseline",
+      "frame": "1Wutc",
+      "side": "long",
+      "tradesChecked": 1,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "baseline",
+      "frame": "1Wutc",
+      "side": "short",
+      "tradesChecked": 0,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "1H",
+      "side": "long",
+      "tradesChecked": 15,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 3
+    },
+    {
+      "label": "revised",
+      "frame": "1H",
+      "side": "short",
+      "tradesChecked": 17,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 2
+    },
+    {
+      "label": "revised",
+      "frame": "4H",
+      "side": "long",
+      "tradesChecked": 8,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "4H",
+      "side": "short",
+      "tradesChecked": 5,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "1Dutc",
+      "side": "long",
+      "tradesChecked": 4,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "1Dutc",
+      "side": "short",
+      "tradesChecked": 2,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "1Wutc",
+      "side": "long",
+      "tradesChecked": 0,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    },
+    {
+      "label": "revised",
+      "frame": "1Wutc",
+      "side": "short",
+      "tradesChecked": 0,
+      "priceAndCostReconciliation": true,
+      "earliestFillAfterSignal": true,
+      "ambiguousCandlesUseStopFirst": true,
+      "ambiguousStopTargetCandles": 0,
+      "optimisticCostGateFailures": 0
+    }
+  ]
+}

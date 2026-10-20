@@ -4,7 +4,7 @@ import {globalContextRelation} from "./globalContext.js";
 
 type Plan=NonNullable<GlobalReport["tradePlan"]>;
 export type GlobalSetupSelection={
-  version:"single-setup-v3";assessment:"long"|"short"|"sideways";
+  version:"single-setup-v4";assessment:"long"|"short"|"sideways";
   regime:"trend"|"recovery"|"range"|"transition";
   rule:"trend_continuation"|"structural_reversal"|"structure_break"|"range_reaction"|"none";
   pathId:string|null;side:"long"|"short"|"none";evidence:string[];limitations:string[];
@@ -44,22 +44,29 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
   if(bounded&&range&&last){
     regime="range";
     evidence.push(say(`Confirmed range ${price(range.lower[0])}–${price(range.upper[1])}; no later completed close has broken its boundaries.`,`已确认区间 ${price(range.lower[0])}–${price(range.upper[1])}；之后完整收盘未突破边界。`));
-    const observed=candidates.filter(c=>c.plan.family?.startsWith("range_")&&c.plan.retestTs&&!c.plan.failure&&!c.plan.blockers.some(b=>["cancelled","expired","history","levels"].includes(b))).sort((a,b)=>(b.plan.retestTs??0)-(a.plan.retestTs??0));
-    if(observed.length)side=observed[0].route.side;
+    // A primary range is context, not a veto of an observed directional reclaim.
+    // All candidate families receive the same chronology/protection checks.
+    const observed=candidates.filter(c=>c.plan.retestTs&&!c.plan.failure&&!c.plan.blockers.some(b=>["cancelled","expired","history","levels"].includes(b))).sort((a,b)=>Number(b.plan.state==="confirmed")-Number(a.plan.state==="confirmed")||(b.plan.retestTs??0)-(a.plan.retestTs??0));
+    if(observed.length){
+      side=observed[0].route.side;
+      if(observed[0].path.direction!=="range"){
+        regime="transition";rule="structural_reversal";
+        evidence.push(say("The primary range remains context. A directional candidate has an observed later entry-frame retest; compare its protection and nearest barrier before entry.","主图区间仍为背景。方向候选已观察到后续入场周期回测；入场前须比较保护与最近障碍。"));
+      }
+    }
     else if(rsi!==undefined&&previousRsi!==undefined){
       const allowance=(report.indicators.atr.points.at(-1)?.value??0)*.1;
       if(last.low<=range.lower[1]+allowance&&last.close>range.lower[1]&&rsi>previousRsi)side="long";
       else if(last.high>=range.upper[0]-allowance&&last.close<range.upper[0]&&rsi<previousRsi)side="short";
     }
-    // Keep one explicit watch plan even in the centre. Proximity selects a
-    // boundary to monitor, never a signal, direction assessment or market fill.
+    // A nearer boundary is not evidence for choosing a trade. Keep the range
+    // map, but do not manufacture a direction, entry, stop or R multiple.
     if(side==="none"){
-      const latest=report.entryStudy?.status==="available"?report.entryStudy.candles.at(-1)?.close:undefined,reference=latest??last.close;
-      side=Math.abs(reference-range.lower[1])<=Math.abs(range.upper[0]-reference)?"long":"short";
-      limitations.push(say("Watch only: price is between range boundaries. Entry requires a fresh edge reaction and follow-through; price may never revisit that edge.","仅观察：价格位于区间边界之间；入场须新的边界反应与后续确认，价格可能不再回到该边界。"));
+      limitations.unshift(say("No entry selected: neither range edge has a qualified reaction. Distance to an old support or resistance does not predict the next move. Entry and stop must come from a new observed reaction.","未选择入场：区间两端均无合格反应。到旧支撑或阻力的距离不能预测下一步；入场和止损须来自新的实际反应。"));
+      evidence.push(say(`Support reference ${price(range.lower[0])}–${price(range.lower[1])}; resistance reference ${price(range.upper[0])}–${price(range.upper[1])}. These are observation zones, not planned entries.`,`支撑参考 ${price(range.lower[0])}–${price(range.lower[1])}；阻力参考 ${price(range.upper[0])}–${price(range.upper[1])}。这些是观察区域，并非计划入场。`));
     }
-    rule="range_reaction";
-    evidence.push(say(`One ${side==="long"?"support-bounce":"resistance-rejection"} watch setup; the opposite edge is an exit reference.`,`仅观察一个${side==="long"?"支撑反弹":"阻力回落"}计划；另一边界为退出参考。`));
+    if(regime==="range")rule="range_reaction";
+    if(side!=="none")evidence.push(say(`Observed ${side==="long"?"support-bounce":"resistance-rejection"} evidence; entry still needs protection and sufficient room to the nearest obstacle.`,`已观察到${side==="long"?"支撑反弹":"阻力回落"}证据；入场仍须保护与最近障碍的足够空间。`));
   }else if(trendUp||trendDown){
     side=trendUp?"long":"short";assessment=side;regime="trend";rule="trend_continuation";
     evidence.push(say(`${row!.structure==="up"?"Higher highs and higher lows":"Lower highs and lower lows"}; close ${price(last!.close)} is ${side==="long"?"above a rising":"below a falling"} SMA55 ${price(ma55!)}.`,`${row!.structure==="up"?"高点与低点抬升":"高点与低点下移"}；收盘 ${price(last!.close)} 位于${side==="long"?"上行 SMA55 上方":"下行 SMA55 下方"} ${price(ma55!)}。`));
@@ -80,6 +87,12 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
   }
   if(side==="none"&&regime!=="range")limitations.push(say("Structure and trend evidence do not establish a directional strategy. No simultaneous long/short setups are proposed.","结构与趋势证据尚未建立方向策略，不同时提出多空入场。"));
   if(report.waveCount.status==="candidate")limitations.push(say("Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes.","艾略特标签为摆动形态假设，内部子浪尚未验证；同源价格指标不是独立投票。"));
+  if(report.entryStudy?.status==="available"){
+    const study=report.entryStudy,latest=study.candles.at(-1),known=study.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=Date.parse(report.snapshot.observedAt));
+    const recentLows=known.filter(a=>a.kind==="low").slice(-2),recentHighs=known.filter(a=>a.kind==="high").slice(-2);
+    const localSupport=recentLows.at(-1),localResistance=recentHighs.at(-1);
+    if(latest&&localSupport&&localResistance)evidence.push(say(`${study.timeframe} local structure: last close ${price(latest.close)}, confirmed low ${price(localSupport.price)}${recentLows.length===2&&localSupport.price>recentLows[0].price?" (higher low)":""}, confirmed high ${price(localResistance.price)}. A nearer reclaim/retest must be evaluated on its own evidence and nearest barrier; it is not ruled out by an older range-edge plan.`,`${study.timeframe} 局部结构：最近收盘 ${price(latest.close)}，确认低点 ${price(localSupport.price)}，确认高点 ${price(localResistance.price)}。更近的收复与回测须按自身证据和最近障碍评估，不能被旧区间边缘计划排除。`));
+  }
   const mapped=candidates.filter(c=>c.route.side===side&&c.route.objectiveIds.length>0&&c.route.protectionLevelId!==null&&(regime==="range"?c.path.kind==="range":c.path.direction!=='range'));
   // Within the chosen direction prefer actual recent entry evidence, then the
   // newest confirmed structural trigger. Never pick a side by a larger R multiple.
@@ -88,5 +101,5 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
   const chosen=mapped[0];
   if(side!=="none"&&!chosen)limitations.unshift(say("No supported target/protection map is available for this direction. Entry is unavailable.","此方向没有受支持目标与保护映射，入场不可用。"));
   if(chosen&&["opposing","unavailable"].includes(globalContextRelation(report,side)))limitations.push(say("Higher-timeframe context blocks entry until it is available and compatible.","高周期背景缺失或相反，入场须等待背景可用且相容。"));
-  return {selection:{version:"single-setup-v3",assessment,regime,rule:chosen?rule:"none",pathId:chosen?.path.id??null,side:chosen?.route.side??"none",evidence,limitations},plan:chosen?.plan??empty};
+  return {selection:{version:"single-setup-v4",assessment,regime,rule:chosen?rule:"none",pathId:chosen?.path.id??null,side:chosen?.route.side??"none",evidence,limitations},plan:chosen?.plan??empty};
 }

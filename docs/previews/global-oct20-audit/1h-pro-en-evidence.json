@@ -1,0 +1,223 @@
+{
+  "frame": "1H",
+  "observedAt": "2026-10-20T17:42:42.267Z",
+  "snapshot": {
+    "instId": "BTC-USDT",
+    "timeframe": "1H",
+    "source": "okx-public-spot",
+    "venue": "OKX Spot",
+    "priceCurrency": "USDT",
+    "observedAt": "2026-10-20T17:42:42.267Z",
+    "lastCandleTs": 1792512000000,
+    "price": 82770.1,
+    "pricePrecision": 2,
+    "completedOnly": true
+  },
+  "selection": {
+    "version": "single-setup-v4",
+    "assessment": "long",
+    "regime": "transition",
+    "rule": "structure_break",
+    "pathId": "recovery",
+    "side": "long",
+    "evidence": [
+      "Completed close 82,770.1 has broken both recent confirmed highs; price is above rising SMA55 81,996.18, with RSI14 60.82.",
+      "15m local structure: last close 82,725.4, confirmed low 82,213.2 (higher low), confirmed high 83,439.9. A nearer reclaim/retest must be evaluated on its own evidence and nearest barrier; it is not ruled out by an older range-edge plan."
+    ],
+    "limitations": [
+      "The break changes the prior swing structure before a new opposite pivot sequence is confirmed. A later held retest is still required; a break is not an entry fill.",
+      "SMA21 has not turned with the break. Its lag is disclosed; follow-through and entry protection remain necessary.",
+      "Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes."
+    ]
+  },
+  "plan": {
+    "side": "long",
+    "pathId": "recovery",
+    "state": "conditional",
+    "condition": "close_retest",
+    "triggerLevelId": "level-pivot-1792314000000-high",
+    "invalidationLevelId": "level-pivot-1792292400000-high",
+    "targetIds": [
+      "target-zone-long-pivot-1791900000000-high"
+    ],
+    "referenceEntry": [
+      82291.1,
+      82478.9
+    ],
+    "referenceStop": 82183.84,
+    "grossRewardRisk": 4.674642445604331,
+    "stopBufferAtr": 0.1,
+    "confirmationTs": 1792508400000,
+    "retestTs": 1792509300000,
+    "blockers": [
+      "entry_price"
+    ],
+    "method": "structure-v5",
+    "strategyId": "intraday",
+    "checkpointIds": [],
+    "firstObstacleRewardRisk": 3.256964685148809,
+    "structureConfirmationTs": 1792504800000,
+    "family": "breakout_retest",
+    "entryTimeframe": "15m",
+    "zone": [
+      82268.9,
+      82291.1
+    ],
+    "stopBasis": "15m reaction low / support + signal-time touch allowance",
+    "evidenceKind": "held_retest",
+    "signalExpiresAt": 1792518300000,
+    "watchOnly": false,
+    "entryObstacle": {
+      "price": 83439.9,
+      "timeframe": "15m",
+      "anchorTs": 1792507500000,
+      "knownAt": 1792511100000
+    },
+    "failure": null
+  },
+  "range": null,
+  "rangeAnchors": [],
+  "entryStudy": {
+    "timeframe": "15m",
+    "lastBars": [
+      {
+        "ts": 1792510200000,
+        "open": 82477.1,
+        "high": 82687.5,
+        "low": 82374.3,
+        "close": 82481.7,
+        "volume": 115.99794432,
+        "confirmed": true
+      },
+      {
+        "ts": 1792511100000,
+        "open": 82481.3,
+        "high": 82618.7,
+        "low": 82345.3,
+        "close": 82610.4,
+        "volume": 53.0735359,
+        "confirmed": true
+      },
+      {
+        "ts": 1792512000000,
+        "open": 82610.4,
+        "high": 82700,
+        "low": 82388,
+        "close": 82547.8,
+        "volume": 84.70634829,
+        "confirmed": true
+      },
+      {
+        "ts": 1792512900000,
+        "open": 82549.9,
+        "high": 82600,
+        "low": 82350,
+        "close": 82490.4,
+        "volume": 56.65487954,
+        "confirmed": true
+      },
+      {
+        "ts": 1792513800000,
+        "open": 82490.4,
+        "high": 82696.9,
+        "low": 82490.4,
+        "close": 82572.5,
+        "volume": 40.50281271,
+        "confirmed": true
+      },
+      {
+        "ts": 1792514700000,
+        "open": 82569.4,
+        "high": 82840,
+        "low": 82549.9,
+        "close": 82770.1,
+        "volume": 94.89488283,
+        "confirmed": true
+      },
+      {
+        "ts": 1792515600000,
+        "open": 82771.5,
+        "high": 82876.9,
+        "low": 82679.7,
+        "close": 82804,
+        "volume": 49.5375388,
+        "confirmed": true
+      },
+      {
+        "ts": 1792516500000,
+        "open": 82801.6,
+        "high": 82823,
+        "low": 82710.9,
+        "close": 82725.4,
+        "volume": 28.59867553,
+        "confirmed": true
+      }
+    ],
+    "recentConfirmedPivots": [
+      {
+        "id": "pivot-1792485000000-high",
+        "ts": 1792485000000,
+        "price": 81625.9,
+        "kind": "high",
+        "confirmedAt": 1792487700000,
+        "knownAt": 1792488600000
+      },
+      {
+        "id": "pivot-1792489500000-low",
+        "ts": 1792489500000,
+        "price": 81332,
+        "kind": "low",
+        "confirmedAt": 1792492200000,
+        "knownAt": 1792493100000
+      },
+      {
+        "id": "pivot-1792491300000-high",
+        "ts": 1792491300000,
+        "price": 81665.5,
+        "kind": "high",
+        "confirmedAt": 1792494000000,
+        "knownAt": 1792494900000
+      },
+      {
+        "id": "pivot-1792497600000-low",
+        "ts": 1792497600000,
+        "price": 81342.8,
+        "kind": "low",
+        "confirmedAt": 1792500300000,
+        "knownAt": 1792501200000
+      },
+      {
+        "id": "pivot-1792500300000-high",
+        "ts": 1792500300000,
+        "price": 81781.9,
+        "kind": "high",
+        "confirmedAt": 1792503000000,
+        "knownAt": 1792503900000
+      },
+      {
+        "id": "pivot-1792503000000-low",
+        "ts": 1792503000000,
+        "price": 81319.2,
+        "kind": "low",
+        "confirmedAt": 1792505700000,
+        "knownAt": 1792506600000
+      },
+      {
+        "id": "pivot-1792507500000-high",
+        "ts": 1792507500000,
+        "price": 83439.9,
+        "kind": "high",
+        "confirmedAt": 1792510200000,
+        "knownAt": 1792511100000
+      },
+      {
+        "id": "pivot-1792508400000-low",
+        "ts": 1792508400000,
+        "price": 82213.2,
+        "kind": "low",
+        "confirmedAt": 1792511100000,
+        "knownAt": 1792512000000
+      }
+    ]
+  }
+}

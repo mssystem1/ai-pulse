@@ -1,36 +1,104 @@
 {
-  "auditDate": "2026-10-20",
-  "tests": {
-    "command": "npm test",
-    "passed": 943,
-    "skipped": 1,
-    "failed": 0,
-    "skippedCase": "local Redis-compatible TCP/Lua: concurrent dedupe, exact volume and cold-reader persistence"
+  "checkedAt": "2026-10-20T21:34:27.858Z",
+  "method": "decision-v5 / structure-v5 / single-setup-v4",
+  "baselineCommit": "2125053",
+  "checks": [
+    {
+      "command": "npm test",
+      "exitCode": 0,
+      "passed": 948,
+      "skipped": 1,
+      "failed": 0,
+      "skipReason": "Optional local Redis TCP/Lua integration"
+    },
+    {
+      "command": "npm run test:global-backtest",
+      "exitCode": 0,
+      "passed": 7,
+      "failed": 0
+    },
+    {
+      "command": "npm run build",
+      "exitCode": 0,
+      "note": "Standard local build; parent-directory reads allowed for esbuild"
+    },
+    {
+      "command": "npm run build -w @pulse/web -- --configLoader runner",
+      "exitCode": 0,
+      "note": "Latest text and regenerated guide assets"
+    },
+    {
+      "command": "Focused final report and integrity tests",
+      "exitCode": 0,
+      "passed": 14,
+      "failed": 0
+    },
+    {
+      "command": "node scripts/audit-global-oct20-reports.mjs",
+      "exitCode": 0,
+      "cases": 16
+    },
+    {
+      "command": "node scripts/audit-global-oct20-browser.mjs",
+      "exitCode": 0,
+      "cases": 32,
+      "runtimeErrors": [],
+      "mutations": []
+    },
+    {
+      "command": "node scripts/summarize-global-backtest.mjs",
+      "exitCode": 0,
+      "ledgers": 16,
+      "tradesValidated": 103,
+      "dailyOhlcComparisons": 457,
+      "ambiguousStopTargetCandles": 0
+    }
+  ],
+  "productionModuleHashes": {
+    "packages/domain/dist/globalEntryPlan.js": "723e2255ad85e4c0fed6e18379b48c0294ab10dcd03b46ed3c0d9f9743a84333",
+    "packages/domain/dist/globalSetupSelection.js": "fd26e97036d9fbe63d54b8e4f9a9d018cfd6badb2b51a723c6badf209307900d",
+    "packages/analysis/dist/globalTradeMap.js": "a5ed3d44e124482decfe7635fc0a35554a933c50a22d0c6e7c8869b504e28d67"
   },
-  "build": {
-    "command": "npm run build",
-    "passed": true
+  "backtest": {
+    "scope": "Historical deterministic research-signal simulation; no live wallet execution",
+    "profitabilityValidated": false,
+    "noParameterOptimization": true,
+    "resultsFile": "docs/backtests/results.json",
+    "revisedSpotLong": [
+      {
+        "frame": "1H",
+        "trades": 15,
+        "wins": 1,
+        "netReturnPercent": -4.505604021861631
+      },
+      {
+        "frame": "4H",
+        "trades": 8,
+        "wins": 1,
+        "netReturnPercent": -3.1678654931212247
+      },
+      {
+        "frame": "1Dutc",
+        "trades": 4,
+        "wins": 0,
+        "netReturnPercent": -3.3059149086708706
+      },
+      {
+        "frame": "1Wutc",
+        "trades": 0,
+        "wins": 0,
+        "netReturnPercent": 0
+      }
+    ]
   },
-  "exports": {
-    "script": "scripts/audit-global-oct20-reports.mjs",
-    "cases": 16,
-    "passed": true
-  },
-  "browser": {
-    "script": "scripts/audit-global-oct20-browser.mjs",
-    "cases": 32,
-    "passed": true,
-    "runtimeErrors": 0,
-    "applicationMutations": 0,
-    "remoteRequestsBlocked": true
-  },
-  "guideImages": 9,
-  "modelCalls": 0,
+  "realModelCalls": 0,
   "walletPayments": 0,
   "telegramSends": 0,
-  "release": {
-    "requestedAction": "Local commit only; owner deploys manually",
-    "pushed": false,
-    "deployed": false
+  "liveTrades": 0,
+  "releaseAuthorization": {
+    "localCommit": true,
+    "push": false,
+    "deployment": false,
+    "operatorDeploysManually": true
   }
 }

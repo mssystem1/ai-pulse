@@ -8,10 +8,10 @@ export function globalEntryTimeframe(frame:string):string {
 }
 /** One geometry calculation for the saved plan, recheck and order-review band.
  * R:R constrains a measured setup zone; it never creates an entry by itself. */
-export function globalEntryGeometry(side:"long"|"short",zone:[number,number],stop:number,target:number,tick=0) {
+export function globalEntryGeometry(side:"long"|"short",zone:[number,number],stop:number,target:number,tick=0,constrain=true) {
   const sign=side==="long"?1:-1;
   const bound=(target+1.5*stop)/2.5;
-  const entry:[number,number]=side==="long"?[zone[0],Math.min(zone[1],bound)]:[Math.max(zone[0],bound),zone[1]];
+  const entry:[number,number]=!constrain?[...zone]:side==="long"?[zone[0],Math.min(zone[1],bound)]:[Math.max(zone[0],bound),zone[1]];
   if(tick>0){entry[0]=Number((Math.ceil((entry[0]-tick*1e-8)/tick)*tick).toPrecision(12));entry[1]=Number((Math.floor((entry[1]+tick*1e-8)/tick)*tick).toPrecision(12));}
   const band=entry[0]<=entry[1]?entry:zone;
   const worst=side==="long"?band[1]:band[0],risk=sign*(worst-stop),reward=sign*(target-worst);
@@ -62,13 +62,13 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   const rawPrices=sourceAnchors.map(a=>a.price).filter(p=>Math.abs(p-trigger!.price)<=atr*.5);
   const zone:[number,number]=[Math.min(trigger.price,...rawPrices),Math.max(trigger.price,...rawPrices)];
   const tolerance=Math.max(tick*2,atr*.1); // Profile's touch/noise allowance, disclosed in docs.
-  const allowanceAt=(at:number)=>Math.max(tick*2,(study.atr.filter(p=>p.ts<=at).at(-1)?.value??atr)*.1);
+  const allowanceAt=(at:number)=>Math.max(tick*2,(study.atr.filter(p=>(candleCloseTime(p.ts,study.timeframe)??Infinity)<=at).at(-1)?.value??tick*20)*.1);
   if(targets.some(l=>sign*(l.price-trigger!.price)<=0))return {...empty,blockers:["levels"]};
   const anchorBefore=(at:number)=>study.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=at&&(side==="long"?a.kind==="low"&&a.price<zone[0]:a.kind==="high"&&a.price>zone[1])).at(-1);
-  const recentAnchorBefore=(at:number)=>{const a=anchorBefore(at);if(!a)return undefined;const index=bars.findIndex(c=>c.ts===a.ts),current=bars.findIndex(c=>c.ts===at);return index>=0&&index>=current-32?a:undefined;};
+  const recentAnchorBefore=(at:number)=>{const a=anchorBefore(at);if(!a)return undefined;const index=bars.findIndex(c=>c.ts===a.ts),current=bars.filter(c=>c.ts<=at).length-1;return index>=0&&index>=current-32?a:undefined;};
   const protectionAllowance=(at:number)=>horizon&&!current?Math.max(tick*2,(report.indicators.atr.points.filter(p=>(candleCloseTime(p.ts,report.snapshot.timeframe)??Infinity)<=at).at(-1)?.value??report.indicators.atr.points[0]?.value??atr)*.1):allowanceAt(at);
   const stopFor=(test:GlobalCandle|undefined,at:number)=>{
-    const recent=recentAnchorBefore(at)?.price;
+    const recent=current&&test?undefined:recentAnchorBefore(at)?.price;
     const fallback=horizon&&!current?boundary.price:recent===undefined&&!test?boundary.price:undefined;
     // Until a range entry is confirmed, protect the full known support or
     // resistance zone. A minor lower-frame pivot inside it is not a defensible
@@ -106,7 +106,7 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
     if(confirmation&&!signal&&c.ts>confirmation.ts){
       const valid=family==="breakout_retest"?touch&&holds:side==="long"?c.close>confirmation.high:c.close<confirmation.low;
       if(valid){
-        signal=c;observedStop=stopFor(family==="breakout_retest"?c:confirmation,c.ts);
+        signal=c;observedStop=stopFor(family==="breakout_retest"?c:confirmation,candleCloseTime(c.ts,study.timeframe)??c.ts);
         const edge=family==="breakout_retest"?trigger.price:side==="long"?confirmation.high:confirmation.low;
         signalZone=side==="long"?[edge,Math.max(edge,c.close)]:[Math.min(edge,c.close),edge];
         if(side==="long"?c.high>=targets[0].price:c.low<=targets[0].price){failure={ts:c.ts,reason:"objective"};confirmation=undefined;signal=undefined;signalZone=undefined;observedStop=undefined;if(horizon){if(!current)failedStructureAt=structure!.closed;structureConfirmationTs=null;}}
@@ -117,19 +117,22 @@ export function deriveGlobalEntryPlan(report:GlobalReport,pathId?:string,forcedS
   const plannedZone:[number,number]=signalZone??watchZone;
   const reaction=family!=="breakout_retest"?confirmation:undefined;
   if(observedStop===undefined&&!reaction&&!recentAnchorBefore(last.ts)&&boundary.id===trigger.id)return {...empty,blockers:["levels"]};
-  const stop=observedStop??stopFor(reaction,last.ts),geometry=globalEntryGeometry(side,plannedZone,stop,targets[0].price,tick);
+  const stop=observedStop??stopFor(reaction,candleCloseTime(last.ts,study.timeframe)??last.ts),geometry=globalEntryGeometry(side,plannedZone,stop,targets[0].price,tick,!current);
   if(stop<=0||sign*((side==="long"?plannedZone[0]:plannedZone[1])-stop)<=0)return {...empty,blockers:["levels"]};
   if(!geometry.entry&&targets.some(l=>sign*(l.price-(side==="long"?plannedZone[1]:plannedZone[0]))<=0))return {...empty,blockers:["reward"]};
   const blockers:Plan["blockers"]=[];
   if(!confirmation)blockers.push("confirmation");if(!signal)blockers.push("retest");
   const checkpoints=(route?.checkpointIds??[]).flatMap(id=>level(id)??[]).filter(l=>sign*(l.price-(side==="long"?(geometry.entry??plannedZone)[1]:(geometry.entry??plannedZone)[0]))>0&&sign*(targets[0].price-l.price)>0).sort((a,b)=>sign*(a.price-b.price));
-  const firstObstacle=checkpoints[0]??targets[0],firstGeometry=globalEntryGeometry(side,geometry.entry??plannedZone,stop,firstObstacle.price,tick);
+  const entryEdge=side==="long"?(geometry.entry??plannedZone)[1]:(geometry.entry??plannedZone)[0];
+  const entryObstacle=current?study.pivots.filter(a=>a.kind===(side==="long"?"high":"low")&&a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=Date.parse(report.snapshot.observedAt)&&sign*(a.price-entryEdge)>tick&&sign*(targets[0].price-a.price)>tick&&!bars.some(c=>c.ts>=(candleCloseTime(a.confirmedAt!,study.timeframe)??Infinity)&&sign*(c.close-a.price)>tick*.5)).sort((a,b)=>sign*(a.price-b.price))[0]:undefined;
+  const firstObstacle=[...checkpoints,targets[0],...(entryObstacle?[entryObstacle]:[])].sort((a,b)=>sign*(a.price-b.price))[0],firstGeometry=globalEntryGeometry(side,geometry.entry??plannedZone,stop,firstObstacle.price,tick,!current);
   if(!geometry.entry||geometry.rr===null||geometry.rr<1.5||horizon&&(!firstGeometry.entry||firstGeometry.rr===null||firstGeometry.rr<1.5))blockers.push("reward");
   if(failure)blockers.push(failure.reason==="objective"?"expired":"cancelled");
   const entry=horizon?(firstGeometry.entry??geometry.entry??plannedZone):geometry.entry??plannedZone;
-  const objectiveRewardRisk=horizon?globalEntryGeometry(side,entry,stop,targets[0].price,tick).rr:geometry.rr;
+  const objectiveRewardRisk=horizon?globalEntryGeometry(side,entry,stop,targets[0].price,tick,!current).rr:geometry.rr;
   if(last.close<entry[0]||last.close>entry[1])blockers.push("entry_price");
   const closed=candleCloseTime(last.ts,study.timeframe),expires=closed===null?null:candleCloseTime(closed,study.timeframe);
   const stopBasis=current&&report.strategy?.targetPolicy==="active-zones-v1"&&path.direction==="range"&&!signal?`${report.snapshot.timeframe} full range boundary + ${study.timeframe} ATR allowance`:horizon&&!current?`${report.snapshot.timeframe} structural boundary + primary ATR allowance; ${study.timeframe} entry reaction`:signal?`${study.timeframe} ${side==="long"?"reaction low / support":"reaction high / resistance"} + signal-time touch allowance`:reaction?`${study.timeframe} observed reaction extreme + touch allowance`:recentAnchorBefore(last.ts)?`${study.timeframe} confirmed swing + touch allowance`:`${report.snapshot.timeframe} mapped boundary + ${study.timeframe} touch allowance`;
-  return {...empty,...(horizon?{strategyId:report.strategy?.id,checkpointIds:route?.checkpointIds??[],firstObstacleRewardRisk:firstGeometry.rr,structureConfirmationTs}:{}),side,pathId:path.id,state:blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:entry,referenceStop:stop,grossRewardRisk:objectiveRewardRisk,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers,zone,stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
+  const watchOnly=current&&!signal;
+  return {...empty,...(horizon?{strategyId:report.strategy?.id,checkpointIds:route?.checkpointIds??[],firstObstacleRewardRisk:watchOnly?null:firstGeometry.rr,structureConfirmationTs}:{}),...(entryObstacle?{entryObstacle:{price:entryObstacle.price,timeframe:study.timeframe,anchorTs:entryObstacle.ts,knownAt:candleCloseTime(entryObstacle.confirmedAt!,study.timeframe)!}}:{}),...(current?{watchOnly}:{}),side,pathId:path.id,state:watchOnly?"conditional":blockers.some(b=>["reward","cancelled","expired"].includes(b))?"avoid":blockers.length?"conditional":"confirmed",family,condition,triggerLevelId:trigger.id,invalidationLevelId:boundary.id,targetIds:targets.map(l=>l.id),referenceEntry:watchOnly?null:entry,referenceStop:watchOnly?null:stop,grossRewardRisk:watchOnly?null:objectiveRewardRisk,confirmationTs:confirmation?.ts??null,retestTs:signal?.ts??null,blockers:watchOnly?blockers.filter(b=>!["reward","entry_price"].includes(b)):blockers,zone,stopBasis:watchOnly?undefined:stopBasis,evidenceKind:family==="breakout_retest"?"held_retest":"follow_through",signalExpiresAt:expires,failure};
 }

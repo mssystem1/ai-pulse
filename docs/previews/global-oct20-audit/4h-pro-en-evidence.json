@@ -1,0 +1,266 @@
+{
+  "frame": "4H",
+  "observedAt": "2026-10-20T17:40:51.719Z",
+  "snapshot": {
+    "instId": "BTC-USDT",
+    "timeframe": "4H",
+    "source": "okx-public-spot",
+    "venue": "OKX Spot",
+    "priceCurrency": "USDT",
+    "observedAt": "2026-10-20T17:40:51.719Z",
+    "lastCandleTs": 1792497600000,
+    "price": 82610.4,
+    "pricePrecision": 2,
+    "completedOnly": true
+  },
+  "selection": {
+    "version": "single-setup-v4",
+    "assessment": "sideways",
+    "regime": "range",
+    "rule": "none",
+    "pathId": null,
+    "side": "none",
+    "evidence": [
+      "Confirmed range 80,680.5–84,166.3; no later completed close has broken its boundaries.",
+      "Support reference 80,680.5–81,200; resistance reference 84,147.1–84,166.3. These are observation zones, not planned entries.",
+      "1H local structure: last close 82,770.1, confirmed low 81,319.2 (higher low), confirmed high 82,268.9. A nearer reclaim/retest must be evaluated on its own evidence and nearest barrier; it is not ruled out by an older range-edge plan."
+    ],
+    "limitations": [
+      "No entry selected: neither range edge has a qualified reaction. Distance to an old support or resistance does not predict the next move. Entry and stop must come from a new observed reaction.",
+      "Elliott labels are a swing-pattern hypothesis; internal subwaves remain unverified. Indicators derived from the same prices are not independent votes."
+    ]
+  },
+  "plan": {
+    "side": "none",
+    "pathId": null,
+    "state": "none",
+    "condition": "close_retest",
+    "triggerLevelId": null,
+    "invalidationLevelId": null,
+    "targetIds": [],
+    "referenceEntry": null,
+    "referenceStop": null,
+    "grossRewardRisk": null,
+    "stopBufferAtr": 0.1,
+    "confirmationTs": null,
+    "retestTs": null,
+    "blockers": [
+      "levels"
+    ],
+    "method": "structure-v5",
+    "entryTimeframe": "1H"
+  },
+  "range": {
+    "lower": [
+      80680.5,
+      81200
+    ],
+    "upper": [
+      84147.1,
+      84166.3
+    ],
+    "anchorIds": [
+      "pivot-1791849600000-low",
+      "pivot-1792166400000-low",
+      "pivot-1792353600000-low",
+      "pivot-1792454400000-low",
+      "pivot-1791878400000-high",
+      "pivot-1791964800000-high"
+    ],
+    "startTs": 1791820800000,
+    "touches": 6
+  },
+  "rangeAnchors": [
+    {
+      "id": "pivot-1791849600000-low",
+      "ts": 1791849600000,
+      "price": 81032.8,
+      "kind": "low",
+      "confirmedAt": 1791892800000,
+      "knownAt": 1791907200000
+    },
+    {
+      "id": "pivot-1791878400000-high",
+      "ts": 1791878400000,
+      "price": 84166.3,
+      "kind": "high",
+      "confirmedAt": 1791921600000,
+      "knownAt": 1791936000000
+    },
+    {
+      "id": "pivot-1791964800000-high",
+      "ts": 1791964800000,
+      "price": 84147.1,
+      "kind": "high",
+      "confirmedAt": 1792008000000,
+      "knownAt": 1792022400000
+    },
+    {
+      "id": "pivot-1792166400000-low",
+      "ts": 1792166400000,
+      "price": 80809.5,
+      "kind": "low",
+      "confirmedAt": 1792209600000,
+      "knownAt": 1792224000000
+    },
+    {
+      "id": "pivot-1792353600000-low",
+      "ts": 1792353600000,
+      "price": 80680.5,
+      "kind": "low",
+      "confirmedAt": 1792396800000,
+      "knownAt": 1792411200000
+    },
+    {
+      "id": "pivot-1792454400000-low",
+      "ts": 1792454400000,
+      "price": 81200,
+      "kind": "low",
+      "confirmedAt": 1792497600000,
+      "knownAt": 1792512000000
+    }
+  ],
+  "entryStudy": {
+    "timeframe": "1H",
+    "lastBars": [
+      {
+        "ts": 1792486800000,
+        "open": 81547.2,
+        "high": 81619.3,
+        "low": 81332,
+        "close": 81494.7,
+        "volume": 101.27697462,
+        "confirmed": true
+      },
+      {
+        "ts": 1792490400000,
+        "open": 81494.7,
+        "high": 81665.5,
+        "low": 81475.2,
+        "close": 81558,
+        "volume": 57.66952504,
+        "confirmed": true
+      },
+      {
+        "ts": 1792494000000,
+        "open": 81558,
+        "high": 81659,
+        "low": 81450.1,
+        "close": 81504.2,
+        "volume": 126.85283043,
+        "confirmed": true
+      },
+      {
+        "ts": 1792497600000,
+        "open": 81503,
+        "high": 81781.9,
+        "low": 81342.8,
+        "close": 81619.8,
+        "volume": 90.37332532,
+        "confirmed": true
+      },
+      {
+        "ts": 1792501200000,
+        "open": 81619.9,
+        "high": 82171.8,
+        "low": 81319.2,
+        "close": 82154.9,
+        "volume": 266.76433081,
+        "confirmed": true
+      },
+      {
+        "ts": 1792504800000,
+        "open": 82154.9,
+        "high": 83439.9,
+        "low": 82100,
+        "close": 83272,
+        "volume": 1213.82243218,
+        "confirmed": true
+      },
+      {
+        "ts": 1792508400000,
+        "open": 83272.1,
+        "high": 83307.2,
+        "low": 82213.2,
+        "close": 82610.4,
+        "volume": 634.20413335,
+        "confirmed": true
+      },
+      {
+        "ts": 1792512000000,
+        "open": 82610.4,
+        "high": 82840,
+        "low": 82350,
+        "close": 82770.1,
+        "volume": 276.75892337,
+        "confirmed": true
+      }
+    ],
+    "recentConfirmedPivots": [
+      {
+        "id": "pivot-1792346400000-high",
+        "ts": 1792346400000,
+        "price": 81280.9,
+        "kind": "high",
+        "confirmedAt": 1792357200000,
+        "knownAt": 1792360800000
+      },
+      {
+        "id": "pivot-1792353600000-low",
+        "ts": 1792353600000,
+        "price": 80680.5,
+        "kind": "low",
+        "confirmedAt": 1792364400000,
+        "knownAt": 1792368000000
+      },
+      {
+        "id": "pivot-1792393200000-high",
+        "ts": 1792393200000,
+        "price": 83168.2,
+        "kind": "high",
+        "confirmedAt": 1792404000000,
+        "knownAt": 1792407600000
+      },
+      {
+        "id": "pivot-1792425600000-low",
+        "ts": 1792425600000,
+        "price": 81743.2,
+        "kind": "low",
+        "confirmedAt": 1792436400000,
+        "knownAt": 1792440000000
+      },
+      {
+        "id": "pivot-1792447200000-high",
+        "ts": 1792447200000,
+        "price": 82276.2,
+        "kind": "high",
+        "confirmedAt": 1792458000000,
+        "knownAt": 1792461600000
+      },
+      {
+        "id": "pivot-1792458000000-low",
+        "ts": 1792458000000,
+        "price": 81200,
+        "kind": "low",
+        "confirmedAt": 1792468800000,
+        "knownAt": 1792472400000
+      },
+      {
+        "id": "pivot-1792468800000-high",
+        "ts": 1792468800000,
+        "price": 82268.9,
+        "kind": "high",
+        "confirmedAt": 1792479600000,
+        "knownAt": 1792483200000
+      },
+      {
+        "id": "pivot-1792501200000-low",
+        "ts": 1792501200000,
+        "price": 81319.2,
+        "kind": "low",
+        "confirmedAt": 1792512000000,
+        "knownAt": 1792515600000
+      }
+    ]
+  }
+}

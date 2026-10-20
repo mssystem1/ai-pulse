@@ -59,22 +59,25 @@ try{
       await call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:width<600});
       await call('Page.navigate',{url:'about:blank'});await call('Page.navigate',{url:origin+'/shared-report#share=deployment_fixture_oct20_000000000000000000'});
       await wait('Boolean(document.querySelector("[data-global-version]"))');
-      await wait('Boolean(document.querySelector(".global-chart-overlay [data-trade-price-ledger]"))');
+      await wait('Boolean(document.querySelector(".global-chart-overlay [data-trade-price-ledger], .global-chart-overlay [data-setup-status]"))');
       const text=await evaluate('document.querySelector(".global-report").textContent');
-      assert.ok(text.includes(card.entry)&&text.includes(card.stop));assert.ok(text.includes(card.location));assert.ok(text.includes(decision.heading));
+      if(card){assert.ok(text.includes(card.entry)&&text.includes(card.stop));assert.ok(text.includes(card.location));}
+      else assert.ok(text.includes(currentReport.setupSelection.limitations[0]));
+      assert.ok(text.includes(decision.heading));
       assert.doesNotMatch(text,/#[0-9a-f]{8}\b/);assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,`${frame}/${tier}/${lang}/${width}: overflow`);
-      assert.equal(await evaluate('document.querySelectorAll("[data-trade-card]").length'),1);
-      assert.equal(await evaluate('document.querySelectorAll(".global-chart-overlay [data-scenario-projection]").length'),1);
-      assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-scenario-projection]").dataset.projectionOrigin'),'entry');
-      assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-role="+JSON.stringify("SL")+"]").dataset.price'),String(currentReport.tradePlan.referenceStop));
-      assert.equal(await evaluate('document.querySelector(".global-entry-detail [data-entry-price-role="+JSON.stringify("SL")+"]").dataset.price'),String(currentReport.tradePlan.referenceStop));
-      await evaluate('document.querySelector("[data-trade-card] button").click()');await pause(100);
-      assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-price-ledger]").dataset.tradePriceLedger'),card.key);
+      assert.equal(await evaluate('document.querySelectorAll("[data-trade-card]").length'),card?1:0);
+      assert.equal(await evaluate('document.querySelectorAll(".global-chart-overlay [data-scenario-projection]").length'),0);
+      if(currentReport.tradePlan.referenceStop!==null){
+        assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-role="+JSON.stringify("SL")+"]").dataset.price'),String(currentReport.tradePlan.referenceStop));
+        assert.equal(await evaluate('document.querySelector(".global-entry-detail [data-entry-price-role="+JSON.stringify("SL")+"]").dataset.price'),String(currentReport.tradePlan.referenceStop));
+        await evaluate('document.querySelector("[data-trade-card] button").click()');await pause(100);
+        assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-price-ledger]").dataset.tradePriceLedger'),card.key);
+      }else assert.equal(await evaluate('document.querySelectorAll(".global-chart-overlay [data-trade-role=SL]").length'),0);
       if(tier==='premium'&&lang==='en'){
         await evaluate('document.querySelector(".global-trade-plans").scrollIntoView({block:"start"})');
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,frame+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
       }
-      cases.push({frame,tier:currentReport.tier,lang,width,overflow:false,cards:1,entry:card.entry,stop:card.stop,projectionOrigin:'entry'});
+      cases.push({frame,tier:currentReport.tier,lang,width,overflow:false,cards:card?1:0,entry:card?.entry??null,stop:card?.stop??null,projection:false});
     }
   }
   assert.deepEqual(errors,[]);assert.deepEqual(mutations,[]);

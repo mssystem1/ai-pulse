@@ -1,0 +1,1202 @@
+[
+  {
+    "side": "short",
+    "entry": [
+      109730,
+      109872.7
+    ],
+    "stop": 110142.55,
+    "target": 106308.9,
+    "key": "[\"short\",\"breakout_retest\",1761955200000,1761958800000,109872.7]",
+    "signalAt": 1761962400000,
+    "availableAt": 1761962400000,
+    "confirmationTs": 1761955200000,
+    "retestTs": 1761958800000,
+    "primaryClose": 109604.1
+  },
+  {
+    "side": "short",
+    "entry": [
+      109730,
+      109872.7
+    ],
+    "stop": 110142.55,
+    "target": 106308.9,
+    "key": "[\"short\",\"breakout_retest\",1761955200000,1761958800000,109872.7]",
+    "signalAt": 1761966000000,
+    "availableAt": 1761962400000,
+    "confirmationTs": 1761955200000,
+    "retestTs": 1761958800000,
+    "primaryClose": 109604.1
+  },
+  {
+    "side": "short",
+    "entry": [
+      103327.5,
+      103514.5
+    ],
+    "stop": 103711.91,
+    "target": 98941.2,
+    "key": "[\"short\",\"breakout_retest\",1762430400000,1762434000000,103514.5]",
+    "signalAt": 1762437600000,
+    "availableAt": 1762437600000,
+    "confirmationTs": 1762430400000,
+    "retestTs": 1762434000000,
+    "primaryClose": 103237.9
+  },
+  {
+    "side": "short",
+    "entry": [
+      106012,
+      106308.9
+    ],
+    "stop": 106376.26,
+    "target": 101375,
+    "key": "[\"short\",\"breakout_retest\",1762804800000,1762815600000,106308.9]",
+    "signalAt": 1762819200000,
+    "availableAt": 1762819200000,
+    "confirmationTs": 1762804800000,
+    "retestTs": 1762815600000,
+    "primaryClose": 106012
+  },
+  {
+    "side": "short",
+    "entry": [
+      106012,
+      106308.9
+    ],
+    "stop": 106376.26,
+    "target": 101375,
+    "key": "[\"short\",\"breakout_retest\",1762804800000,1762815600000,106308.9]",
+    "signalAt": 1762822800000,
+    "availableAt": 1762819200000,
+    "confirmationTs": 1762804800000,
+    "retestTs": 1762815600000,
+    "primaryClose": 106012
+  },
+  {
+    "side": "short",
+    "entry": [
+      88104,
+      88240.3
+    ],
+    "stop": 88766.39,
+    "target": 80636.3,
+    "key": "[\"short\",\"resistance_rejection\",1764025200000,1764028800000,88611.7]",
+    "signalAt": 1764032400000,
+    "availableAt": 1764032400000,
+    "confirmationTs": 1764025200000,
+    "retestTs": 1764028800000,
+    "primaryClose": 88281.8
+  },
+  {
+    "side": "long",
+    "entry": [
+      92288,
+      92645.2
+    ],
+    "stop": 92175.44,
+    "target": 93836.5,
+    "key": "[\"long\",\"breakout_retest\",1765310400000,1765314000000,92288]",
+    "signalAt": 1765317600000,
+    "availableAt": 1765317600000,
+    "confirmationTs": 1765310400000,
+    "retestTs": 1765314000000,
+    "primaryClose": 93805
+  },
+  {
+    "side": "long",
+    "entry": [
+      92288,
+      92498.9
+    ],
+    "stop": 91948.59,
+    "target": 93836.5,
+    "key": "[\"long\",\"breakout_retest\",1765328400000,1765332000000,92288]",
+    "signalAt": 1765335600000,
+    "availableAt": 1765335600000,
+    "confirmationTs": 1765328400000,
+    "retestTs": 1765332000000,
+    "primaryClose": 92682.5
+  },
+  {
+    "side": "long",
+    "entry": [
+      92288,
+      92498.9
+    ],
+    "stop": 91948.59,
+    "target": 93836.5,
+    "key": "[\"long\",\"breakout_retest\",1765328400000,1765332000000,92288]",
+    "signalAt": 1765339200000,
+    "availableAt": 1765335600000,
+    "confirmationTs": 1765328400000,
+    "retestTs": 1765332000000,
+    "primaryClose": 92410.2
+  },
+  {
+    "side": "long",
+    "entry": [
+      91972.1,
+      92097
+    ],
+    "stop": 91889.38,
+    "target": 93836.5,
+    "key": "[\"long\",\"breakout_retest\",1765368000000,1765371600000,91972.1]",
+    "signalAt": 1765375200000,
+    "availableAt": 1765375200000,
+    "confirmationTs": 1765368000000,
+    "retestTs": 1765371600000,
+    "primaryClose": 92131
+  },
+  {
+    "side": "long",
+    "entry": [
+      91972.1,
+      92174.9
+    ],
+    "stop": 91838.97,
+    "target": 93836.5,
+    "key": "[\"long\",\"breakout_retest\",1765378800000,1765382400000,91972.1]",
+    "signalAt": 1765386000000,
+    "availableAt": 1765386000000,
+    "confirmationTs": 1765378800000,
+    "retestTs": 1765382400000,
+    "primaryClose": 92069.9
+  },
+  {
+    "side": "short",
+    "entry": [
+      90192,
+      90213.9
+    ],
+    "stop": 90413.96,
+    "target": 89500,
+    "key": "[\"short\",\"breakout_retest\",1765569600000,1765573200000,90213.9]",
+    "signalAt": 1765576800000,
+    "availableAt": 1765576800000,
+    "confirmationTs": 1765569600000,
+    "retestTs": 1765573200000,
+    "primaryClose": 90197.1
+  },
+  {
+    "side": "long",
+    "entry": [
+      90213.9,
+      90340.4
+    ],
+    "stop": 90168.78,
+    "target": 93564.4,
+    "key": "[\"long\",\"breakout_retest\",1765598400000,1765602000000,90213.9]",
+    "signalAt": 1765605600000,
+    "availableAt": 1765605600000,
+    "confirmationTs": 1765598400000,
+    "retestTs": 1765602000000,
+    "primaryClose": 90341.9
+  },
+  {
+    "side": "short",
+    "entry": [
+      86237.3,
+      86317.4
+    ],
+    "stop": 86386.99,
+    "target": 83833.4,
+    "key": "[\"short\",\"breakout_retest\",1765828800000,1765832400000,86317.4]",
+    "signalAt": 1765836000000,
+    "availableAt": 1765836000000,
+    "confirmationTs": 1765828800000,
+    "retestTs": 1765832400000,
+    "primaryClose": 86149.1
+  },
+  {
+    "side": "short",
+    "entry": [
+      86237.3,
+      86317.4
+    ],
+    "stop": 86386.99,
+    "target": 83833.4,
+    "key": "[\"short\",\"breakout_retest\",1765828800000,1765832400000,86317.4]",
+    "signalAt": 1765839600000,
+    "availableAt": 1765836000000,
+    "confirmationTs": 1765828800000,
+    "retestTs": 1765832400000,
+    "primaryClose": 86149.1
+  },
+  {
+    "side": "short",
+    "entry": [
+      87968.9,
+      88040.4
+    ],
+    "stop": 88256.59,
+    "target": 85147.7,
+    "key": "[\"short\",\"breakout_retest\",1765886400000,1765897200000,88040.4]",
+    "signalAt": 1765900800000,
+    "availableAt": 1765900800000,
+    "confirmationTs": 1765886400000,
+    "retestTs": 1765897200000,
+    "primaryClose": 87968.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88374.3
+    ],
+    "stop": 88090.56,
+    "target": 90375,
+    "key": "[\"long\",\"breakout_retest\",1767110400000,1767114000000,88364.9]",
+    "signalAt": 1767117600000,
+    "availableAt": 1767117600000,
+    "confirmationTs": 1767110400000,
+    "retestTs": 1767114000000,
+    "primaryClose": 89005
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88456.8
+    ],
+    "stop": 88322.25,
+    "target": 90375,
+    "key": "[\"long\",\"breakout_retest\",1767142800000,1767150000000,88364.9]",
+    "signalAt": 1767153600000,
+    "availableAt": 1767153600000,
+    "confirmationTs": 1767142800000,
+    "retestTs": 1767150000000,
+    "primaryClose": 88456.8
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88487
+    ],
+    "stop": 88241.01,
+    "target": 89400,
+    "key": "[\"long\",\"breakout_retest\",1767182400000,1767189600000,88364.9]",
+    "signalAt": 1767193200000,
+    "availableAt": 1767193200000,
+    "confirmationTs": 1767182400000,
+    "retestTs": 1767189600000,
+    "primaryClose": 89017.1
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88646.3
+    ],
+    "stop": 88340.33,
+    "target": 89400,
+    "key": "[\"long\",\"breakout_retest\",1767301200000,1767304800000,88364.9]",
+    "signalAt": 1767308400000,
+    "availableAt": 1767308400000,
+    "confirmationTs": 1767301200000,
+    "retestTs": 1767304800000,
+    "primaryClose": 88385.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88646.3
+    ],
+    "stop": 88340.33,
+    "target": 89400,
+    "key": "[\"long\",\"breakout_retest\",1767301200000,1767304800000,88364.9]",
+    "signalAt": 1767319200000,
+    "availableAt": 1767308400000,
+    "confirmationTs": 1767301200000,
+    "retestTs": 1767304800000,
+    "primaryClose": 88847.1
+  },
+  {
+    "side": "long",
+    "entry": [
+      88364.9,
+      88646.3
+    ],
+    "stop": 88340.33,
+    "target": 89400,
+    "key": "[\"long\",\"breakout_retest\",1767301200000,1767304800000,88364.9]",
+    "signalAt": 1767330000000,
+    "availableAt": 1767308400000,
+    "confirmationTs": 1767301200000,
+    "retestTs": 1767304800000,
+    "primaryClose": 88946.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      90713,
+      90736.1
+    ],
+    "stop": 90892.47,
+    "target": 89327.8,
+    "key": "[\"short\",\"resistance_rejection\",1768107600000,1768114800000,90875]",
+    "signalAt": 1768118400000,
+    "availableAt": 1768118400000,
+    "confirmationTs": 1768107600000,
+    "retestTs": 1768114800000,
+    "primaryClose": 90713
+  },
+  {
+    "side": "long",
+    "entry": [
+      96543,
+      96653.5
+    ],
+    "stop": 96432.86,
+    "target": 104039,
+    "key": "[\"long\",\"breakout_retest\",1768420800000,1768435200000,96543]",
+    "signalAt": 1768438800000,
+    "availableAt": 1768438800000,
+    "confirmationTs": 1768420800000,
+    "retestTs": 1768435200000,
+    "primaryClose": 96945.9
+  },
+  {
+    "side": "short",
+    "entry": [
+      67276.7,
+      67350
+    ],
+    "stop": 67435.42,
+    "target": 60000,
+    "key": "[\"short\",\"breakout_retest\",1770818400000,1770832800000,67350]",
+    "signalAt": 1770836400000,
+    "availableAt": 1770836400000,
+    "confirmationTs": 1770818400000,
+    "retestTs": 1770832800000,
+    "primaryClose": 66522
+  },
+  {
+    "side": "short",
+    "entry": [
+      67273.4,
+      67350
+    ],
+    "stop": 67677.77,
+    "target": 65759.1,
+    "key": "[\"short\",\"breakout_retest\",1770984000000,1770987600000,67350]",
+    "signalAt": 1770991200000,
+    "availableAt": 1770991200000,
+    "confirmationTs": 1770984000000,
+    "retestTs": 1770987600000,
+    "primaryClose": 67177
+  },
+  {
+    "side": "short",
+    "entry": [
+      64267.5,
+      64280
+    ],
+    "stop": 64482.23,
+    "target": 60000,
+    "key": "[\"short\",\"breakout_retest\",1771905600000,1771948800000,64280]",
+    "signalAt": 1771952400000,
+    "availableAt": 1771952400000,
+    "confirmationTs": 1771905600000,
+    "retestTs": 1771948800000,
+    "primaryClose": 63972.4
+  },
+  {
+    "side": "long",
+    "entry": [
+      68221,
+      68509.9
+    ],
+    "stop": 68120.53,
+    "target": 69999.9,
+    "key": "[\"long\",\"breakout_retest\",1772481600000,1772503200000,68221]",
+    "signalAt": 1772506800000,
+    "availableAt": 1772506800000,
+    "confirmationTs": 1772481600000,
+    "retestTs": 1772503200000,
+    "primaryClose": 68832.3
+  },
+  {
+    "side": "long",
+    "entry": [
+      68221,
+      68332
+    ],
+    "stop": 68118.76,
+    "target": 69999.9,
+    "key": "[\"long\",\"breakout_retest\",1772575200000,1772578800000,68221]",
+    "signalAt": 1772582400000,
+    "availableAt": 1772582400000,
+    "confirmationTs": 1772575200000,
+    "retestTs": 1772578800000,
+    "primaryClose": 68332
+  },
+  {
+    "side": "long",
+    "entry": [
+      68221,
+      68320
+    ],
+    "stop": 67902.46,
+    "target": 69999.9,
+    "key": "[\"long\",\"breakout_retest\",1772586000000,1772589600000,68221]",
+    "signalAt": 1772593200000,
+    "availableAt": 1772593200000,
+    "confirmationTs": 1772586000000,
+    "retestTs": 1772589600000,
+    "primaryClose": 68332
+  },
+  {
+    "side": "long",
+    "entry": [
+      73893,
+      74046.2
+    ],
+    "stop": 73725.16,
+    "target": 79335.5,
+    "key": "[\"long\",\"breakout_retest\",1773691200000,1773723600000,73893]",
+    "signalAt": 1773727200000,
+    "availableAt": 1773727200000,
+    "confirmationTs": 1773691200000,
+    "retestTs": 1773723600000,
+    "primaryClose": 74465.6
+  },
+  {
+    "side": "long",
+    "entry": [
+      73893,
+      74046.2
+    ],
+    "stop": 73725.16,
+    "target": 79335.5,
+    "key": "[\"long\",\"breakout_retest\",1773691200000,1773723600000,73893]",
+    "signalAt": 1773741600000,
+    "availableAt": 1773727200000,
+    "confirmationTs": 1773691200000,
+    "retestTs": 1773723600000,
+    "primaryClose": 74245.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      67120.3,
+      67360.1
+    ],
+    "stop": 67543.61,
+    "target": 65616.3,
+    "key": "[\"short\",\"breakout_retest\",1774771200000,1774836000000,67360.1]",
+    "signalAt": 1774839600000,
+    "availableAt": 1774839600000,
+    "confirmationTs": 1774771200000,
+    "retestTs": 1774836000000,
+    "primaryClose": 66017.2
+  },
+  {
+    "side": "short",
+    "entry": [
+      71484.1,
+      71636.6
+    ],
+    "stop": 72060.24,
+    "target": 67730.1,
+    "key": "[\"short\",\"range_sell\",1775635200000,1775642400000,71809.4]",
+    "signalAt": 1775646000000,
+    "availableAt": 1775646000000,
+    "confirmationTs": 1775635200000,
+    "retestTs": 1775642400000,
+    "primaryClose": 71636.5
+  },
+  {
+    "side": "long",
+    "entry": [
+      73807.2,
+      74094.2
+    ],
+    "stop": 73746.24,
+    "target": 76011.8,
+    "key": "[\"long\",\"breakout_retest\",1776139200000,1776189600000,73807.2]",
+    "signalAt": 1776193200000,
+    "availableAt": 1776193200000,
+    "confirmationTs": 1776139200000,
+    "retestTs": 1776189600000,
+    "primaryClose": 75328.2
+  },
+  {
+    "side": "long",
+    "entry": [
+      73807.2,
+      74094.2
+    ],
+    "stop": 73746.24,
+    "target": 76011.8,
+    "key": "[\"long\",\"breakout_retest\",1776139200000,1776189600000,73807.2]",
+    "signalAt": 1776207600000,
+    "availableAt": 1776193200000,
+    "confirmationTs": 1776139200000,
+    "retestTs": 1776189600000,
+    "primaryClose": 74219.4
+  },
+  {
+    "side": "long",
+    "entry": [
+      75429.9,
+      75839.4
+    ],
+    "stop": 75362.73,
+    "target": 78344.3,
+    "key": "[\"long\",\"breakout_retest\",1776715200000,1776783600000,75429.9]",
+    "signalAt": 1776787200000,
+    "availableAt": 1776787200000,
+    "confirmationTs": 1776715200000,
+    "retestTs": 1776783600000,
+    "primaryClose": 75839.4
+  },
+  {
+    "side": "long",
+    "entry": [
+      75429.9,
+      75839.4
+    ],
+    "stop": 75362.73,
+    "target": 78344.3,
+    "key": "[\"long\",\"breakout_retest\",1776715200000,1776783600000,75429.9]",
+    "signalAt": 1776790800000,
+    "availableAt": 1776787200000,
+    "confirmationTs": 1776715200000,
+    "retestTs": 1776783600000,
+    "primaryClose": 75839.4
+  },
+  {
+    "side": "long",
+    "entry": [
+      76954.1,
+      76994.2
+    ],
+    "stop": 76840.63,
+    "target": 77891.7,
+    "key": "[\"long\",\"breakout_retest\",1777608000000,1777615200000,76954.1]",
+    "signalAt": 1777618800000,
+    "availableAt": 1777618800000,
+    "confirmationTs": 1777608000000,
+    "retestTs": 1777615200000,
+    "primaryClose": 77130.6
+  },
+  {
+    "side": "long",
+    "entry": [
+      77880,
+      78200
+    ],
+    "stop": 77812.37,
+    "target": 79462.3,
+    "key": "[\"long\",\"breakout_retest\",1777651200000,1777669200000,77880]",
+    "signalAt": 1777672800000,
+    "availableAt": 1777672800000,
+    "confirmationTs": 1777651200000,
+    "retestTs": 1777669200000,
+    "primaryClose": 78363.5
+  },
+  {
+    "side": "long",
+    "entry": [
+      77880,
+      78200
+    ],
+    "stop": 77812.37,
+    "target": 79462.3,
+    "key": "[\"long\",\"breakout_retest\",1777651200000,1777669200000,77880]",
+    "signalAt": 1777676400000,
+    "availableAt": 1777672800000,
+    "confirmationTs": 1777651200000,
+    "retestTs": 1777669200000,
+    "primaryClose": 78363.5
+  },
+  {
+    "side": "short",
+    "entry": [
+      79699.1,
+      79839.9
+    ],
+    "stop": 80098.44,
+    "target": 78760.1,
+    "key": "[\"short\",\"breakout_retest\",1778760000000,1778763600000,79839.9]",
+    "signalAt": 1778767200000,
+    "availableAt": 1778767200000,
+    "confirmationTs": 1778760000000,
+    "retestTs": 1778763600000,
+    "primaryClose": 79250.5
+  },
+  {
+    "side": "short",
+    "entry": [
+      79163.1,
+      79198.6
+    ],
+    "stop": 79234.46,
+    "target": 78760.1,
+    "key": "[\"short\",\"breakout_retest\",1778889600000,1778893200000,79198.6]",
+    "signalAt": 1778896800000,
+    "availableAt": 1778896800000,
+    "confirmationTs": 1778889600000,
+    "retestTs": 1778893200000,
+    "primaryClose": 79116.6
+  },
+  {
+    "side": "short",
+    "entry": [
+      77086.3,
+      77129.5
+    ],
+    "stop": 77164.79,
+    "target": 74943.7,
+    "key": "[\"short\",\"breakout_retest\",1779076800000,1779087600000,77129.5]",
+    "signalAt": 1779091200000,
+    "availableAt": 1779091200000,
+    "confirmationTs": 1779076800000,
+    "retestTs": 1779087600000,
+    "primaryClose": 77086.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      77643.8,
+      77656
+    ],
+    "stop": 77837.22,
+    "target": 74943.7,
+    "key": "[\"short\",\"breakout_retest\",1779076800000,1779105600000,77656]",
+    "signalAt": 1779109200000,
+    "availableAt": 1779109200000,
+    "confirmationTs": 1779076800000,
+    "retestTs": 1779105600000,
+    "primaryClose": 77286.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      77023.1,
+      77129.5
+    ],
+    "stop": 77169.46,
+    "target": 74943.7,
+    "key": "[\"short\",\"breakout_retest\",1779152400000,1779170400000,77129.5]",
+    "signalAt": 1779174000000,
+    "availableAt": 1779174000000,
+    "confirmationTs": 1779152400000,
+    "retestTs": 1779170400000,
+    "primaryClose": 76788.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      77414.3,
+      77529.3
+    ],
+    "stop": 77564.77,
+    "target": 74258.6,
+    "key": "[\"short\",\"breakout_retest\",1779681600000,1779685200000,77529.3]",
+    "signalAt": 1779688800000,
+    "availableAt": 1779688800000,
+    "confirmationTs": 1779681600000,
+    "retestTs": 1779685200000,
+    "primaryClose": 77030.2
+  },
+  {
+    "side": "long",
+    "entry": [
+      63150,
+      63193.4
+    ],
+    "stop": 63130.24,
+    "target": 65423.7,
+    "key": "[\"long\",\"breakout_retest\",1785643200000,1785657600000,63150]",
+    "signalAt": 1785661200000,
+    "availableAt": 1785661200000,
+    "confirmationTs": 1785643200000,
+    "retestTs": 1785657600000,
+    "primaryClose": 63492.5
+  },
+  {
+    "side": "short",
+    "entry": [
+      63189,
+      63261.6
+    ],
+    "stop": 63292.75,
+    "target": 62457.1,
+    "key": "[\"short\",\"breakout_retest\",1785672000000,1785686400000,63261.6]",
+    "signalAt": 1785690000000,
+    "availableAt": 1785690000000,
+    "confirmationTs": 1785672000000,
+    "retestTs": 1785686400000,
+    "primaryClose": 63111.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      63150,
+      63211.9
+    ],
+    "stop": 63089.96,
+    "target": 63639.4,
+    "key": "[\"long\",\"breakout_retest\",1785715200000,1785718800000,63150]",
+    "signalAt": 1785722400000,
+    "availableAt": 1785722400000,
+    "confirmationTs": 1785715200000,
+    "retestTs": 1785718800000,
+    "primaryClose": 63574.6
+  },
+  {
+    "side": "long",
+    "entry": [
+      64542.7,
+      64647.7
+    ],
+    "stop": 64517.76,
+    "target": 65423.7,
+    "key": "[\"long\",\"breakout_retest\",1785960000000,1785974400000,64542.7]",
+    "signalAt": 1785978000000,
+    "availableAt": 1785978000000,
+    "confirmationTs": 1785960000000,
+    "retestTs": 1785974400000,
+    "primaryClose": 64659.3
+  },
+  {
+    "side": "long",
+    "entry": [
+      64542.7,
+      64619.9
+    ],
+    "stop": 64515.88,
+    "target": 65026.6,
+    "key": "[\"long\",\"breakout_retest\",1786032000000,1786035600000,64542.7]",
+    "signalAt": 1786039200000,
+    "availableAt": 1786039200000,
+    "confirmationTs": 1786032000000,
+    "retestTs": 1786035600000,
+    "primaryClose": 64630.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      65026.6,
+      65046.4
+    ],
+    "stop": 65011.51,
+    "target": 65388,
+    "key": "[\"long\",\"breakout_retest\",1786204800000,1786212000000,65026.6]",
+    "signalAt": 1786215600000,
+    "availableAt": 1786215600000,
+    "confirmationTs": 1786204800000,
+    "retestTs": 1786212000000,
+    "primaryClose": 65078.3
+  },
+  {
+    "side": "long",
+    "entry": [
+      63799.3,
+      63841.6
+    ],
+    "stop": 63776.57,
+    "target": 64500,
+    "key": "[\"long\",\"breakout_retest\",1786536000000,1786539600000,63799.3]",
+    "signalAt": 1786543200000,
+    "availableAt": 1786543200000,
+    "confirmationTs": 1786536000000,
+    "retestTs": 1786539600000,
+    "primaryClose": 64236.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      63694.8,
+      63799.3
+    ],
+    "stop": 63839.5,
+    "target": 63237.6,
+    "key": "[\"short\",\"breakout_retest\",1786564800000,1786593600000,63799.3]",
+    "signalAt": 1786597200000,
+    "availableAt": 1786597200000,
+    "confirmationTs": 1786564800000,
+    "retestTs": 1786593600000,
+    "primaryClose": 63648.3
+  },
+  {
+    "side": "short",
+    "entry": [
+      63134.5,
+      63237.6
+    ],
+    "stop": 63262.06,
+    "target": 62846.3,
+    "key": "[\"short\",\"breakout_retest\",1786708800000,1786723200000,63237.6]",
+    "signalAt": 1786726800000,
+    "availableAt": 1786726800000,
+    "confirmationTs": 1786708800000,
+    "retestTs": 1786723200000,
+    "primaryClose": 62984.7
+  },
+  {
+    "side": "short",
+    "entry": [
+      63084.2,
+      63125.7
+    ],
+    "stop": 63181.92,
+    "target": 62521.8,
+    "key": "[\"short\",\"resistance_rejection\",1786831200000,1786834800000,63150]",
+    "signalAt": 1786838400000,
+    "availableAt": 1786838400000,
+    "confirmationTs": 1786831200000,
+    "retestTs": 1786834800000,
+    "primaryClose": 63084.2
+  },
+  {
+    "side": "short",
+    "entry": [
+      63084.2,
+      63125.7
+    ],
+    "stop": 63181.92,
+    "target": 62521.8,
+    "key": "[\"short\",\"resistance_rejection\",1786831200000,1786834800000,63150]",
+    "signalAt": 1786849200000,
+    "availableAt": 1786838400000,
+    "confirmationTs": 1786831200000,
+    "retestTs": 1786834800000,
+    "primaryClose": 63084.2
+  },
+  {
+    "side": "long",
+    "entry": [
+      64630.3,
+      64730.8
+    ],
+    "stop": 64610.31,
+    "target": 65388,
+    "key": "[\"long\",\"breakout_retest\",1787090400000,1787094000000,64630.3]",
+    "signalAt": 1787097600000,
+    "availableAt": 1787097600000,
+    "confirmationTs": 1787090400000,
+    "retestTs": 1787094000000,
+    "primaryClose": 64730.8
+  },
+  {
+    "side": "long",
+    "entry": [
+      79515.7,
+      79689.4
+    ],
+    "stop": 79465.51,
+    "target": 81280,
+    "key": "[\"long\",\"breakout_retest\",1787846400000,1787893200000,79515.7]",
+    "signalAt": 1787896800000,
+    "availableAt": 1787896800000,
+    "confirmationTs": 1787846400000,
+    "retestTs": 1787893200000,
+    "primaryClose": 79812.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      79515.7,
+      79689.4
+    ],
+    "stop": 79465.51,
+    "target": 81280,
+    "key": "[\"long\",\"breakout_retest\",1787846400000,1787893200000,79515.7]",
+    "signalAt": 1787904000000,
+    "availableAt": 1787896800000,
+    "confirmationTs": 1787846400000,
+    "retestTs": 1787893200000,
+    "primaryClose": 79666
+  },
+  {
+    "side": "long",
+    "entry": [
+      79515.7,
+      79598
+    ],
+    "stop": 79471.11,
+    "target": 81280,
+    "key": "[\"long\",\"breakout_retest\",1787911200000,1787914800000,79515.7]",
+    "signalAt": 1787918400000,
+    "availableAt": 1787918400000,
+    "confirmationTs": 1787911200000,
+    "retestTs": 1787914800000,
+    "primaryClose": 79598
+  },
+  {
+    "side": "short",
+    "entry": [
+      77434.7,
+      77615.1
+    ],
+    "stop": 77689.66,
+    "target": 77000,
+    "key": "[\"short\",\"breakout_retest\",1788292800000,1788303600000,77615.1]",
+    "signalAt": 1788307200000,
+    "availableAt": 1788307200000,
+    "confirmationTs": 1788292800000,
+    "retestTs": 1788303600000,
+    "primaryClose": 77434.7
+  },
+  {
+    "side": "short",
+    "entry": [
+      77175.9,
+      77615.1
+    ],
+    "stop": 77664.51,
+    "target": 76416.6,
+    "key": "[\"short\",\"breakout_retest\",1788350400000,1788364800000,77615.1]",
+    "signalAt": 1788368400000,
+    "availableAt": 1788368400000,
+    "confirmationTs": 1788350400000,
+    "retestTs": 1788364800000,
+    "primaryClose": 77290
+  },
+  {
+    "side": "short",
+    "entry": [
+      77175.9,
+      77615.1
+    ],
+    "stop": 77664.51,
+    "target": 76416.6,
+    "key": "[\"short\",\"breakout_retest\",1788350400000,1788364800000,77615.1]",
+    "signalAt": 1788372000000,
+    "availableAt": 1788368400000,
+    "confirmationTs": 1788350400000,
+    "retestTs": 1788364800000,
+    "primaryClose": 77290
+  },
+  {
+    "side": "long",
+    "entry": [
+      77507.1,
+      78175.7
+    ],
+    "stop": 77440.81,
+    "target": 79768,
+    "key": "[\"long\",\"breakout_retest\",1789372800000,1789390800000,77507.1]",
+    "signalAt": 1789434000000,
+    "availableAt": 1789394400000,
+    "confirmationTs": 1789372800000,
+    "retestTs": 1789390800000,
+    "primaryClose": 78195.7
+  },
+  {
+    "side": "long",
+    "entry": [
+      84557.8,
+      84752.4
+    ],
+    "stop": 84496.43,
+    "target": 85199.8,
+    "key": "[\"long\",\"breakout_retest\",1790884800000,1790892000000,84557.8]",
+    "signalAt": 1790895600000,
+    "availableAt": 1790895600000,
+    "confirmationTs": 1790884800000,
+    "retestTs": 1790892000000,
+    "primaryClose": 84681.9
+  },
+  {
+    "side": "long",
+    "entry": [
+      85650,
+      85688.3
+    ],
+    "stop": 85339.8,
+    "target": 87283,
+    "key": "[\"long\",\"breakout_retest\",1790928000000,1790949600000,85650]",
+    "signalAt": 1790953200000,
+    "availableAt": 1790953200000,
+    "confirmationTs": 1790928000000,
+    "retestTs": 1790949600000,
+    "primaryClose": 86418.2
+  },
+  {
+    "side": "long",
+    "entry": [
+      84557.8,
+      84780.2
+    ],
+    "stop": 84456.49,
+    "target": 87283,
+    "key": "[\"long\",\"breakout_retest\",1790913600000,1790960400000,84557.8]",
+    "signalAt": 1790964000000,
+    "availableAt": 1790964000000,
+    "confirmationTs": 1790913600000,
+    "retestTs": 1790960400000,
+    "primaryClose": 85330.1
+  },
+  {
+    "side": "long",
+    "entry": [
+      84557.8,
+      84717.2
+    ],
+    "stop": 84527.53,
+    "target": 87238.3,
+    "key": "[\"long\",\"breakout_retest\",1791028800000,1791061200000,84557.8]",
+    "signalAt": 1791064800000,
+    "availableAt": 1791064800000,
+    "confirmationTs": 1791028800000,
+    "retestTs": 1791061200000,
+    "primaryClose": 84849.3
+  },
+  {
+    "side": "long",
+    "entry": [
+      85650,
+      85678.4
+    ],
+    "stop": 85573.16,
+    "target": 86994.3,
+    "key": "[\"long\",\"breakout_retest\",1791244800000,1791248400000,85650]",
+    "signalAt": 1791252000000,
+    "availableAt": 1791252000000,
+    "confirmationTs": 1791244800000,
+    "retestTs": 1791248400000,
+    "primaryClose": 85759.7
+  },
+  {
+    "side": "short",
+    "entry": [
+      82242.3,
+      82556.6
+    ],
+    "stop": 82602.1,
+    "target": 80133.4,
+    "key": "[\"short\",\"breakout_retest\",1791475200000,1791518400000,82556.6]",
+    "signalAt": 1791522000000,
+    "availableAt": 1791522000000,
+    "confirmationTs": 1791475200000,
+    "retestTs": 1791518400000,
+    "primaryClose": 82419.7
+  },
+  {
+    "side": "short",
+    "entry": [
+      82849.9,
+      82874.5
+    ],
+    "stop": 82931.02,
+    "target": 80400,
+    "key": "[\"short\",\"breakout_retest\",1791576000000,1791608400000,82874.5]",
+    "signalAt": 1791612000000,
+    "availableAt": 1791612000000,
+    "confirmationTs": 1791576000000,
+    "retestTs": 1791608400000,
+    "primaryClose": 82600
+  },
+  {
+    "side": "short",
+    "entry": [
+      83110.5,
+      83174.7
+    ],
+    "stop": 83194.56,
+    "target": 80400,
+    "key": "[\"short\",\"breakout_retest\",1791604800000,1791651600000,83174.7]",
+    "signalAt": 1791655200000,
+    "availableAt": 1791655200000,
+    "confirmationTs": 1791604800000,
+    "retestTs": 1791651600000,
+    "primaryClose": 83057.6
+  },
+  {
+    "side": "long",
+    "entry": [
+      83530.1,
+      83628.5
+    ],
+    "stop": 83326.08,
+    "target": 84361.6,
+    "key": "[\"long\",\"breakout_retest\",1791878400000,1791882000000,83530.1]",
+    "signalAt": 1791885600000,
+    "availableAt": 1791885600000,
+    "confirmationTs": 1791878400000,
+    "retestTs": 1791882000000,
+    "primaryClose": 83857.8
+  },
+  {
+    "side": "short",
+    "entry": [
+      80892.1,
+      81032.8
+    ],
+    "stop": 81130.1,
+    "target": 80400,
+    "key": "[\"short\",\"breakout_retest\",1792040400000,1792044000000,81032.8]",
+    "signalAt": 1792047600000,
+    "availableAt": 1792047600000,
+    "confirmationTs": 1792040400000,
+    "retestTs": 1792044000000,
+    "primaryClose": 80920.1
+  },
+  {
+    "side": "short",
+    "entry": [
+      82416.7,
+      82556.6
+    ],
+    "stop": 82712.25,
+    "target": 80400,
+    "key": "[\"short\",\"breakout_retest\",1792008000000,1792076400000,82556.6]",
+    "signalAt": 1792080000000,
+    "availableAt": 1792080000000,
+    "confirmationTs": 1792008000000,
+    "retestTs": 1792076400000,
+    "primaryClose": 82416.7
+  },
+  {
+    "side": "short",
+    "entry": [
+      82416.7,
+      82556.6
+    ],
+    "stop": 82712.25,
+    "target": 80400,
+    "key": "[\"short\",\"breakout_retest\",1792008000000,1792076400000,82556.6]",
+    "signalAt": 1792087200000,
+    "availableAt": 1792080000000,
+    "confirmationTs": 1792008000000,
+    "retestTs": 1792076400000,
+    "primaryClose": 82416.7
+  },
+  {
+    "side": "long",
+    "entry": [
+      82291.1,
+      82416.2
+    ],
+    "stop": 82081.21,
+    "target": 84147.1,
+    "key": "[\"long\",\"breakout_retest\",1792382400000,1792404000000,82291.1]",
+    "signalAt": 1792407600000,
+    "availableAt": 1792407600000,
+    "confirmationTs": 1792382400000,
+    "retestTs": 1792404000000,
+    "primaryClose": 82720.5
+  },
+  {
+    "side": "long",
+    "entry": [
+      82291.1,
+      82416.2
+    ],
+    "stop": 82081.21,
+    "target": 84147.1,
+    "key": "[\"long\",\"breakout_retest\",1792382400000,1792404000000,82291.1]",
+    "signalAt": 1792411200000,
+    "availableAt": 1792407600000,
+    "confirmationTs": 1792382400000,
+    "retestTs": 1792404000000,
+    "primaryClose": 82357.7
+  }
+]

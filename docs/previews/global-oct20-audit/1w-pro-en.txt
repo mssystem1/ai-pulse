@@ -2,19 +2,19 @@ PULSE research report
 BTC-USDT · 1W (UTC) · Global Pro
 2026-10-20 17:44 UTC
 
-MACRO · BIAS LONG · Entry needs better reward to TP1
-The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry. Reclaiming and holding 82,842.00 would reopen recovery toward 87,399.00 → 97,925.40 → 124,500.00.
+MACRO · BIAS LONG · Watch structure · Entry and SL not established
+Watch structure · Entry and SL not established. Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. Reclaiming and holding 82,842.00 would reopen recovery toward 87,399.00 → 97,925.40 → 124,500.00.
 
 MARKET SNAPSHOT
 • OKX Spot · USDT · okx-public-spot
 • Reference: last completed 1W (UTC) close 82,109.30 USDT · bar closed 2026-10-19 00:00 UTC; not a live quote.
 
 CURRENT DECISION
-• MACRO · BIAS LONG · Entry needs better reward to TP1
+• MACRO · BIAS LONG · Watch structure · Entry and SL not established
 • Market view: Structural recovery
 • Reclaiming and holding 82,842.00 would reopen recovery toward 87,399.00 → 97,925.40 → 124,500.00.
-• The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry.
-• LONG · R:R to TP1: 1.25; minimum 1.50 before costs.
+• Watch structure · Entry and SL not established. Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level.
+• LONG · R:R to TP1: —; minimum 1.50 before costs.
 • 1M (UTC) · mixed
 • A lower-timeframe pullback or rebound can occur within the broader structure; each horizon needs its own confirmation.
 • Reassess after a completed 1W (UTC) close below 80,636.30; an entered position uses its actual protective stop.
@@ -23,26 +23,27 @@ STRATEGY AND HOLDING HORIZON
 • MACRO · 1W (UTC) · months and longer
 • Selected strategy: Structural recovery / reversal
 • Structural recovery; close 82,109.3 above rising SMA21 71,678.23, RSI14 57.24.
+• 1D (UTC) local structure: last close 81,943.8, confirmed low 79,775.1, confirmed high 84,361.6. A nearer reclaim/retest must be evaluated on its own evidence and nearest barrier; it is not ruled out by an older range-edge plan.
 • SMA55 has not turned with the recovery. This is a reversal hypothesis, not an established long-term trend.
 • 1D (UTC) confirms entry and establishes the trade SL.
 
 NEXT CONDITION
-• The selected setup needs better reward to TP1. A new supported structure is required; another confirmation alone does not qualify entry.
+• Watch structure · Entry and SL not established. Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level.
 • Before order review, verify the entry signal, SL, TP1 and current quote costs.
 
 SELECTED ENTRY EVIDENCE
-• BUY / LONG · Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. R:R to TP1 1.25; minimum 1.50 before costs.
+• BUY / LONG · Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. Entry confirmation required.
 
 SELECTED SETUP · ENTRY / SL / TP
-• LONG / BUY · Entry needs better reward to TP1
-• Entry (planned): 82,842.00–83,049.14 · SL (planned): 79,567.96
-• TP1 87,399.00 (+5.24%) → TP2 97,925.40 (+17.91%) → TP3 124,500.00 (+49.91%)
+• LONG / BUY · Watch structure · Entry and SL not established
+• Entry (planned): After a new price reaction · SL (planned): After a new price reaction
+• TP1 87,399.00 → TP2 97,925.40 → TP3 124,500.00
 • TP1 basis: 1W (UTC) · confirmed swing · 2026-09-21
 • TP2 basis: 1W (UTC) · confirmed swing · 2026-01-12
 • TP3 basis: 1W (UTC) · confirmed swing · 2025-08-11
-• 1D (UTC) last completed close 81,943.80; planned entry is 1.35% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.30R before costs (minimum 1.50R).
+• Nearest entry-frame barrier: 1D (UTC) 84,361.60; reward/risk —R.
 • Trigger: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level
-• R:R to TP1: 1.25 · Entry–SL: 4.19%. Planned prices; entry signal is not confirmed.
+• R:R to TP1: —. Observation references; entry signal is not confirmed.
 
 TIMEFRAME MAP
 • 1W (UTC) · Up · closed 2026-10-19T00:00:00.000Z
@@ -60,7 +61,7 @@ CHART TIMEFRAMES
 POSSIBLE MOVES
 • ① Main · Continuation
 • 1W (UTC) structure route: above 82,842.00, references 87,399.00 → 97,925.40 → 124,500.00.
-• Entry: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. R:R to TP1 1.25; minimum 1.50 before costs.
+• Entry: Completed 1W (UTC) close above 82,842; then a later 1D (UTC) retest holding that level. Entry confirmation required.
 
 ELLIOTT HYPOTHESIS
 • Count unclear
@@ -76,9 +77,6 @@ PRO EVIDENCE
 • RSI14 57.24 · ATR14 6,142.71 · volume / prior 20 bars 0.79×
 • 1M (UTC) · mixed · SMA55 59,493.97
 • Oversold RSI alone does not confirm entry. SMAs, waves and Fibonacci share price evidence; they are not independent votes.
-
-RISK REFERENCE
-• 4.19% · 1.68 × 1D (UTC) ATR14
 
 HISTORICAL SUPPORT / RESISTANCE
 • Historical resistance 82,842 · 1W (UTC) · context only; not a TP in this plan

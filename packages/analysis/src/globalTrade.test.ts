@@ -25,28 +25,27 @@ test("current reports reject mixed strategy versions and invented historical con
 for(const [frame,at,ref] of delta.requests)test(`${frame}: uploaded v4 numeric identity survives the revised method`,()=>{
   const original=replay(frame,at,"decision-v4");assert.equal(globalArtifactReference(original),ref);
 });
-for(const r of reports)test(`${r.snapshot.timeframe}: one saved setup exposes canonical Entry, SL and ordered TP1–TP3`,()=>{
+for(const r of reports)test(`${r.snapshot.timeframe}: a saved watch map keeps ordered references without claiming observed entry prices`,()=>{
   const cards=globalTradeCards(r),txt=globalTradeCardLines(r).join("\n"),svg=globalReportChartSvg(r)!;
   assert.equal(cards.length,1);assert.equal(cards[0].side,r.tradePlan!.side);
-  for(const c of cards){assert.ok(c.plan.referenceEntry);assert.ok(c.plan.referenceStop);assert.ok(txt.includes(c.entry));assert.ok(txt.includes(c.stop));assert.ok(c.targets.length<=3&&c.targets.length>0);assert.ok(c.targets.every((t,i)=>i===0||(c.side==="long"?1:-1)*(t.price-c.targets[i-1].price)>0));}
+  for(const c of cards){assert.equal(c.plan.watchOnly,true);assert.equal(c.plan.referenceEntry,null);assert.equal(c.plan.referenceStop,null);assert.ok(txt.includes(c.entry));assert.ok(txt.includes(c.stop));assert.ok(c.targets.length<=3&&c.targets.length>0);assert.ok(c.targets.every((t,i)=>i===0||(c.side==="long"?1:-1)*(t.price-c.targets[i-1].price)>0));}
   assert.ok(!/CHECKPOINT|OBJECTIVE|WATCH AREA|VIEW CHANGE|NO TRADE|WAIT|EXPIRED|INVALIDATED/.test(svg));
-  for(const role of ["Entry","SL","TP1","TP2","TP3"])assert.ok(svg.includes(`data-trade-role="${role}"`),role+" is drawn despite missing confirmation");
-  assert.ok(svg.includes('data-price-labels="exact"'));assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,1,"One conditional projection accompanies the setup");
-  for(const role of ["Entry","SL","TP1"])assert.ok(globalEntryStudySvg(r)!.includes(`data-entry-price-role="${role}"`));
+  assert.ok(svg.includes('data-setup-status="unavailable"'));assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,0);
+  for(const role of ["Entry","SL"])assert.ok(!globalEntryStudySvg(r)!.includes(`data-entry-price-role="${role}"`));
   assert.ok(globalDefaultChartLayers(r).fibonacci);assert.ok(globalDefaultChartLayers(r).allSmas);assert.ok(globalDefaultChartLayers(r).regression);
   assert.equal(GlobalReportSchema.safeParse(r).success,true);
 });
-test("weekly near-term TP sequence precedes historical six-figure resistance and uses daily trade protection",()=>{
+test("weekly reference sequence precedes archive resistance without inventing daily protection before a reaction",()=>{
   const r=reports.find(r=>r.snapshot.timeframe==="1Wutc")!,long=globalTradeCandidateCards(r).find(c=>c.side==="long")!,short=globalTradeCandidateCards(r).find(c=>c.side==="short")!;
   assert.deepEqual(long.targets.map(t=>t.price),[89111,98188.4,108365]);assert.ok(long.targets.every(t=>t.price!==124500));
-  assert.ok(long.targets.every(t=>t.source.includes("confirmed swing")&&t.source.includes("1W (UTC)")));assert.ok(long.targets[0].movePercent!>7&&long.targets[0].movePercent!<8);
-  assert.ok(long.plan.referenceStop!>78000&&long.plan.referenceStop!<81000);assert.ok(short.plan.referenceStop!<90000,"Old 124,500 weekly high is not a short SL");
+  assert.ok(long.targets.every(t=>t.source.includes("confirmed swing")&&t.source.includes("1W (UTC)")));assert.equal(long.targets[0].movePercent,null);
+  assert.equal(long.plan.referenceStop,null);assert.equal(short.plan.referenceStop,null);
   assert.match(globalHistoricalLevelLines(r).join("\n"),/Historical resistance 124,500.*not a TP/);
-  assert.ok(short.riskPercent!<5,"No 51% short risk generated from an archive high");
+  assert.equal(short.riskPercent,null,"No numerical risk without observed protection");
 });
-test("daily weak reward remains explicit while its planned Entry and SL stay visible",()=>{
+test("an unobserved daily reaction cannot claim a numerical entry, stop or reward",()=>{
   const r=reports.find(r=>r.snapshot.timeframe==="1Dutc")!,card=globalTradeCards(r).find(c=>c.side==="long")!;
-  assert.ok(card.rr!<1.5);assert.equal(card.confirmed,false);assert.match(card.state,/TP1/);assert.ok(card.plan.blockers.includes("reward"));
+  assert.equal(card.rr,null);assert.equal(card.confirmed,false);assert.match(card.state,/not established/);assert.equal(card.plan.referenceEntry,null);
   assert.ok(globalTradeCardLines(r).join("\n").includes(card.stop));assert.equal(globalDecision(r).qualified,false);
 });
 for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])for(const side of ["long","short"] as const)for(const family of ["breakout_retest","reaction"] as const)test(`${frame} ${side} ${family}: real chronological entry evidence can qualify v5`,()=>{
@@ -68,15 +67,16 @@ test("recheck and saved plan retain the same observed prices and trading timefra
   assert.equal(a.state,"technical_valid",JSON.stringify(a));assert.deepEqual(a.permittedEntry,p.referenceEntry);assert.equal(a.observedStop,p.referenceStop);assert.deepEqual(a.targets,[110]);
 });
 test("range plans never include entry prices inside the SL allowance",()=>{
-  const r=reports.find(r=>r.snapshot.timeframe==="4H")!;
-  for(const c of globalTradeCards(r)){const p=c.plan;assert.ok(p.referenceEntry&&p.referenceStop);const nearest=Math.min(...p.referenceEntry!.map(v=>Math.abs(v-p.referenceStop!)));assert.ok(nearest>1,"Planned band has meaningful separation from SL");}
+  const {report:r}=tradePlanFixture();
+  for(const c of globalTradeCards(r)){const p=c.plan;assert.ok(p.referenceEntry&&p.referenceStop);assert.ok(c.side==="long"?p.referenceStop<p.referenceEntry[0]:p.referenceStop>p.referenceEntry[1],"The entire observed band stays on the protected side of SL");}
 });
 
 test("an opposite-side drawing option cannot publish a second setup",()=>{
-  const r=reports.find(r=>r.snapshot.timeframe==="4H")!,card=globalTradeCards(r)[0],other=globalTradeCandidateCards(r).find(c=>c.side!==card.side)!;
-  const svg=globalReportChartSvg(r,{selectedPathId:other.key})!,inset=globalEntryStudySvg(r,660,other.key)!;
+  const {report:r}=tradePlanFixture(),card=globalTradeCards(r)[0],other="unpublished-opposite-plan";
+  const svg=globalReportChartSvg(r,{selectedPathId:other})!,inset=globalEntryStudySvg(r,660,other)!;
   assert.ok(svg.includes(`data-trade-plan="${card.key}"`));
-  for(const output of [svg,inset])assert.ok(output.includes(`data-entry-price-role="SL" data-price="${card.plan.referenceStop}"`),"Entry inset follows the selected trade");
+  assert.ok(inset.includes(`data-entry-price-role="SL" data-price="${card.plan.referenceStop}"`),"Entry inset follows the selected trade");
+  assert.ok(svg.includes(`data-trade-role="SL" data-price="${card.plan.referenceStop}"`));
 });
 
 test("the saved selected plan controls the single headline, chart and conditional projection",()=>{
@@ -88,8 +88,8 @@ test("the saved selected plan controls the single headline, chart and conditiona
   for(const lang of ["en","zh"] as const){
     r.lang=lang;const d=globalDecision(r),svg=globalReportChartSvg(r)!;
     assert.equal(d.qualified,false);assert.equal(d.direction,alternative.side==="long"?"LONG":"SHORT");
-    assert.ok(svg.includes(`data-trade-plan="${alternative.key}"`));
-    assert.ok(svg.includes(d.heading));assert.ok(svg.includes('data-scenario-projection="conditional"'));assert.equal(globalTradeCards(r).length,1);
+    assert.ok(svg.includes('data-setup-status="unavailable"'));
+    assert.ok(svg.includes(d.heading));assert.ok(!svg.includes('data-scenario-projection="conditional"'));assert.equal(globalTradeCards(r).length,1);
   }
 });
 

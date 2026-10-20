@@ -1,6 +1,6 @@
 {
   "purpose": "Historical educational examples, not current trade signals",
-  "method": "decision-v5 / structure-v5 / horizon-v2 / active-zones-v1 / single-setup-v3",
+  "method": "decision-v5 / structure-v5 / horizon-v2 / active-zones-v1 / single-setup-v4",
   "sources": [
     {
       "path": "packages/analysis/src/globalReport.oct17-fixtures.json",
@@ -19,7 +19,7 @@
       "shownCandles": 123
     },
     "4H": {
-      "reference": "cdedf642",
+      "reference": "81f75473",
       "observedAt": "2026-10-17T21:14:44.983Z",
       "savedCandles": 520,
       "shownCandles": 180
@@ -31,13 +31,13 @@
       "shownCandles": 260
     },
     "1Wutc": {
-      "reference": "ee1d8b11",
+      "reference": "7df0a652",
       "observedAt": "2026-10-17T21:12:39.757Z",
       "savedCandles": 457,
       "shownCandles": 260
     },
     "15m": {
-      "reference": "6b74d8f3",
+      "reference": "a4227db8",
       "observedAt": "2026-10-17T21:16:16.779Z",
       "savedCandles": 520,
       "shownCandles": 96

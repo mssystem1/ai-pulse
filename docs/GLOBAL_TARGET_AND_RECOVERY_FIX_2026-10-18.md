@@ -1,5 +1,7 @@
 # BTC Global target and processing incident — 18 October 2026
 
+Historical incident record. Current entry-evidence rules, limitations and backtest results are documented in the [reopened October 20 audit](GLOBAL_REPORT_AUDIT_2026-10-20.md).
+
 **Subsequent strategy correction:** the [single-setup audit](GLOBAL_SINGLE_SETUP_STRATEGY_2026-10-18.md) adds one strategy per report and restores its conditional projected move while retaining every target/recovery fix here. The LONG prices below are forensic candidate calculations, not a second published setup. Earlier target-only artifacts are historical intermediate results.
 
 The reported daily report `9d763a0a` had a real target-selection defect. LONG Entry was 82,285–82,357.02, SL 80,737.48, and TP1 82,473.60: only 116.58 above the least favorable entry, approximately **0.14% / 0.07R**. The previous audit checked consistent prices across outputs but did not catch that this historical pivot had lost its resistance role. Its target-selection conclusion is superseded by this correction.

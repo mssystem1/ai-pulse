@@ -13,16 +13,16 @@
       "state": "Watch only · pullback required",
       "entry": [
         82291.1,
-        82311.9
+        82478.9
       ],
-      "stop": 81281.04,
+      "stop": 82183.84,
       "targets": [
         83858.2
       ],
-      "grossRewardRisk": 1.500009700638304,
-      "location": "15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R).",
+      "grossRewardRisk": 4.674642445604331,
+      "location": "15m last completed close 82,725.40; planned entry is 0.30% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.09R before costs (minimum 1.50R).",
       "captionCharacters": 468,
-      "messageCharacters": 1574
+      "messageCharacters": 1655
     },
     {
       "frame": "1H",
@@ -36,16 +36,16 @@
       "state": "仅观察；等待回调",
       "entry": [
         82291.1,
-        82311.9
+        82478.9
       ],
-      "stop": 81281.04,
+      "stop": 82183.84,
       "targets": [
         83858.2
       ],
-      "grossRewardRisk": 1.500009700638304,
-      "location": "15m 最近完整收盘 82,725.40；计划入场低于该收盘 0.50%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 0.78R（门槛 1.50R）。",
+      "grossRewardRisk": 4.674642445604331,
+      "location": "15m 最近完整收盘 82,725.40；计划入场低于该收盘 0.30%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 2.09R（门槛 1.50R）。",
       "captionCharacters": 296,
-      "messageCharacters": 917
+      "messageCharacters": 960
     },
     {
       "frame": "1H",
@@ -59,16 +59,16 @@
       "state": "Watch only · pullback required",
       "entry": [
         82291.1,
-        82311.9
+        82478.9
       ],
-      "stop": 81281.04,
+      "stop": 82183.84,
       "targets": [
         83858.2
       ],
-      "grossRewardRisk": 1.500009700638304,
-      "location": "15m last completed close 82,725.40; planned entry is 0.50% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.78R before costs (minimum 1.50R).",
+      "grossRewardRisk": 4.674642445604331,
+      "location": "15m last completed close 82,725.40; planned entry is 0.30% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.09R before costs (minimum 1.50R).",
       "captionCharacters": 468,
-      "messageCharacters": 1572
+      "messageCharacters": 1653
     },
     {
       "frame": "1H",
@@ -82,16 +82,16 @@
       "state": "仅观察；等待回调",
       "entry": [
         82291.1,
-        82311.9
+        82478.9
       ],
-      "stop": 81281.04,
+      "stop": 82183.84,
       "targets": [
         83858.2
       ],
-      "grossRewardRisk": 1.500009700638304,
-      "location": "15m 最近完整收盘 82,725.40；计划入场低于该收盘 0.50%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 0.78R（门槛 1.50R）。",
+      "grossRewardRisk": 4.674642445604331,
+      "location": "15m 最近完整收盘 82,725.40；计划入场低于该收盘 0.30%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 2.09R（门槛 1.50R）。",
       "captionCharacters": 296,
-      "messageCharacters": 915
+      "messageCharacters": 958
     },
     {
       "frame": "4H",
@@ -102,19 +102,14 @@
       "entryStudyClose": 82770.1,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "Watch only · rebound required",
-      "entry": [
-        84097.7,
-        84147.1
-      ],
-      "stop": 84215.71,
-      "targets": [
-        81200
-      ],
-      "grossRewardRisk": 24.55469875434089,
-      "location": "1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R).",
-      "captionCharacters": 493,
-      "messageCharacters": 1643
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 482,
+      "messageCharacters": 723
     },
     {
       "frame": "4H",
@@ -125,19 +120,14 @@
       "entryStudyClose": 82770.1,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "仅观察；等待反弹",
-      "entry": [
-        84097.7,
-        84147.1
-      ],
-      "stop": 84215.71,
-      "targets": [
-        81200
-      ],
-      "grossRewardRisk": 24.55469875434089,
-      "location": "1H 最近完整收盘 82,770.10；计划入场高于该收盘 1.60%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 1.09R（门槛 1.50R）。",
-      "captionCharacters": 307,
-      "messageCharacters": 951
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 232,
+      "messageCharacters": 430
     },
     {
       "frame": "4H",
@@ -148,19 +138,14 @@
       "entryStudyClose": 82770.1,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "Watch only · rebound required",
-      "entry": [
-        84097.7,
-        84147.1
-      ],
-      "stop": 84215.71,
-      "targets": [
-        81200
-      ],
-      "grossRewardRisk": 24.55469875434089,
-      "location": "1H last completed close 82,770.10; planned entry is 1.60% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 1.09R before costs (minimum 1.50R).",
-      "captionCharacters": 493,
-      "messageCharacters": 1641
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 482,
+      "messageCharacters": 721
     },
     {
       "frame": "4H",
@@ -171,19 +156,14 @@
       "entryStudyClose": 82770.1,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "仅观察；等待反弹",
-      "entry": [
-        84097.7,
-        84147.1
-      ],
-      "stop": 84215.71,
-      "targets": [
-        81200
-      ],
-      "grossRewardRisk": 24.55469875434089,
-      "location": "1H 最近完整收盘 82,770.10；计划入场高于该收盘 1.60%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 1.09R（门槛 1.50R）。",
-      "captionCharacters": 307,
-      "messageCharacters": 949
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 232,
+      "messageCharacters": 428
     },
     {
       "frame": "1Dutc",
@@ -194,20 +174,14 @@
       "entryStudyClose": 82610.4,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "Watch only · pullback required",
-      "entry": [
-        80400,
-        80483.84
-      ],
-      "stop": 79691.25,
-      "targets": [
-        84361.6,
-        87238.3
-      ],
-      "grossRewardRisk": 4.892516938139551,
-      "location": "4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R).",
-      "captionCharacters": 526,
-      "messageCharacters": 1740
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 500,
+      "messageCharacters": 738
     },
     {
       "frame": "1Dutc",
@@ -218,20 +192,14 @@
       "entryStudyClose": 82610.4,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "仅观察；等待回调",
-      "entry": [
-        80400,
-        80483.84
-      ],
-      "stop": 79691.25,
-      "targets": [
-        84361.6,
-        87238.3
-      ],
-      "grossRewardRisk": 4.892516938139551,
-      "location": "4H 最近完整收盘 82,610.40；计划入场低于该收盘 2.57%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 0.60R（门槛 1.50R）。",
-      "captionCharacters": 343,
-      "messageCharacters": 1040
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 250,
+      "messageCharacters": 445
     },
     {
       "frame": "1Dutc",
@@ -242,20 +210,14 @@
       "entryStudyClose": 82610.4,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "Watch only · pullback required",
-      "entry": [
-        80400,
-        80483.84
-      ],
-      "stop": 79691.25,
-      "targets": [
-        84361.6,
-        87238.3
-      ],
-      "grossRewardRisk": 4.892516938139551,
-      "location": "4H last completed close 82,610.40; planned entry is 2.57% below it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 0.60R before costs (minimum 1.50R).",
-      "captionCharacters": 526,
-      "messageCharacters": 1738
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 500,
+      "messageCharacters": 736
     },
     {
       "frame": "1Dutc",
@@ -266,20 +228,14 @@
       "entryStudyClose": 82610.4,
       "bias": "SIDEWAYS",
       "action": "WAIT",
-      "state": "仅观察；等待回调",
-      "entry": [
-        80400,
-        80483.84
-      ],
-      "stop": 79691.25,
-      "targets": [
-        84361.6,
-        87238.3
-      ],
-      "grossRewardRisk": 4.892516938139551,
-      "location": "4H 最近完整收盘 82,610.40；计划入场低于该收盘 2.57%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 0.60R（门槛 1.50R）。",
-      "captionCharacters": 343,
-      "messageCharacters": 1038
+      "state": "No validated entry",
+      "entry": null,
+      "stop": null,
+      "targets": [],
+      "grossRewardRisk": null,
+      "location": null,
+      "captionCharacters": 250,
+      "messageCharacters": 443
     },
     {
       "frame": "1Wutc",
@@ -290,21 +246,18 @@
       "entryStudyClose": 81943.8,
       "bias": "LONG",
       "action": "WAIT",
-      "state": "Entry needs better reward to TP1",
-      "entry": [
-        82842,
-        83049.136189169
-      ],
-      "stop": 79567.96,
+      "state": "Watch structure · Entry and SL not established",
+      "entry": null,
+      "stop": null,
       "targets": [
         87399,
         97925.4,
         124500
       ],
-      "grossRewardRisk": 1.249538539406524,
-      "location": "1D (UTC) last completed close 81,943.80; planned entry is 1.35% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.30R before costs (minimum 1.50R).",
-      "captionCharacters": 518,
-      "messageCharacters": 1561
+      "grossRewardRisk": null,
+      "location": "",
+      "captionCharacters": 556,
+      "messageCharacters": 1402
     },
     {
       "frame": "1Wutc",
@@ -315,21 +268,18 @@
       "entryStudyClose": 81943.8,
       "bias": "LONG",
       "action": "WAIT",
-      "state": "TP1 收益空间不足",
-      "entry": [
-        82842,
-        83049.136189169
-      ],
-      "stop": 79567.96,
+      "state": "仅观察结构；尚无入场与止损",
+      "entry": null,
+      "stop": null,
       "targets": [
         87399,
         97925.4,
         124500
       ],
-      "grossRewardRisk": 1.249538539406524,
-      "location": "1D (UTC) 最近完整收盘 81,943.80；计划入场高于该收盘 1.35%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 2.30R（门槛 1.50R）。",
-      "captionCharacters": 346,
-      "messageCharacters": 988
+      "grossRewardRisk": null,
+      "location": "",
+      "captionCharacters": 335,
+      "messageCharacters": 890
     },
     {
       "frame": "1Wutc",
@@ -340,21 +290,18 @@
       "entryStudyClose": 81943.8,
       "bias": "LONG",
       "action": "WAIT",
-      "state": "Entry needs better reward to TP1",
-      "entry": [
-        82842,
-        83049.136189169
-      ],
-      "stop": 79567.96,
+      "state": "Watch structure · Entry and SL not established",
+      "entry": null,
+      "stop": null,
       "targets": [
         87399,
         97925.4,
         124500
       ],
-      "grossRewardRisk": 1.249538539406524,
-      "location": "1D (UTC) last completed close 81,943.80; planned entry is 1.35% above it. Price must revisit the zone and satisfy the stated confirmation; it may never return. At that close, the same SL/TP1 gives 2.30R before costs (minimum 1.50R).",
-      "captionCharacters": 518,
-      "messageCharacters": 1559
+      "grossRewardRisk": null,
+      "location": "",
+      "captionCharacters": 556,
+      "messageCharacters": 1400
     },
     {
       "frame": "1Wutc",
@@ -365,21 +312,18 @@
       "entryStudyClose": 81943.8,
       "bias": "LONG",
       "action": "WAIT",
-      "state": "TP1 收益空间不足",
-      "entry": [
-        82842,
-        83049.136189169
-      ],
-      "stop": 79567.96,
+      "state": "仅观察结构；尚无入场与止损",
+      "entry": null,
+      "stop": null,
       "targets": [
         87399,
         97925.4,
         124500
       ],
-      "grossRewardRisk": 1.249538539406524,
-      "location": "1D (UTC) 最近完整收盘 81,943.80；计划入场高于该收盘 1.35%。须重新进入该区间并完成所列确认；价格可能不再回到该位。 按该收盘价及同一 SL/TP1 计算，扣费前仅 2.30R（门槛 1.50R）。",
-      "captionCharacters": 346,
-      "messageCharacters": 986
+      "grossRewardRisk": null,
+      "location": "",
+      "captionCharacters": 335,
+      "messageCharacters": 888
     }
   ],
   "modelCalls": 0,

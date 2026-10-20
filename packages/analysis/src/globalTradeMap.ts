@@ -65,7 +65,7 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
 /** Explicit, free technical correction. Stored reports and original model prose
  * remain untouched; a review has its own artifact reference and provenance. */
 export function reviewGlobalTargetReport(saved:GlobalReport):GlobalReport {
-  if(saved.decisionVersion!=="decision-v5"||saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v3")return saved;
+  if(saved.decisionVersion!=="decision-v5"||saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v4")return saved;
   const report=rebuildSavedGlobalCandidates(saved),sourceRef=globalArtifactReference(saved);
   report.targetReviewOf=sourceRef;
   applyGlobalTradeMap(report);

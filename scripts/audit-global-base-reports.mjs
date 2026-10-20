@@ -166,19 +166,21 @@ async function deliver(frame){
   check(text===telegramText,'TXT and Telegram file mismatch');check(caption.length<=1024&&message.length<=3900,'Telegram limits exceeded');
   check(svg&&!svg.includes('NaN')&&png?.length>10000,'Chart rendering failed');
   check(!/CHECKPOINT|OBJECTIVE|WATCH AREA|anchor, not TP|>124,500</i.test(svg||''),'Confusing chart wording or rejected archive level');
-  check(g.setupSelection?.version==='single-setup-v3','Single-setup selector missing');
+  check(g.setupSelection?.version==='single-setup-v4','Single-setup selector missing');
   check(['LONG','SHORT','SIDEWAYS'].includes(globalDecision(g).direction),'Invalid market assessment');
-  check(cards.length===1&&g.paths.length===1&&g.strategy.routes.length===1,'Expected one supported setup, path and route');
-  check((svg?.match(/data-scenario-projection=/g)||[]).length===1,'Missing single conditional projected move');
+  check(cards.length<=1&&g.paths.length===cards.length&&g.strategy.routes.length===cards.length,'Expected at most one supported setup, path and route');
+  check((svg?.match(/data-scenario-projection=/g)||[]).length===cards.filter(c=>c.confirmed).length,'Only confirmed entries may draw a projected move');
   for(const section of presentResearch(report).sections)check((technicalReview?markdown:delivery.reportMarkdown).includes('## '+section.title),`Missing Markdown section: ${section.title}`);
   for(const card of cards){
     const p=card.plan,sign=card.side==='long'?1:-1,entry=p.referenceEntry?.[card.side==='long'?1:0];
-    check(entry>0&&p.referenceStop>0,`${card.key}: missing Entry/SL`);
-    check(sign*(entry-p.referenceStop)>0,`${card.key}: SL on wrong side`);
-    if(g.range&&!p.retestTs)check(card.side==='long'?p.referenceStop<g.range.lower[0]:p.referenceStop>g.range.upper[1],`${card.key}: provisional range stop is inside the full boundary`);
-    check(card.targets.length>0&&card.targets.every((t,i)=>sign*(t.price-(i?card.targets[i-1].price:entry))>0),`${card.key}: TP ordering`);
-    const calculated=sign*(card.targets[0]?.price-entry)/Math.abs(entry-p.referenceStop);
-    check(Math.abs(calculated-card.rr)<1e-7,`${card.key}: R:R calculation`);
+    if(p.watchOnly)check(p.referenceEntry===null&&p.referenceStop===null&&card.rr===null&&!card.confirmed,`${card.key}: watch level invented an entry or protection`);
+    else{
+      check(entry>0&&p.referenceStop>0,`${card.key}: missing observed Entry/SL`);
+      check(sign*(entry-p.referenceStop)>0,`${card.key}: SL on wrong side`);
+      const calculated=sign*(card.targets[0]?.price-entry)/Math.abs(entry-p.referenceStop);
+      check(Math.abs(calculated-card.rr)<1e-7,`${card.key}: R:R calculation`);
+    }
+    check(card.targets.length>0&&card.targets.every((t,i)=>i===0||sign*(t.price-card.targets[i-1].price)>0),`${card.key}: TP ordering`);
     if(card.confirmed)check(card.rr>=1.5&&p.confirmationTs&&p.retestTs,`${card.key}: unqualified confirmed entry`);
     const selectedSvg=globalReportChartSvg(g,{selectedPathId:card.key});
     fs.writeFileSync(`${artifactRoot}/${name}-${card.side}.svg`,selectedSvg);
@@ -186,8 +188,8 @@ async function deliver(frame){
       check(output.includes(card.entry)&&output.includes(card.stop),`${card.key}: Entry/SL mismatch`);
       check(output.includes(card.condition),`${card.key}: missing full trigger`);
     }
-    check(selectedSvg.includes(`data-trade-price-ledger="${card.key}"`),`${card.key}: chart selection mismatch`);
-    for(const [role,value]of [['SL',p.referenceStop],...card.targets.map((t,i)=>[`TP${i+1}`,t.price])]){
+    check(selectedSvg.includes(p.watchOnly?'data-setup-status="unavailable"':`data-trade-price-ledger="${card.key}"`),`${card.key}: chart selection mismatch`);
+    for(const [role,value]of p.watchOnly?[]:[['SL',p.referenceStop],...card.targets.map((t,i)=>[`TP${i+1}`,t.price])]){
       check(selectedSvg.includes(`data-trade-role="${role}" data-price="${value}"`),`${card.key}: ${role} outside chart scale`);
     }
   }

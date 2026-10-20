@@ -1,0 +1,220 @@
+{
+  "frame": "1Wutc",
+  "observedAt": "2026-10-20T17:44:09.991Z",
+  "snapshot": {
+    "instId": "BTC-USDT",
+    "timeframe": "1Wutc",
+    "source": "okx-public-spot",
+    "venue": "OKX Spot",
+    "priceCurrency": "USDT",
+    "observedAt": "2026-10-20T17:44:09.991Z",
+    "lastCandleTs": 1791763200000,
+    "price": 82109.3,
+    "pricePrecision": 2,
+    "completedOnly": true
+  },
+  "selection": {
+    "version": "single-setup-v4",
+    "assessment": "long",
+    "regime": "recovery",
+    "rule": "structural_reversal",
+    "pathId": "recovery",
+    "side": "long",
+    "evidence": [
+      "Structural recovery; close 82,109.3 above rising SMA21 71,678.23, RSI14 57.24.",
+      "1Dutc local structure: last close 81,943.8, confirmed low 79,775.1, confirmed high 84,361.6. A nearer reclaim/retest must be evaluated on its own evidence and nearest barrier; it is not ruled out by an older range-edge plan."
+    ],
+    "limitations": [
+      "SMA55 has not turned with the recovery. This is a reversal hypothesis, not an established long-term trend."
+    ]
+  },
+  "plan": {
+    "side": "long",
+    "pathId": "recovery",
+    "state": "conditional",
+    "condition": "close_retest",
+    "triggerLevelId": "level-pivot-1777852800000-high",
+    "invalidationLevelId": "level-pivot-1763337600000-low",
+    "targetIds": [
+      "target-zone-long-pivot-1789948800000-high",
+      "target-zone-long-pivot-1768176000000-high",
+      "target-zone-long-pivot-1754870400000-high"
+    ],
+    "referenceEntry": null,
+    "referenceStop": null,
+    "grossRewardRisk": null,
+    "stopBufferAtr": 0.1,
+    "confirmationTs": null,
+    "retestTs": null,
+    "blockers": [
+      "confirmation",
+      "retest"
+    ],
+    "method": "structure-v5",
+    "strategyId": "macro",
+    "checkpointIds": [],
+    "firstObstacleRewardRisk": null,
+    "structureConfirmationTs": null,
+    "family": "breakout_retest",
+    "entryTimeframe": "1Dutc",
+    "zone": [
+      82842,
+      82842
+    ],
+    "evidenceKind": "held_retest",
+    "signalExpiresAt": 1792540800000,
+    "watchOnly": true,
+    "entryObstacle": {
+      "price": 84361.6,
+      "timeframe": "1Dutc",
+      "anchorTs": 1791763200000,
+      "knownAt": 1792108800000
+    },
+    "failure": null
+  },
+  "range": null,
+  "rangeAnchors": [],
+  "entryStudy": {
+    "timeframe": "1Dutc",
+    "lastBars": [
+      {
+        "ts": 1791763200000,
+        "open": 83763.7,
+        "high": 84361.6,
+        "low": 81767,
+        "close": 81853.1,
+        "volume": 6004.90593744,
+        "confirmed": true
+      },
+      {
+        "ts": 1791849600000,
+        "open": 81853.2,
+        "high": 84166.3,
+        "low": 81032.8,
+        "close": 83172.2,
+        "volume": 6001.04419625,
+        "confirmed": true
+      },
+      {
+        "ts": 1791936000000,
+        "open": 83172.2,
+        "high": 84147.1,
+        "low": 81453.2,
+        "close": 81682.6,
+        "volume": 6219.05010247,
+        "confirmed": true
+      },
+      {
+        "ts": 1792022400000,
+        "open": 81682.6,
+        "high": 82642.8,
+        "low": 79775.1,
+        "close": 82232.4,
+        "volume": 8552.91112332,
+        "confirmed": true
+      },
+      {
+        "ts": 1792108800000,
+        "open": 82232.3,
+        "high": 82928.5,
+        "low": 80809.5,
+        "close": 81617.5,
+        "volume": 5873.63832964,
+        "confirmed": true
+      },
+      {
+        "ts": 1792195200000,
+        "open": 81617.6,
+        "high": 81775,
+        "low": 80813.6,
+        "close": 81489.4,
+        "volume": 1321.19317777,
+        "confirmed": true
+      },
+      {
+        "ts": 1792281600000,
+        "open": 81489.5,
+        "high": 82291.1,
+        "low": 80680.5,
+        "close": 82109.3,
+        "volume": 3407.77478888,
+        "confirmed": true
+      },
+      {
+        "ts": 1792368000000,
+        "open": 82109.3,
+        "high": 83168.2,
+        "low": 81743.2,
+        "close": 81943.8,
+        "volume": 4895.47746531,
+        "confirmed": true
+      }
+    ],
+    "recentConfirmedPivots": [
+      {
+        "id": "pivot-1788393600000-high",
+        "ts": 1788393600000,
+        "price": 82285,
+        "kind": "high",
+        "confirmedAt": 1788652800000,
+        "knownAt": 1788739200000
+      },
+      {
+        "id": "pivot-1789430400000-low",
+        "ts": 1789430400000,
+        "price": 74955.5,
+        "kind": "low",
+        "confirmedAt": 1789689600000,
+        "knownAt": 1789776000000
+      },
+      {
+        "id": "pivot-1789948800000-high",
+        "ts": 1789948800000,
+        "price": 87399,
+        "kind": "high",
+        "confirmedAt": 1790208000000,
+        "knownAt": 1790294400000
+      },
+      {
+        "id": "pivot-1790553600000-low",
+        "ts": 1790553600000,
+        "price": 82556.6,
+        "kind": "low",
+        "confirmedAt": 1790812800000,
+        "knownAt": 1790899200000
+      },
+      {
+        "id": "pivot-1790899200000-high",
+        "ts": 1790899200000,
+        "price": 87238.3,
+        "kind": "high",
+        "confirmedAt": 1791158400000,
+        "knownAt": 1791244800000
+      },
+      {
+        "id": "pivot-1791417600000-low",
+        "ts": 1791417600000,
+        "price": 80400,
+        "kind": "low",
+        "confirmedAt": 1791676800000,
+        "knownAt": 1791763200000
+      },
+      {
+        "id": "pivot-1791763200000-high",
+        "ts": 1791763200000,
+        "price": 84361.6,
+        "kind": "high",
+        "confirmedAt": 1792022400000,
+        "knownAt": 1792108800000
+      },
+      {
+        "id": "pivot-1792022400000-low",
+        "ts": 1792022400000,
+        "price": 79775.1,
+        "kind": "low",
+        "confirmedAt": 1792281600000,
+        "knownAt": 1792368000000
+      }
+    ]
+  }
+}

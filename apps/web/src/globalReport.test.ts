@@ -15,12 +15,12 @@ import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
 import {globalWilderIndicators} from "../../../packages/analysis/src/globalReport.js";
 
-test("saved v2 reports offer the free correction while current v3 reports show the entry location",()=>{
+test("saved v3 reports offer the free correction while current v4 reports show the entry location",()=>{
   const {report}=tradePlanFixture("4H");
-  assert.equal(report.setupSelection!.version,"single-setup-v3");
+  assert.equal(report.setupSelection!.version,"single-setup-v4");
   const current=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(!current.includes('class="global-target-review"'));assert.ok(current.includes("planned entry is"));
-  report.setupSelection!.version="single-setup-v2";
+  report.setupSelection!.version="single-setup-v3";
   const old=renderToStaticMarkup(createElement(GlobalResearchReport,{report,assessmentAccess:{kind:"share",token:"test-review-capability"}}));
   assert.ok(old.includes("Review setup and targets · free"));assert.ok(!old.includes("test-review-capability"));
 });

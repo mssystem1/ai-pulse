@@ -7,10 +7,13 @@ const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":
  * prices. Future horizontal spacing is illustrative, never a target date. */
 export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions){
   const cards=globalTradeCards(report),card=cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];
-  if(!card)return "";
-  const p=card.plan,zh=report.lang==="zh",future=g.right-g.historyEnd,price=(n:number)=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
+  const zh=report.lang==="zh",future=g.right-g.historyEnd,price=(n:number)=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
   const txt=(x:number,y:number,s:unknown,color="#c9d8e9",size=10,anchor="start")=>`<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${color}" font-size="${size}">${escape(s)}</text>`;
-  if(!p.referenceEntry||!p.referenceStop)return txt(g.historyEnd+14,g.top+30,`${card.direction} · ${card.state}`);
+  const p=card?.plan;
+  if(!card||!p?.referenceEntry||p.referenceStop===null){
+    const range=report.range,trigger=report.levels.find(l=>l.id===card?.plan.triggerLevelId),lines=[zh?"暂无有效入场":"NO VALIDATED ENTRY",zh?"Entry / SL：等待实际反应":"Entry / SL: await observed reaction",...(range?[`${zh?"支撑参考":"Support"}: ${range.lower.map(price).join('–')}`,`${zh?"阻力参考":"Resistance"}: ${range.upper.map(price).join('–')}`]:trigger?[`${zh?"观察位":"Watch level"}: ${price(trigger.price)}`]:[]),zh?"须新的反应与后续确认":"Fresh reaction + later confirmation",zh?"参考价位不预测下一步走势":"References do not predict the next move"];
+    return `<g data-setup-status="unavailable">${lines.map((l,i)=>txt(g.historyEnd+12,g.top+36+i*21,l,i===0?"#ffcb76":"#a5b7cd",i===0?11:9)).join('')}</g>`;
+  }
   const entry=card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0];
   const rows=[{role:"Entry",price:entry,color:"#ffcb76"},{role:"SL",price:p.referenceStop,color:"#f0738c"},...card.targets.map((t,i)=>({role:`TP${i+1}`,price:t.price,color:"#53dabb"}))];
   let svg=`<g data-trade-plan="${escape(card.key)}" data-confirmed="${card.confirmed}" data-price-labels="exact">`;
@@ -18,7 +21,7 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   // invents an unsupported pullback/rebound forecast, even with a dashed line.
   const projectionColor=card.side==="long"?"#53dabb":"#f0738c";
   const projection=[{x:g.historyEnd+future*.18,y:g.y(entry)},...card.targets.map((t,i)=>({x:g.historyEnd+future*(.43+i*.19),y:g.y(t.price)}))].filter((p):p is {x:number;y:number}=>p.y!==null&&p.y>=g.top&&p.y<=g.bottom);
-  if(options.showScenarios!==false&&projection.length>=2){
+  if(card.confirmed&&options.showScenarios!==false&&projection.length>=2){
     const end=projection.at(-1)!,prior=projection.at(-2)!,angle=Math.atan2(end.y-prior.y,end.x-prior.x);
     const arrow=[end,{x:end.x-10*Math.cos(angle)+4*Math.sin(angle),y:end.y-10*Math.sin(angle)-4*Math.cos(angle)},{x:end.x-10*Math.cos(angle)-4*Math.sin(angle),y:end.y-10*Math.sin(angle)+4*Math.cos(angle)}];
     svg+=`<g data-scenario-projection="conditional" data-projection-origin="entry" data-projection-side="${card.side}" data-projection-path="${escape(card.pathId)}"><path d="${projection.map((p,i)=>`${i?'L':'M'} ${p.x} ${p.y}`).join(' ')}" fill="none" stroke="${projectionColor}" stroke-width="2.3" stroke-dasharray="7 5"/><polygon points="${arrow.map(p=>`${p.x},${p.y}`).join(' ')}" fill="${projectionColor}"/>${txt(g.historyEnd+12,g.top+24,zh?"仅入场后 · 时间为示意":"ONLY AFTER ENTRY · TIMING SCHEMATIC",projectionColor,8)}</g>`;

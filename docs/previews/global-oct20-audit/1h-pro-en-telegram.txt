@@ -3,7 +3,7 @@ PULSE · BTC-USDT · 1H · Intraday
 Reference: last completed 1H close 82,770.10 USDT · bar closed 2026-10-20 17:00 UTC; not a live quote.
 INTRADAY · BIAS LONG · Watch only · pullback required
 LONG / BUY · planned
-Entry 82,291.10–82,311.90 · SL 81,281.04
+Entry 82,291.10–82,478.90 · SL 82,183.84
 TP1 83,858.20
 Trigger: Completed 1H close above 82,291.1; then a later 15m retest holding that level.
 Saved planned prices; confirm the signal and recheck a fresh quote. Full evidence in TXT.

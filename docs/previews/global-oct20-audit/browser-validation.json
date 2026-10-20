@@ -7,9 +7,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -18,9 +18,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -29,9 +29,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -40,9 +40,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -51,9 +51,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -62,9 +62,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -73,9 +73,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "1H",
@@ -84,9 +84,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,291.10–82,311.90",
-      "stop": "81,281.04",
-      "projectionOrigin": "entry"
+      "entry": "82,291.10–82,478.90",
+      "stop": "82,183.84",
+      "projection": false
     },
     {
       "frame": "4H",
@@ -94,10 +94,10 @@
       "lang": "en",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -105,10 +105,10 @@
       "lang": "en",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -116,10 +116,10 @@
       "lang": "zh",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -127,10 +127,10 @@
       "lang": "zh",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -138,10 +138,10 @@
       "lang": "en",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -149,10 +149,10 @@
       "lang": "en",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -160,10 +160,10 @@
       "lang": "zh",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "4H",
@@ -171,10 +171,10 @@
       "lang": "zh",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "84,097.70–84,147.10",
-      "stop": "84,215.71",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -182,10 +182,10 @@
       "lang": "en",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -193,10 +193,10 @@
       "lang": "en",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -204,10 +204,10 @@
       "lang": "zh",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -215,10 +215,10 @@
       "lang": "zh",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -226,10 +226,10 @@
       "lang": "en",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -237,10 +237,10 @@
       "lang": "en",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -248,10 +248,10 @@
       "lang": "zh",
       "width": 1454,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Dutc",
@@ -259,10 +259,10 @@
       "lang": "zh",
       "width": 390,
       "overflow": false,
-      "cards": 1,
-      "entry": "80,400.00–80,483.84",
-      "stop": "79,691.25",
-      "projectionOrigin": "entry"
+      "cards": 0,
+      "entry": null,
+      "stop": null,
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -271,9 +271,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "After a new price reaction",
+      "stop": "After a new price reaction",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -282,9 +282,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "After a new price reaction",
+      "stop": "After a new price reaction",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -293,9 +293,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "实际反应后确定",
+      "stop": "实际反应后确定",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -304,9 +304,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "实际反应后确定",
+      "stop": "实际反应后确定",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -315,9 +315,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "After a new price reaction",
+      "stop": "After a new price reaction",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -326,9 +326,9 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "After a new price reaction",
+      "stop": "After a new price reaction",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -337,9 +337,9 @@
       "width": 1454,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "实际反应后确定",
+      "stop": "实际反应后确定",
+      "projection": false
     },
     {
       "frame": "1Wutc",
@@ -348,13 +348,13 @@
       "width": 390,
       "overflow": false,
       "cards": 1,
-      "entry": "82,842.00–83,049.14",
-      "stop": "79,567.96",
-      "projectionOrigin": "entry"
+      "entry": "实际反应后确定",
+      "stop": "实际反应后确定",
+      "projection": false
     }
   ],
   "runtimeErrors": [],
-  "navigationCancellations": 27,
+  "navigationCancellations": 30,
   "mutations": [],
   "remoteRequestsBlocked": true,
   "modelCalls": 0,

@@ -1,0 +1,135 @@
+{
+  "label": "baseline",
+  "frame": "1H",
+  "entryFrame": "15m",
+  "sourceManifest": {
+    "source": "https://www.okx.com/api/v5/market/history-candles",
+    "instrument": "BTC-USDT",
+    "requestedEnd": "2026-10-21T00:00:00.000Z",
+    "downloadedAt": "2026-10-20T20:24:40.848Z",
+    "files": [
+      {
+        "bar": "15m",
+        "path": ".tmp/global-backtest/15m.json",
+        "rows": 43999,
+        "first": 1752928200000,
+        "last": 1792526400000,
+        "sha256": "667db201bbcb7969764d036e31c8c7b161d6b882c9b53ddf3f368455dc83e199"
+      },
+      {
+        "bar": "1Dutc",
+        "path": ".tmp/global-backtest/1Dutc.json",
+        "rows": 999,
+        "first": 1706140800000,
+        "last": 1792368000000,
+        "sha256": "e5ab7e4f3cb347c96116c97d70dbec3f8e403bc0108c9318bea452311c81fecb"
+      },
+      {
+        "bar": "1Wutc",
+        "path": ".tmp/global-backtest/1Wutc.json",
+        "rows": 458,
+        "first": 1515369600000,
+        "last": 1791763200000,
+        "sha256": "13e4346d991f9ceba2fbba7a5504e3c22510b625b0a318c2769a76ab9de013a1"
+      },
+      {
+        "bar": "1Mutc",
+        "path": ".tmp/global-backtest/1Mutc.json",
+        "rows": 105,
+        "first": 1514764800000,
+        "last": 1788220800000,
+        "sha256": "3de6cc3a065c29e7f32407fe5e41be4eceda729c0d22727b302304dbd7345d65"
+      }
+    ]
+  },
+  "productionModuleHashes": {
+    "packages/domain/dist/globalEntryPlan.js": "da71e70e99e3aeecc8042e564db227fd59ddb55e93ef103df4ca227931ee24fa",
+    "packages/domain/dist/globalSetupSelection.js": "a892e917f5e911b1a0f31181054630c88b022acc798e9055c1f812ca13dca13e",
+    "packages/analysis/dist/globalTradeMap.js": "89ebd4086b40d11b6457fe4f78f1981b2e2aa770dc43e391ee972f4b27e01e73"
+  },
+  "start": "2025-10-20T00:00:00.000Z",
+  "end": "2026-10-20T20:15:00.000Z",
+  "warmup": {
+    "15m": 520,
+    "1Dutc": 520,
+    "1Wutc": 406,
+    "1Mutc": 93,
+    "1H": 520,
+    "4H": 520
+  },
+  "decisionBars": 35121,
+  "errors": [],
+  "counts": {
+    "no_trade": 19538,
+    "blocker:levels": 14063,
+    "blocker:confirmation": 15497,
+    "blocker:retest": 19655,
+    "blocker:reward": 4695,
+    "blocker:entry_price": 20307,
+    "waiting_retest": 3119,
+    "waiting_confirmation": 10161,
+    "technical_valid": 225,
+    "invalidated": 1893,
+    "blocker:cancelled": 2315,
+    "expired": 185,
+    "blocker:expired": 263
+  },
+  "costs": {
+    "feeBps": 10,
+    "slippageBps": 2
+  },
+  "initialEquity": 10000,
+  "benchmarkNetReturnPercent": -24.12433210245003,
+  "summaries": {
+    "long": {
+      "resolvedTrades": 17,
+      "sampleEndExits": 0,
+      "wins": 2,
+      "losses": 15,
+      "winRatePercent": 11.764705882352942,
+      "winRate95Percent": [
+        3.287908001292092,
+        34.33684249770991
+      ],
+      "profitFactor": 0.2137390817633182,
+      "profitFactorUndefinedReason": null,
+      "expectancyR": -0.7160533382760638,
+      "netPnl": -833.1366837219066,
+      "netReturnPercent": -8.331366837219068,
+      "maxDrawdownPercent": 8.331366837219067,
+      "fees": 315.65656781425486,
+      "exposurePercent": 1.0107912644856354,
+      "blockedNextOpenFills": 55,
+      "execution": "Unlevered spot; 1% risk cap, 100% cash cap"
+    },
+    "short": {
+      "resolvedTrades": 20,
+      "sampleEndExits": 0,
+      "wins": 5,
+      "losses": 15,
+      "winRatePercent": 25,
+      "winRate95Percent": [
+        11.186005278940309,
+        46.87050099580636
+      ],
+      "profitFactor": 0.7612971040108086,
+      "profitFactorUndefinedReason": null,
+      "expectancyR": -0.2807326341532691,
+      "netPnl": -248.64575503661035,
+      "netReturnPercent": -2.4864575503661057,
+      "maxDrawdownPercent": 6.004158271567491,
+      "fees": 380.77648507776206,
+      "exposurePercent": 1.6286552205233336,
+      "blockedNextOpenFills": 81,
+      "execution": "Hypothetical unlevered short; borrow/funding unavailable, NOT executable OKX spot"
+    }
+  },
+  "method": {
+    "sampling": "Every completed entry-frame candle, recompute the entire production setup using <=520 completed candles per frame",
+    "fills": "Next candle open only, adverse slippage, fill must stay in saved entry band; no retrospective intrabar entry",
+    "exit": "Frozen SL and first target, all units exit; ambiguous candle stop first; stop gaps at open; no trailing or optimization",
+    "positions": "One position per timeframe and direction; separate ledgers, never pool overlapping timeframes",
+    "end": "Remaining position liquidated at final close and excluded from resolved win rate",
+    "validation": "Rules already inspected historical BTC examples. Retrospective diagnostic, not untouched out-of-sample proof. No parameter fitting."
+  }
+}

@@ -40,6 +40,8 @@ export const GlobalTradePlanSchema = z.object({
   entryTimeframe: z.string().optional(), zone: z.tuple([price,price]).optional(),
   stopBasis: z.string().optional(), evidenceKind: z.enum(["held_retest","follow_through"]).optional(),
   signalExpiresAt: time.nullable().optional(),
+  watchOnly:z.boolean().optional(),
+  entryObstacle:z.object({price,timeframe:z.string(),anchorTs:time,knownAt:time}).optional(),
   failure: z.object({ts:time,reason:z.enum(["structure","stop","trigger","objective"])}).nullable().optional(),
 });
 export const GlobalChannelSchema = z.object({
@@ -76,7 +78,7 @@ export const GlobalReportSchema = z.object({
   evaluationVersion: z.literal("completed-v2").optional(),
   decisionVersion:z.enum(["decision-v1","decision-v2","decision-v3","decision-v4","decision-v5"]).optional(), hierarchy:z.array(GlobalFrameSchema).max(7).optional(),
   targetReviewOf:z.string().regex(/^[0-9a-f]{8}$/).optional(),
-  setupSelection:z.object({version:z.enum(["single-setup-v1","single-setup-v2","single-setup-v3"]),assessment:z.enum(["long","short","sideways"]),regime:z.enum(["trend","recovery","range","transition"]),rule:z.enum(["trend_continuation","structural_reversal","structure_break","range_reaction","none"]),pathId:z.string().nullable(),side:z.enum(["long","short","none"]),evidence:z.array(z.string()),limitations:z.array(z.string())}).optional(),
+  setupSelection:z.object({version:z.enum(["single-setup-v1","single-setup-v2","single-setup-v3","single-setup-v4"]),assessment:z.enum(["long","short","sideways"]),regime:z.enum(["trend","recovery","range","transition"]),rule:z.enum(["trend_continuation","structural_reversal","structure_break","range_reaction","none"]),pathId:z.string().nullable(),side:z.enum(["long","short","none"]),evidence:z.array(z.string()),limitations:z.array(z.string())}).optional(),
   strategy:z.object({version:z.enum(["horizon-v1","horizon-v2"]),targetPolicy:z.enum(["active-zones-v1","legacy-pivots-v1"]).optional(),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().nonnegative(),contextLevelIds:z.array(z.string()).optional(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
   entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
@@ -149,7 +151,12 @@ export const GlobalReportSchema = z.object({
     if(path&&path.direction!=="range"&&(plan.triggerLevelId!==path.triggerLevelId||plan.invalidationLevelId!==path.invalidationLevelId||JSON.stringify(plan.targetIds)!==JSON.stringify(path.targetIds)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional plan must retain its path trigger, invalidation and targets"});
     if(plan.method?.startsWith("structure-")&&plan.side!=="none"&&(!plan.family||!plan.zone||plan.entryTimeframe!==report.entryStudy?.timeframe||plan.zone[0]>plan.zone[1]))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Structure-v2 needs a named family, measured zone and matching entry frame"});
     if(plan.method?.startsWith("structure-")&&[plan.confirmationTs,plan.retestTs].some(ts=>ts!==null&&!report.entryStudy?.candles.some(c=>c.ts===ts)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry signal times must identify saved entry-study candles"});
-    if (plan.side !== "none" && (!path || !plan.referenceEntry || !plan.referenceStop || !plan.targetIds.length || !plan.triggerLevelId || !plan.invalidationLevelId)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional research plan requires a path, entry, risk reference and targets"});
+    if(plan.watchOnly&&(plan.state==="confirmed"||plan.referenceEntry!==null||plan.referenceStop!==null||plan.grossRewardRisk!==null||plan.retestTs!==null))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Watch references cannot claim observed entry, stop, reward or signal"});
+    if(plan.entryObstacle){
+      const obstacle=plan.entryObstacle,study=report.entryStudy,anchor=study?.pivots.find(a=>a.ts===obstacle.anchorTs&&a.price===obstacle.price&&a.kind===(plan.side==="long"?"high":"low"));
+      if(!study||obstacle.timeframe!==study.timeframe||!anchor||anchor.confirmedAt===null||candleCloseTime(anchor.confirmedAt,study.timeframe)!==obstacle.knownAt||obstacle.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Entry barrier must retain its confirmed entry-frame source and knowledge time"});
+    }
+    if (plan.side !== "none" && (!path || !plan.watchOnly&&(!plan.referenceEntry || !plan.referenceStop) || !plan.targetIds.length || !plan.triggerLevelId || !plan.invalidationLevelId)) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Directional research plan requires a path, observed entry/risk or explicit watch status, and targets"});
     if (plan.referenceEntry && plan.referenceStop) {
       const [lo,hi] = plan.referenceEntry, targets = plan.targetIds.map(id => level(id)!);
       if (lo > hi || (plan.side === "long" ? plan.referenceStop >= lo || targets.some(p => p <= hi) : plan.referenceStop <= hi || targets.some(p => p >= lo))) ctx.addIssue({code:z.ZodIssueCode.custom,message:"Research plan prices must be ordered for its side"});

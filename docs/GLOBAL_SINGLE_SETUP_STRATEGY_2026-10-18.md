@@ -1,5 +1,7 @@
 # Global: one strategy, one setup — 18 October 2026
 
+Historical design record. The [reopened October 20 audit](GLOBAL_REPORT_AUDIT_2026-10-20.md) supersedes proximity-based boundary selection, numerical watch entries/stops, clipped entry bands and unconfirmed trade projections. Use that audit and its backtest for the current rules.
+
 This revision supersedes the dual LONG/SHORT presentation in the earlier [trade-plan audit](GLOBAL_BTC_TRADE_PLAN_AUDIT_2026-10-18.md) and [four paid reports audit](GLOBAL_BASE_BTC_REPORT_AUDIT_2026-10-18.md). It also retains every correction in the [target and processing incident](GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md). No additional reports, model calls, payments or trades were needed for this review.
 
 Each timeframe publishes **LONG**, **SHORT** or **SIDEWAYS**, one supported strategy and at most one setup. SIDEWAYS means a sideways market with one range setup, as clarified by the user. Insufficient evidence produces an explanation and unavailable entry fields rather than fabricated prices. Selecting a direction does not confirm entry.

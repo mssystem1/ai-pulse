@@ -149,9 +149,26 @@ export function globalTradePlanLines(report: GlobalReport): string[] {
     ...p.blockers.map(key=>blockers[key]),
     p.blockers.includes("reward")?zh?"新入场因收益不足而放弃；仅有确认无法弥补收益不足。减持已持有现货须单独决定并核查新报价。":"New entry is avoided for insufficient reward; confirmation alone does not repair it. Review any owned Spot reduction separately with a fresh quote.":p.side==="short"?zh?"现货操作：仅卖出或减持已持有资产；做空研究不创建杠杆空仓。":"Spot action: sell/reduce owned inventory on confirmation. Short research does not open a leveraged short.":zh?"现货操作：确认后复核买入；实际止损依据已观察回测，批准前复核实时费用。":"Spot action: review a buy after confirmation; executable SL comes from the observed retest and costs require a fresh quote."];
 }
+/** Explain newer local structure without turning an old range edge into entry. */
+function localEntryReferences(report:GlobalReport):string[]{
+  const study=report.entryStudy,last=study?.candles.at(-1);if(!study||study.status!=="available"||!last)return [];
+  const zh=report.lang==="zh",tf=globalFrameReference(study.timeframe),cutoff=Date.parse(report.snapshot.observedAt),price=(p:number)=>globalPrice(report,p),known=study.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,study.timeframe)??Infinity)<=cutoff);
+  const active=(kind:"low"|"high")=>known.filter(a=>a.kind===kind&&(kind==="low"?a.price<last.close:a.price>last.close)&&!study.candles.some(c=>c.ts>=(candleCloseTime(a.confirmedAt!,study.timeframe)??Infinity)&&(kind==="low"?c.close<a.price:c.close>a.price))).sort((a,b)=>kind==="low"?b.price-a.price:a.price-b.price)[0];
+  const support=active("low"),resistance=active("high"),lines=[zh?`${tf} 最近完整收盘 ${price(last.close)}；${support?`局部支撑参考 ${price(support.price)}；`:""}${resistance?`最近确认阻力 ${price(resistance.price)}。`:""}`:`${tf} last completed close ${price(last.close)}; ${support?`local support reference ${price(support.price)}; `:""}${resistance?`nearest confirmed resistance ${price(resistance.price)}.`:""}`];
+  const crosses=known.filter(a=>a.kind==="high"&&a.price<last.close).flatMap(a=>study.candles.flatMap((c,i)=>i>0&&c.ts>=(candleCloseTime(a.confirmedAt!,study.timeframe)??Infinity)&&study.candles[i-1].close<=a.price&&c.close>a.price?[{anchor:a,bar:c}]:[])).sort((a,b)=>b.bar.ts-a.bar.ts||b.anchor.ts-a.anchor.ts);
+  const reclaim=crosses[0];
+  if(reclaim){const closed=candleCloseTime(reclaim.bar.ts,study.timeframe)!,when=new Date(closed).toISOString().slice(0,16).replace('T',' ')+' UTC',later=study.candles.some(c=>c.ts>reclaim.bar.ts);
+    lines.push(zh?`${tf} 于 ${when} 收盘收复 ${price(reclaim.anchor.price)}。${later?"后续 K 线须按独立的回测、保护及收益条件评估。":"之后尚无另一根完整 K 线，后续回测尚未观察到。"}`:`${tf} reclaimed ${price(reclaim.anchor.price)} at the ${when} close. ${later?"Later candles must be assessed against the separate retest, protection and reward requirements.":"No later completed candle exists; a subsequent held retest is unobserved."}`);
+  }
+  return lines;
+}
+
 /** Compact next-setup detail; old prices remain identifiable as references. */
 export function globalNextSetupLines(report:GlobalReport):string[] {
-  if(report.decisionVersion==="decision-v5")return globalTradeCardLines(report);
+  if(report.decisionVersion==="decision-v5"){
+    const lines=globalTradeCardLines(report);
+    return lines.length?lines:[...(report.setupSelection?.limitations.slice(0,1)??[]),...(globalRangeSummary(report)?[globalRangeSummary(report)!]:report.setupSelection?.evidence??[]),...localEntryReferences(report)];
+  }
   const d=globalDecision(report),p=globalTradePlan(report),zh=report.lang==="zh";
   const target=p.targetIds.map((id,i)=>`${p.strategyId?`${report.strategy?.name} objective ${i+1}`:d.planningValid?`TP${i+1}`:zh?`目标 ${i+1}`:`Objective ${i+1}`} ${globalLevelPrice(report,id)}`).join(" → ");
   const observed=d.signalObserved,valid=d.planningValid;
