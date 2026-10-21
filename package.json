@@ -18,6 +18,8 @@
     "test:cloud-env": "node --test scripts/cloud-env.test.mjs",
     "test:global-backtest": "node --test scripts/global-backtest-engine.test.mjs scripts/global-backtest-data.test.mjs",
     "backtest:global": "node scripts/backtest-global-reports.mjs",
+    "test:global-strategies": "node --test scripts/global-strategy-research.test.mjs",
+    "research:global-strategies": "node scripts/research-global-strategies.mjs",
     "check:arc-qualification": "tsc -p scripts/arc-qualification.tsconfig.json",
     "dev:api": "npm run dev -w @pulse/api",
     "dev:web": "npm run dev -w @pulse/web",

@@ -1,0 +1,5 @@
+# Keep frozen research source hashes reproducible across Windows and Unix checkouts.
+scripts/global-strategy-research.mjs text eol=lf
+scripts/research-global-strategies.mjs text eol=lf
+scripts/global-backtest-engine.mjs text eol=lf
+scripts/global-backtest-data.mjs text eol=lf

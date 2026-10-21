@@ -1,0 +1,15 @@
+{
+  "sourceHashes": {
+    "scripts/global-strategy-research.mjs": "e8cbe5634df5ba57a85d5cd8ea28ad00d9a42e9fb2e3d6d57addad2bd65f84b6",
+    "scripts/research-global-strategies.mjs": "f9fc2447465c19db8267e267f1aa883d0d95b0c30f4019913e604fb79ccdeb45",
+    "scripts/global-backtest-engine.mjs": "845fd31f44ab93c8b1dd0c4e5f2df694e152f734314ba74cf0eaff7df0e554c4",
+    "scripts/global-backtest-data.mjs": "5a9a1373849a53021182fc16df1880b1201876577913b74a2e32aa78ba664932",
+    "docs/backtests/data/btc-okx-20261020.json.gz": "ce64f96f0d17d6b0c085fd66d135033a01157e884724133910fc0942392065f7"
+  },
+  "selected": {
+    "1H": null,
+    "4H": null,
+    "1Dutc": null,
+    "1Wutc": null
+  }
+}

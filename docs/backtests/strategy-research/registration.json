@@ -1,0 +1,153 @@
+{
+  "registeredAt": "2026-10-21T08:11:23.932Z",
+  "policy": {
+    "version": "global-strategy-research-v1",
+    "minimumNetRewardRisk": 1.5,
+    "winRateTargetPercent": 70,
+    "minimumFinalTrades": 100,
+    "minimumRealizedPayoff": 1.5,
+    "maximumDrawdownPercent": 10,
+    "riskPercent": 1,
+    "dailyLossLimitPercent": 3,
+    "cooldownBarsAfterLoss": 4,
+    "maxHoldingBars": 48,
+    "feeBps": 10,
+    "slippageBps": 2
+  },
+  "strategies": [
+    {
+      "id": "trend_pullback-core-1.75R",
+      "family": "trend_pullback",
+      "filter": "core",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "trend_pullback-core-2.5R",
+      "family": "trend_pullback",
+      "filter": "core",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "trend_pullback-aligned-1.75R",
+      "family": "trend_pullback",
+      "filter": "aligned",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "trend_pullback-aligned-2.5R",
+      "family": "trend_pullback",
+      "filter": "aligned",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "trend_pullback-strict-1.75R",
+      "family": "trend_pullback",
+      "filter": "strict",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "trend_pullback-strict-2.5R",
+      "family": "trend_pullback",
+      "filter": "strict",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "breakout_retest-core-1.75R",
+      "family": "breakout_retest",
+      "filter": "core",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "breakout_retest-core-2.5R",
+      "family": "breakout_retest",
+      "filter": "core",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "breakout_retest-aligned-1.75R",
+      "family": "breakout_retest",
+      "filter": "aligned",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "breakout_retest-aligned-2.5R",
+      "family": "breakout_retest",
+      "filter": "aligned",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "breakout_retest-strict-1.75R",
+      "family": "breakout_retest",
+      "filter": "strict",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "breakout_retest-strict-2.5R",
+      "family": "breakout_retest",
+      "filter": "strict",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "range_rejection-core-1.75R",
+      "family": "range_rejection",
+      "filter": "core",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "range_rejection-core-2.5R",
+      "family": "range_rejection",
+      "filter": "core",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "range_rejection-aligned-1.75R",
+      "family": "range_rejection",
+      "filter": "aligned",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "range_rejection-aligned-2.5R",
+      "family": "range_rejection",
+      "filter": "aligned",
+      "rewardRisk": 2.5
+    },
+    {
+      "id": "range_rejection-strict-1.75R",
+      "family": "range_rejection",
+      "filter": "strict",
+      "rewardRisk": 1.75
+    },
+    {
+      "id": "range_rejection-strict-2.5R",
+      "family": "range_rejection",
+      "filter": "strict",
+      "rewardRisk": 2.5
+    }
+  ],
+  "splits": {
+    "train": {
+      "start": 1760918400000,
+      "end": 1776643200000
+    },
+    "validation": {
+      "start": 1776643200000,
+      "end": 1784505600000
+    },
+    "final": {
+      "start": 1784505600000,
+      "end": 1792540800000
+    }
+  },
+  "sourceHashes": {
+    "scripts/global-strategy-research.mjs": "e8cbe5634df5ba57a85d5cd8ea28ad00d9a42e9fb2e3d6d57addad2bd65f84b6",
+    "scripts/research-global-strategies.mjs": "f9fc2447465c19db8267e267f1aa883d0d95b0c30f4019913e604fb79ccdeb45",
+    "scripts/global-backtest-engine.mjs": "845fd31f44ab93c8b1dd0c4e5f2df694e152f734314ba74cf0eaff7df0e554c4",
+    "scripts/global-backtest-data.mjs": "5a9a1373849a53021182fc16df1880b1201876577913b74a2e32aa78ba664932",
+    "docs/backtests/data/btc-okx-20261020.json.gz": "ce64f96f0d17d6b0c085fd66d135033a01157e884724133910fc0942392065f7"
+  },
+  "target": "Strictly more than 70% profitable resolved trades, after costs, with >=1.5 realized payoff, positive expectancy and uncertainty/sample gates.",
+  "scope": "BTC-USDT unlevered Spot longs only. Research candidates, NOT the production Global report selector.",
+  "priorExposure": "This archive has already been used for production-rule diagnostics and supplied screenshot development. Chronological partitioning is NOT an untouched external validation. No candidate qualifies for a production profitability claim without new forward/independent evidence.",
+  "selection": "Select using train and validation only. Final outcomes cannot choose or retune any candidate. No qualifying candidate means no selection.",
+  "antiCherryPicking": "All 18 declared candidates across four frames and all splits are saved. No tuning after this run, no profitable subperiod extraction, no pooled win rate across overlapping frames."
+}

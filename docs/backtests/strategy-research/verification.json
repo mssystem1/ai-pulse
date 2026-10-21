@@ -1,0 +1,21 @@
+{
+  "checkedAt": "2026-10-21T08:22:22.843Z",
+  "sourceHashesVerified": true,
+  "dailyComparisons": 457,
+  "ledgers": 216,
+  "tradesChecked": 33,
+  "ambiguousStopTargetCandles": 0,
+  "checks": [
+    "next-open availability",
+    "reaction before confirmation",
+    "net >=1.5R at fill",
+    "fees/slippage",
+    "cash and 1% risk caps",
+    "independent OHLC exits",
+    "split boundaries",
+    "closing equity drawdown",
+    "win counts",
+    "train/validation-only selection"
+  ],
+  "productionPromotions": []
+}

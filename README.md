@@ -1125,6 +1125,8 @@ The dashboard mark is a timestamped OKX public spot observation. Automatic execu
 
 ## Current release discipline
 
+The user's Global setup acceptance target is >70% net wins with meaningful risk/reward. Current report heuristics and the additional 18 strategy candidates per frame have **not** established that target; no new strategy is promoted. The [strategy validation record](docs/GLOBAL_STRATEGY_VALIDATION_2026-10-21.md) states the rules, costs, chronological splits, uncertainty gates and failed results. Run `npm run test:global-strategies`, `npm run research:global-strategies` and `node scripts/verify-global-strategy-research.mjs` to reproduce the isolated study. These commands place no orders or paid model calls.
+
 ### Non-spending verification
 
 `npm run audit:autopilot -- --pair=ETH-USDT --timeframe=4H --summary` evaluates the deterministic setup gates using **closed OKX candles only**. It does not load wallet keys or call Grok. A technical candidate is not an authorized Buy: the active pass, AI budget, compact confirmation, signed policy and execution route must still pass.
