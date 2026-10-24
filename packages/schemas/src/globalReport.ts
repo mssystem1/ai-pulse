@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {candleCloseTime} from "./candleTimeframe.js";
+import {GlobalOrderFlowSchema} from "./globalOrderFlow.js";
 
 const price = z.number().finite().positive();
 const time = z.number().finite().nonnegative();
@@ -58,12 +59,17 @@ export const GlobalEntryStudySchema = z.object({
 });
 export const GlobalIndicatorsSchema = z.object({
   sma: z.array(z.object({ period: z.number().int().positive(), points: z.array(seriesPoint) })),
+  ema: z.array(z.object({ period: z.number().int().positive(), points: z.array(seriesPoint) })).optional(),
   rsi: z.object({ period: z.literal(14), points: z.array(seriesPoint) }),
   atr: z.object({ period: z.literal(14), points: z.array(seriesPoint) }),
   volumeRatio: z.number().finite().nonnegative().nullable(),
   regression: z.object({ bars: z.literal(120), residualSigma: z.number().finite().nonnegative(), mid: z.array(seriesPoint), upper: z.array(seriesPoint), lower: z.array(seriesPoint) }).nullable(),
   fibonacci: z.array(z.object({ ratio: z.number(), price, anchorIds: z.tuple([z.string(), z.string()]) })),
-  vwap: z.object({ anchorId: z.string(), points: z.array(seriesPoint) }).nullable(),
+  vwap: z.object({ anchorId: z.string(), points: z.array(seriesPoint), anchorTs: time.optional(), knownAt: time.optional(),
+    basis: z.literal("primary_hlc3_volume").optional(),
+    anchorReason:z.enum(["session_open","week_open","swing_low","swing_high","cycle_low","cycle_high"]).optional(),selectedAt:time.optional(),
+    bands: z.array(z.object({ multiple: z.union([z.literal(1),z.literal(2),z.literal(3)]), upper: z.array(seriesPoint), lower: z.array(seriesPoint) })).optional(),
+  }).nullable(),
   pivots: z.array(GlobalAnchorSchema),
   channel: z.object({ lower: z.tuple([GlobalAnchorSchema, GlobalAnchorSchema]), upper: z.tuple([GlobalAnchorSchema, GlobalAnchorSchema]) }).nullable(),
   channels:z.array(GlobalChannelSchema).max(2).optional(),
@@ -73,6 +79,23 @@ export const GlobalFrameSchema = z.object({
   observedAt:z.string(), completedAt:time.nullable(), price:price.nullable(), sma55:price.nullable(), smaChange:z.number().finite().nullable(),
   structure:z.enum(["up","down","range","mixed"]), bias:z.enum(["up","down","range","mixed"]), candles:z.number().int().nonnegative(),
 });
+export const GlobalHorizonContextSchema=z.object({
+  version:z.literal("horizon-context-v1"),timeframe:z.string(),reading:z.enum(["session","intraday","swing","position","macro"]),knownAt:time,
+  zones:z.array(z.object({id:z.string(),role:z.enum(["support","resistance"]),lower:price,upper:price,startTs:time,knownAt:time,anchorIds:z.array(z.string()).min(1),basis:z.literal("confirmed_pivot_wicks")})).max(6),
+  ranges:z.array(z.object({id:z.string(),kind:z.enum(["session","balance","recovery_leg","decline_leg","cycle"]),lower:price,upper:price,startTs:time,endTs:time,knownAt:time,anchorIds:z.array(z.string())})).max(3),
+});
+/** A priced scenario for the trader's decision, separate from observed signal
+ * and order authorization. Every price retains its saved candle provenance. */
+export const GlobalDiscretionaryPlanSchema=z.object({
+  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2"]),side:z.enum(["long","short"]),
+  family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest"]),objectiveTimeframe:z.string(),
+  entry:price,stop:price,
+  entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band"]),timeframe:z.string(),knownAt:time,price}),
+  reference:z.object({timeframe:z.string(),candleTs:time,completedAt:time,price}),
+  stopBasis:z.object({timeframe:z.string(),anchorTs:time,knownAt:time,price}),
+  targets:z.array(z.object({price,timeframe:z.string(),anchorTs:time,knownAt:time,basis:z.enum(["confirmed_swing","observed_extreme","measured_projection","vwap_band","range_boundary","range_midpoint","range_quartile"]),bandMultiple:z.number().int().min(-3).max(3).optional()})).min(1).max(3),
+  barriers:z.array(z.object({price,timeframe:z.string(),anchorTs:time,knownAt:time})).max(5),
+});
 export const GlobalReportSchema = z.object({
   version: z.literal("pulse-global-v3"), tier: z.enum(["quick", "pro"]), lang: z.enum(["en", "zh"]),
   evaluationVersion: z.literal("completed-v2").optional(),
@@ -80,16 +103,52 @@ export const GlobalReportSchema = z.object({
   targetReviewOf:z.string().regex(/^[0-9a-f]{8}$/).optional(),
   setupSelection:z.object({version:z.enum(["single-setup-v1","single-setup-v2","single-setup-v3","single-setup-v4"]),assessment:z.enum(["long","short","sideways"]),regime:z.enum(["trend","recovery","range","transition"]),rule:z.enum(["trend_continuation","structural_reversal","structure_break","range_reaction","none"]),pathId:z.string().nullable(),side:z.enum(["long","short","none"]),evidence:z.array(z.string()),limitations:z.array(z.string())}).optional(),
   strategy:z.object({version:z.enum(["horizon-v1","horizon-v2"]),targetPolicy:z.enum(["active-zones-v1","legacy-pivots-v1"]).optional(),id:z.enum(["fast","intraday","swing","position","macro"]),name:z.string(),holding:z.string(),entryTimeframe:z.string(),lookbackBars:z.number().int().positive(),majorSwingAtr:z.number().nonnegative(),minimumObjectiveAtr:z.number().nonnegative(),contextLevelIds:z.array(z.string()).optional(),routes:z.array(z.object({pathId:z.string(),side:z.enum(["long","short"]),protectionLevelId:z.string().nullable(),objectiveIds:z.array(z.string()),checkpointIds:z.array(z.string())}))}).optional(),
-  entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),
+  entryStudy:GlobalEntryStudySchema.optional(),range:GlobalRangeSchema.nullable().optional(),horizonContext:GlobalHorizonContextSchema.optional(),
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
   candles: z.array(GlobalCandleSchema), levels: z.array(GlobalLevelSchema), waveCount: GlobalWaveSchema, paths: z.array(GlobalPathSchema).max(3),
-  setup: GlobalSetupSchema, tradePlan: GlobalTradePlanSchema.optional(), indicators: GlobalIndicatorsSchema,
+  setup: GlobalSetupSchema, tradePlan: GlobalTradePlanSchema.optional(), discretionaryPlan:GlobalDiscretionaryPlanSchema.optional(), orderFlow:GlobalOrderFlowSchema.optional(), indicators: GlobalIndicatorsSchema,
   context: z.object({ timeframe: z.string().nullable(), status: z.enum(["available", "unavailable", "not_requested"]), source: z.string().nullable(),
     candles: z.array(GlobalCandleSchema), sma55: z.array(seriesPoint), agreement: z.enum(["supports", "conflicts", "neutral", "unknown"]) }),
   narrative: z.object({ headline: z.string(), summary: z.string(), reasons: z.array(z.string()), riskNotes: z.array(z.string()), limitations: z.array(z.string()), disclaimer: z.string() }),
   view: z.object({ levelIds: z.array(z.string()), pathIds: z.array(z.string()), smaPeriods: z.array(z.number()), defaultLayers: z.array(z.string()) }),
 }).superRefine((report, ctx) => {
+  if(report.horizonContext){const h=report.horizonContext,cutoff=Date.parse(report.snapshot.observedAt),pivots=new Set(report.indicators.pivots.filter(a=>a.confirmedAt!==null&&(candleCloseTime(a.confirmedAt,report.snapshot.timeframe)??Infinity)<=cutoff).map(a=>a.id));
+    if(h.timeframe!==report.snapshot.timeframe||h.knownAt>cutoff||h.zones.some(z=>z.lower>z.upper||z.startTs>z.knownAt||z.knownAt>cutoff||z.anchorIds.some(id=>!pivots.has(id)))||h.ranges.some(r=>r.lower>=r.upper||r.startTs>r.endTs||r.endTs>r.knownAt||r.knownAt>cutoff||r.anchorIds.some(id=>!pivots.has(id))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Horizon context must retain confirmed primary-frame anchors, price zones and available times"});
+    const close=report.candles.at(-1)?.close;
+    for(const zone of h.zones){
+      const anchors=zone.anchorIds.map(id=>report.indicators.pivots.find(a=>a.id===id));
+      const wicks=anchors.map(a=>{const c=a&&report.candles.find(c=>c.ts===a.ts);return a&&c?{lower:a.kind==="low"?c.low:Math.max(c.open,c.close),upper:a.kind==="low"?Math.min(c.open,c.close):c.high}:null;});
+      if(wicks.some(w=>!w)||zone.lower!==Math.min(...wicks.map(w=>w?.lower??Infinity))||zone.upper!==Math.max(...wicks.map(w=>w?.upper??-Infinity))||zone.startTs!==Math.min(...anchors.map(a=>a?.ts??Infinity))||anchors.some(a=>a?.confirmedAt===null||(candleCloseTime(a?.confirmedAt??Infinity,report.snapshot.timeframe)??Infinity)>zone.knownAt)||close===undefined||(zone.role==="support"?zone.upper>close:zone.lower<close))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Context support and resistance must match saved primary-candle wicks on their evidenced price side"});
+    }
+    for(const range of h.ranges.filter(r=>r.kind==="cycle"||r.kind==="recovery_leg"||r.kind==="decline_leg")){
+      const anchors=range.anchorIds.map(id=>report.indicators.pivots.find(a=>a.id===id)),low=anchors.find(a=>a?.kind==="low"),high=anchors.find(a=>a?.kind==="high");
+      if(anchors.length!==2||!low||!high||range.lower!==low.price||range.upper!==high.price||range.startTs!==Math.min(low.ts,high.ts)||range.endTs!==Math.max(low.ts,high.ts)||range.kind==="recovery_leg"&&low.ts>=high.ts||range.kind==="decline_leg"&&high.ts>=low.ts||anchors.some(a=>(candleCloseTime(a?.confirmedAt??Infinity,report.snapshot.timeframe)??Infinity)>range.knownAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Macro and position ranges must match their confirmed primary pivot prices, chronology and available times"});
+    }
+  }
+  if(report.orderFlow){const f=report.orderFlow,cutoff=Date.parse(report.snapshot.observedAt);
+    if(f.source!==report.snapshot.source||f.instId!==report.snapshot.instId||f.priceCurrency!==report.snapshot.priceCurrency||f.profile.timeframe!==report.snapshot.timeframe||f.coverage.knownAt>cutoff||f.profile.knownAt>cutoff||f.footprints.some(b=>b.knownAt>cutoff)||report.snapshot.source==="okx-public-spot"&&(f.marketType!=="spot"||f.quantityUnit!=="base"))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Report order flow must match its venue, instrument, timeframe, quantity and observation cutoff"});
+    const near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
+    if(f.footprints.some(b=>{const c=report.candles.find(c=>c.ts===b.start);return !c||candleCloseTime(c.ts,report.snapshot.timeframe)!==b.end||!near(c.open,b.open)||!near(c.high,b.high)||!near(c.low,b.low)||!near(c.close,b.close)||!near(c.volume,b.volume)}))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Executed footprints must reconcile to their completed primary-candle OHLC and volume"});
+  }
+  const discretionary=report.discretionaryPlan;
+  if(discretionary){
+    const r=discretionary.reference,bars=r.timeframe===report.snapshot.timeframe?report.candles:r.timeframe===report.entryStudy?.timeframe?report.entryStudy.candles:[],bar=bars.find(c=>c.ts===r.candleTs),sign=discretionary.side==="long"?1:-1;
+    if(!bar||bar.close!==r.price||candleCloseTime(r.candleTs,r.timeframe)!==r.completedAt||r.completedAt>Date.parse(report.snapshot.observedAt)||discretionary.entryBasis.price!==discretionary.entry||discretionary.entryBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan entry must retain its saved completed reference and entry basis"});
+    if(sign*(discretionary.entry-discretionary.stop)<=0||discretionary.targets.some((t,i)=>sign*(t.price-discretionary.entry)<=0||i>0&&sign*(t.price-discretionary.targets[i-1].price)<=0||t.knownAt>Date.parse(report.snapshot.observedAt))||discretionary.stopBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan requires ordered protection, targets and available evidence"});
+    if(discretionary.objectiveTimeframe!==report.snapshot.timeframe||discretionary.stopBasis.timeframe!==report.snapshot.timeframe||discretionary.targets.some(t=>t.timeframe!==report.snapshot.timeframe)||sign*(discretionary.stopBasis.price-discretionary.stop)<=0)ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional protection and objectives must retain the primary horizon and protect beyond invalidation"});
+    if(discretionary.stopBasis.anchorTs>discretionary.stopBasis.knownAt||discretionary.targets.some(t=>t.anchorTs>t.knownAt)||discretionary.barriers.some(b=>b.anchorTs>b.knownAt||b.knownAt>Date.parse(report.snapshot.observedAt)||b.timeframe!==report.entryStudy?.timeframe&&b.timeframe!==report.snapshot.timeframe||sign*(b.price-discretionary.entry)<=0||sign*(discretionary.targets[0].price-b.price)<=0))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional levels must retain available source times and intermediate-barrier ordering"});
+    if(discretionary.version==="discretionary-plan-v2"){
+      const range=report.range,near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
+      if(discretionary.targets.some(t=>{
+        if(!["range_midpoint","range_quartile","range_boundary"].includes(t.basis))return false;
+        if(!range)return true;
+        const low=range.lower[1],high=range.upper[0],fraction=t.basis==="range_midpoint"?.5:discretionary.side==="long"?.75:.25;
+        const expected=t.basis==="range_boundary"?(discretionary.side==="long"?high:low):low+(high-low)*fraction;
+        return !near(t.price,expected)||t.anchorTs!==range.startTs;
+      }))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional range objectives must match the saved geometric range"});
+    }
+  }
   if(report.decisionVersion){
     const rows=report.hierarchy??[];
     if(!rows.some(row=>row.timeframe===report.snapshot.timeframe)||new Set(rows.map(r=>r.timeframe)).size!==rows.length||rows.some(r=>r.observedAt!==report.snapshot.observedAt||r.source!==null&&r.source!==report.snapshot.source||r.completedAt!==null&&r.completedAt>Date.parse(report.snapshot.observedAt)||r.status==="available"&&(r.candles<55||r.price===null||r.sma55===null)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Decision hierarchy must retain one source, cutoff and evidenced completed frames"});

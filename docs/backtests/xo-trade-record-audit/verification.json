@@ -1,0 +1,26 @@
+{
+  "verifiedAt": "2026-10-22T18:46:20.045Z",
+  "sourcePostVersions": 11,
+  "canonicalPosts": 10,
+  "mediaFiles": 27,
+  "uniqueMediaIds": 23,
+  "uniqueImageByteHashes": 22,
+  "duplicateByteReferences": 5,
+  "completeCopyInstructions": 0,
+  "personalWinRateCalculated": false,
+  "assets": [
+    "BTC",
+    "ETH",
+    "HYPE",
+    "SOL"
+  ],
+  "fileHashes": {
+    "initial-records.json": "b8c448fb3e646a07c494a06875a121f3ecb1f61711cef30b1ce61086938b7c7c",
+    "chain-records.json": "c1301351a397748618a7c8534f78f90d7942e903bb83731bfd6ee08cafa64c7e",
+    "media-manifest.json": "0b9513b1e1d387ca1bc7da8ec5b27633a4737d5dd1e08bbd091bcf79ea8540a7",
+    "chart-inspections.json": "dfabeec00b6beddf8281fa66218f842bfb7db571023db1ba6e5439404b633f4a",
+    "timeline.json": "58eb2f997c7cc884441334a4ab61a815e4aab9a8d7dff76c63d3fc98037fbd89"
+  },
+  "verifierSha256": "9d8c8b6e003b8eecc98e4df0416d54b10e6d9d02be952953fc30e0c98663926b",
+  "checks": "Every local original image hash/type/length, directly read source identity, own-photo counts, linked predecessor chronology, edited-version relationship and visible-number transcription checked. Exact chart times are not future to their posts. Duplicate/reused media do not create trades. A price on an ROI card is not an exit fill. Checks validate source bookkeeping, not private fills or full strategy fidelity."
+}

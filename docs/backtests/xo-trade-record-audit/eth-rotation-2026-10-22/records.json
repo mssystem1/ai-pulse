@@ -1,0 +1,176 @@
+{
+  "schema": "xo-eth-original-chain-v1",
+  "capturedAt": "2026-10-22T19:29:47.464Z",
+  "scope": "Five additional original post pages read directly; paraphrases and numeric facts only. Existing eleven-version snapshot remains unchanged.",
+  "timezone": "Europe/Samara UTC+4",
+  "records": [
+    {
+      "postId": "1948046812570431714",
+      "displayLocal": "2025-07-23 19:45 UTC+4",
+      "kind": "balanced_context_and_conditional_acceptance",
+      "ownPhotoCount": 2,
+      "mediaIds": [
+        "GwjaP9aWEAAK9y4",
+        "GwjaP9YX0AAVjt0"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1947019929858756919"
+      ],
+      "summary": "Overlapping session profiles and slowing momentum define balanced/range conditions. Reports reducing most of an earlier position. Acceptance below the 3600 region favors 3500; acceptance above the 3650 region favors a rotation toward 3800.",
+      "reportedRegions": {
+        "acceptBelow": 3600,
+        "lowerRotation": 3500,
+        "acceptAbove": 3650,
+        "upperRotation": 3800
+      },
+      "gaps": [
+        "Exact acceptance test and duration",
+        "Composite profile parameters",
+        "Entry fills, initial stop and sizing",
+        "Which earlier position is being reduced"
+      ],
+      "url": "https://x.com/Trader_XO/status/1948046812570431714",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-23T15:45:27.733Z",
+      "timestampMeaning": "Public ID/version creation time; displayed minute confirmed in Europe/Samara UTC+4, not an exchange fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1948134865355829359",
+      "displayLocal": "2025-07-24 01:35 UTC+4",
+      "kind": "composite_value_reaction_and_cross_asset_condition",
+      "ownPhotoCount": 4,
+      "mediaIds": [
+        "GwkqVOcW0AI3E2h",
+        "GwkqVOwW4AAjHVQ",
+        "GwkqVOZWgAAkzcL"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1948046812570431714"
+      ],
+      "summary": "Reports a test of the two-day composite value-area low in the low 3500 region. A rotation toward 3800 is conditional on BTC holding its weekly open. A failed hold instead brings the 3420 NPOC and 3300 yearly-open regions into consideration for later long interest.",
+      "reportedRegions": {
+        "compositeVal": 3500,
+        "npoc": 3420,
+        "yearOpen": 3300,
+        "upperRotation": 3800
+      },
+      "gaps": [
+        "Fourth own-photo link is present but its media URL was not recovered from the public page",
+        "Exact two-day profile start/end, price bins, value percentage and order-flow trigger",
+        "BTC hold/acceptance definition",
+        "New long entry, initial stop and size"
+      ],
+      "url": "https://x.com/Trader_XO/status/1948134865355829359",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-23T21:35:21.153Z",
+      "timestampMeaning": "Public ID/version creation time; displayed minute confirmed in Europe/Samara UTC+4, not an exchange fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1948409297148285397",
+      "displayLocal": "2025-07-24 19:45 UTC+4",
+      "kind": "support_reaction_and_protection_update",
+      "ownPhotoCount": 3,
+      "mediaIds": [
+        "Gwoj7R5XAAAG_Ad",
+        "Gwoj7R5WEAAXc8M",
+        "Gwoj7R_W4AErTla"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1948134865355829359"
+      ],
+      "summary": "Reports support at the 3500 region, an upside preference toward 3800/local highs and stops moved upward. Links his own reading-the-market article and describes cut-and-reverse practice.",
+      "reportedRegions": {
+        "support": 3500,
+        "upside": 3800
+      },
+      "article": "https://www.traderxo.com/p/reading-the-market-in-real-time",
+      "gaps": [
+        "Numeric updated stop and effective order time",
+        "Remaining quantity and exact entry",
+        "The linked article redirected to a welcome page; its full contents were not read"
+      ],
+      "url": "https://x.com/Trader_XO/status/1948409297148285397",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-24T15:45:50.791Z",
+      "timestampMeaning": "Public ID/version creation time; displayed minute confirmed in Europe/Samara UTC+4, not an exchange fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1948697315054653781",
+      "displayLocal": "2025-07-25 14:50 UTC+4",
+      "kind": "retrospective_stop_and_reverse_report",
+      "ownPhotoCount": 1,
+      "mediaIds": [
+        "Gwsp4OcWMAAhzeG"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1948409297148285397"
+      ],
+      "summary": "Reports that the earlier ETH short had a stop in the 3860 region, was closed in the 3500 region and flipped long. Discusses a possible stop-driven move toward the 3900–4000 region if local highs are exceeded.",
+      "reportedRegions": {
+        "priorShortStop": 3860,
+        "closeAndReverse": 3500,
+        "possibleUpside": [
+          3900,
+          4000
+        ]
+      },
+      "gaps": [
+        "Exact prior short entry/stop orders and fill timestamps",
+        "Exact reverse entry, long initial stop and size",
+        "Conditional stop-cascade discussion is not an exchange order"
+      ],
+      "url": "https://x.com/Trader_XO/status/1948697315054653781",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-25T10:50:19.611Z",
+      "timestampMeaning": "Public ID/version creation time; displayed minute confirmed in Europe/Samara UTC+4, not an exchange fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1949517447821770959",
+      "displayLocal": "2025-07-27 21:09 UTC+4",
+      "kind": "retrospective_two_way_rotation_update",
+      "ownPhotoCount": 3,
+      "mediaIds": [
+        "Gw4TyMmXMAABxre",
+        "Gw4TyM6WwAAebyu",
+        "Gw4TyMnWQAACxiZ"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1948697315054653781"
+      ],
+      "summary": "Reports the earlier rotation from the 3800 region into 3500 and back toward 3800, with no clear higher-timeframe view. This is a later management report, not three independent forward-published entries.",
+      "reportedRegions": {
+        "upper": 3800,
+        "lower": 3500
+      },
+      "gaps": [
+        "Exact closure fills and sizes",
+        "Complete original order sequence",
+        "Later July 28 half-short reduction must remain a separate position report rather than a fabricated fresh long at 3650"
+      ],
+      "url": "https://x.com/Trader_XO/status/1949517447821770959",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-27T17:09:14.500Z",
+      "timestampMeaning": "Public ID/version creation time; displayed minute confirmed in Europe/Samara UTC+4, not an exchange fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    }
+  ]
+}

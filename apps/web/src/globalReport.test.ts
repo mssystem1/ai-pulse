@@ -14,10 +14,14 @@ import {globalTradeCards} from "@pulse/domain";
 import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
 import {globalWilderIndicators} from "../../../packages/analysis/src/globalReport.js";
+import {applyGlobalHorizonContext} from "../../../packages/analysis/src/globalHorizonContext.js";
 
 test("saved v3 reports offer the free correction while current v4 reports show the entry location",()=>{
   const {report}=tradePlanFixture("4H");
   assert.equal(report.setupSelection!.version,"single-setup-v4");
+  const missingContext=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
+  assert.ok(missingContext.includes('class="global-target-review"'));
+  applyGlobalHorizonContext(report);
   const current=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(!current.includes('class="global-target-review"'));assert.ok(current.includes("planned entry is"));
   report.setupSelection!.version="single-setup-v3";

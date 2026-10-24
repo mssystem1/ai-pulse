@@ -3,6 +3,8 @@ import {globalStrategyProfile,globalArtifactReference,selectGlobalTradePlan,glob
 import {globalStrategyPivots} from "./globalStrategyMap.js";
 import {activeGlobalTargetZones} from "./globalTargetZones.js";
 import {rebuildSavedGlobalCandidates} from "./globalReport.js";
+import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
+import {restoreGlobalSetupStudies} from "./globalSetupStudies.js";
 
 /** Current trade targets and historical context are separate. A style changes
  * the analysis horizon; it never permits skipping the nearest exit barrier. */
@@ -65,12 +67,20 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
 /** Explicit, free technical correction. Stored reports and original model prose
  * remain untouched; a review has its own artifact reference and provenance. */
 export function reviewGlobalTargetReport(saved:GlobalReport):GlobalReport {
-  if(saved.decisionVersion!=="decision-v5"||saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v4")return saved;
+  if(saved.decisionVersion!=="decision-v5")return saved;
+  if(saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v4"){
+    if(saved.horizonContext&&(saved.discretionaryPlan?.version==="discretionary-plan-v2"||saved.tradePlan?.state==="confirmed"))return saved;
+    const report=structuredClone(saved);restoreGlobalSetupStudies(report);applyGlobalDiscretionaryPlan(report);
+    if(report.discretionaryPlan||report.horizonContext)report.targetReviewOf=globalArtifactReference(saved);
+    return GlobalReportSchema.parse(report);
+  }
   const report=rebuildSavedGlobalCandidates(saved),sourceRef=globalArtifactReference(saved);
   report.targetReviewOf=sourceRef;
   applyGlobalTradeMap(report);
   report.view.levelIds=[...new Set([...report.view.levelIds,...report.strategy!.routes.flatMap(r=>[r.protectionLevelId,...r.objectiveIds]).filter((id):id is string=>id!==null)])];
   applySingleGlobalSetup(report);
+  restoreGlobalSetupStudies(report);
+  applyGlobalDiscretionaryPlan(report);
   const d=globalDecision(report),zh=report.lang==="zh";
   report.narrative={headline:`${report.snapshot.instId} · ${d.heading}`,summary:`${d.entryInstruction} ${d.route}`,reasons:[],riskNotes:[],limitations:[zh?"原始快照技术复核；使用相同已保存 K 线，未调用新的 AI 分析。已排除被后续收盘突破的历史价位；没有依据的后续 TP 不会生成。":"Technical review of the original snapshot, using the same saved candles and no new AI analysis. Consumed historical levels are excluded; unsupported later TPs are not invented."],disclaimer:saved.narrative.disclaimer};
   return GlobalReportSchema.parse(report);

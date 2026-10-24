@@ -1,0 +1,37 @@
+{
+  "schema": "xo-original-page-metadata-v1",
+  "pages": [
+    {
+      "url": "https://x.com/Trader_XO/status/1947019929858756919",
+      "canonical": "https://x.com/Trader_XO/status/1947019929858756919",
+      "author": "https://x.com/Trader_XO",
+      "publishedDate": "2025-07-20T19:44:59.000Z",
+      "ownPhotoLinks": [
+        "https://x.com/Trader_XO/status/1947019929858756919/photo/1"
+      ],
+      "ownMediaIds": [
+        "GwU0TeuW0AIKw3n"
+      ],
+      "method": "Direct original-page extraction through TinyFish fetch_content on 24 October 2026; own attachments occur before separately quoted-post images.",
+      "quotedMediaExcluded": true
+    },
+    {
+      "url": "https://x.com/Trader_XO/status/1937448336279105751",
+      "canonical": "https://x.com/Trader_XO/status/1937448336279105751",
+      "author": "https://x.com/Trader_XO",
+      "publishedDate": "2025-06-24T09:50:54.000Z",
+      "ownPhotoLinks": [
+        "https://x.com/Trader_XO/status/1937448336279105751/photo/1",
+        "https://x.com/Trader_XO/status/1937448336279105751/photo/2",
+        "https://x.com/Trader_XO/status/1937448336279105751/photo/3"
+      ],
+      "ownMediaIds": [
+        "GuMy_cEWYAAlFLj",
+        "GuMy_cFWIAECOA8",
+        "GuMy_cIX0AASLpm"
+      ],
+      "method": "Direct original-page extraction through TinyFish fetch_content on 24 October 2026; own attachments occur before separately quoted-post images.",
+      "quotedMediaExcluded": true
+    }
+  ]
+}

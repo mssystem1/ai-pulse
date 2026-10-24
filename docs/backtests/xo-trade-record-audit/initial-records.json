@@ -1,0 +1,183 @@
+{
+  "schema": "xo-public-trade-record-audit-v1",
+  "capturedAt": "2026-10-22T18:17:20.857Z",
+  "scope": "Four directly read original public posts; not complete exchange records or a personal win-rate audit. Chart URLs collected but not yet visually verified.",
+  "records": [
+    {
+      "postId": "2072376414956130393",
+      "url": "https://x.com/Trader_XO/status/2072376414956130393",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-01T17:46:54.874Z",
+      "idTimestampCaveat": "ID-derived creation timestamp; does not prove the current text existed before a price move. Edited content needs its history.",
+      "displayedDateText": [
+        "Последнее редактирование 21:46 · 1 июл. 2026 г.Открыть историю редактирования"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2070925189534101700"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMKKHk9W4AARzcz?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKLKDQWgAAOSWh?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMhW-XMAAEDCF?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMjMeXYAA8f40?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1jr0HXgAA61Q3?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1nDt4XgAArr6f?format=webp&name=large"
+      ],
+      "imagesVisuallyInspected": false,
+      "assets": [
+        "BTC"
+      ],
+      "kind": "reported_position_change_and_conditional_plan",
+      "publishedLevels": {
+        "reportedShortEntryApprox": 81500,
+        "reportedShortExitApprox": 60000,
+        "longEntry": null,
+        "stop": null,
+        "target": "2024 value-area POC, numeric value not established"
+      },
+      "summary": "Reports a closed BTC short and incremental longs after a failed auction at 2024 value-area lows. POC is the first rotational objective; overhead supply remains relevant.",
+      "edited": true,
+      "gaps": [
+        "Initial short publication and fills",
+        "Exact long entry and sizing",
+        "Numerical stop and target",
+        "Edit chronology"
+      ],
+      "implication": "Failed auction at established value; fixed calendar VWAP bands alone do not reproduce this example.",
+      "personalWinRateCalculated": false,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072749403106841058",
+      "url": "https://x.com/Trader_XO/status/2072749403106841058",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-02T18:29:02.179Z",
+      "idTimestampCaveat": "ID-derived creation timestamp; does not prove the current text existed before a price move. Edited content needs its history.",
+      "displayedDateText": [
+        "22:29 · 2 июл. 2026 г."
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2071539355512934850"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMPiGEAWcAA4I8R?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMPidM3WUAApPDW?format=webp&name=large"
+      ],
+      "imagesVisuallyInspected": false,
+      "assets": [
+        "HYPE",
+        "BTC"
+      ],
+      "kind": "retrospective_short_closure_and_current_long_report",
+      "publishedLevels": {
+        "reportedShortEntryApprox": 75,
+        "reportedShortExitApprox": 62,
+        "longEntry": null,
+        "stop": null,
+        "target": "prior highs; no complete numeric order instruction"
+      },
+      "summary": "Reports closing a prior HYPE short and holding a new long. BTC continuation and recovery above daily EMA12/25 are contextual factors.",
+      "edited": false,
+      "gaps": [
+        "Advance short entry/SL publication",
+        "Exact closure time",
+        "New long entry/SL/size",
+        "Full target and management instructions"
+      ],
+      "implication": "BTC context and daily EMA recovery matter; the post is not permission to backdate a copy entry.",
+      "personalWinRateCalculated": false,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2073713750675218879",
+      "url": "https://x.com/Trader_XO/status/2073713750675218879",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-05T10:21:00.556Z",
+      "idTimestampCaveat": "ID-derived creation timestamp; does not prove the current text existed before a price move. Edited content needs its history.",
+      "displayedDateText": [
+        "14:21 · 5 июл. 2026 г."
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2073069754709954657"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMdNluXXMAAQ_6p?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMdO0WOWYAAVFQl?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMUFLhYXoAEnESE?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMUFNMUXoAA_qqH?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMUFlLcXIAAc6cB?format=webp&name=large"
+      ],
+      "imagesVisuallyInspected": false,
+      "assets": [
+        "HYPE"
+      ],
+      "kind": "management_report_and_conditional_reversal",
+      "publishedLevels": {
+        "reportedLongStart": "mid-range",
+        "reportedLongExit": "0.75 of range",
+        "reportedSmallShortEntry": null,
+        "stop": "cut short after acceptance above the week's high; exact trigger unspecified",
+        "target": null
+      },
+      "summary": "Reports taking long profit at the upper range quarter and opening a small short. May-origin anchored VWAP, EMA support and fixed-range profile guide context; acceptance above weekly highs changes the plan.",
+      "edited": false,
+      "gaps": [
+        "Numerical range endpoints and exact anchor",
+        "Long and short fills/size",
+        "Definition of acceptance",
+        "Timing and full management updates"
+      ],
+      "implication": "Use an event anchor, range objectives and conditional reversal; do not substitute a universal calendar anchor or sigma target.",
+      "personalWinRateCalculated": false,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072657962145906964",
+      "url": "https://x.com/Trader_XO/status/2072657962145906964",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-02T12:25:40.955Z",
+      "idTimestampCaveat": "ID-derived creation timestamp; does not prove the current text existed before a price move. Edited content needs its history.",
+      "displayedDateText": [
+        "16:25 · 2 июл. 2026 г."
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2072376414956130393"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMOOU04WUAAt38n?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMOOcqlWoAArflb?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMOOpH9XoAAWMij?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMOOwXsXoAA0nff?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKKHk9W4AARzcz?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKLKDQWgAAOSWh?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMhW-XMAAEDCF?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMjMeXYAA8f40?format=webp&name=large"
+      ],
+      "imagesVisuallyInspected": false,
+      "assets": [
+        "BTC"
+      ],
+      "kind": "range_rotation_framework",
+      "publishedLevels": {
+        "entry": "established range extremes; no exact instruction",
+        "stop": null,
+        "target": "weekly bands before considering a reverse sell rotation"
+      },
+      "summary": "Describes trading the February-established range extremes until price accepts outside the range, with a potential rotation into weekly bands then a short.",
+      "edited": false,
+      "gaps": [
+        "Numerical range endpoints",
+        "Exact trigger/SL/size",
+        "Advance individual trade instructions",
+        "Definition and timing of acceptance"
+      ],
+      "implication": "Acceptance changes the regime; an edge touch alone does not constitute the documented discretionary process.",
+      "personalWinRateCalculated": false,
+      "completeCopyInstruction": false
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "xo-eth-origin-image-inspections-v1",
+  "method": "All four unchanged local originals opened with view_image at original detail on 24 October 2026. Printed values remain distinct from execution orders and approximate profile readings.",
+  "images": [
+    {
+      "mediaId": "GuMy_cEWYAAlFLj",
+      "kind": "earlier_structural_support_plan",
+      "chartTimeframe": null,
+      "chartCreatedAtUTC": "2025-06-14T08:02:00Z",
+      "printedChartCapture": "2025-06-14 09:02 UTC+1",
+      "reported": {"upperReference": 2791.78, "dashedReference": 2694.33, "supportUpper": 2175.27, "supportLower": 2112.06, "displayedCurrentPrice": 2536.3},
+      "notes": "An earlier June 14 chart reused in the June 24 post. It marks a broad support zone and discusses a lower sweep and absorption. The plotted reference levels are not labeled EP, SL or TP orders. Timeframe and venue are cropped; the June 14 TradingView header does not prove this image was published on X then.",
+      "executionOrder": false
+    },
+    {
+      "mediaId": "GuMy_cFWIAECOA8",
+      "kind": "daily_structural_support_reaction",
+      "chartTimeframe": "1D",
+      "chartCreatedAtUTC": "2025-06-23T09:06:00Z",
+      "printedChartCapture": "2025-06-23 10:06 UTC+1",
+      "reported": {"rangeUpperReference": 3542.24, "midReference": 2795.64, "supportUpper": 2179.2, "supportLower": 2105.33, "displayedCurrentPrice": 2258.69},
+      "notes": "ETHUSDT, 1D, BINANCE are printed. The broad support area and lower-wick reaction are retained. Exact session boundary and market type are not printed. These daily-candle references are not stop orders; a current candle with a countdown is not a completed daily close.",
+      "executionOrder": false
+    },
+    {
+      "mediaId": "GuMy_cIX0AASLpm",
+      "kind": "daily_fixed_range_profile_and_support",
+      "chartTimeframe": "1D",
+      "chartCreatedAtUTC": "2025-06-24T09:49:00Z",
+      "printedChartCapture": "2025-06-24 10:49 UTC+1",
+      "reported": {"rangeUpperReference": 3542.24, "midReference": 2851.33, "supportUpper": 2179.2, "supportLower": 2105.33, "displayedCurrentPrice": 2420.31},
+      "notes": "ETHUSDT, 1D, BINANCE are printed. A selected historical fixed-range profile separately marks VAH, POC and VAL, above the broad support zone. Numeric profile boundaries, price rows, volume basis, session clock and calculation settings are not supplied. The visible profile is preserved in the original image; its labels are not transcribed into guessed order prices.",
+      "executionOrder": false
+    },
+    {
+      "mediaId": "GwU0TeuW0AIKw3n",
+      "kind": "macro_structural_origin_and_overhead_supply",
+      "chartTimeframe": null,
+      "chartCreatedAtUTC": "2025-07-20T19:35:00Z",
+      "printedChartCapture": "2025-07-20 20:35 UTC+1",
+      "reported": {"upperReference": 4084.21, "intermediateUpper": 3058.66, "intermediateLower": 3028.7, "originUpper": 2212.92, "originLower": 2176.29, "displayedCurrentPrice": 3773.04},
+      "notes": "Long-horizon structure spans late 2023 through July 2025. Two origins of rally and overhead supply are marked. The source preserves macro context while warning about compressed reward/risk for late longs. The candle interval is cropped; neither its wide history nor its visual density establishes a weekly interval. No fresh EP/SL order is printed.",
+      "executionOrder": false
+    }
+  ]
+}

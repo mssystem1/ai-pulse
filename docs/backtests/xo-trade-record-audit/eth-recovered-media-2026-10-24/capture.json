@@ -1,0 +1,16 @@
+{
+  "schema": "xo-recovered-original-media-v1",
+  "postId": "1948134865355829359",
+  "postUrl": "https://x.com/Trader_XO/status/1948134865355829359",
+  "sourcePhotoOrdinal": 4,
+  "mediaId": "GwkqVOmWIAALd9E",
+  "sourceUrl": "https://pbs.twimg.com/media/GwkqVOmWIAALd9E?format=webp&name=large",
+  "file": "docs/backtests/xo-trade-record-audit/eth-recovered-media-2026-10-24/source-images/1948134865355829359-4-GwkqVOmWIAALd9E.webp",
+  "capturedAt": "2026-10-24T11:51:53.713Z",
+  "bytes": 19798,
+  "sha256": "8e7824d813a24645c850062d4fc722846ec90df680fe37b5074421607a2b347e",
+  "collectorSha256": "e24fe21b3cfe1b66674aa87b4cf5b03943aaaa88d4c29b52b84945eba5ae961a",
+  "evidence": "Original post and photo/4 page read on 24 October 2026: four own-photo links and four media IDs before the separately quoted earlier post. First three IDs match the retained original capture.",
+  "previousCapture": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/media-manifest.json",
+  "previousCapturePreserved": true
+}

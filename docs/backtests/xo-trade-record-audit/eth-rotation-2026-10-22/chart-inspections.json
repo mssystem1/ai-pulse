@@ -1,0 +1,152 @@
+{
+  "inspectedAt": "2026-10-22T19:32:11.981Z",
+  "method": "Every retained original image opened with view_image at original resolution; no edits or overlays.",
+  "images": [
+    {
+      "postId": "1948046812570431714",
+      "mediaId": "GwjaP9aWEAAK9y4",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948046812570431714-1-GwjaP9aWEAAK9y4.webp",
+      "sha256": "e5d38b1544255a4b6fb074faeedcdef584fd1d84807f2673e800eb434fecd709",
+      "kind": "session_profile_chart",
+      "observed": "Session profiles, POC/VAH/VAL and fixed two-day composite references. The marked composite belongs to earlier July 18/19 sessions, rather than automatically rolling to the latest two days. Exact binning, profile basis and session settings remain unknown.",
+      "chartCapture": "2025-07-23 16:40 UTC+1",
+      "executionOrder": false
+    },
+    {
+      "postId": "1948046812570431714",
+      "mediaId": "GwjaP9YX0AAVjt0",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948046812570431714-2-GwjaP9YX0AAVjt0.webp",
+      "sha256": "2e46a1dc0895fbdf08377493da1f141d744d07ce020201a9001b25206872e19b",
+      "kind": "reported_open_short_card",
+      "reported": {
+        "entryPrice": 3842.54,
+        "currentPrice": 3616.22,
+        "leverage": 20,
+        "displayedRoiPercent": 116.45
+      },
+      "executionCaveat": "Current Price is not Exit Price; no fill time, size or exchange verification."
+    },
+    {
+      "postId": "1948134865355829359",
+      "mediaId": "GwkqVOcW0AI3E2h",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-1-GwkqVOcW0AI3E2h.webp",
+      "sha256": "84d967ceced2efc2caccf2676154a1e380c0eb34c88697a48abb170776efd96d",
+      "kind": "composite_profile_chart",
+      "observed": "Explicit earlier-session two-day composite VAH/VAL, with a low-area reaction marker. Current-price field 3530.01 is distinct from the exact value-area boundary; the original composite is retained.",
+      "chartCapture": "2025-07-23 22:27 UTC+1",
+      "executionOrder": false
+    },
+    {
+      "postId": "1948134865355829359",
+      "mediaId": "GwkqVOwW4AAjHVQ",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-2-GwkqVOwW4AAjHVQ.webp",
+      "sha256": "71ad8af55d93dfa13f4ebc66cd8fb116f563e2f33721e847bfc3f9d127d40dab",
+      "kind": "session_profile_chart",
+      "observed": "Daily/session profile references around the lower 3500 area, NPOC in the 3420 region and a lower yearly-open region. Profile basis, value percentage and price rows are not printed.",
+      "chartCapture": "2025-07-23 22:31 UTC+1",
+      "executionOrder": false
+    },
+    {
+      "postId": "1948134865355829359",
+      "mediaId": "GwkqVOZWgAAkzcL",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-3-GwkqVOZWgAAkzcL.webp",
+      "sha256": "6a1c124abd8fbb2e874f09728c6fdca11095fa527fe4ce684003aa187fa0a60a",
+      "kind": "key_level_candles",
+      "observed": "Weekly Open and Yearly Open context; visible SpacemanBTC Key Level V13.1 indicator name. Third-party indicator authorship is not assigned to XO. Horizontal levels are not assumed to be stop/entry orders.",
+      "exactVisibleReferences": [
+        3849.92,
+        3824.02
+      ],
+      "chartCapture": "2025-07-23 22:33 UTC+1",
+      "executionOrder": false
+    },
+    {
+      "postId": "1948409297148285397",
+      "mediaId": "Gwoj7R5XAAAG_Ad",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-1-Gwoj7R5XAAAG_Ad.webp",
+      "sha256": "018bc7edcfd88522c0cffd35bdac550855e4642adcc81334bb082d311ded9135",
+      "kind": "hourly_phone_chart",
+      "observed": "ETHUSDT 1h, weekly-open reference, dotted curves and a support reaction. Dotted-curve identity/settings are not printed. Crosshair time is not an order time.",
+      "exactVisibleReferences": [
+        3876.29,
+        3498.81
+      ],
+      "executionOrder": false
+    },
+    {
+      "postId": "1948409297148285397",
+      "mediaId": "Gwoj7R5WEAAXc8M",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-2-Gwoj7R5WEAAXc8M.webp",
+      "sha256": "2b59be739ee4dc1e3c098fc51b000b8f0380e2b3ce2fbcc2a78a1c29451ba25c",
+      "kind": "reported_short_exit_card",
+      "reported": {
+        "entryPrice": 3842.54,
+        "exitPrice": 3591.68,
+        "leverage": 20,
+        "displayedRoiPercent": 130.56
+      },
+      "executionCaveat": "Exit Price is explicitly printed, unlike a current-price card. Quantity, exact entry/exit timestamps and whether the card represents the entire account position are not supplied."
+    },
+    {
+      "postId": "1948409297148285397",
+      "mediaId": "Gwoj7R_W4AErTla",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-3-Gwoj7R_W4AErTla.webp",
+      "sha256": "0d5d3bf38d6b4534cf7ede3443d00bd624150ecbcc9e8b580766daafb944b3e4",
+      "kind": "reported_open_long_card",
+      "reported": {
+        "entryPrice": 3578.48,
+        "currentPrice": 3738.48,
+        "leverage": 20,
+        "displayedRoiPercent": 88.49
+      },
+      "executionCaveat": "A later long-entry report; Current Price is not an exit. Do not invent a same-tick reversal from the short card."
+    },
+    {
+      "postId": "1948697315054653781",
+      "mediaId": "Gwsp4OcWMAAhzeG",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948697315054653781-1-Gwsp4OcWMAAhzeG.webp",
+      "sha256": "75fa731952bed11bde6c541e7d90e21596842e51993d5aa81e27ff889f446beb",
+      "kind": "higher_frame_key_levels",
+      "observed": "A recovery above the marked lower structural level and an upper reference. Neither horizontal line is an explicit protective order.",
+      "exactVisibleReferences": [
+        3514.05,
+        4115.39
+      ],
+      "chartCapture": "2025-07-25 03:49 UTC-7",
+      "executionOrder": false
+    },
+    {
+      "postId": "1949517447821770959",
+      "mediaId": "Gw4TyMmXMAABxre",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-1-Gw4TyMmXMAABxre.webp",
+      "sha256": "46c59c5fab7ed2def5a641b5d5012b263f990aa833605e50543b6faece7e37f6",
+      "kind": "later_session_profile_chart",
+      "observed": "Successive session distributions and profile references show the rotation back toward the upper area. Later current/profile price labels do not recreate an earlier entry.",
+      "chartCapture": "2025-07-27 18:04 UTC+1",
+      "executionOrder": false
+    },
+    {
+      "postId": "1949517447821770959",
+      "mediaId": "Gw4TyM6WwAAebyu",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-2-Gw4TyM6WwAAebyu.webp",
+      "sha256": "c3ee70e8d0068a41a0514d34f6ef1dc3129d180aad9309a2b4077789855b18b0",
+      "kind": "reported_long_exit_card",
+      "reported": {
+        "entryPrice": 3578.48,
+        "exitPrice": 3818.39,
+        "leverage": 20,
+        "displayedRoiPercent": 134.08
+      },
+      "executionCaveat": "Exit Price is printed and entry matches the earlier long card. Exact fill times, quantity, complete partials and initial SL remain missing; this is reported card evidence, not an independently audited exchange ledger."
+    },
+    {
+      "postId": "1949517447821770959",
+      "mediaId": "Gw4TyMnWQAACxiZ",
+      "file": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-3-Gw4TyMnWQAACxiZ.webp",
+      "sha256": "05d7c7c755fc7f4be4b97e4e2ace9f59da5b18bb50f95e966eb9da8f9564d8da",
+      "kind": "third_party_macro_calendar_screenshot",
+      "observed": "A screenshot of a third-party weekly events post used as context. It contains no order, fill or stop instruction for the ETH position."
+    }
+  ],
+  "personalWinRateCalculated": false
+}

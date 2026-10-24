@@ -1,0 +1,1554 @@
+{
+  "schema": "xo-published-setups-v1",
+  "assets": [
+    "BTC",
+    "ETH",
+    "HYPE",
+    "SOL",
+    "BNB",
+    "XRP"
+  ],
+  "timeframes": [
+    "15m",
+    "1H",
+    "4H",
+    "1D",
+    "1W"
+  ],
+  "publications": [
+    {
+      "postId": "1937448336279105751",
+      "sourceUrl": "https://x.com/Trader_XO/status/1937448336279105751",
+      "author": "Trader_XO",
+      "publishedAt": "2025-06-24T09:50:54.075Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1937448336279105751",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "forward_conditional_value_reclaim_plan",
+      "summary": "A reclaim of the established value-area low favors rotation through POC toward value-area highs in the 2700 region. Rejection instead leaves another pullback long conditional on support around 2100. The stated context favors seeking longs rather than swing shorts.",
+      "publishedReferences": {
+        "keySupport": 2100,
+        "valueAreaHighObjective": 2700
+      },
+      "gaps": [
+        "Exact value-area boundaries and profile settings",
+        "Numerical entry trigger and acceptance definition",
+        "Initial stop, position size and actual order times",
+        "A conditional pullback is not a forecast that price must revisit support"
+      ],
+      "laterResolutions": [],
+      "predecessors": [],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/records.json"
+    },
+    {
+      "postId": "1947019929858756919",
+      "sourceUrl": "https://x.com/Trader_XO/status/1947019929858756919",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-20T19:44:59.816Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1947019929858756919",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "higher_frame_long_context_and_late_entry_warning",
+      "summary": "Reports maintaining a long-focused context from the 2100 region. Near current highs through the 4100 region, late-long reward/risk is compressed and value may build. Bullish context coexists with possible corrective conditions; the ETHBTC yearly-open relationship is additional context.",
+      "publishedReferences": {
+        "earlierLongContext": 2100,
+        "upperContext": 4100,
+        "ethBtcYearOpenRelatedEthRegion": 4000
+      },
+      "gaps": [
+        "No fresh exact entry, protective stop, position size or order time",
+        "Context references are regions, not exact SL/TP orders",
+        "Conditional correction discussion does not establish a required price path"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1937448336279105751"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/records.json"
+    },
+    {
+      "postId": "1948046812570431714",
+      "sourceUrl": "https://x.com/Trader_XO/status/1948046812570431714",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-23T15:45:27.733Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1948046812570431714",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "balanced_context_and_conditional_acceptance",
+      "summary": "Overlapping session profiles and slowing momentum define balanced/range conditions. Reports reducing most of an earlier position. Acceptance below the 3600 region favors 3500; acceptance above the 3650 region favors a rotation toward 3800.",
+      "publishedReferences": {
+        "acceptBelow": 3600,
+        "lowerRotation": 3500,
+        "acceptAbove": 3650,
+        "upperRotation": 3800
+      },
+      "gaps": [
+        "Exact acceptance test and duration",
+        "Composite profile parameters",
+        "Entry fills, initial stop and sizing",
+        "Which earlier position is being reduced"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1947019929858756919"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json"
+    },
+    {
+      "postId": "1948134865355829359",
+      "sourceUrl": "https://x.com/Trader_XO/status/1948134865355829359",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-23T21:35:21.153Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1948134865355829359",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "composite_value_reaction_and_cross_asset_condition",
+      "summary": "Reports a test of the two-day composite value-area low in the low 3500 region. A rotation toward 3800 is conditional on BTC holding its weekly open. A failed hold instead brings the 3420 NPOC and 3300 yearly-open regions into consideration for later long interest.",
+      "publishedReferences": {
+        "compositeVal": 3500,
+        "npoc": 3420,
+        "yearOpen": 3300,
+        "upperRotation": 3800
+      },
+      "gaps": [
+        "Fourth own-photo link is present but its media URL was not recovered from the public page",
+        "Exact two-day profile start/end, price bins, value percentage and order-flow trigger",
+        "BTC hold/acceptance definition",
+        "New long entry, initial stop and size"
+      ],
+      "laterResolutions": [
+        "The fourth original media URL was recovered on 24 October 2026. Its position card is included below. The earlier capture is unchanged."
+      ],
+      "predecessors": [
+        "1948046812570431714"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json"
+    },
+    {
+      "postId": "1948409297148285397",
+      "sourceUrl": "https://x.com/Trader_XO/status/1948409297148285397",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-24T15:45:50.791Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1948409297148285397",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "support_reaction_and_protection_update",
+      "summary": "Reports support at the 3500 region, an upside preference toward 3800/local highs and stops moved upward. Links his own reading-the-market article and describes cut-and-reverse practice.",
+      "publishedReferences": {
+        "support": 3500,
+        "upside": 3800
+      },
+      "gaps": [
+        "Numeric updated stop and effective order time",
+        "Remaining quantity and exact entry",
+        "The linked article redirected to a welcome page; its full contents were not read"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1948134865355829359"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json"
+    },
+    {
+      "postId": "1948697315054653781",
+      "sourceUrl": "https://x.com/Trader_XO/status/1948697315054653781",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-25T10:50:19.611Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1948697315054653781",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "retrospective_stop_and_reverse_report",
+      "summary": "Reports that the earlier ETH short had a stop in the 3860 region, was closed in the 3500 region and flipped long. Discusses a possible stop-driven move toward the 3900–4000 region if local highs are exceeded.",
+      "publishedReferences": {
+        "priorShortStop": 3860,
+        "closeAndReverse": 3500,
+        "possibleUpside": [
+          3900,
+          4000
+        ]
+      },
+      "gaps": [
+        "Exact prior short entry/stop orders and fill timestamps",
+        "Exact reverse entry, long initial stop and size",
+        "Conditional stop-cascade discussion is not an exchange order"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1948409297148285397"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json"
+    },
+    {
+      "postId": "1949517447821770959",
+      "sourceUrl": "https://x.com/Trader_XO/status/1949517447821770959",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-27T17:09:14.500Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1949517447821770959",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "retrospective_two_way_rotation_update",
+      "summary": "Reports the earlier rotation from the 3800 region into 3500 and back toward 3800, with no clear higher-timeframe view. This is a later management report, not three independent forward-published entries.",
+      "publishedReferences": {
+        "upper": 3800,
+        "lower": 3500
+      },
+      "gaps": [
+        "Exact closure fills and sizes",
+        "Complete original order sequence",
+        "Later July 28 half-short reduction must remain a separate position report rather than a fabricated fresh long at 3650"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1948697315054653781"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json"
+    },
+    {
+      "postId": "1949841701612273784",
+      "sourceUrl": "https://x.com/Trader_XO/status/1949841701612273784",
+      "author": "Trader_XO",
+      "publishedAt": "2025-07-28T14:37:42.628Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "1949841701612273784",
+      "supersededBy": null,
+      "assets": [
+        "ETH"
+      ],
+      "contextAssets": [],
+      "kind": "intraday_short_partial_and_conditional_long_interest",
+      "summary": "Separately identifies the 3650 naked POC as possible future long interest and reports taking half off an existing short. The partial fill price is not stated; the attached card shows a different current-price reference.",
+      "publishedReferences": {
+        "conditionalLongInterestApprox": 3650,
+        "shortPartialFraction": 0.5,
+        "longEntry": null,
+        "stop": null,
+        "target": null,
+        "cardReportedEntryPrice": 3879.85,
+        "cardCurrentPrice": 3776.42,
+        "cardLeverage": 20,
+        "cardRoiPercent": 52.71,
+        "cardCurrentPriceIsExitConfirmation": false
+      },
+      "gaps": [
+        "Original short entry and stop",
+        "Remaining position management",
+        "New long trigger, size, SL and TP",
+        "Exact execution timing",
+        "The 3650 interest level is distinct from the reported current short reduction; do not assign that partial an invented 3650 fill."
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "1949517447821770959"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2062790868642222084",
+      "sourceUrl": "https://x.com/Trader_XO/status/2062790868642222084",
+      "author": "Trader_XO",
+      "publishedAt": "2026-06-05T06:57:22.542Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2062790868642222084",
+      "supersededBy": null,
+      "assets": [
+        "BTC"
+      ],
+      "contextAssets": [],
+      "kind": "retrospective_short_setup_and_profit_report",
+      "summary": "Describes a selective swing short around February highs and using realised gains to add spot BTC. The screenshot and prior entry instruction still need matching.",
+      "publishedReferences": {
+        "entry": "around February highs; no exact order price",
+        "stop": null,
+        "target": null
+      },
+      "gaps": [
+        "Advance entry post",
+        "Exact position size and SL",
+        "Full exits",
+        "Spot/perpetual allocation"
+      ],
+      "laterResolutions": [],
+      "predecessors": [],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2070925189534101700",
+      "sourceUrl": "https://x.com/Trader_XO/status/2070925189534101700",
+      "author": "Trader_XO",
+      "publishedAt": "2026-06-27T17:40:15.771Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2070925189534101700",
+      "supersededBy": null,
+      "assets": [
+        "BTC"
+      ],
+      "contextAssets": [],
+      "kind": "forward_conditional_long_plan",
+      "summary": "Several unsuccessful downside auctions and absorption at February lows motivate a conditional long after another sweep fails and returns inside. Macro spillover remains a condition, and the earlier short may be covered.",
+      "publishedReferences": {
+        "entry": "failed sweep and acceptance back inside February lows",
+        "stop": null,
+        "target": null
+      },
+      "gaps": [
+        "Numerical stop and entry trigger",
+        "Definition of acceptance",
+        "Execution size",
+        "Complete management"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2062790868642222084"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2071539355512934850",
+      "sourceUrl": "https://x.com/Trader_XO/status/2071539355512934850",
+      "author": "Trader_XO",
+      "publishedAt": "2026-06-29T10:20:44.351Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2071539355512934850",
+      "supersededBy": null,
+      "assets": [
+        "BTC",
+        "HYPE"
+      ],
+      "contextAssets": [],
+      "kind": "reported_short_reduction",
+      "summary": "Reports being out of BTC swing shorts from the 81 region near 60 and mostly covering a HYPE short from the 75 region near 62.",
+      "publishedReferences": {
+        "btcReportedEntryApprox": 81000,
+        "btcReportedExitApprox": 60000,
+        "hypeReportedEntryApprox": 75,
+        "hypeReportedExitApprox": 62
+      },
+      "gaps": [
+        "Trade identifiers and fills",
+        "Exact entry/exit times",
+        "Original stops and sizing",
+        "Remaining HYPE position size"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2070925189534101700"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2072373535574511834",
+      "sourceUrl": "https://x.com/Trader_XO/status/2072373535574511834",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-01T17:35:28.376Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2072373535574511834",
+      "supersededBy": "2072376414956130393",
+      "assets": [
+        "BTC"
+      ],
+      "contextAssets": [],
+      "kind": "original_version_current_long_report",
+      "summary": "Original version of the July 1 long report: failed auction beneath the established 2024 value area, incremental long exposure and POC first objective.",
+      "publishedReferences": {
+        "entry": null,
+        "stop": null,
+        "target": "2024 value-area POC"
+      },
+      "gaps": [
+        "Exact long fills, stop and size",
+        "Numeric POC and profile parameters",
+        "Earlier entry execution"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2070925189534101700"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2072376414956130393",
+      "sourceUrl": "https://x.com/Trader_XO/status/2072376414956130393",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-01T17:46:54.874Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2072373535574511834",
+      "supersededBy": null,
+      "assets": [
+        "BTC"
+      ],
+      "contextAssets": [],
+      "kind": "reported_position_change_and_conditional_plan",
+      "summary": "Reports a closed BTC short and incremental longs after a failed auction at 2024 value-area lows. POC is the first rotational objective; overhead supply remains relevant.",
+      "publishedReferences": {
+        "reportedShortEntryApprox": 81500,
+        "reportedShortExitApprox": 60000,
+        "longEntry": null,
+        "stop": null,
+        "target": "2024 value-area POC, numeric value not established"
+      },
+      "gaps": [
+        "Initial short publication and fills",
+        "Exact long entry and sizing",
+        "Numerical stop and target",
+        "Edit chronology"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2070925189534101700"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/initial-records.json"
+    },
+    {
+      "postId": "2072657962145906964",
+      "sourceUrl": "https://x.com/Trader_XO/status/2072657962145906964",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-02T12:25:40.955Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2072657962145906964",
+      "supersededBy": null,
+      "assets": [
+        "BTC"
+      ],
+      "contextAssets": [],
+      "kind": "range_rotation_framework",
+      "summary": "Describes trading the February-established range extremes until price accepts outside the range, with a potential rotation into weekly bands then a short.",
+      "publishedReferences": {
+        "entry": "established range extremes; no exact instruction",
+        "stop": null,
+        "target": "weekly bands before considering a reverse sell rotation"
+      },
+      "gaps": [
+        "Numerical range endpoints",
+        "Exact trigger/SL/size",
+        "Advance individual trade instructions",
+        "Definition and timing of acceptance"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2072376414956130393"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/initial-records.json"
+    },
+    {
+      "postId": "2072749403106841058",
+      "sourceUrl": "https://x.com/Trader_XO/status/2072749403106841058",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-02T18:29:02.179Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2072749403106841058",
+      "supersededBy": null,
+      "assets": [
+        "HYPE"
+      ],
+      "contextAssets": [
+        "BTC"
+      ],
+      "kind": "retrospective_short_closure_and_current_long_report",
+      "summary": "Reports closing a prior HYPE short and holding a new long. BTC continuation and recovery above daily EMA12/25 are contextual factors.",
+      "publishedReferences": {
+        "reportedShortEntryApprox": 75,
+        "reportedShortExitApprox": 62,
+        "longEntry": null,
+        "stop": null,
+        "target": "prior highs; no complete numeric order instruction"
+      },
+      "gaps": [
+        "Advance short entry/SL publication",
+        "Exact closure time",
+        "New long entry/SL/size",
+        "Full target and management instructions"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2071539355512934850"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/initial-records.json"
+    },
+    {
+      "postId": "2073069754709954657",
+      "sourceUrl": "https://x.com/Trader_XO/status/2073069754709954657",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-03T15:41:59.953Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2073069754709954657",
+      "supersededBy": null,
+      "assets": [
+        "HYPE"
+      ],
+      "contextAssets": [],
+      "kind": "first_objective_update",
+      "summary": "Reports that the first HYPE objective has traded, with possible further upside; renewed trading below approximately 65 changes the assessment.",
+      "publishedReferences": {
+        "firstObjective": "shown in linked charts; not a new order instruction",
+        "conditionalProblemBelowApprox": 65,
+        "stop": null
+      },
+      "gaps": [
+        "Whether and how much was closed at this update",
+        "Exact long entry and SL",
+        "Definition of below-level acceptance",
+        "Numerical further targets"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2072749403106841058"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    },
+    {
+      "postId": "2073713750675218879",
+      "sourceUrl": "https://x.com/Trader_XO/status/2073713750675218879",
+      "author": "Trader_XO",
+      "publishedAt": "2026-07-05T10:21:00.556Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2073713750675218879",
+      "supersededBy": null,
+      "assets": [
+        "HYPE"
+      ],
+      "contextAssets": [],
+      "kind": "management_report_and_conditional_reversal",
+      "summary": "Reports taking long profit at the upper range quarter and opening a small short. May-origin anchored VWAP, EMA support and fixed-range profile guide context; acceptance above weekly highs changes the plan.",
+      "publishedReferences": {
+        "reportedLongStart": "mid-range",
+        "reportedLongExit": "0.75 of range",
+        "reportedSmallShortEntry": null,
+        "stop": "cut short after acceptance above the week's high; exact trigger unspecified",
+        "target": null
+      },
+      "gaps": [
+        "Numerical range endpoints and exact anchor",
+        "Long and short fills/size",
+        "Definition of acceptance",
+        "Timing and full management updates"
+      ],
+      "laterResolutions": [],
+      "predecessors": [
+        "2073069754709954657"
+      ],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/initial-records.json"
+    },
+    {
+      "postId": "2105320157430087763",
+      "sourceUrl": "https://x.com/Trader_XO/status/2105320157430087763",
+      "author": "Trader_XO",
+      "publishedAt": "2026-09-30T15:33:35.145Z",
+      "timestampMeaning": "Publication/version creation time, not order or fill time. Displayed source minute corroborates the ID timestamp.",
+      "canonicalPostId": "2105320157430087763",
+      "supersededBy": null,
+      "assets": [
+        "SOL"
+      ],
+      "contextAssets": [],
+      "kind": "spot_hedge_and_conditional_flip",
+      "summary": "Reports a SOL short around the yearly open as downside cover for spot. Discusses a possible 60-to-120 structural range and a flip above approximately 125, with selling again after a return below.",
+      "publishedReferences": {
+        "entry": "around yearly open; exact execution unspecified",
+        "conditionalFlipAboveApprox": 125,
+        "conditionalSellBackBelowApprox": 125,
+        "rangeLowApprox": 60,
+        "rangeHighApprox": 120,
+        "stop": null
+      },
+      "gaps": [
+        "Spot exposure and hedge ratio",
+        "Exact short entry and size",
+        "Definition of flip/acceptance trigger",
+        "Actual exit updates",
+        "Standalone TP/SL orders"
+      ],
+      "laterResolutions": [],
+      "predecessors": [],
+      "sourceRecordFile": "docs/backtests/xo-trade-record-audit/chain-records.json"
+    }
+  ],
+  "images": [
+    {
+      "postId": "2072376414956130393",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMKKHk9W4AARzcz?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072376414956130393-1-HMKKHk9W4AARzcz.webp",
+      "sha256": "e50df48292140f24cc8b48bc71b5523c99202206dd5ce13e2c5239be7483621e",
+      "bytes": 11812,
+      "observation": {
+        "mediaId": "HMKKHk9W4AARzcz",
+        "kind": "text_excerpt",
+        "notes": "Conditional failed sweep and return inside; no complete order or numerical stop.",
+        "reported": {},
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072376414956130393",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMKLKDQWgAAOSWh?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072376414956130393-2-HMKLKDQWgAAOSWh.webp",
+      "sha256": "ad4a771fd514c3f2877145048fc6dd4f15bac3fb33db3b0f07e951762b134156",
+      "bytes": 59316,
+      "observation": {
+        "mediaId": "HMKLKDQWgAAOSWh",
+        "kind": "value_area_chart",
+        "notes": "Established 2024 profile/value area; colored levels are not identified as protective orders.",
+        "reported": {
+          "displayedCurrentPrice": 60141.7
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-01T17:28:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072376414956130393",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/HMKMhW-XMAAEDCF?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072376414956130393-3-HMKMhW-XMAAEDCF.webp",
+      "sha256": "ab0850483369bd2d635cb89d1baf589bfe8d0bcf9f06d99f821ef91baa32b56d",
+      "bytes": 43622,
+      "observation": {
+        "mediaId": "HMKMhW-XMAAEDCF",
+        "kind": "price_structure_chart",
+        "notes": "Recent repeated lows and descending structure; exact timeframe and SL are not displayed.",
+        "reported": {
+          "displayedCurrentPrice": 60102.6
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-01T17:34:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072376414956130393",
+      "photoOrdinal": 4,
+      "originalUrl": "https://pbs.twimg.com/media/HMKMjMeXYAA8f40?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072376414956130393-4-HMKMjMeXYAA8f40.webp",
+      "sha256": "2c5c297d5f245b8c4a22644b3a4f519ca129a9bb6b205f81804fa723cf297ef2",
+      "bytes": 111116,
+      "observation": {
+        "mediaId": "HMKMjMeXYAA8f40",
+        "kind": "footprint_and_orderbook",
+        "notes": "BTCUSDT 1D footprint/DOM. Reference lines are not labeled initial stops; full exchange/settings and execution history absent.",
+        "reported": {
+          "greenReferenceLevels": [
+            58832.8,
+            58043.6
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": "1D"
+      }
+    },
+    {
+      "postId": "2072749403106841058",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMPiGEAWcAA4I8R?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072749403106841058-1-HMPiGEAWcAA4I8R.webp",
+      "sha256": "c5ed6005cce368251930a90eead6ddf3606116bfa51172d06e3f0abbad899c91",
+      "bytes": 42872,
+      "observation": {
+        "mediaId": "HMPiGEAWcAA4I8R",
+        "kind": "range_chart",
+        "notes": "Range levels read approximately from the axis, not exact order prices.",
+        "reported": {
+          "displayedCurrentPrice": 66.993
+        },
+        "approximateReadings": {
+          "rangeLow": 54.4,
+          "rangeMid": 65.3,
+          "rangeHigh": 76
+        },
+        "chartCreatedAtUTC": "2026-07-02T18:25:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072749403106841058",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMPidM3WUAApPDW?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072749403106841058-2-HMPidM3WUAApPDW.webp",
+      "sha256": "ba749072014a5b3f4e653aea093f694bbd5f1cc22ba08ae3276902648413ac24",
+      "bytes": 45412,
+      "observation": {
+        "mediaId": "HMPidM3WUAApPDW",
+        "kind": "ema_context_chart",
+        "notes": "Macro Trend Scanner attribution visible; current candle has a countdown and is not a final daily close.",
+        "reported": {
+          "displayedCurrentPrice": 67.052,
+          "visibleLowerEmaValue": 64.029
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-02T18:28:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2073713750675218879",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMdNluXXMAAQ_6p?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2073713750675218879-1-HMdNluXXMAAQ_6p.webp",
+      "sha256": "e8abaf0c212cfde94ee67dde6ce462ac2117762d180801912c0b9c19da454718",
+      "bytes": 55994,
+      "observation": {
+        "mediaId": "HMdNluXXMAAQ_6p",
+        "kind": "event_vwap_and_ema_chart",
+        "notes": "Event anchor marker and deviation bands visible. Exact anchor bar, variance formula and settings not supplied.",
+        "reported": {
+          "displayedCurrentPrice": 68.817
+        },
+        "approximateReadings": {
+          "anchorWindow": "mid-May 2026"
+        },
+        "chartCreatedAtUTC": "2026-07-05T10:11:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2073713750675218879",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMdO0WOWYAAVFQl?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2073713750675218879-2-HMdO0WOWYAAVFQl.webp",
+      "sha256": "5f5cefc3683c500c0407bde8280ea0e8ca1a831808d051159974fd652bb446a5",
+      "bytes": 44510,
+      "observation": {
+        "mediaId": "HMdO0WOWYAAVFQl",
+        "kind": "profile_and_range_chart",
+        "notes": "Profile/range context; approximate axis readings are not confirmed stop/target orders.",
+        "reported": {
+          "displayedCurrentPrice": 68.823
+        },
+        "approximateReadings": {
+          "valueLow": 56.4,
+          "poc": 62.8,
+          "valueHigh": 68.4,
+          "localHigh": 71.5
+        },
+        "chartCreatedAtUTC": "2026-07-05T10:17:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072657962145906964",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMOOU04WUAAt38n?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072657962145906964-1-HMOOU04WUAAt38n.webp",
+      "sha256": "42b6c67ec132fdd7123dc671d5ec929f1df6e97d5c2a6c6aa88e7af2f1e153a6",
+      "bytes": 10494,
+      "observation": {
+        "mediaId": "HMOOU04WUAAt38n",
+        "kind": "earlier_post_screenshot",
+        "notes": "Screenshot references March 5 February-range preparation; original post ID and year still need verification.",
+        "reported": {},
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072657962145906964",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMOOcqlWoAArflb?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072657962145906964-2-HMOOcqlWoAArflb.webp",
+      "sha256": "ba4f342571c6f66468b95a09d97aa2770bb64fb8a5a6792ef6813ea900538b2b",
+      "bytes": 43194,
+      "observation": {
+        "mediaId": "HMOOcqlWoAArflb",
+        "kind": "february_range_chart",
+        "notes": "USD chart, named February highs/lows; axis-derived bounds remain approximate.",
+        "reported": {
+          "displayedCurrentPrice": 61148
+        },
+        "approximateReadings": {
+          "februaryHigh": 79400,
+          "februaryLow": 60000
+        },
+        "chartCreatedAtUTC": "2026-07-02T12:21:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072657962145906964",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/HMOOpH9XoAAWMij?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072657962145906964-3-HMOOpH9XoAAWMij.webp",
+      "sha256": "0de7fe15ca9531fa1fc1b239f18f3be7dc7e86f11a91a627177ae934db1d035a",
+      "bytes": 55138,
+      "observation": {
+        "mediaId": "HMOOpH9XoAAWMij",
+        "kind": "higher_horizon_chart",
+        "notes": "Long-horizon context, not a published entry/SL/TP sequence. Exact chart timeframe is cropped.",
+        "reported": {
+          "displayedCurrentPrice": 61139,
+          "visibleReferenceLevels": [
+            122575,
+            100005,
+            96781,
+            74401,
+            71746,
+            49935,
+            45762,
+            18831
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-02T12:22:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072657962145906964",
+      "photoOrdinal": 4,
+      "originalUrl": "https://pbs.twimg.com/media/HMOOwXsXoAA0nff?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072657962145906964-4-HMOOwXsXoAA0nff.webp",
+      "sha256": "f5339478066d33b505e4b78f138172e5dbcaac472d9a2d21f45bb8526d7afd58",
+      "bytes": 74454,
+      "observation": {
+        "mediaId": "HMOOwXsXoAA0nff",
+        "kind": "higher_horizon_ema_chart",
+        "notes": "EMA context with a developing-candle countdown. No copied fresh entry or full order instruction.",
+        "reported": {
+          "displayedCurrentPrice": 61174,
+          "visibleEmaValues": [
+            73804,
+            68096
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072373535574511834",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMKKHk9W4AARzcz?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072373535574511834-1-HMKKHk9W4AARzcz.webp",
+      "sha256": "e50df48292140f24cc8b48bc71b5523c99202206dd5ce13e2c5239be7483621e",
+      "bytes": 11812,
+      "observation": {
+        "mediaId": "HMKKHk9W4AARzcz",
+        "kind": "text_excerpt",
+        "notes": "Conditional failed sweep and return inside; no complete order or numerical stop.",
+        "reported": {},
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072373535574511834",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMKLKDQWgAAOSWh?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072373535574511834-2-HMKLKDQWgAAOSWh.webp",
+      "sha256": "ad4a771fd514c3f2877145048fc6dd4f15bac3fb33db3b0f07e951762b134156",
+      "bytes": 59316,
+      "observation": {
+        "mediaId": "HMKLKDQWgAAOSWh",
+        "kind": "value_area_chart",
+        "notes": "Established 2024 profile/value area; colored levels are not identified as protective orders.",
+        "reported": {
+          "displayedCurrentPrice": 60141.7
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-01T17:28:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072373535574511834",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/HMKMhW-XMAAEDCF?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072373535574511834-3-HMKMhW-XMAAEDCF.webp",
+      "sha256": "ab0850483369bd2d635cb89d1baf589bfe8d0bcf9f06d99f821ef91baa32b56d",
+      "bytes": 43622,
+      "observation": {
+        "mediaId": "HMKMhW-XMAAEDCF",
+        "kind": "price_structure_chart",
+        "notes": "Recent repeated lows and descending structure; exact timeframe and SL are not displayed.",
+        "reported": {
+          "displayedCurrentPrice": 60102.6
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-01T17:34:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2072373535574511834",
+      "photoOrdinal": 4,
+      "originalUrl": "https://pbs.twimg.com/media/HMKMjMeXYAA8f40?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2072373535574511834-4-HMKMjMeXYAA8f40.webp",
+      "sha256": "2c5c297d5f245b8c4a22644b3a4f519ca129a9bb6b205f81804fa723cf297ef2",
+      "bytes": 111116,
+      "observation": {
+        "mediaId": "HMKMjMeXYAA8f40",
+        "kind": "footprint_and_orderbook",
+        "notes": "BTCUSDT 1D footprint/DOM. Reference lines are not labeled initial stops; full exchange/settings and execution history absent.",
+        "reported": {
+          "greenReferenceLevels": [
+            58832.8,
+            58043.6
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": "1D"
+      }
+    },
+    {
+      "postId": "2070925189534101700",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HL1jr0HXgAA61Q3?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2070925189534101700-1-HL1jr0HXgAA61Q3.webp",
+      "sha256": "8921b68c0852f956255235b69cdc091b6910a969c010a6fbbacc27183c155b50",
+      "bytes": 39950,
+      "observation": {
+        "mediaId": "HL1jr0HXgAA61Q3",
+        "kind": "prior_february_range_chart",
+        "notes": "Predecessor plan chart; lower edge reaction/acceptance still conditions execution.",
+        "reported": {
+          "displayedCurrentPrice": 60562.7
+        },
+        "approximateReadings": {
+          "februaryHigh": 79400,
+          "februaryLow": 60000
+        },
+        "chartCreatedAtUTC": "2026-06-27T17:23:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2070925189534101700",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HL1nDt4XgAArr6f?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2070925189534101700-2-HL1nDt4XgAArr6f.webp",
+      "sha256": "ced4c3654927777435c4c65eb1413962e4c2159d8da1c26ade5f5ae7e49fb558",
+      "bytes": 84618,
+      "observation": {
+        "mediaId": "HL1nDt4XgAArr6f",
+        "kind": "prior_footprint_chart",
+        "notes": "Daily BTCUSDT footprint/absorption context. Small label is an approximate reading; no stop order is established.",
+        "reported": {},
+        "approximateReadings": {
+          "februaryLowLabel": 59869
+        },
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": "1D"
+      }
+    },
+    {
+      "postId": "2062790868642222084",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HKCBXJnWAAAx9kv?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2062790868642222084-1-HKCBXJnWAAAx9kv.webp",
+      "sha256": "8c152120878d0b576ebfbb8fa448f61e90e0d4b4a6ba483a4f2970c83c763e92",
+      "bytes": 18926,
+      "observation": {
+        "mediaId": "HKCBXJnWAAAx9kv",
+        "kind": "position_roi_card",
+        "notes": "Current-price field is not exit confirmation. Margin, size, account return and complete fills are not supplied.",
+        "reported": {
+          "reportedEntryPrice": 81506.67,
+          "displayedCurrentPrice": 61878.8,
+          "reportedLeverage": 10,
+          "displayedRoiPercent": 314.69
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2073069754709954657",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HMUFLhYXoAEnESE?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2073069754709954657-1-HMUFLhYXoAEnESE.webp",
+      "sha256": "c5ed6005cce368251930a90eead6ddf3606116bfa51172d06e3f0abbad899c91",
+      "bytes": 42872,
+      "observation": {
+        "mediaId": "HMUFLhYXoAEnESE",
+        "kind": "reused_range_chart",
+        "notes": "July 3 post reuses the exact July 2 chart bytes. It is not a second independent trade/chart observation.",
+        "reported": {
+          "displayedCurrentPrice": 66.993
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-07-02T18:25:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2073069754709954657",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/HMUFNMUXoAA_qqH?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2073069754709954657-2-HMUFNMUXoAA_qqH.webp",
+      "sha256": "4ae7f0996492dda5ea22ec3618576f4286e92b5b4fa14338ce73a8b529dbdcaf",
+      "bytes": 37556,
+      "observation": {
+        "mediaId": "HMUFNMUXoAA_qqH",
+        "kind": "first_objective_structure_chart",
+        "notes": "First-objective update and local higher lows. Numeric current price is distinct from an actual exit fill.",
+        "reported": {
+          "displayedCurrentPrice": 70.417
+        },
+        "approximateReadings": {
+          "rangeLow": 54.3,
+          "rangeMid": 64.9,
+          "rangeHigh": 76
+        },
+        "chartCreatedAtUTC": "2026-07-03T15:38:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2073069754709954657",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/HMUFlLcXIAAc6cB?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2073069754709954657-3-HMUFlLcXIAAc6cB.webp",
+      "sha256": "d7d19109b8f3c6c6e8ed8043a3fb4296eceb78e07ebfe3b9ad1dba1b198c9099",
+      "bytes": 33728,
+      "observation": {
+        "mediaId": "HMUFlLcXIAAc6cB",
+        "kind": "first_objective_profile_chart",
+        "notes": "Move above value-area high visible; no complete quantity/exit statement in the image.",
+        "reported": {
+          "displayedCurrentPrice": 70.24
+        },
+        "approximateReadings": {
+          "poc": 62.8,
+          "valueHigh": 68.4,
+          "valueLow": 56.4
+        },
+        "chartCreatedAtUTC": "2026-07-03T15:40:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "2105320157430087763",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/HTeZAnLW4AEXkKs?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/2105320157430087763-1-HTeZAnLW4AEXkKs.webp",
+      "sha256": "db0ddc0718a8d1d915bfc2e6c87b13fc3c0ac39a510e80b7801635a1cb07fedd",
+      "bytes": 48990,
+      "observation": {
+        "mediaId": "HTeZAnLW4AEXkKs",
+        "kind": "spot_hedge_context_chart",
+        "notes": "SOL long-term context and measured move. The post describes a spot hedge; portfolio exposure and exact fill remain absent.",
+        "reported": {
+          "visibleUpperReference": 122.71,
+          "displayedCurrentPrice": 118.89,
+          "visibleLowerReference": 52.52
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": "2026-09-30T15:31:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949841701612273784",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/Gw86sKyWgAAAS_-?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/1949841701612273784-1-Gw86sKyWgAAAS_-.webp",
+      "sha256": "10ff2a94d8a2dca7db4943b086ca356c15810d21af0eea9af11fd1e8db8d8dfb",
+      "bytes": 41928,
+      "observation": {
+        "mediaId": "Gw86sKyWgAAAS_-",
+        "kind": "session_profile_chart",
+        "notes": "Session profile context. Exact session boundaries, row size and venue are not supplied.",
+        "reported": {
+          "displayedCurrentPrice": 3775.95
+        },
+        "approximateReadings": {
+          "npocZone": "around 3650"
+        },
+        "chartCreatedAtUTC": "2025-07-28T14:30:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949841701612273784",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/Gw86sKOWUAE3MOG?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/1949841701612273784-2-Gw86sKOWUAE3MOG.webp",
+      "sha256": "230e8e640c71bceda94e99c5888fc6bd07de3ed4c5643a23c3555ea3211208c2",
+      "bytes": 32888,
+      "observation": {
+        "mediaId": "Gw86sKOWUAE3MOG",
+        "kind": "intraday_structure_chart",
+        "notes": "Current decline and a lower area of interest; no full new long order. Approximate shaded bounds are not SL/TP.",
+        "reported": {
+          "displayedCurrentPrice": 3788.5,
+          "visibleLowerReference": 3481.01
+        },
+        "approximateReadings": {
+          "shadedZone": [
+            3660,
+            3705
+          ]
+        },
+        "chartCreatedAtUTC": "2025-07-28T14:34:00Z",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949841701612273784",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/Gw86sIaXkAA4SG0?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/1949841701612273784-3-Gw86sIaXkAA4SG0.webp",
+      "sha256": "5768bb388b6cd09e0638bad3b723b147f0b675e9d6f5ed0f7be36c715a0aca08",
+      "bytes": 44704,
+      "observation": {
+        "mediaId": "Gw86sIaXkAA4SG0",
+        "kind": "substack_note_screenshot",
+        "notes": "Earlier note relates local highs to aggressive buyers meeting absorption/stacked offers. Original note URL/time not yet established.",
+        "reported": {},
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949841701612273784",
+      "photoOrdinal": 4,
+      "originalUrl": "https://pbs.twimg.com/media/Gw86sIXWEAAseHy?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/source-images/1949841701612273784-4-Gw86sIXWEAAseHy.webp",
+      "sha256": "9a519407167f3d18d0f1863a9c7b658a3269f6f9e277e650db72e0dd65a9ae83",
+      "bytes": 18954,
+      "observation": {
+        "mediaId": "Gw86sIXWEAAseHy",
+        "kind": "position_roi_card",
+        "notes": "Separate current-price card and conditional 3650 interest; neither proves a partial exit fill at 3650.",
+        "reported": {
+          "reportedEntryPrice": 3879.85,
+          "displayedCurrentPrice": 3776.42,
+          "reportedLeverage": 20,
+          "displayedRoiPercent": 52.71
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948046812570431714",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/GwjaP9aWEAAK9y4?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948046812570431714-1-GwjaP9aWEAAK9y4.webp",
+      "sha256": "e5d38b1544255a4b6fb074faeedcdef584fd1d84807f2673e800eb434fecd709",
+      "bytes": 59510,
+      "observation": {
+        "mediaId": "GwjaP9aWEAAK9y4",
+        "kind": "session_profile_chart",
+        "notes": "Session profiles, POC/VAH/VAL and fixed two-day composite references. The marked composite belongs to earlier July 18/19 sessions, rather than automatically rolling to the latest two days. Exact binning, profile basis and session settings remain unknown.",
+        "reported": {
+          "visibleReferences": []
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-23 16:40 UTC+1",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948046812570431714",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/GwjaP9YX0AAVjt0?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948046812570431714-2-GwjaP9YX0AAVjt0.webp",
+      "sha256": "2e46a1dc0895fbdf08377493da1f141d744d07ce020201a9001b25206872e19b",
+      "bytes": 16352,
+      "observation": {
+        "mediaId": "GwjaP9YX0AAVjt0",
+        "kind": "reported_open_short_card",
+        "notes": "Current Price is not Exit Price; no fill time, size or exchange verification.",
+        "reported": {
+          "entryPrice": 3842.54,
+          "currentPrice": 3616.22,
+          "leverage": 20,
+          "displayedRoiPercent": 116.45
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948134865355829359",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/GwkqVOcW0AI3E2h?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-1-GwkqVOcW0AI3E2h.webp",
+      "sha256": "84d967ceced2efc2caccf2676154a1e380c0eb34c88697a48abb170776efd96d",
+      "bytes": 56944,
+      "observation": {
+        "mediaId": "GwkqVOcW0AI3E2h",
+        "kind": "composite_profile_chart",
+        "notes": "Explicit earlier-session two-day composite VAH/VAL, with a low-area reaction marker. Current-price field 3530.01 is distinct from the exact value-area boundary; the original composite is retained.",
+        "reported": {
+          "visibleReferences": []
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-23 22:27 UTC+1",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948134865355829359",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/GwkqVOwW4AAjHVQ?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-2-GwkqVOwW4AAjHVQ.webp",
+      "sha256": "71ad8af55d93dfa13f4ebc66cd8fb116f563e2f33721e847bfc3f9d127d40dab",
+      "bytes": 57400,
+      "observation": {
+        "mediaId": "GwkqVOwW4AAjHVQ",
+        "kind": "session_profile_chart",
+        "notes": "Daily/session profile references around the lower 3500 area, NPOC in the 3420 region and a lower yearly-open region. Profile basis, value percentage and price rows are not printed.",
+        "reported": {
+          "visibleReferences": []
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-23 22:31 UTC+1",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948134865355829359",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/GwkqVOZWgAAkzcL?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948134865355829359-3-GwkqVOZWgAAkzcL.webp",
+      "sha256": "6a1c124abd8fbb2e874f09728c6fdca11095fa527fe4ce684003aa187fa0a60a",
+      "bytes": 36220,
+      "observation": {
+        "mediaId": "GwkqVOZWgAAkzcL",
+        "kind": "key_level_candles",
+        "notes": "Weekly Open and Yearly Open context; visible SpacemanBTC Key Level V13.1 indicator name. Third-party indicator authorship is not assigned to XO. Horizontal levels are not assumed to be stop/entry orders.",
+        "reported": {
+          "visibleReferences": [
+            3849.92,
+            3824.02
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-23 22:33 UTC+1",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948409297148285397",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/Gwoj7R5XAAAG_Ad?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-1-Gwoj7R5XAAAG_Ad.webp",
+      "sha256": "018bc7edcfd88522c0cffd35bdac550855e4642adcc81334bb082d311ded9135",
+      "bytes": 55372,
+      "observation": {
+        "mediaId": "Gwoj7R5XAAAG_Ad",
+        "kind": "hourly_phone_chart",
+        "notes": "ETHUSDT 1h, weekly-open reference, dotted curves and a support reaction. Dotted-curve identity/settings are not printed. Crosshair time is not an order time.",
+        "reported": {
+          "visibleReferences": [
+            3876.29,
+            3498.81
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": "1H"
+      }
+    },
+    {
+      "postId": "1948409297148285397",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/Gwoj7R5WEAAXc8M?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-2-Gwoj7R5WEAAXc8M.webp",
+      "sha256": "2b59be739ee4dc1e3c098fc51b000b8f0380e2b3ce2fbcc2a78a1c29451ba25c",
+      "bytes": 22094,
+      "observation": {
+        "mediaId": "Gwoj7R5WEAAXc8M",
+        "kind": "reported_short_exit_card",
+        "notes": "Exit Price is explicitly printed, unlike a current-price card. Quantity, exact entry/exit timestamps and whether the card represents the entire account position are not supplied.",
+        "reported": {
+          "entryPrice": 3842.54,
+          "exitPrice": 3591.68,
+          "leverage": 20,
+          "displayedRoiPercent": 130.56
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948409297148285397",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/Gwoj7R_W4AErTla?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948409297148285397-3-Gwoj7R_W4AErTla.webp",
+      "sha256": "0d5d3bf38d6b4534cf7ede3443d00bd624150ecbcc9e8b580766daafb944b3e4",
+      "bytes": 16534,
+      "observation": {
+        "mediaId": "Gwoj7R_W4AErTla",
+        "kind": "reported_open_long_card",
+        "notes": "A later long-entry report; Current Price is not an exit. Do not invent a same-tick reversal from the short card.",
+        "reported": {
+          "entryPrice": 3578.48,
+          "currentPrice": 3738.48,
+          "leverage": 20,
+          "displayedRoiPercent": 88.49
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948697315054653781",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/Gwsp4OcWMAAhzeG?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1948697315054653781-1-Gwsp4OcWMAAhzeG.webp",
+      "sha256": "75fa731952bed11bde6c541e7d90e21596842e51993d5aa81e27ff889f446beb",
+      "bytes": 51710,
+      "observation": {
+        "mediaId": "Gwsp4OcWMAAhzeG",
+        "kind": "higher_frame_key_levels",
+        "notes": "A recovery above the marked lower structural level and an upper reference. Neither horizontal line is an explicit protective order.",
+        "reported": {
+          "visibleReferences": [
+            3514.05,
+            4115.39
+          ]
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-25 03:49 UTC-7",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949517447821770959",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/Gw4TyMmXMAABxre?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-1-Gw4TyMmXMAABxre.webp",
+      "sha256": "46c59c5fab7ed2def5a641b5d5012b263f990aa833605e50543b6faece7e37f6",
+      "bytes": 80912,
+      "observation": {
+        "mediaId": "Gw4TyMmXMAABxre",
+        "kind": "later_session_profile_chart",
+        "notes": "Successive session distributions and profile references show the rotation back toward the upper area. Later current/profile price labels do not recreate an earlier entry.",
+        "reported": {
+          "visibleReferences": []
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": "2025-07-27 18:04 UTC+1",
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949517447821770959",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/Gw4TyM6WwAAebyu?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-2-Gw4TyM6WwAAebyu.webp",
+      "sha256": "c3ee70e8d0068a41a0514d34f6ef1dc3129d180aad9309a2b4077789855b18b0",
+      "bytes": 18454,
+      "observation": {
+        "mediaId": "Gw4TyM6WwAAebyu",
+        "kind": "reported_long_exit_card",
+        "notes": "Exit Price is printed and entry matches the earlier long card. Exact fill times, quantity, complete partials and initial SL remain missing; this is reported card evidence, not an independently audited exchange ledger.",
+        "reported": {
+          "entryPrice": 3578.48,
+          "exitPrice": 3818.39,
+          "leverage": 20,
+          "displayedRoiPercent": 134.08
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1949517447821770959",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/Gw4TyMnWQAACxiZ?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-rotation-2026-10-22/source-images/1949517447821770959-3-Gw4TyMnWQAACxiZ.webp",
+      "sha256": "05d7c7c755fc7f4be4b97e4e2ace9f59da5b18bb50f95e966eb9da8f9564d8da",
+      "bytes": 17126,
+      "observation": {
+        "mediaId": "Gw4TyMnWQAACxiZ",
+        "kind": "third_party_macro_calendar_screenshot",
+        "notes": "A screenshot of a third-party weekly events post used as context. It contains no order, fill or stop instruction for the ETH position.",
+        "reported": {
+          "visibleReferences": []
+        },
+        "approximateReadings": {},
+        "chartCreatedAtUTC": null,
+        "printedChartCapture": null,
+        "chartTimeframe": null
+      }
+    },
+    {
+      "postId": "1948134865355829359",
+      "photoOrdinal": 4,
+      "originalUrl": "https://pbs.twimg.com/media/GwkqVOmWIAALd9E?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-recovered-media-2026-10-24/source-images/1948134865355829359-4-GwkqVOmWIAALd9E.webp",
+      "sha256": "8e7824d813a24645c850062d4fc722846ec90df680fe37b5074421607a2b347e",
+      "bytes": 19798,
+      "observation": {
+        "schema": "xo-recovered-original-inspection-v1",
+        "mediaId": "GwkqVOmWIAALd9E",
+        "postId": "1948134865355829359",
+        "kind": "reported_open_short_card",
+        "method": "Unchanged local original opened with view_image at original detail on 24 October 2026.",
+        "reported": {
+          "asset": "ETHUSDT",
+          "side": "short",
+          "leverage": 20,
+          "entryPrice": 3842.54,
+          "currentPrice": 3539.4,
+          "displayedRoiPercent": 155.97
+        },
+        "chartTimeframe": null,
+        "chartCreatedAtUTC": null,
+        "executionOrder": false,
+        "notes": "The fourth photo is a position card, not a profile chart. Its field explicitly says Current Price, not Exit Price. The reported entry matches the earlier short card and later explicit exit card. This adds a published position observation; it does not provide an entry time, protective order, position quantity or new independent trade.",
+        "sameReportedEntryMediaIds": [
+          "GwjaP9YX0AAVjt0",
+          "Gwoj7R5WEAAXc8M"
+        ],
+        "sourcePostPublishedAt": "2025-07-23T21:35:21.153Z",
+        "timestampMeaning": "Public post/version creation time from its ID, corroborated to the displayed minute. It is not an exchange fill or image creation time."
+      }
+    },
+    {
+      "postId": "1937448336279105751",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/GuMy_cEWYAAlFLj?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-1-GuMy_cEWYAAlFLj.webp",
+      "sha256": "aa9c67bf9f1558c77145aca68a4857fa9a959fb422f27003ae0546c603f9997b",
+      "bytes": 46094,
+      "observation": {
+        "mediaId": "GuMy_cEWYAAlFLj",
+        "kind": "earlier_structural_support_plan",
+        "chartTimeframe": null,
+        "chartCreatedAtUTC": "2025-06-14T08:02:00Z",
+        "printedChartCapture": "2025-06-14 09:02 UTC+1",
+        "reported": {
+          "upperReference": 2791.78,
+          "dashedReference": 2694.33,
+          "supportUpper": 2175.27,
+          "supportLower": 2112.06,
+          "displayedCurrentPrice": 2536.3
+        },
+        "notes": "An earlier June 14 chart reused in the June 24 post. It marks a broad support zone and discusses a lower sweep and absorption. The plotted reference levels are not labeled EP, SL or TP orders. Timeframe and venue are cropped; the June 14 TradingView header does not prove this image was published on X then.",
+        "executionOrder": false
+      }
+    },
+    {
+      "postId": "1937448336279105751",
+      "photoOrdinal": 2,
+      "originalUrl": "https://pbs.twimg.com/media/GuMy_cFWIAECOA8?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-2-GuMy_cFWIAECOA8.webp",
+      "sha256": "26d68febe93945208334de2d34331aa058b39068374ca63577c52e0ed5cd68ca",
+      "bytes": 40676,
+      "observation": {
+        "mediaId": "GuMy_cFWIAECOA8",
+        "kind": "daily_structural_support_reaction",
+        "chartTimeframe": "1D",
+        "chartCreatedAtUTC": "2025-06-23T09:06:00Z",
+        "printedChartCapture": "2025-06-23 10:06 UTC+1",
+        "reported": {
+          "rangeUpperReference": 3542.24,
+          "midReference": 2795.64,
+          "supportUpper": 2179.2,
+          "supportLower": 2105.33,
+          "displayedCurrentPrice": 2258.69
+        },
+        "notes": "ETHUSDT, 1D, BINANCE are printed. The broad support area and lower-wick reaction are retained. Exact session boundary and market type are not printed. These daily-candle references are not stop orders; a current candle with a countdown is not a completed daily close.",
+        "executionOrder": false
+      }
+    },
+    {
+      "postId": "1937448336279105751",
+      "photoOrdinal": 3,
+      "originalUrl": "https://pbs.twimg.com/media/GuMy_cIX0AASLpm?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-3-GuMy_cIX0AASLpm.webp",
+      "sha256": "8ea160ffdf8b5e4b2d47d4de0870495fe3b041fdd370eb737fd4582d08b691df",
+      "bytes": 41140,
+      "observation": {
+        "mediaId": "GuMy_cIX0AASLpm",
+        "kind": "daily_fixed_range_profile_and_support",
+        "chartTimeframe": "1D",
+        "chartCreatedAtUTC": "2025-06-24T09:49:00Z",
+        "printedChartCapture": "2025-06-24 10:49 UTC+1",
+        "reported": {
+          "rangeUpperReference": 3542.24,
+          "midReference": 2851.33,
+          "supportUpper": 2179.2,
+          "supportLower": 2105.33,
+          "displayedCurrentPrice": 2420.31
+        },
+        "notes": "ETHUSDT, 1D, BINANCE are printed. A selected historical fixed-range profile separately marks VAH, POC and VAL, above the broad support zone. Numeric profile boundaries, price rows, volume basis, session clock and calculation settings are not supplied. The visible profile is preserved in the original image; its labels are not transcribed into guessed order prices.",
+        "executionOrder": false
+      }
+    },
+    {
+      "postId": "1947019929858756919",
+      "photoOrdinal": 1,
+      "originalUrl": "https://pbs.twimg.com/media/GwU0TeuW0AIKw3n?format=webp&name=large",
+      "localUrl": "../backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1947019929858756919-1-GwU0TeuW0AIKw3n.webp",
+      "sha256": "e442ad169ed66c2797c68922b93bf97e4876fdab1897d13bbbd0498368b7a085",
+      "bytes": 59010,
+      "observation": {
+        "mediaId": "GwU0TeuW0AIKw3n",
+        "kind": "macro_structural_origin_and_overhead_supply",
+        "chartTimeframe": null,
+        "chartCreatedAtUTC": "2025-07-20T19:35:00Z",
+        "printedChartCapture": "2025-07-20 20:35 UTC+1",
+        "reported": {
+          "upperReference": 4084.21,
+          "intermediateUpper": 3058.66,
+          "intermediateLower": 3028.7,
+          "originUpper": 2212.92,
+          "originLower": 2176.29,
+          "displayedCurrentPrice": 3773.04
+        },
+        "notes": "Long-horizon structure spans late 2023 through July 2025. Two origins of rally and overhead supply are marked. The source preserves macro context while warning about compressed reward/risk for late longs. The candle interval is cropped; neither its wide history nor its visual density establishes a weekly interval. No fresh EP/SL order is printed.",
+        "executionOrder": false
+      }
+    }
+  ],
+  "scope": "Original publication and management review. Unchanged original images, not generated signals, backtest fills, current trading recommendations or private account records."
+}

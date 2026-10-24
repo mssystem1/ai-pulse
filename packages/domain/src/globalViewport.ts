@@ -1,11 +1,19 @@
 import type {GlobalReport} from "@pulse/schemas";
 import {globalChannelBounds} from "./globalChannels.js";
 import {globalFrameReference} from "./globalContext.js";
+import {globalSetupStudySeries} from "./globalSetupStudies.js";
 
-export type GlobalStructuralLayers={channel?:boolean;localChannel?:boolean;regression?:boolean;fibonacci?:boolean};
+export type GlobalStructuralLayers={studyScale?:"setup"|"context";channel?:boolean;localChannel?:boolean;regression?:boolean;fibonacci?:boolean;range?:boolean;ema?:boolean;vwap?:boolean;vwapBands?:boolean;volumeProfile?:boolean;footprint?:boolean};
 export function globalDefaultChartLayers(report:GlobalReport){
+  if(report.tier==="pro"&&report.decisionVersion==="decision-v5"&&report.strategy?.targetPolicy==="active-zones-v1"&&report.indicators.ema?.some(e=>e.points.length))return {
+    studyScale:"context" as const,channel:false,localChannel:false,allSmas:false,sma:false,regression:false,fibonacci:false,waves:false,
+    ema:true,vwap:Boolean(report.indicators.vwap),vwapBands:true,range:Boolean(report.range||report.horizonContext?.zones.length||report.horizonContext?.ranges.length),volumeProfile:Boolean(report.orderFlow),footprint:Boolean(report.orderFlow?.footprints.length),
+  };
+  return globalStructureChartLayers(report);
+}
+export function globalStructureChartLayers(report:GlobalReport){
   const pro=report.tier==="pro";
-  return {channel:true,localChannel:true,allSmas:pro,regression:pro,fibonacci:pro&&globalMeasuredFib(report)!==null};
+  return {studyScale:"context" as const,channel:true,localChannel:true,allSmas:pro,sma:true,regression:pro,fibonacci:pro&&globalMeasuredFib(report)!==null,waves:true,ema:false,vwap:false,vwapBands:false,range:false};
 }
 export function globalMeasuredFib(report:GlobalReport){
   const levels=report.indicators.fibonacci,ids=levels[0]?.anchorIds,anchors=[...report.indicators.pivots,...report.waveCount.anchors];
@@ -29,6 +37,13 @@ export function globalStructuralWindow(report:GlobalReport,fitFib=false){
 export function globalStructuralScaleValues(report:GlobalReport,start:number,layers:GlobalStructuralLayers){
   const last=report.candles.at(-1);if(!last)return [];
   const values:number[]=[];
+  const prices=report.candles.filter(c=>c.ts>=start).flatMap(c=>[c.low,c.high]),planned=report.discretionaryPlan;
+  if(planned)prices.push(planned.entry,planned.stop,...planned.targets.map(t=>t.price));
+  const lo=Math.min(...prices),hi=Math.max(...prices),pad=(hi-lo)*.15;
+  for(const study of globalSetupStudySeries(report,layers))values.push(...study.points.filter(p=>p.ts>=start&&p.value>0&&(layers.studyScale!=="setup"||p.value>=lo-pad&&p.value<=hi+pad)).map(p=>p.value));
+  if(layers.range&&report.range)values.push(...report.range.lower,...report.range.upper);
+  if(layers.range&&report.horizonContext)values.push(...report.horizonContext.zones.flatMap(z=>[z.lower,z.upper]),...report.horizonContext.ranges.flatMap(r=>[r.lower,r.upper]));
+  if(layers.volumeProfile&&report.orderFlow)values.push(report.orderFlow.profile.rows[0].low,report.orderFlow.profile.rows.at(-1)!.high);
   for(const channel of report.indicators.channels??[]){
     if(channel.scope==="broad"?layers.channel===false:report.tier!=="pro"||layers.localChannel===false)continue;
     const first=report.candles.find(c=>c.ts>=Math.max(start,channel.startTs));

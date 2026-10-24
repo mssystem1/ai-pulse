@@ -25,3 +25,6 @@ node
 DB_backup/
 .tmp/telegram-*
 .tmp/
+.private/
+/scripts/__pycache__/
+!docs/backtests/**/python-install-report.json

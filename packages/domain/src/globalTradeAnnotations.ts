@@ -47,7 +47,7 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const ledgerHeight=44+rows.length*18,mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;
   const ledgerY=mean>(g.top+g.bottom)/2?g.top+42:g.bottom-ledgerHeight-14,lx=g.historyEnd+14,lw=Math.max(100,future-30);
   svg+=`<g data-trade-price-ledger="${escape(card.key)}"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
-  svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"} · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`,card.side==="long"?"#53dabb":"#f0738c",11);
+  svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"}${report.discretionaryPlan?"":` · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`}`,card.side==="long"?"#53dabb":"#f0738c",11);
   rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,row.role==="Entry"?card.entry:price(row.price),row.color,10,"end");});
   svg+="</g>";
   const alternative=cards.find(c=>c.key!==card.key&&c.side!==card.side);

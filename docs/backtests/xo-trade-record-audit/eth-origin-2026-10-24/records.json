@@ -1,0 +1,77 @@
+{
+  "schema": "xo-eth-origin-publications-v1",
+  "capturedAt": "2026-10-24T12:05:25.368Z",
+  "scope": "Directly read original predecessors linked by the ETH management chain. Paraphrases and numeric facts; own-photo order excludes quoted posts and reply media.",
+  "records": [
+    {
+      "postId": "1937448336279105751",
+      "assets": [
+        "ETH"
+      ],
+      "kind": "forward_conditional_value_reclaim_plan",
+      "displayedPublishedMinuteUTC": "2025-06-24T09:50",
+      "ownPhotoCount": 3,
+      "mediaIds": [
+        "GuMy_cEWYAAlFLj",
+        "GuMy_cFWIAECOA8",
+        "GuMy_cIX0AASLpm"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1937075022549365105"
+      ],
+      "summary": "A reclaim of the established value-area low favors rotation through POC toward value-area highs in the 2700 region. Rejection instead leaves another pullback long conditional on support around 2100. The stated context favors seeking longs rather than swing shorts.",
+      "reportedRegions": {
+        "keySupport": 2100,
+        "valueAreaHighObjective": 2700
+      },
+      "gaps": [
+        "Exact value-area boundaries and profile settings",
+        "Numerical entry trigger and acceptance definition",
+        "Initial stop, position size and actual order times",
+        "A conditional pullback is not a forecast that price must revisit support"
+      ],
+      "url": "https://x.com/Trader_XO/status/1937448336279105751",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-06-24T09:50:54.075Z",
+      "timestampMeaning": "Public post/version creation time, corroborated to displayed source minute; not a fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1947019929858756919",
+      "assets": [
+        "ETH"
+      ],
+      "kind": "higher_frame_long_context_and_late_entry_warning",
+      "displayedPublishedMinuteUTC": "2025-07-20T19:44",
+      "ownPhotoCount": 1,
+      "mediaIds": [
+        "GwU0TeuW0AIKw3n"
+      ],
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1937448336279105751"
+      ],
+      "summary": "Reports maintaining a long-focused context from the 2100 region. Near current highs through the 4100 region, late-long reward/risk is compressed and value may build. Bullish context coexists with possible corrective conditions; the ETHBTC yearly-open relationship is additional context.",
+      "reportedRegions": {
+        "earlierLongContext": 2100,
+        "upperContext": 4100,
+        "ethBtcYearOpenRelatedEthRegion": 4000
+      },
+      "gaps": [
+        "No fresh exact entry, protective stop, position size or order time",
+        "Context references are regions, not exact SL/TP orders",
+        "Conditional correction discussion does not establish a required price path"
+      ],
+      "url": "https://x.com/Trader_XO/status/1947019929858756919",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-20T19:44:59.816Z",
+      "timestampMeaning": "Public post/version creation time, corroborated to displayed source minute; not a fill time.",
+      "numericPrecision": "Text shorthand denotes regions, not exact order prices.",
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    }
+  ]
+}

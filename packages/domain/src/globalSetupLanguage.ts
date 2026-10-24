@@ -5,20 +5,20 @@ import {globalTradeCards} from "./globalTradeDisplay.js";
 
 /** Direction and an exact entry sentence, independent of internal status codes. */
 export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalReport["tradePlan"]>,qualified:boolean){
-  const zh=report.lang==="zh",path=report.paths.find(path=>path.role==="main"),tf=p.entryTimeframe??report.snapshot.timeframe;
+  const zh=report.lang==="zh",path=report.paths.find(path=>path.role==="main"),tf=report.discretionaryPlan?.reference.timeframe??p.entryTimeframe??report.snapshot.timeframe;
   const price=(value:number|undefined)=>value===undefined?"—":value.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:Math.min(2,report.snapshot.pricePrecision),maximumFractionDigits:report.snapshot.pricePrecision});
   const displayTf=globalFrameReference(tf);
   const trigger=report.levels.find(l=>l.id===p.triggerLevelId)?.price;
   const verb=p.side==="short"?zh?"卖出":"Sell":zh?"买入":"Buy";
-  const signalObserved=p.retestTs!==null&&!p.failure&&!p.blockers.some(b=>["history","levels","cancelled","expired"].includes(b));
-  const planningValid=p.side!=="none"&&!p.blockers.some(b=>["reward","history","levels"].includes(b));
+  const signalObserved=!report.discretionaryPlan&&p.retestTs!==null&&!p.failure&&!p.blockers.some(b=>["history","levels","cancelled","expired"].includes(b));
+  const planningValid=Boolean(report.discretionaryPlan)||p.side!=="none"&&!p.blockers.some(b=>["reward","history","levels"].includes(b));
   const primary=report.hierarchy?.find(r=>r.timeframe===report.snapshot.timeframe);
   if(report.decisionVersion==="decision-v5"){
     const cards=globalTradeCards(report),card=cards[0],selection=report.setupSelection;
     const direction=selection?.assessment==="sideways"?"SIDEWAYS":selection?.assessment==="long"?"LONG":selection?.assessment==="short"?"SHORT":p.side==="long"?"LONG":p.side==="short"?"SHORT":"SIDEWAYS";
     const label=qualified?(zh?"入场信号已确认":"Entry signal confirmed"):card?.state??(zh?"暂无有效入场":"No validated entry");
     const heading=`${report.strategy?.name.toUpperCase()??""} · ${zh?"观点":"BIAS"} ${direction} · ${label}`;
-    const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到最近障碍的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to the nearest barrier. A new supported structure is required; another confirmation alone does not qualify entry."):card?`${card.state}. ${card.condition}. ${card.location}`.trim():(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
+    const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到最近障碍的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to the nearest barrier. A new supported structure is required; another confirmation alone does not qualify entry."):card?(report.discretionaryPlan?`${card.condition} ${card.location}`:`${card.state}. ${card.condition}. ${card.location}`).trim():(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
     return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
   }
   const mixed=Boolean(report.decisionVersion)&&primary?.bias==="mixed"&&!qualified;

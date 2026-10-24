@@ -2,6 +2,7 @@ import type {GlobalReport} from "@pulse/schemas";
 import {globalPlanCandidates} from "./globalTradePlan.js";
 import {globalContextRelation,globalFrameReference} from "./globalContext.js";
 import {globalTradePlan} from "./globalTradePlan.js";
+import {globalDiscretionaryCard} from "./globalDiscretionaryPlan.js";
 
 export function globalEntryCondition(report:GlobalReport,p:NonNullable<GlobalReport["tradePlan"]>){
   const zh=report.lang==="zh",frame=globalFrameReference(p.entryTimeframe??report.snapshot.timeframe),value=report.levels.find(l=>l.id===p.triggerLevelId)?.price;
@@ -22,6 +23,8 @@ export function globalEntryCondition(report:GlobalReport,p:NonNullable<GlobalRep
 /** Symmetric entry evidence, separate from the primary horizon's market view.
  * Kept inspectable even when neither direction supplies an entry. */
 export function globalScenarioEvidence(report:GlobalReport){
+  const priced=globalDiscretionaryCard(report);
+  if(priced)return [{plan:priced.plan,side:priced.direction,family:priced.state,condition:priced.condition,reason:priced.state,context:globalContextRelation(report,priced.side),line:priced.lines.join(". ")}];
   const zh=report.lang==="zh";
   const selected=globalTradePlan(report);
   return globalPlanCandidates(report).filter(p=>p.side!=="none"&&(report.decisionVersion!=="decision-v5"||p.pathId===selected.pathId&&p.side===selected.side)).map(p=>{

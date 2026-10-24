@@ -1,5 +1,6 @@
 import type {GlobalReport} from "@pulse/schemas";
 import {globalFrameReference} from "./globalContext.js";
+import {globalSetupFamilyName} from "./globalSetupStrategies.js";
 
 /** Product strategy profiles requested by the owner. ATR settings measure
  * structural scale; they are not backtested performance claims. */
@@ -18,6 +19,7 @@ export function globalStrategyName(report:GlobalReport){return report.strategy?.
 export function globalStrategyLines(report:GlobalReport):string[]{
   const s=report.strategy;if(!s)return [];
   const zh=report.lang==="zh",price=(id:string)=>report.levels.find(l=>l.id===id)?.price.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision})??"—";
+  if(report.discretionaryPlan){const p=report.discretionaryPlan;return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,`${zh?"所选策略":"Selected strategy"}: ${globalSetupFamilyName(p.family,report.lang)}`,`${globalFrameReference(p.objectiveTimeframe)} ${zh?"目标":"objectives"} · ${globalFrameReference(p.reference.timeframe)} ${zh?"入场执行研究":"entry execution study"}`];}
   if(report.setupSelection){
     const selected=report.setupSelection,names={trend_continuation:zh?"趋势延续":"Trend continuation",structural_reversal:zh?"结构恢复 / 反转":"Structural recovery / reversal",range_reaction:zh?"区间边界反应":"Range-edge reaction",none:zh?"尚无有效入场":"No validated entry"};
     return [`${s.name.toUpperCase()} · ${globalFrameReference(report.snapshot.timeframe)} · ${s.holding}`,`${zh?"所选策略":"Selected strategy"}: ${selected.rule==="structure_break"?(zh?"确认结构突破":"Confirmed structure break"):names[selected.rule]}`,...selected.evidence,...selected.limitations,zh?`${globalFrameReference(s.entryTimeframe)} 确认入场并确定交易 SL。`:`${globalFrameReference(s.entryTimeframe)} confirms entry and establishes the trade SL.`];

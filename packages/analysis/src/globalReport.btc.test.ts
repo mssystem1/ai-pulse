@@ -39,7 +39,7 @@ for(const row of rows)test(`Legacy ${row.frame} map retains directional prices w
   assert.match(globalTradePlanLines(finished).join("\n"),/Planned entry reference|Planned SL reference/);
   const svg=globalReportChartSvg(finished)!;assert.ok(/(?:2\d|3[0-9]|[4-8]\d|9[0-6]) \/ (520|470)/.test(svg));assert.match(svg,/data-wave-swings/);assert.ok(!/data-stage="ENTRY"/.test(svg));assert.doesNotMatch(svg,/NaN|Infinity/);
 });
-test("Quick and Pro provider inputs distinguish rising SMA21 from the falling default SMA55 on the weekly BTC snapshot",async()=>{
+test("Quick and Pro provider inputs retain SMA evidence and identify the actual default chart studies",async()=>{
   const row=rows.find(r=>r.frame==="1W")!;
   for(const tier of ["base","premium"] as const)for(const lang of ["en","zh"] as const){
     const input=market(row),before=structuredClone(input);let calls=0,prepared=false;
@@ -50,9 +50,13 @@ test("Quick and Pro provider inputs distinguish rising SMA21 from the falling de
       const block=request.messages[1].content.match(/<saved_market_map>\s*([\s\S]*?)\s*<\/saved_market_map>/);
       assert.ok(block,"The provider must receive the saved map");
       const evidence=JSON.parse(block[1]),sma=evidence.indicators.sma;
-      assert.deepEqual(sma.filter((s:{displayedByDefault:boolean})=>s.displayedByDefault).map((s:{period:number})=>s.period),tier==="premium"?[21,55,89,144,233]:[55]);
+      assert.deepEqual(sma.filter((s:{displayedByDefault:boolean})=>s.displayedByDefault).map((s:{period:number})=>s.period),tier==="premium"?[]:[55]);
+      if(tier==="premium"){
+        assert.deepEqual(evidence.indicators.ema.map((s:{period:number})=>s.period),[12,25]);
+        assert.ok(evidence.indicators.ema.every((s:{displayedByDefault:boolean;value:number})=>s.displayedByDefault&&Number.isFinite(s.value)));
+      }
       const plotted=sma.find((s:{period:number})=>s.period===55);assert.ok(plotted.change10Bars<0);
-      if(tier==="premium"){const optional=sma.find((s:{period:number})=>s.period===21);assert.equal(optional.displayedByDefault,true);assert.ok(optional.change10Bars>0);}else assert.deepEqual(sma.map((s:{period:number})=>s.period),[55]);
+      if(tier==="premium"){const optional=sma.find((s:{period:number})=>s.period===21);assert.equal(optional.displayedByDefault,false);assert.ok(optional.change10Bars>0);}else assert.deepEqual(sma.map((s:{period:number})=>s.period),[55]);
       assert.ok(evidence.waveCandidate.validation.includes("swing_pattern_only_subdivisions_unverified"));
       return Response.json({choices:[{message:{content:JSON.stringify({headline:lang==="zh"?"候选推动浪之后的条件区间":"Conditional range after a candidate impulse",summary:lang==="zh"?"SMA55 下行；仍须确认。":"SMA55 fell over ten completed bars; confirmation remains required.",regime:"range",bias:"neutral",confidence:50,waveCandidateId:evidence.waveCandidate.id,mainPathId:evidence.paths.find((p:{role:string})=>p.role==="main")?.id??null,setupPathId:evidence.setup.pathId,reasons:[],pathNotes:[],riskNotes:[],limitations:[],disclaimer:"Research only"})}}]});
     }},{instId:input.instId,timeframe:row.frame,tier,lang,reasoningEffort:tier==="premium"?"medium":"low",maxInputTokens:32000,contextMarket:market(row,true)},input,async()=>{prepared=true;});

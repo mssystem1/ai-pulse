@@ -3,6 +3,7 @@ import {deriveGlobalEntryPlan} from "./globalEntryPlan.js";
 import {globalTradePlan} from "./globalTradePlan.js";
 import {globalEntryCondition} from "./globalScenarioEvidence.js";
 import {globalContextRelation,globalContextRequired,globalFrameReference} from "./globalContext.js";
+import {globalDiscretionaryCard} from "./globalDiscretionaryPlan.js";
 
 export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:string;side:"long"|"short"}){
   const zh=report.lang==="zh",selected=globalTradePlan(report),routes=report.strategy?.routes.filter(r=>report.view.pathIds.includes(r.pathId))??[];
@@ -49,6 +50,7 @@ export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:stri
 /** Every visible report has one setup. Archived maps retain their stored
  * candidates, but their saved selected entry is the only published setup. */
 export function globalTradeCards(report:GlobalReport){
+  const priced=globalDiscretionaryCard(report);if(priced)return [priced];
   const p=globalTradePlan(report),selection=report.setupSelection,pathId=selection?.pathId??p.pathId,side=selection?.side??p.side;
   return pathId&&side!=="none"?globalTradeCandidateCards(report,{pathId,side}).slice(0,1):[];
 }

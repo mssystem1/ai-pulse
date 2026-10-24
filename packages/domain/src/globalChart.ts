@@ -7,12 +7,16 @@ import {globalDecision,globalDecisionTitle} from "./globalDecision.js";
 import {globalContextLine} from "./globalContext.js";
 import {globalChannelBounds,globalChannelLines} from "./globalChannels.js";
 import {globalEntryStudySvg} from "./globalEntryChart.js";
+import {globalOrderFlowAnnotations,globalOrderFlowLines,globalOrderFlowStudy} from "./globalOrderFlow.js";
 import {globalFrameReference} from "./globalContext.js";
 import {globalCoverageLine} from "./globalCoverage.js";
 import {globalWavePhase} from "./globalSetupSelection.js";
+import {globalSetupStudySeries,globalSetupStudyReadings} from "./globalSetupStudies.js";
+import {globalTradeCards} from "./globalTradeDisplay.js";
+import {globalHorizonContextAnnotations,globalHorizonContextLines} from "./globalHorizonContext.js";
 import {globalDefaultChartLayers,globalStructuralScaleValues,globalStructuralWindow,globalMeasuredFib,globalChannelAvailability} from "./globalViewport.js";
 
-export type GlobalChartLayers = { allSmas?: boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean; localChannel?:boolean; channelMid?:boolean };
+export type GlobalChartLayers = { studyScale?:"setup"|"context";allSmas?: boolean; sma?:boolean; ema?:boolean; vwapBands?:boolean; range?:boolean; volumeProfile?:boolean;footprint?:boolean; waves?:boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean; localChannel?:boolean; channelMid?:boolean };
 export type GlobalChartOptions = { layers?: GlobalChartLayers; selectedPathId?: string | null; showScenarios?: boolean; fullHistory?: boolean; structure?: boolean; fitFibonacci?:boolean };
 export type GlobalChartCoordinates = { x: (ts: number) => number | null; y: (price: number) => number | null; left: number; right: number; top: number; bottom: number; historyEnd: number };
 export const escapeGlobalSvg = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]!));
@@ -62,7 +66,18 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   const legend=parallels.length?`${report.lang==="zh"?"平行通道":"Parallel channel"}: ${parallels.map(c=>`${c.scope}${c.priceState&&c.priceState!=="inside"?` (price ${c.priceState})`:""}`).join(" / ")}${options.layers?.regression?" · cyan: regression 120 ±2σ":""}`:options.layers?.regression?"Regression channel · 120 bars · ±2σ; no qualifying parallel channel":"";
   if(legend)svg+=text(left+8,top+15,legend,"#a8b4c6",10);
   if (options.showScenarios !== false) svg += `<rect x="${historyEnd+1}" y="${top}" width="${Math.max(0,right-historyEnd)}" height="${bottom-top}" fill="#142034" fill-opacity=".36"/>`+line(historyEnd, top, historyEnd, bottom, "#536175", 1, "4 5")+text(historyEnd+15,top-9,report.decisionVersion==="decision-v5"?report.lang==="zh"?"交易计划 · Entry / SL / TP":"TRADE PLAN · ENTRY / SL / TP":report.lang==="zh"?"有条件走势 · 时间仅为示意":"CONDITIONAL MOVES · TIMING SCHEMATIC","#99abc4",9);
-  if (report.waveCount.status === "unclear") svg += text(left + 8, top + (legend?36:19), globalLabel("unclear", report.lang), "#acb8cb", 12);
+  if (options.layers?.waves!==false&&report.waveCount.status === "unclear") svg += text(left + 8, top + (legend?36:19), globalLabel("unclear", report.lang), "#acb8cb", 12);
+  if(pro&&options.layers?.range&&report.horizonContext)svg+=globalHorizonContextAnnotations(report,g);
+  if(pro&&options.layers?.volumeProfile)svg+=globalOrderFlowAnnotations(report,g);
+  if(pro&&options.layers?.range&&report.range&&!report.horizonContext){
+    const range=report.range,mid=(range.lower[1]+range.upper[0])/2,start=report.candles.find(c=>c.ts>=range.startTs&&g.x(c.ts)!==null&&g.x(c.ts)!>=left),rx=Math.max(left,start?g.x(start.ts)??left:left);
+    for(const [kind,zone,color] of [["support",range.lower,"#53dabb"],["resistance",range.upper,"#ef6b85"]] as const){
+      const a=g.y(zone[0]),b=g.y(zone[1]);if(a===null||b===null)continue;
+      const zoneTop=Math.max(top,Math.min(a,b)),zoneBottom=Math.min(bottom,Math.max(a,b));
+      if(zoneBottom>=zoneTop)svg+=`<g data-range-zone="${kind}"><rect x="${rx}" y="${zoneTop}" width="${Math.max(0,historyEnd-rx)}" height="${Math.max(1,zoneBottom-zoneTop)}" fill="${color}" fill-opacity=".09"/>${[a,b].filter(visible).map(y=>line(rx,y,historyEnd,y,color,.8,"5 4")).join("")}</g>`;
+    }
+    const my=g.y(mid);if(visible(my))svg+=`<g data-range-midpoint="${mid}">${line(rx,my,historyEnd,my,"#91a1b8",.8,"2 5")}</g>`;
+  }
   const origin = report.waveCount.anchors[0];
   for(const channel of report.indicators.channels??[]){
     if(channel.scope==="broad"?options.layers?.channel===false:!pro||options.layers?.localChannel===false)continue;
@@ -114,19 +129,20 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   }
   if (pro && options.layers?.pivots) for (const a of report.indicators.pivots) { const p = point(g, a.ts, a.price); if (a.confirmedAt !== null && p && p.x >= left && p.x <= historyEnd && visible(p.y)) svg += `<circle cx="${p.x}" cy="${p.y}" r="2.5" fill="#83a9bc"/>`; }
   const waveLabels: Array<{ x: number; y: number }> = [];
-  const wavePoints=report.waveCount.anchors.flatMap(a=>{const p=point(g,a.ts,a.price);return p&&p.x>=left&&p.x<=historyEnd&&visible(p.y)?[p]:[];});
+  const waveAnchors=options.layers?.waves===false?[]:report.waveCount.anchors;
+  const wavePoints=waveAnchors.flatMap(a=>{const p=point(g,a.ts,a.price);return p&&p.x>=left&&p.x<=historyEnd&&visible(p.y)?[p]:[];});
   if(wavePoints.length>1)svg+=`<polyline data-wave-swings="candidate" points="${wavePoints.map(p=>`${p.x},${p.y}`).join(" ")}" fill="none" stroke="#a38ebd" stroke-width="1.2" stroke-dasharray="4 3"/>`;
   const latest = report.candles.at(-1), closeY = latest ? g.y(latest.close) : null, atr = pro && options.layers?.atr ? report.indicators.atr.points.at(-1)?.value : undefined;
   const atrY = latest && atr !== undefined ? g.y(latest.close - atr) : null;
   const readingRows = [closeY === null ? null : closeY - 7, atrY === null ? null : atrY + 13].filter((row): row is number => row !== null);
-  for (const a of report.waveCount.anchors) { const p = point(g, a.ts, a.price); if (!p || !visible(p.y) || p.x < left || p.x > historyEnd) continue;
+  for (const a of waveAnchors) { const p = point(g, a.ts, a.price); if (!p || !visible(p.y) || p.x < left || p.x > historyEnd) continue;
     const desiredY = p.y + (a.kind === "high" ? -14 : 20);
     const candidates = [0, -24, 24, -48, 48, -72, 72].flatMap(dy => [0, -30, 30, -60, 60].map(dx => ({ x: Math.max(left + 14, Math.min(historyEnd - 14, p.x + dx)), y: Math.max(top + 15, Math.min(bottom - 8, desiredY + dy)), distance: dx * dx + dy * dy }))).sort((a, b) => a.distance - b.distance);
     const label = candidates.find(candidate => waveLabels.every(placed => Math.abs(candidate.x - placed.x) >= 29 || Math.abs(candidate.y - placed.y) >= 23) && readingRows.every(row => candidate.x < historyEnd - 145 || Math.abs(candidate.y - row) >= 22)) ?? candidates[0];
     waveLabels.push(label);
     svg += `<g data-wave-label="${escapeGlobalSvg(a.id)}">` + (Math.abs(label.x-p.x)>2 || Math.abs(label.y-desiredY)>2 ? line(p.x, p.y, label.x, label.y - 5, "#a38ebd", .7) : "") + `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#d0b7f7"/><rect x="${label.x-13}" y="${label.y-14}" width="26" height="20" rx="5" fill="#202036"/>` + text(label.x, label.y, a.label, "#e6d5ff", 13, "middle") + "</g>";
   }
-  if (origin) svg += text(left + 8, bottom - 8, globalWavePhase(report).recovered?(report.lang==="zh"?"C 后恢复 · 历史 ABC 候选":"POST-C RECOVERY · HISTORICAL ABC CANDIDATE"):`${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
+  if (origin&&options.layers?.waves!==false) svg += text(left + 8, bottom - 8, globalWavePhase(report).recovered?(report.lang==="zh"?"C 后恢复 · 历史 ABC 候选":"POST-C RECOVERY · HISTORICAL ABC CANDIDATE"):`${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
   if (options.showScenarios === false) return svg;
   if(report.decisionVersion==="decision-v5")return svg+globalTradeAnnotations(report,g,options);
   const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a,b)=>Number(b.level.id===plan.triggerLevelId||plan.targetIds.includes(b.level.id))-Number(a.level.id===plan.triggerLevelId||plan.targetIds.includes(a.level.id))).filter((item,i,all)=>!all.slice(0,i).some(prior=>Math.abs(prior.level.price-item.level.price)<10**-report.snapshot.pricePrecision)).sort((a, b) => a.y - b.y);
@@ -230,18 +246,18 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
 /** Self-contained image of a saved report. No URLs, model calls or live prices. */
 export function globalReportChartSvg(report: GlobalReport, options: GlobalChartOptions = {}): string | null {
   if (report.candles.length < 2) return null;
-  const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId), footerTop = entryTop+(entryImage?240:0);
+  const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,layers={...globalDefaultChartLayers(report),...options.layers},entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId),flow=pro&&layers.footprint?globalOrderFlowStudy(report,1250):null,flowTop=entryTop+(entryImage?240:0),footerTop=flowTop+(flow?flow.height+15:0);
   const decision=globalDecision(report),primary=globalTradePlan(report);
   const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
     ...(decision.rewardLine&&decision.direction!=="BUY / SELL"?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
-    ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?globalChannelLines(report):[])].filter(Boolean))];
+    ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?[...globalHorizonContextLines(report),...globalOrderFlowLines(report),...globalChannelLines(report)]:[])].filter(Boolean))];
   const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?100:70):(index?185:140),rows:string[]=[];let rest=value;while(rest.length>max){const space=report.lang==="en"?rest.lastIndexOf(" ",max):-1,at=space>max/2?space:max;rows.push(rest.slice(0,at));rest=rest.slice(at).trimStart();}if(rest)rows.push(rest);return rows;});
   const footerHeight=wrapped.length*19+32,height=footerTop+footerHeight+35;
-  const layers = { ...globalDefaultChartLayers(report), ...options.layers }, periods = pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
+  const periods = layers.sma===false?[]:pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
   const candles = options.fullHistory?report.candles:report.candles.slice(options.fitFibonacci?-globalStructuralWindow(report,true):options.structure?-Math.max(180,globalSetupWindow(report)):-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
   const refs = globalSetupMap(report).view.levelIds.flatMap(id => { const p = report.levels.find(l => l.id === id)?.price; return p === undefined ? [] : [p]; });
   const plan=globalTradePlan(report),visiblePoints=(points:Array<{ts:number;value:number}>)=>points.filter(p=>p.ts>=start&&p.ts<=end);
-  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers), ...((decision.planningValid||report.decisionVersion==="decision-v5")?plan.referenceEntry??[]:[]),...((decision.planningValid||report.decisionVersion==="decision-v5")&&plan.referenceStop!==null?[plan.referenceStop]:[])];
+  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers),...globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop===null?[]:[c.plan.referenceStop]),...c.targets.map(t=>t.price)]), ...((decision.planningValid||report.decisionVersion==="decision-v5")?plan.referenceEntry??[]:[]),...((decision.planningValid||report.decisionVersion==="decision-v5")&&plan.referenceStop!==null?[plan.referenceStop]:[])];
   const low = Math.min(...values), high = Math.max(...values), margin = Math.max(high - low, high * .01) * .1, min = Math.max(0, low - margin), max = high + margin;
   const y = (p: number) => top + (max - p) / (max - min) * (priceBottom - top), x = (ts: number) => left + (ts - start) / Math.max(1, end - start) * (historyEnd - left);
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };
@@ -263,12 +279,12 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const smaColors = ["#ffcb76", "#b790ff", "#59c2ee", "#e593c2", "#71969b"];
   report.indicators.sma.forEach((s, i) => { if (periods.includes(s.period)) drawSeries(s.points, smaColors[i]); });
   if (pro && layers.regression && report.indicators.regression) for (const series of [report.indicators.regression.upper, report.indicators.regression.mid, report.indicators.regression.lower]) drawSeries(series, "#31b8da", "4 3");
-  if (pro && layers.vwap && report.indicators.vwap) drawSeries(report.indicators.vwap.points, "#f8dea1");
+  for(const study of globalSetupStudySeries(report,layers)){svg+=`<g data-setup-study="${escapeGlobalSvg(study.name)}">`;drawSeries(study.points,study.color,study.dash?"4 4":"");svg+="</g>";}
   svg += globalChartAnnotations(report, g, { ...options, layers });
   const unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
   const axisDate = (ts: number) => ["day", "week", "month"].includes(unit ?? "") ? new Date(ts).toISOString().slice(0, 10) + " UTC" : new Date(ts).toISOString().slice(5, 16).replace("T", " ") + " UTC";
   svg += text(left, priceBottom + 25, axisDate(start), "#8298b5", 10) + text(historyEnd, priceBottom + 25, axisDate(end), "#8298b5", 10, "end");
-  svg += text(left, priceBottom + 44, report.indicators.sma.filter(s => periods.includes(s.period)).map(s => `SMA${s.period} ${globalPrice(report, s.points.at(-1)?.value)}`).join(" · "), "#bda8df", 10);
+  svg += text(left, priceBottom + 44, [...report.indicators.sma.filter(s => periods.includes(s.period)).map(s => `SMA${s.period} ${globalPrice(report, s.points.at(-1)?.value)}`),...globalSetupStudyReadings(report,layers).map(s=>`${s.name} ${globalPrice(report,s.value)}`)].join(" · "), "#bda8df", 10);
   if (pro) {
     const panelTop = 618, panelBottom = 728, ry = (value: number) => panelTop + (100 - value) / 100 * (panelBottom - panelTop);
     svg += text(left, panelTop - 12, `RSI14 · ${report.indicators.rsi.points.at(-1)?.value.toFixed(2) ?? "—"}`, "#a0b4ce", 11);
@@ -276,14 +292,16 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
     svg += `<polyline points="${visiblePoints(report.indicators.rsi.points).map(p => `${x(p.ts)},${ry(p.value)}`).join(" ")}" fill="none" stroke="#d4b479" stroke-width="1.3"/>`;
     const c = report.context, cx = 916, cw = 340;
     svg += `<rect x="${cx}" y="${panelTop - 14}" width="${cw}" height="147" rx="8" fill="#152033" stroke="#334258"/>` + text(cx + 13, panelTop + 5, `${globalLabel("context", report.lang)} · ${globalTimeframeLabel(c.timeframe ?? "—", report.lang)}`, "#a0b4ce", 11);
-    if (c.status === "available" && c.candles.length) { const data = c.candles.slice(-36), csma = c.sma55.filter(p => p.ts >= data[0].ts), clow = Math.min(...data.map(c => c.low), ...csma.map(p => p.value)), chigh = Math.max(...data.map(c => c.high), ...csma.map(p => p.value)), cy = (price:number) => panelTop + 17 + (chigh - price) / Math.max(1e-10, chigh - clow) * 77, cxx = (ts:number) => cx + 18 + (ts - data[0].ts) / Math.max(1, data.at(-1)!.ts - data[0].ts) * 303;
+    if (c.candles.length>=2) { const data = c.candles.slice(-36), csma = c.sma55.filter(p => p.ts >= data[0].ts), clow = Math.min(...data.map(c => c.low), ...csma.map(p => p.value)), chigh = Math.max(...data.map(c => c.high), ...csma.map(p => p.value)), cy = (price:number) => panelTop + 17 + (chigh - price) / Math.max(1e-10, chigh - clow) * 77, cxx = (ts:number) => cx + 18 + (ts - data[0].ts) / Math.max(1, data.at(-1)!.ts - data[0].ts) * 303;
       for (const bar of data) {const color=bar.close>=bar.open?"#35d0aa":"#ef6b85";svg += line(cxx(bar.ts), cy(bar.low), cxx(bar.ts), cy(bar.high), color, 1)+`<rect x="${cxx(bar.ts)-2.5}" y="${Math.min(cy(bar.open),cy(bar.close))}" width="5" height="${Math.max(1,Math.abs(cy(bar.open)-cy(bar.close)))}" fill="${color}"/>`;}
       const agreement = decision.contextRelation;
-      svg += `<polyline points="${csma.map(p => `${cxx(p.ts)},${cy(p.value)}`).join(" ")}" fill="none" stroke="#b58aff" stroke-width="1.2"/>` + text(cx + 12, panelBottom + 9, `${agreement} · SMA55 ${globalPrice(report, csma.at(-1)?.value)}`, "#bda8df", 10);
+      if(csma.length)svg+=`<polyline points="${csma.map(p => `${cxx(p.ts)},${cy(p.value)}`).join(" ")}" fill="none" stroke="#b58aff" stroke-width="1.2"/>`;
+      svg+=text(cx+12,panelBottom+9,csma.length?`${agreement} · SMA55 ${globalPrice(report,csma.at(-1)?.value)}`:`${c.candles.length} ${report.lang==="zh"?"根完整 K 线":"completed candles"}`,"#bda8df",10);
     } else svg += text(cx + 16, panelTop + 67, globalLabel("unavailable", report.lang), "#a0b4ce", 13);
     svg += text(left, panelBottom + 23, `${report.lang === "zh" ? "成交量/前20根" : "Volume / prior 20 bars"}: ${report.indicators.volumeRatio?.toFixed(2) ?? "—"}× · ATR14 ${globalPrice(report, report.indicators.atr.points.at(-1)?.value)}`, "#91a7c3", 10);
   }
   if(entryImage)svg+=`<g transform="translate(25 ${entryTop})">${entryImage}</g>`;
+  if(flow)svg+=`<g transform="translate(25 ${flowTop})">${flow.svg}</g>`;
   svg += `<rect x="25" y="${footerTop}" width="1250" height="${footerHeight}" rx="10" fill="#181c24" stroke="#695335"/>`;
   wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?12:16));
   svg += text(26, height - 14, report.targetReviewOf ? report.lang === "zh" ? "原快照技术复核 · 相同 K 线 · 未调用新 AI · 研究用途" : "Technical review of saved snapshot · same saved candles · no new AI · research only" : report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);

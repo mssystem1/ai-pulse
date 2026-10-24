@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { priceLabel, type AppConfig } from "@pulse/config";
 import { createMcpPaymentGate } from "@pulse/payments";
-import { runPreparedSpotAnalysis, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, loadGlobalMarketSet } from "@pulse/analysis";
+import { runPreparedSpotAnalysis, GLOBAL_HISTORY_LIMIT, globalContextTimeframe } from "@pulse/analysis";
 import { searchSpotInstruments } from "@pulse/market";
 import {
   marketPulse,
@@ -27,6 +27,7 @@ import { z } from "zod";
 import { saveReport } from "./store.js";
 import { autopilotPassTargetExists } from "./autopilotAutomation.js";
 import { executionTicker, executionMarketContext } from "./robinhoodMarkets.js";
+import {loadGlobalReportMarketSet} from "./globalOrderFlowSource.js";
 
 type JsonRpc = {
   jsonrpc?: string;
@@ -367,12 +368,12 @@ async function dispatch(
     }
     case "analysis_base": {
       const p = AnalysisArgs.parse(args);
-      const {market,contextMarket,hierarchyMarkets}=await loadGlobalMarketSet({instId:p.instId,timeframe:p.timeframe??"1H"},input=>executionMarketContext(cfg,input));
+      const {market,contextMarket,hierarchyMarkets}=await loadGlobalReportMarketSet({instId:p.instId,timeframe:p.timeframe??"1H"},input=>executionMarketContext(cfg,input));
       return runPreparedSpotAnalysis(grokCfg, { ...p, tier: "base",contextMarket,hierarchyMarkets, reasoningEffort:cfg.GROK_REASONING_STANDARD,maxInputTokens:cfg.GROK_MAX_INPUT_STANDARD,maxOutputTokens:cfg.GROK_MAX_OUTPUT_STANDARD }, market);
     }
     case "analysis_premium": {
       const p = AnalysisArgs.parse(args);
-      const {market,contextMarket,hierarchyMarkets}=await loadGlobalMarketSet({instId:p.instId,timeframe:p.timeframe??"1H"},input=>executionMarketContext(cfg,input));
+      const {market,contextMarket,hierarchyMarkets}=await loadGlobalReportMarketSet({instId:p.instId,timeframe:p.timeframe??"1H"},input=>executionMarketContext(cfg,input));
       return runPreparedSpotAnalysis(grokCfg, { ...p, tier: "premium",contextMarket,hierarchyMarkets,reasoningEffort:cfg.GROK_REASONING_PREMIUM,maxInputTokens:cfg.GROK_MAX_INPUT_PREMIUM,maxOutputTokens:cfg.GROK_MAX_OUTPUT_PREMIUM }, market);
     }
     case "resolve": {

@@ -37,7 +37,7 @@ import {
   getX402OutputSchema,
   type SettlementRequest,
 } from "@pulse/payments";
-import { buildFusedAiContext, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, loadGlobalMarketSet, prepareGlobalReport, finishGlobalReport, globalCompatibility } from "@pulse/analysis";
+import { buildFusedAiContext, buildTechnicalStructure, calculateFusionFeatures, isAnalyticsEligible, preparePredictionContext, runGrokTokenRiskAnalysis, runPreparedSpotAnalysis, runPreparedV5Analysis, spotOutputTokenLimit, GLOBAL_HISTORY_LIMIT, globalContextTimeframe, prepareGlobalReport, finishGlobalReport, globalCompatibility } from "@pulse/analysis";
 import {
   buildMarketContext,
   getCandles,
@@ -84,6 +84,7 @@ import { getCdpNativeUsdcSwap } from "./cdpSwap.js";
 import { getXLayerTokenCatalog } from "./tokenCatalog.js";
 import { createPersistence, paymentIdempotencyKey, requestHash, runReceiptBoundOperation, verifyRecoveryToken, type AnalysisJob, type PaymentReceipt } from "./jobs.js";
 import { executionTicker, executionMarketContext, isRobinhoodMarket, robinhoodCandles } from "./robinhoodMarkets.js";
+import {defaultGlobalOrderFlowSource,loadGlobalReportMarketSet,type GlobalOrderFlowFeed} from "./globalOrderFlowSource.js";
 import { isArcMarket, arcTokenCatalog } from "./arcMarkets.js";
 import { DurableJobWorker } from "./jobWorker.js";
 import { observeProvider, prometheusMetrics, recordAiUsage, recordJob, recordPayment, recordProvider, recordReport, setQueueDepth, telemetryMiddleware } from "./telemetry.js";
@@ -153,6 +154,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   persistence?: ReturnType<typeof createPersistence>;
   arcBudget?: ArcBudgetStore;
   spotContext?: typeof buildMarketContext;
+  globalOrderFlowFeed?:GlobalOrderFlowFeed|null;
   spotInstrumentExists?: (instId: string) => Promise<boolean>;
   passTargetExists?: typeof autopilotPassTargetExists;
   automationTick?: Partial<AutomationTickDependencies>;
@@ -184,6 +186,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   const reportHistoryAuth = new ReportHistoryAuth(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || ((input: Parameters<typeof buildMarketContext>[0]) =>
     executionMarketContext(cfg, { ...input, timeframe: input.timeframe ?? "1H", candleLimit: input.candleLimit ?? 100 }));
+  const globalOrderFlowFeed=dependencies.globalOrderFlowFeed!==undefined?dependencies.globalOrderFlowFeed:dependencies.spotContext?null:defaultGlobalOrderFlowSource();
   const arcBudget = dependencies.arcBudget || createArcBudgetStore({
     QUEUE_PROVIDER: cfg.QUEUE_PROVIDER, REDIS_URL: cfg.REDIS_URL, KV_REST_API_URL: cfg.KV_REST_API_URL, KV_REST_API_TOKEN: cfg.KV_REST_API_TOKEN,
     PERSISTENCE_NAMESPACE: cfg.PERSISTENCE_NAMESPACE,
@@ -1336,7 +1339,7 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const buildSpotReport = async (req: express.Request, body: z.infer<typeof AnalysisBodySchema>, tier: "base" | "premium", canonical: boolean, onContextReady?: () => Promise<void>, onEnriching?: () => Promise<void>, signal?: AbortSignal, onGenerating?:()=>Promise<void>) => {
       signal?.throwIfAborted();
-      const {market,contextMarket,hierarchyMarkets}=await loadGlobalMarketSet({instId:body.instId,timeframe:body.timeframe},input=>observeProvider("okx","global_context",()=>loadSpotContext(input)));
+      const {market,contextMarket,hierarchyMarkets}=await loadGlobalReportMarketSet({instId:body.instId,timeframe:body.timeframe},input=>observeProvider("okx","global_context",()=>loadSpotContext(input)),isArc(req)&&cfg.ARC_AI_MODE==="fixture"?null:globalOrderFlowFeed);
       signal?.throwIfAborted();
       await onContextReady?.();
       if (isArc(req) && cfg.ARC_AI_MODE === "fixture") {

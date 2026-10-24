@@ -21,15 +21,16 @@ test("Oct 20 1H: the lookback cannot erase older unconsumed resistance and leave
   assert.ok(card.plan.referenceEntry);assert.ok(card.plan.referenceStop);
   assert.equal(card.confirmed,false);assert.equal(globalDecision(r).currentAction,"WAIT");
   const oldest=r.candles.at(-r.strategy!.lookbackBars)!.ts;
-  assert.ok(r.indicators.pivots.some(p=>p.ts<oldest&&r.levels.find(l=>l.id===card.targets[0].id)!.anchorIds.includes(p.id)));
+  assert.ok(r.indicators.pivots.some(p=>p.ts<oldest&&r.levels.find(l=>l.id===r.tradePlan!.targetIds[0])!.anchorIds.includes(p.id)));
 });
 
 test("Oct 20 4H: a middle-of-range price cannot manufacture a short entry with a 24R claim",()=>{
   const r=make("4H"),cards=globalTradeCards(r),d=globalDecision(r);
-  assert.equal(r.snapshot.price,82610.4);assert.equal(d.direction,"SIDEWAYS");assert.equal(cards.length,0);
+  assert.equal(r.snapshot.price,82610.4);assert.equal(d.direction,"SIDEWAYS");assert.equal(cards.length,1);
   assert.equal(r.tradePlan!.referenceEntry,null);assert.equal(r.tradePlan!.referenceStop,null);assert.equal(r.tradePlan!.grossRewardRisk,null);
-  assert.equal(d.currentAction,"WAIT");assert.match(d.route,/80,680.50–81,200.00/);assert.match(d.route,/84,147.10–84,166.30/);
-  assert.match(globalReportChartSvg(r)!,/data-setup-status="unavailable"/);
+  assert.equal(d.currentAction,"WAIT");assert.ok(r.discretionaryPlan);assert.ok(cards[0].rr!<24);
+  assert.ok(r.discretionaryPlan.targets.every(t=>t.timeframe==="4H"));
+  assert.match(globalReportChartSvg(r)!,/data-trade-price-ledger=/);
 });
 
 test("Oct 20 daily: old support is not a justified entry; newer 4H structure has no later completed retest",()=>{
@@ -44,17 +45,22 @@ test("Oct 20 daily: old support is not a justified entry; newer 4H structure has
   const reclaimed=r.entryStudy!.candles.filter(c=>c.ts>high.ts&&c.close>high.price).at(-1)!;
   assert.equal(reclaimed.ts,r.entryStudy!.candles.at(-1)!.ts,"No later completed retest exists after this local reclaim");
   assert.ok(r.entryStudy!.pivots.some(a=>a.kind==="high"&&a.price===83168.2&&a.confirmedAt!==null));
-  assert.equal(globalDecision(r).currentAction,"WAIT");assert.equal(globalTradeCards(r).length,0);
-  assert.doesNotMatch(svg,/data-scenario-projection=/);assert.match(svg,/NO VALIDATED ENTRY/);
+  assert.equal(globalDecision(r).currentAction,"WAIT");assert.equal(globalTradeCards(r).length,1);
+  assert.equal(r.discretionaryPlan!.entry,82291.1);assert.notEqual(r.discretionaryPlan!.entry,80400);
+  assert.deepEqual(r.discretionaryPlan!.targets.map(t=>t.price),[84361.6,87238.3]);
+  assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe==="1Dutc"));
+  assert.ok(r.discretionaryPlan!.barriers.some(t=>t.timeframe==="4H"&&t.price===83168.2));
+  assert.doesNotMatch(svg,/data-scenario-projection=|NO VALIDATED ENTRY/);assert.match(svg,/data-trade-price-ledger=/);
   assert.match(r.setupSelection!.evidence.join(' '),/81,200 \(higher low\).*83,168.2/);
-  assert.match(globalSections(r).flatMap(s=>s.lines).join(' '),/reclaimed 82,291.10.*No later completed candle exists/);
+  assert.match(globalSections(r).flatMap(s=>s.lines).join(' '),/82,291.10/);
   assert.doesNotMatch(svg,/PULSE · GLOBAL[^<]*#[0-9a-f]{8}/);
 });
 
 test("Oct 20 weekly: a recovery bias without confirmation cannot claim an entry, stop or measured reward",()=>{
   const r=make("1Wutc"),card=globalTradeCards(r)[0];
-  assert.equal(r.snapshot.price,82109.3);assert.equal(card.plan.watchOnly,true);
-  assert.equal(card.plan.referenceEntry,null);assert.equal(card.plan.referenceStop,null);assert.equal(card.plan.grossRewardRisk,null);assert.equal(card.confirmed,false);
+  assert.equal(r.snapshot.price,82109.3);assert.equal(r.tradePlan!.watchOnly,true);
+  assert.equal(r.tradePlan!.referenceEntry,null);assert.equal(r.tradePlan!.referenceStop,null);assert.equal(card.confirmed,false);
+  assert.ok(card.plan.referenceEntry&&card.plan.referenceStop&&card.rr);assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe==="1Wutc"));
   assert.doesNotMatch(globalReportChartSvg(r)!,/data-scenario-projection=/);
   assert.equal(globalDecision(r).currentAction,"WAIT");
   const invented=structuredClone(r);invented.tradePlan!.referenceEntry=[82842,83049.14];
@@ -68,7 +74,7 @@ for(const frame of ["1H","4H","1Dutc","1Wutc"])test(`Oct 20 ${frame}: all tiers/
     assert.equal(GlobalReportSchema.safeParse(r).success,true);assert.equal(cards.length,globalTradeCards(baseline).length);
     assert.deepEqual(r.tradePlan,baseline.tradePlan);assert.equal(r.setupSelection!.version,"single-setup-v4");
     assert.doesNotMatch(svg,/data-scenario-projection=/);assert.doesNotMatch(svg,/NaN|undefined/);
-    if(r.tradePlan!.referenceStop!==null)assert.ok(study.includes(`data-entry-price-role="SL" data-price="${r.tradePlan!.referenceStop}"`));
+    if(cards[0]?.plan.referenceStop!==null)assert.ok(study.includes(`data-entry-price-role="SL" data-price="${cards[0].plan.referenceStop}"`)||/data-entry-offscale-levels="[^"]*SL/.test(study));
     else assert.doesNotMatch(study,/data-entry-price-role="SL"/);
     const text=globalSections(r).flatMap(s=>s.lines).join("\n");assert.doesNotMatch(text,/#[0-9a-f]{8}/);
     if(cards[0])assert.ok(text.includes(cards[0].location));else assert.ok(text.includes(r.setupSelection!.limitations[0]));

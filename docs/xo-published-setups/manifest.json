@@ -1,0 +1,28 @@
+{
+  "generatedAt": "2026-10-24T12:08:47.238Z",
+  "schema": "xo-published-setups-v1",
+  "publicationVersions": 18,
+  "canonicalPosts": 17,
+  "ownImageReferences": 44,
+  "uniqueImageByteHashes": 39,
+  "inputs": {
+    "docs/backtests/xo-trade-record-audit/initial-records.json": "b8c448fb3e646a07c494a06875a121f3ecb1f61711cef30b1ce61086938b7c7c",
+    "docs/backtests/xo-trade-record-audit/chain-records.json": "c1301351a397748618a7c8534f78f90d7942e903bb83731bfd6ee08cafa64c7e",
+    "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/records.json": "a405f44164568663f16553cc326b96b3a1eaec4e5099ab8ef1b502ae436a6b24",
+    "docs/backtests/xo-trade-record-audit/media-manifest.json": "0b9513b1e1d387ca1bc7da8ec5b27633a4737d5dd1e08bbd091bcf79ea8540a7",
+    "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/media-manifest.json": "354b1e1b4adfa6e1a0a84979d4110e826292da2d00eb0c175357a84605037fe5",
+    "docs/backtests/xo-trade-record-audit/chart-inspections.json": "dfabeec00b6beddf8281fa66218f842bfb7db571023db1ba6e5439404b633f4a",
+    "docs/backtests/xo-trade-record-audit/eth-rotation-2026-10-22/chart-inspections.json": "9c77bfa68a010de6abad2b9bbaa3abdeaa5fd375ae905c7cc87916be0af74304",
+    "docs/backtests/xo-trade-record-audit/eth-recovered-media-2026-10-24/capture.json": "17aac7b5d0e31cc875aa372e86d00f5fdc98615a7e3b1e272e3a6e2e2631df95",
+    "docs/backtests/xo-trade-record-audit/eth-recovered-media-2026-10-24/observations.json": "7e42fa35eacd2575b61cbc1fca4ebbe6f6db40cd17baec9e26f36a1becf2ec38",
+    "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/records.json": "8f155d17c5ec8975112c3da0d35da6a5db63e4b7ed0d68f651c99510a131a589",
+    "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/media-manifest.json": "3f83d6ce3e6ef1e95c65e0d158d042f635d5c2778ed203c375014e4d1419c039",
+    "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/chart-inspections.json": "d39309f36886fa625f5cdd90cc783cc7bfe00e3e94ad4a967ffd960777973b6c",
+    "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-pages.json": "641c523b1dbe0de7443fd42cdef3d6ed4826a41b406e3aa3233414e71a4ff41e"
+  },
+  "builderSha256": "56e1aeec74649d5b9918c52111d8b2435b7cf6e19c22579fff8dec3043f77681",
+  "templateSha256": "d549dda553d228043c03431a1ac851ef7380ba2110231012a4655c580819332f",
+  "outputSha256": "e55258085d64c5a4e941fda22a896337724cae2125719df30befeaf2be8a0d04",
+  "dataSha256": "f0de6d8717ffc08d9d3eca9d14a3855bdbc3ef98d15c3fc897ed175b4dd8a1e8",
+  "checks": "All original record identities, source-version timestamps, own-photo counts, retained image byte hashes and known image creation times reconciled. No strategy execution or performance calculation."
+}

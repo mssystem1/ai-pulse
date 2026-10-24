@@ -1,0 +1,22 @@
+{
+  "schema": "xo-recovered-original-inspection-v1",
+  "mediaId": "GwkqVOmWIAALd9E",
+  "postId": "1948134865355829359",
+  "kind": "reported_open_short_card",
+  "method": "Unchanged local original opened with view_image at original detail on 24 October 2026.",
+  "reported": {
+    "asset": "ETHUSDT",
+    "side": "short",
+    "leverage": 20,
+    "entryPrice": 3842.54,
+    "currentPrice": 3539.4,
+    "displayedRoiPercent": 155.97
+  },
+  "chartTimeframe": null,
+  "chartCreatedAtUTC": null,
+  "executionOrder": false,
+  "notes": "The fourth photo is a position card, not a profile chart. Its field explicitly says Current Price, not Exit Price. The reported entry matches the earlier short card and later explicit exit card. This adds a published position observation; it does not provide an entry time, protective order, position quantity or new independent trade.",
+  "sameReportedEntryMediaIds": ["GwjaP9YX0AAVjt0", "Gwoj7R5WEAAXc8M"],
+  "sourcePostPublishedAt": "2025-07-23T21:35:21.153Z",
+  "timestampMeaning": "Public post/version creation time from its ID, corroborated to the displayed minute. It is not an exchange fill or image creation time."
+}

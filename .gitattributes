@@ -1,5 +1,25 @@
-# Keep frozen research source hashes reproducible across Windows and Unix checkouts.
+# Keep recorded research source hashes reproducible across Windows and Unix checkouts.
 scripts/global-strategy-research.mjs text eol=lf
 scripts/research-global-strategies.mjs text eol=lf
 scripts/global-backtest-engine.mjs text eol=lf
 scripts/global-backtest-data.mjs text eol=lf
+
+# Evidence indexes hash exact bytes. Preserve text and binary artifacts on checkout.
+scripts/*global*.mjs text eol=lf
+scripts/*global*.py text eol=lf
+docs/backtests/**/*.json text eol=lf
+docs/backtests/**/*.jsonl text eol=lf
+docs/backtests/**/*.csv text eol=lf
+docs/backtests/**/*.html text eol=lf
+docs/backtests/**/*.mjs text eol=lf
+docs/backtests/**/*.py text eol=lf
+docs/backtests/**/*.md text eol=lf
+docs/backtests/**/*.txt text eol=lf
+docs/backtests/**/*.CHECKSUM text eol=lf
+docs/backtests/**/*.gz binary
+docs/backtests/**/*.zip binary
+docs/backtests/**/*.png binary
+docs/backtests/**/*.joblib binary
+docs/xo-published-setups/*.json text eol=lf
+docs/xo-published-setups/*.html text eol=lf
+scripts/templates/global-xo-publications.html text eol=lf

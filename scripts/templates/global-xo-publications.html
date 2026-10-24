@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XO published setups and management</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0d1420;color:#e0e8f2;font:15px/1.55 system-ui}main{max-width:1440px;margin:auto;padding:24px}h1{font-size:26px;margin:0 0 8px}h2{font-size:19px}a{color:#89cff5;overflow-wrap:anywhere}button,select{font:inherit;background:#1a2b40;color:inherit;border:1px solid #49617c;border-radius:6px;padding:9px;max-width:100%;min-width:0}button{cursor:pointer}label{display:flex;flex-direction:column;gap:5px;min-width:0}.controls{display:grid;grid-template-columns:120px 160px minmax(0,1fr);gap:12px;margin:20px 0}.panel{background:#142031;border:1px solid #344962;border-radius:10px;padding:18px;margin:18px 0}.image-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap}img{display:block;max-width:100%;height:auto;max-height:1000px;object-fit:contain;margin:18px auto}dl{display:grid;grid-template-columns:190px minmax(0,1fr);gap:8px;margin:16px 0}dt{color:#a2b8ce}dd{margin:0;overflow-wrap:anywhere}p{margin:8px 0}.muted{color:#a2b8ce}.history{display:grid;gap:10px}.history button{text-align:left}.history button[aria-current=true]{border-color:#68d0bc;background:#173936}.history small{display:block;color:#a2b8ce}.reference{white-space:pre-wrap}.empty{padding:20px;background:#142031;border:1px solid #344962;border-radius:10px}details{margin:14px 0}summary{cursor:pointer}@media(max-width:700px){main{padding:12px}.controls{grid-template-columns:1fr 1fr}.controls label:last-child{grid-column:1/-1}.panel{padding:12px}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:9px}h1{font-size:23px}}
+</style>
+<main>
+<h1>XO published setups and management</h1>
+<p>Original charts and position updates, in publication order. Select a post to see what was available at that time.</p>
+<div class="controls">
+  <label>Asset<select id="asset"></select></label>
+  <label>Chart timeframe<select id="frame"><option value="all">All original images</option></select></label>
+  <label>Published post or edit<select id="post"></select></label>
+</div>
+<p id="empty" class="empty" hidden></p>
+<article id="publication" class="panel">
+  <a id="source" target="_blank" rel="noopener noreferrer">Open original post</a>
+  <p id="summary"></p><dl id="facts"></dl>
+  <div class="image-controls"><label>Original attachment<select id="photo"></select></label><a id="full" target="_blank" rel="noopener noreferrer">Open full original image</a></div>
+  <img id="image" alt="Unchanged original attachment published by Trader_XO">
+  <p id="imageNote" class="muted"></p><dl id="imageFacts"></dl>
+  <details><summary>Published references and remaining source details</summary><dl id="references"></dl><p id="gaps"></p><p id="resolutions"></p></details>
+</article>
+<section id="historyPanel" class="panel"><h2>Publications available through this version</h2><div id="history" class="history"></div></section>
+<p class="muted">A position card reports the fields printed on it. Current Price, Exit Price, chart reference levels and a new order instruction have different meanings. Publication time is separate from execution time.</p>
+</main>
+<script>
+const DATA=__PUBLICATIONS__;
+const $=id=>document.getElementById(id),query=new URLSearchParams(location.search);
+const labels={'15m':'15m','1H':'1H','4H':'4H','1D':'1D','1W':'1W'};
+const words=s=>String(s).replace(/([a-z])([A-Z])/g,'$1 $2').replaceAll('_',' ');
+const utc=value=>new Date(value).toISOString().slice(0,19).replace('T',' ')+' UTC';
+function showFacts(element,rows){element.replaceChildren();for(const [name,value]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=name;dd.textContent=value;element.append(dt,dd);}}
+function readable(value){return value===null?'Not specified in this publication':typeof value==='object'?JSON.stringify(value):String(value);}
+for(const asset of DATA.assets)$('asset').add(new Option(asset,asset));
+for(const frame of DATA.timeframes)$('frame').add(new Option(labels[frame]+' — printed timeframe only',frame));
+$('frame').add(new Option('Timeframe not printed / position cards','unknown'));
+if(DATA.assets.includes(query.get('asset')))$('asset').value=query.get('asset');
+let selected=[],photos=[];
+function filteredPhotos(record){return DATA.images.filter(image=>image.postId===record.postId&&($('frame').value==='all'||($('frame').value==='unknown'?!image.observation.chartTimeframe:image.observation.chartTimeframe===$('frame').value)));}
+function renderAsset(preferredId){
+ selected=DATA.publications.filter(record=>record.assets.includes($('asset').value));
+ $('post').replaceChildren(...selected.map(record=>new Option(utc(record.publishedAt)+' · '+words(record.kind),record.postId)));
+ if(selected.some(record=>record.postId===preferredId))$('post').value=preferredId;
+ else if($('frame').value!=='all'){const first=selected.find(record=>filteredPhotos(record).length);if(first)$('post').value=first.postId;}
+ $('post').disabled=!selected.length;$('publication').hidden=!selected.length;$('historyPanel').hidden=!selected.length;$('empty').hidden=Boolean(selected.length);
+ $('empty').textContent='No original setup for '+$('asset').value+' is present in this source collection.';
+ renderPublication();
+}
+function renderPublication(){
+ const record=selected.find(item=>item.postId===$('post').value);if(!record)return;
+ $('source').href=record.sourceUrl;$('summary').textContent=record.summary;
+ showFacts($('facts'),[['Published version',utc(record.publishedAt)],['Published information',words(record.kind)],['Asset',record.assets.join(', ')],...(record.contextAssets.length?[['Additional market context',record.contextAssets.join(', ')]]:[])]);
+ showFacts($('references'),Object.entries(record.publishedReferences).map(([name,value])=>[words(name),readable(value)]));
+ $('gaps').textContent='Not established by this publication: '+record.gaps.join('; ');
+ $('resolutions').textContent=record.laterResolutions.join(' ');
+ photos=filteredPhotos(record);$('photo').replaceChildren(...photos.map((image,index)=>new Option('Photo '+image.photoOrdinal+' · '+words(image.observation.kind),String(index))));$('photo').disabled=!photos.length;
+ const known=selected.filter(item=>Date.parse(item.publishedAt)<=Date.parse(record.publishedAt));
+ $('history').replaceChildren(...known.map(item=>{const button=document.createElement('button'),small=document.createElement('small');button.dataset.postId=item.postId;button.setAttribute('aria-current',String(item.postId===record.postId));button.append(document.createTextNode(utc(item.publishedAt)));small.textContent=item.summary;button.append(small);button.onclick=()=>{$('post').value=item.postId;renderPublication();};return button;}));
+ $('publication').dataset.postId=record.postId;$('history').dataset.cutoff=record.publishedAt;
+ renderImage();
+}
+function renderImage(){
+ const image=photos[Number($('photo').value)];$('image').hidden=!image;$('full').hidden=!image;$('imageFacts').replaceChildren();
+ if(!image){$('image').removeAttribute('src');$('imageNote').textContent=$('frame').value==='all'?'This publication has no own attachment; its quoted charts belong to their original posts.':'No original attachment in this publication has the selected printed timeframe.';return;}
+ $('image').src=image.localUrl;$('full').href=image.localUrl;$('image').dataset.sha256=image.sha256;
+ const observation=image.observation;$('imageNote').textContent=observation.notes;
+ showFacts($('imageFacts'),[['Printed chart timeframe',observation.chartTimeframe?labels[observation.chartTimeframe]:'Not established / not a candle chart'],...(observation.chartCreatedAtUTC?[['Chart creation time',utc(observation.chartCreatedAtUTC)]]:[]),...(observation.printedChartCapture?[['Printed chart capture',observation.printedChartCapture]]:[]),...Object.entries(observation.reported??{}).map(([name,value])=>[words(name),readable(value)]),...(Object.keys(observation.approximateReadings??{}).length?[['Approximate chart readings',Object.entries(observation.approximateReadings).map(([name,value])=>words(name)+': '+readable(value)).join('; ')]]:[])]);
+}
+$('asset').onchange=()=>renderAsset();$('frame').onchange=()=>renderAsset($('post').value);$('post').onchange=renderPublication;$('photo').onchange=renderImage;
+renderAsset(query.get('post'));
+</script>
+</html>

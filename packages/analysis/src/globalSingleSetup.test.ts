@@ -23,14 +23,16 @@ for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])test(`${frame}: Quick, Pro 
   for(const r of reports){
     const selection=r.setupSelection!,cards=globalTradeCards(r),d=globalDecision(r),svg=globalReportChartSvg(r)!;
     assert.deepEqual([selection.assessment,selection.rule,selection.pathId,selection.side],[expected.assessment,expected.rule,expected.pathId,expected.side]);
-    assert.ok(["LONG","SHORT","SIDEWAYS"].includes(d.direction));assert.equal(r.paths.length,cards.length);assert.equal(r.strategy!.routes.length,cards.length);assert.ok(cards.length<=1);assert.equal(GlobalReportSchema.safeParse(r).success,true);
+    assert.ok(["LONG","SHORT","SIDEWAYS"].includes(d.direction));assert.equal(r.paths.length,r.strategy!.routes.length);assert.equal(cards.length,1);assert.equal(GlobalReportSchema.safeParse(r).success,true);
     const drawable=cards.filter(c=>c.plan.referenceEntry&&c.plan.referenceStop);
     assert.equal((svg.match(/data-trade-price-ledger=/g)??[]).length,drawable.length);
     assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,cards.filter(c=>c.confirmed).length);
     for(const card of cards){
-      assert.ok(r.tradePlan!.side==="none"||card.side===r.tradePlan!.side);assert.equal(card.pathId,selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
+      assert.ok(r.tradePlan!.side==="none"||card.side===r.tradePlan!.side);assert.equal(card.pathId,r.discretionaryPlan?"priced-setup":selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
       if(!card.plan.referenceEntry||!card.plan.referenceStop)continue;
-      const inset=globalEntryStudySvg(r)!;assert.ok(inset.includes(`data-entry-price-role="SL" data-price="${card.plan.referenceStop}"`));
+      const inset=globalEntryStudySvg(r)!;
+      if(r.entryStudy?.status==="available")assert.ok(inset.includes(`data-entry-price-role="SL" data-price="${card.plan.referenceStop}"`));
+      else assert.doesNotMatch(inset,/data-entry-signal=/,"Unavailable lower-frame history cannot fabricate an observed signal");
       for(const [i,target] of card.targets.entries())assert.ok(svg.includes(`data-trade-role="TP${i+1}" data-price="${target.price}"`));
     }
   }
@@ -87,7 +89,8 @@ function breakReport(mirror=false){
 }
 for(const mirror of [false,true])test(`${mirror?"bullish":"bearish"} break: confirmed close overrides the stale opposite pivot sequence, with MA55 and RSI evidence`,()=>{
   const r=breakReport(mirror);assert.equal(r.setupSelection!.rule,"structure_break");assert.equal(r.setupSelection!.side,mirror?"long":"short");assert.equal(globalTradeCards(r).length,1);
-  assert.equal(globalTradeCards(r)[0].targets[0].price,mirror?160000-80809.5:80809.5,"The nearby genuine swing remains TP1 even when used by Fibonacci");
+  assert.equal(r.levels.find(l=>l.id===r.tradePlan!.targetIds[0])!.price,mirror?160000-80809.5:80809.5,"The original observed-signal map retains the genuine swing even when used by Fibonacci");
+  assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe===r.snapshot.timeframe));
   assert.ok(r.setupSelection!.limitations.some(l=>l.includes("SMA21 has not turned")));assert.equal(GlobalReportSchema.safeParse(r).success,true);
   const neutral=structuredClone(r);neutral.indicators.rsi.points.at(-1)!.value=50;assert.notEqual(selectSingleGlobalSetup(neutral).selection.rule,"structure_break","A price break without the momentum condition is insufficient");
 });

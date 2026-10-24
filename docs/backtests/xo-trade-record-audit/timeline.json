@@ -1,0 +1,140 @@
+{
+  "generatedAt": "2026-10-22T18:46:20.044Z",
+  "scope": "Publication/version chronology only; not fill times, realised PnL or independent trade counts.",
+  "timeline": [
+    {
+      "postId": "1949841701612273784",
+      "url": "https://x.com/Trader_XO/status/1949841701612273784",
+      "at": "2025-07-28T14:37:42.628Z",
+      "kind": "intraday_short_partial_and_conditional_long_interest",
+      "assets": [
+        "ETH"
+      ],
+      "summary": "Separately identifies the 3650 naked POC as possible future long interest and reports taking half off an existing short. The partial fill price is not stated; the attached card shows a different current-price reference.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2062790868642222084",
+      "url": "https://x.com/Trader_XO/status/2062790868642222084",
+      "at": "2026-06-05T06:57:22.542Z",
+      "kind": "retrospective_short_setup_and_profit_report",
+      "assets": [
+        "BTC"
+      ],
+      "summary": "Describes a selective swing short around February highs and using realised gains to add spot BTC. The screenshot and prior entry instruction still need matching.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2070925189534101700",
+      "url": "https://x.com/Trader_XO/status/2070925189534101700",
+      "at": "2026-06-27T17:40:15.771Z",
+      "kind": "forward_conditional_long_plan",
+      "assets": [
+        "BTC"
+      ],
+      "summary": "Several unsuccessful downside auctions and absorption at February lows motivate a conditional long after another sweep fails and returns inside. Macro spillover remains a condition, and the earlier short may be covered.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2071539355512934850",
+      "url": "https://x.com/Trader_XO/status/2071539355512934850",
+      "at": "2026-06-29T10:20:44.351Z",
+      "kind": "reported_short_reduction",
+      "assets": [
+        "BTC",
+        "HYPE"
+      ],
+      "summary": "Reports being out of BTC swing shorts from the 81 region near 60 and mostly covering a HYPE short from the 75 region near 62.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072373535574511834",
+      "url": "https://x.com/Trader_XO/status/2072373535574511834",
+      "at": "2026-07-01T17:35:28.376Z",
+      "kind": "original_version_current_long_report",
+      "assets": [
+        "BTC"
+      ],
+      "summary": "Original version of the July 1 long report: failed auction beneath the established 2024 value area, incremental long exposure and POC first objective. The later version adds a short-closure statement.",
+      "supersededBy": "2072376414956130393",
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072376414956130393",
+      "url": "https://x.com/Trader_XO/status/2072376414956130393",
+      "at": "2026-07-01T17:46:54.874Z",
+      "kind": "reported_position_change_and_conditional_plan",
+      "assets": [
+        "BTC"
+      ],
+      "summary": "Reports a closed BTC short and incremental longs after a failed auction at 2024 value-area lows. POC is the first rotational objective; overhead supply remains relevant.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072657962145906964",
+      "url": "https://x.com/Trader_XO/status/2072657962145906964",
+      "at": "2026-07-02T12:25:40.955Z",
+      "kind": "range_rotation_framework",
+      "assets": [
+        "BTC"
+      ],
+      "summary": "Describes trading the February-established range extremes until price accepts outside the range, with a potential rotation into weekly bands then a short.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2072749403106841058",
+      "url": "https://x.com/Trader_XO/status/2072749403106841058",
+      "at": "2026-07-02T18:29:02.179Z",
+      "kind": "retrospective_short_closure_and_current_long_report",
+      "assets": [
+        "HYPE",
+        "BTC"
+      ],
+      "summary": "Reports closing a prior HYPE short and holding a new long. BTC continuation and recovery above daily EMA12/25 are contextual factors.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2073069754709954657",
+      "url": "https://x.com/Trader_XO/status/2073069754709954657",
+      "at": "2026-07-03T15:41:59.953Z",
+      "kind": "first_objective_update",
+      "assets": [
+        "HYPE"
+      ],
+      "summary": "Reports that the first HYPE objective has traded, with possible further upside; renewed trading below approximately 65 changes the assessment.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2073713750675218879",
+      "url": "https://x.com/Trader_XO/status/2073713750675218879",
+      "at": "2026-07-05T10:21:00.556Z",
+      "kind": "management_report_and_conditional_reversal",
+      "assets": [
+        "HYPE"
+      ],
+      "summary": "Reports taking long profit at the upper range quarter and opening a small short. May-origin anchored VWAP, EMA support and fixed-range profile guide context; acceptance above weekly highs changes the plan.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    },
+    {
+      "postId": "2105320157430087763",
+      "url": "https://x.com/Trader_XO/status/2105320157430087763",
+      "at": "2026-09-30T15:33:35.145Z",
+      "kind": "spot_hedge_and_conditional_flip",
+      "assets": [
+        "SOL"
+      ],
+      "summary": "Reports a SOL short around the yearly open as downside cover for spot. Discusses a possible 60-to-120 structural range and a flip above approximately 125, with selling again after a return below.",
+      "supersededBy": null,
+      "completeCopyInstruction": false
+    }
+  ]
+}

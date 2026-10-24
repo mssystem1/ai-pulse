@@ -1,0 +1,277 @@
+{
+  "schema": "xo-public-trade-chain-v1",
+  "capturedAt": "2026-10-22T18:25:37.785Z",
+  "scope": "Seven additional directly read original pages/versions, linked from the initial cases or located through search. Paraphrases and numeric facts; no private fill or personal win-rate claims.",
+  "records": [
+    {
+      "postId": "2072373535574511834",
+      "url": "https://x.com/Trader_XO/status/2072373535574511834",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-01T17:35:28.376Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2070925189534101700",
+        "https://x.com/Trader_XO/status/2072376414956130393"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMKKHk9W4AARzcz?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKLKDQWgAAOSWh?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMhW-XMAAEDCF?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMKMjMeXYAA8f40?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1jr0HXgAA61Q3?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1nDt4XgAArr6f?format=webp&name=large"
+      ],
+      "assets": [
+        "BTC"
+      ],
+      "ownPhotoCount": 4,
+      "kind": "original_version_current_long_report",
+      "summary": "Original version of the July 1 long report: failed auction beneath the established 2024 value area, incremental long exposure and POC first objective. The later version adds a short-closure statement.",
+      "levels": {
+        "entry": null,
+        "stop": null,
+        "target": "2024 value-area POC"
+      },
+      "relatedCase": "BTC-2026-range-rotation",
+      "gaps": [
+        "Exact long fills, stop and size",
+        "Numeric POC and profile parameters",
+        "Earlier entry execution"
+      ],
+      "editRelation": {
+        "supersededBy": "2072376414956130393",
+        "historyRead": true
+      },
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "2070925189534101700",
+      "url": "https://x.com/Trader_XO/status/2070925189534101700",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-06-27T17:40:15.771Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2062790868642222084"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HL1jr0HXgAA61Q3?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1nDt4XgAArr6f?format=webp&name=large",
+        "https://pbs.twimg.com/media/HKCBXJnWAAAx9kv?format=webp&name=large"
+      ],
+      "assets": [
+        "BTC"
+      ],
+      "ownPhotoCount": 2,
+      "kind": "forward_conditional_long_plan",
+      "summary": "Several unsuccessful downside auctions and absorption at February lows motivate a conditional long after another sweep fails and returns inside. Macro spillover remains a condition, and the earlier short may be covered.",
+      "levels": {
+        "entry": "failed sweep and acceptance back inside February lows",
+        "stop": null,
+        "target": null
+      },
+      "relatedCase": "BTC-2026-range-rotation",
+      "gaps": [
+        "Numerical stop and entry trigger",
+        "Definition of acceptance",
+        "Execution size",
+        "Complete management"
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "2071539355512934850",
+      "url": "https://x.com/Trader_XO/status/2071539355512934850",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-06-29T10:20:44.351Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2070925189534101700"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HL1jr0HXgAA61Q3?format=webp&name=large",
+        "https://pbs.twimg.com/media/HL1nDt4XgAArr6f?format=webp&name=large"
+      ],
+      "assets": [
+        "BTC",
+        "HYPE"
+      ],
+      "ownPhotoCount": 0,
+      "kind": "reported_short_reduction",
+      "summary": "Reports being out of BTC swing shorts from the 81 region near 60 and mostly covering a HYPE short from the 75 region near 62.",
+      "levels": {
+        "btcReportedEntryApprox": 81000,
+        "btcReportedExitApprox": 60000,
+        "hypeReportedEntryApprox": 75,
+        "hypeReportedExitApprox": 62
+      },
+      "relatedCase": "BTC-and-HYPE-2026-swing-shorts",
+      "gaps": [
+        "Trade identifiers and fills",
+        "Exact entry/exit times",
+        "Original stops and sizing",
+        "Remaining HYPE position size"
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "2062790868642222084",
+      "url": "https://x.com/Trader_XO/status/2062790868642222084",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-06-05T06:57:22.542Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HKCBXJnWAAAx9kv?format=webp&name=large"
+      ],
+      "assets": [
+        "BTC"
+      ],
+      "ownPhotoCount": 1,
+      "kind": "retrospective_short_setup_and_profit_report",
+      "summary": "Describes a selective swing short around February highs and using realised gains to add spot BTC. The screenshot and prior entry instruction still need matching.",
+      "levels": {
+        "entry": "around February highs; no exact order price",
+        "stop": null,
+        "target": null
+      },
+      "relatedCase": "BTC-2026-range-rotation",
+      "gaps": [
+        "Advance entry post",
+        "Exact position size and SL",
+        "Full exits",
+        "Spot/perpetual allocation"
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "2073069754709954657",
+      "url": "https://x.com/Trader_XO/status/2073069754709954657",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-07-03T15:41:59.953Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/2072749403106841058"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HMUFLhYXoAEnESE?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMUFNMUXoAA_qqH?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMUFlLcXIAAc6cB?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMPiGEAWcAA4I8R?format=webp&name=large",
+        "https://pbs.twimg.com/media/HMPidM3WUAApPDW?format=webp&name=large"
+      ],
+      "assets": [
+        "HYPE"
+      ],
+      "ownPhotoCount": 3,
+      "kind": "first_objective_update",
+      "summary": "Reports that the first HYPE objective has traded, with possible further upside; renewed trading below approximately 65 changes the assessment.",
+      "levels": {
+        "firstObjective": "shown in linked charts; not a new order instruction",
+        "conditionalProblemBelowApprox": 65,
+        "stop": null
+      },
+      "relatedCase": "HYPE-2026-July-long-to-short",
+      "gaps": [
+        "Whether and how much was closed at this update",
+        "Exact long entry and SL",
+        "Definition of below-level acceptance",
+        "Numerical further targets"
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "2105320157430087763",
+      "url": "https://x.com/Trader_XO/status/2105320157430087763",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2026-09-30T15:33:35.145Z",
+      "timestampMeaning": "Version creation time derived from the public ID, confirmed to the displayed minute in Europe/Samara (UTC+4). An edited version is not the original publication.",
+      "linkedPosts": [],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/HTeZAnLW4AEXkKs?format=webp&name=large"
+      ],
+      "assets": [
+        "SOL"
+      ],
+      "ownPhotoCount": 1,
+      "kind": "spot_hedge_and_conditional_flip",
+      "summary": "Reports a SOL short around the yearly open as downside cover for spot. Discusses a possible 60-to-120 structural range and a flip above approximately 125, with selling again after a return below.",
+      "levels": {
+        "entry": "around yearly open; exact execution unspecified",
+        "conditionalFlipAboveApprox": 125,
+        "conditionalSellBackBelowApprox": 125,
+        "rangeLowApprox": 60,
+        "rangeHighApprox": 120,
+        "stop": null
+      },
+      "relatedCase": "SOL-2026-September-spot-hedge",
+      "gaps": [
+        "Spot exposure and hedge ratio",
+        "Exact short entry and size",
+        "Definition of flip/acceptance trigger",
+        "Actual exit updates",
+        "Standalone TP/SL orders"
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    },
+    {
+      "postId": "1949841701612273784",
+      "url": "https://x.com/Trader_XO/status/1949841701612273784",
+      "author": "Trader_XO",
+      "directPrimaryPageRead": true,
+      "idTimestampInferredUTC": "2025-07-28T14:37:42.628Z",
+      "timestampMeaning": "Original post creation time derived from ID, confirmed to displayed minute in Europe/Samara.",
+      "linkedPosts": [
+        "https://x.com/Trader_XO/status/1949517447821770959"
+      ],
+      "imageUrls": [
+        "https://pbs.twimg.com/media/Gw86sKyWgAAAS_-?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw86sKOWUAE3MOG?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw86sIaXkAA4SG0?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw86sIXWEAAseHy?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw4TyMmXMAABxre?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw4TyM6WwAAebyu?format=webp&name=large",
+        "https://pbs.twimg.com/media/Gw4TyMnWQAACxiZ?format=webp&name=large"
+      ],
+      "assets": [
+        "ETH"
+      ],
+      "ownPhotoCount": 4,
+      "kind": "intraday_short_partial_and_conditional_long_interest",
+      "summary": "Separately identifies the 3650 naked POC as possible future long interest and reports taking half off an existing short. The partial fill price is not stated; the attached card shows a different current-price reference.",
+      "levels": {
+        "conditionalLongInterestApprox": 3650,
+        "shortPartialFraction": 0.5,
+        "longEntry": null,
+        "stop": null,
+        "target": null,
+        "cardReportedEntryPrice": 3879.85,
+        "cardCurrentPrice": 3776.42,
+        "cardLeverage": 20,
+        "cardRoiPercent": 52.71,
+        "cardCurrentPriceIsExitConfirmation": false
+      },
+      "relatedCase": "ETH-2025-July-intraday-rotation",
+      "gaps": [
+        "Original short entry and stop",
+        "Remaining position management",
+        "New long trigger, size, SL and TP",
+        "Exact execution timing",
+        "The 3650 interest level is distinct from the reported current short reduction; do not assign that partial an invented 3650 fill."
+      ],
+      "completeCopyInstruction": false,
+      "personalWinRateCalculated": false
+    }
+  ]
+}

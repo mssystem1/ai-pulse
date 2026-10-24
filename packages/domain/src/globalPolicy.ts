@@ -3,9 +3,11 @@ import { globalTradePlan } from "./globalTradePlan.js";
 import { fnv1a } from "./hash.js";
 import {globalContextRelation,globalContextRequired} from "./globalContext.js";
 import {globalStructuralWindow} from "./globalViewport.js";
+import {globalDiscretionaryCard} from "./globalDiscretionaryPlan.js";
+import {globalSetupStrategyProfile} from "./globalSetupStrategies.js";
 
 export function globalArtifactReference(report:GlobalReport):string {
-  return fnv1a(JSON.stringify([report.snapshot,report.tradePlan,report.levels])).toString(16).padStart(8,"0");
+  return fnv1a(JSON.stringify([report.snapshot,report.tradePlan,report.levels,...(report.discretionaryPlan?[report.discretionaryPlan]:[]),...(report.horizonContext?[report.horizonContext,report.indicators.vwap,report.indicators.ema]:[]),...(report.orderFlow?[report.orderFlow]:[])])).toString(16).padStart(8,"0");
 }
 export function globalArtifactTag(report:GlobalReport):string {
   return `${report.snapshot.observedAt.replace(/\D/g,"").slice(0,14)}-${globalArtifactReference(report)}`;
@@ -54,14 +56,17 @@ export function globalEligibility(report:GlobalReport):GlobalEligibility {
   return "technical_valid";
 }
 export function globalRiskMeasurement(report:GlobalReport) {
-  const p=globalTradePlan(report),atr=p.method==="structure-v4"?report.indicators.atr.points.at(-1)?.value:p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
+  if(report.discretionaryPlan){const p=report.discretionaryPlan,source=p.stopBasis.timeframe===report.snapshot.timeframe?report.indicators.atr.points:report.entryStudy?.atr,atr=source?.at(-1)?.value,distance=Math.abs(p.entry-p.stop);return {entry:p.entry,distance,percent:distance/p.entry*100,atr:atr?distance/atr:null,timeframe:p.stopBasis.timeframe};}
+  const p=globalDiscretionaryCard(report)?.plan??globalTradePlan(report),atr=p.method==="structure-v4"?report.indicators.atr.points.at(-1)?.value:p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
   if(!p.referenceEntry||p.referenceStop===null)return null;
   const entry=p.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],distance=Math.abs(entry-p.referenceStop);
   return {entry,distance,percent:distance/entry*100,atr:atr?distance/atr:null,timeframe:p.method==="structure-v4"?report.snapshot.timeframe:p.entryTimeframe??report.snapshot.timeframe};
 }
-/** Keep execution structure readable; Structure/Full history retains older
- * Elliott anchors. Do not widen a setup view to fit an ancient wave origin. */
+/** A timeframe changes the scale of market context. Entry-study detail is
+ * separate; the primary chart must not collapse to the latest reaction. */
 export function globalSetupWindow(report:GlobalReport):number {
+  const profile=globalSetupStrategyProfile(report.snapshot.timeframe);
+  if(profile)return Math.min(report.candles.length,profile.window);
   if(report.decisionVersion)return globalStructuralWindow(report);
   const p=globalTradePlan(report),ids=[p.triggerLevelId,p.invalidationLevelId];
   const unit=parseCandleTimeframe(report.snapshot.timeframe)?.unit;

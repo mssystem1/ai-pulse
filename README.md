@@ -115,25 +115,35 @@ Spot navigation separates **Trade setup** and **Dashboard**. Autopilot provides 
 
 ### Global Market
 
-Choose a live OKX instrument and timeframe. PULSE fetches public ticker/OHLCV data, calculates structure from completed candles, renders the chart locally and sends bounded structured evidence to Grok. Quick provides focused candles, SMA55, volume and at most one supported entry setup. Pro adds SMA21/55/89/144/233, qualifying broad/local parallel channels, regression, Fibonacci retracements, RSI14, ATR14 and independently observed higher-timeframe context. Available channels, trend studies and Fibonacci are visible by default and can be toggled individually. An incomplete Elliott count does not prevent support/resistance planning; wave labels remain hypotheses.
+Choose a live OKX instrument, report depth and timeframe. PULSE builds the report from saved completed candles and identifies its source and timestamps. Each timeframe provides a LONG, SHORT or SIDEWAYS assessment and a priced setup with Entry, SL and supported objectives. The trader makes the final decision.
 
-Every timeframe publishes one assessment: **LONG**, **SHORT** or **SIDEWAYS**, with at most one supported entry setup. A bounded range supplies observation zones; distance to an edge cannot select a trade. Without an observed reaction, Entry and SL remain unestablished. Strategy selection uses completed structure, SMA trend and RSI momentum before entry qualification. A primary range cannot automatically veto an observed compatible directional retest. A historical Elliott ABC remains a hypothesis; reclaiming B after C supports a recovery hypothesis rather than a perpetual C-leg forecast.
+New Pro reports open with broad price history: an EMA trend ribbon, available anchored VWAP with deviation bands, volume and evidenced range references alongside Entry, SL and supported targets. Default history is 120 candles for 15m/1H, 180 for 4H, and 260 for daily/weekly, limited by source coverage. Zoom and Full history let you change the view; indicator controls preserve your zoom. The PNG export uses the same saved series and selected layers. Older reports retain their available saved indicators.
 
-Unconfirmed or blocked setups draw no future trade path. A technically confirmed entry may illustrate supported targets, with schematic timing. Web, TXT, PNG and Telegram share the same setup and evidence. The current entry band is measured without clipping it backward to manufacture 1.50R; SL uses the actual reaction and structural zone. TP1 is the nearest active primary-frame objective. A closer confirmed entry-frame barrier is checked separately and can block entry; the fresh quote cost gate also receives that barrier. Older unconsumed primary barriers remain relevant when local objectives are missing. Unsupported later targets are omitted. These are research heuristics, not profitability claims. Version-1/2/3 selectors offer a free version-4 review from saved candles, without another payment or AI call. See the [reopened report audit](docs/GLOBAL_REPORT_AUDIT_2026-10-20.md) and [costed historical backtest](docs/backtests/README.md). The backtest does not establish a profitable strategy or high win rate. Earlier [strategy design](docs/GLOBAL_SINGLE_SETUP_STRATEGY_2026-10-18.md) and [target/recovery incident](docs/GLOBAL_TARGET_AND_RECOVERY_FIX_2026-10-18.md) are historical records.
+A planned entry is conditional. An entry below the latest price does not forecast a mandatory pullback. Unconfirmed or blocked plans draw no projected trade move. The selector describes the setup mix for 15m Fast, 1H Intraday, 4H Swing, 1D Position and 1W Macro. Each horizon uses its own structure, volatility, objectives and execution study. Nearby lower-frame barriers remain separate from the main objectives. Missing targets remain absent. Daily and weekly completed closes can be older than the lower-timeframe entry chart.
 
-| Main chart | Profile | Entry study |
+| Main chart | Reading | Entry study |
 | --- | --- | --- |
-| 15m | Fast | 5m |
-| 1H | Intraday | 15m |
-| 4H | Swing | 1H |
-| 1D UTC | Position | 4H |
-| 1W UTC | Macro | 1D UTC |
+| 15m | Session value, fast structure and session range | 5m |
+| 1H | Weekly value and intraday support/resistance | 15m |
+| 4H | Swing value, structure and active balance | 1H |
+| 1D UTC | Multi-month recovery or decline, daily balance and position levels | 4H |
+| 1W UTC | Cycle value, major decline/recovery legs and weekly support/resistance | 1D UTC |
 
-**Show this plan on chart** selects the same Entry/SL/TP geometry in the main drawing, entry inset and downloaded PNG. A readable price ledger preserves crowded levels without moving their lines. Internal report references preserve snapshot identity and download traceability; visible reports disclose capture/completed-bar timestamps and any history limits without an opaque hashtag. Reopening and technical rechecks reuse the paid report. Text, web, mobile and Telegram exports share the saved prices.
+Each chart calculates its context from its own completed candles. The report identifies the VWAP anchor and timeframe, and distinguishes an observed balance from recovery, decline and cycle ranges. A weekly chart can retain a major decline and the recovery that followed it. Green/red zones retain primary-candle support/resistance evidence. Shared indicator names do not imply shared anchors or trade levels across timeframes.
 
-Spot SELL reduces owned inventory; SHORT research does not open leverage. Only current observed protection can prefill eligible Spot buy levels; unconfirmed plans require manual configuration and fresh review. Each order still needs a verified token representation, amount-specific quote, balance/cost checks and wallet approval. Multiple research TPs do not create an automatic exit ladder; current Spot review uses one selected TP, normally TP1. Changing pair, timeframe, network or request tier supersedes the earlier request so a late response cannot replace the current context.
+PULSE applies Trader_XO's documented methods to the selected market's current evidence: trend pullbacks, structural reclaim/retests, range rotation and VWAP reversion. The [current implementation scope](docs/GLOBAL_XO_CURRENT_MARKET_SCOPE.md) covers fresh setups across supported assets and all five horizons. Original publications substantiate the methods; generated setups use PULSE's implementation choices and are separate from his published orders or personal performance. Strategy backtests and win-rate optimization remain stopped.
 
-The in-app **Docs → Chart & indicator guide** (`/docs#docs-global-chart`) explains the workflow in English and Chinese with nine historical illustrations. See the [trade-plan methodology audit](docs/GLOBAL_BTC_TRADE_PLAN_AUDIT_2026-10-18.md) and [four-report Base validation](docs/GLOBAL_BASE_BTC_REPORT_AUDIT_2026-10-18.md), including Entry/SL/TP tables, coverage limits, receipts and export checks.
+Setup selection follows structural context and location. A candle changing color does not reverse a range setup. A range escape uses the broken boundary for its retest and invalidation; an intact range retains its own objectives. Range midpoint and quartile references describe geometry, while measured POC/VAL/VAH require genuine executed-volume evidence. Intervening primary and lower-frame levels remain visible.
+
+The [original setup and management review](docs/xo-published-setups/index.html) preserves published charts, source versions and follow-up chronology. Its [source manifest](docs/xo-published-setups/manifest.json) identifies the retained records and unchanged image bytes; it is source material for the report integration.
+
+Fresh Global reports automatically attempt to obtain and reconcile an available complete exchange-trade window. Reports containing that evidence offer **Volume profile** and **Trade footprint** controls, with POC/VAL/VAH and actual taker buy/sell volume. Read the venue and UTC dates in the caption: an archive profile can cover a shorter, earlier window than the primary chart. Saved profiles keep their original window when you zoom or review the report. Executed volume and resting order-book liquidity require separate evidence.
+
+Profile levels start at their own source window, rather than spanning earlier macro history. A profile newer than the completed primary candles remains compact recent context; panning before its window clears the overlay from that earlier view.
+
+Web, TXT, PNG and Telegram preserve the saved plan's prices. Chart titles identify the market and timeframe without opaque internal reference codes. Reopening and technical rechecks reuse the paid report. Spot SELL reduces owned inventory; SHORT research does not open leverage. A report does not activate Autopilot or authorize an order: review the current quote, amount and protection before signing.
+
+See the [chart user guide](docs/GLOBAL_REPORT_CHART_GUIDE.md) or the English/Chinese in-app **Docs > Chart & indicator guide** (`/docs#docs-global-chart`). Public documentation covers the workflow and visible chart tools. Proprietary strategy recipes, tuning and private research artifacts are excluded. Software verification does not establish a guaranteed win rate or mirroring of a trader's private account.
 
 ### Prediction Market
 
@@ -481,7 +491,7 @@ Key rules:
 
 - Provider payloads are normalized and bounded before model input; Grok receives structured evidence, not screenshots, wallet secrets, or arbitrary raw pages.
 - Pivot, Fibonacci, alternating swing points, Elliott candidate/invalidation, and chart paths are calculated deterministically. The report explanation must remain consistent with those values.
-- Global reports publish one LONG, SHORT or SIDEWAYS assessment and at most one supported entry setup. Missing reactions leave Entry and SL unestablished, with observation references and a clear explanation. Nearer entry-frame barriers cannot be hidden by a farther primary TP. Unconfirmed or blocked setups draw no projected trade path. Spot SELL reduces owned inventory; analytical SHORT does not authorize leverage.
+- Global reports publish one LONG, SHORT or SIDEWAYS assessment and a priced setup with Entry, SL and supported targets. A displayed plan remains separate from an observed signal or a fill. Each horizon retains broad price history and its own protection and objectives; nearby entry-frame barriers stay visible. Spot SELL reduces owned inventory; analytical SHORT does not authorize leverage.
 - DeFi discovery first resolves the selected chain representation—for example `BTC → cbBTC` on Base or `BTC → WBTC` on Arbitrum—then accepts only products containing that exact contract.
 - Prediction Market uses one explicitly selected condition/outcome mapping. It never silently substitutes a trending market. Pro may add an independently sourced 4H underlying-asset chart, clearly separated from the prediction probability evidence.
 - The Opportunity Radar is a free technical shortlist. Its score selects what to investigate; it is not transaction authorization.
@@ -1125,7 +1135,7 @@ The dashboard mark is a timestamped OKX public spot observation. Automatic execu
 
 ## Current release discipline
 
-The user's Global setup acceptance target is >70% net wins with meaningful risk/reward. Current report heuristics and the additional 18 strategy candidates per frame have **not** established that target; no new strategy is promoted. The [strategy validation record](docs/GLOBAL_STRATEGY_VALIDATION_2026-10-21.md) states the rules, costs, chronological splits, uncertainty gates and failed results. Run `npm run test:global-strategies`, `npm run research:global-strategies` and `node scripts/verify-global-strategy-research.mjs` to reproduce the isolated study. These commands place no orders or paid model calls.
+Global report changes require verified saved-data behavior, consistent chart/text/export prices and a reviewed manual trading workflow. Strategy evaluation and confidential research records remain separate from public product documentation. Local verification does not establish production availability or guaranteed performance.
 
 ### Non-spending verification
 

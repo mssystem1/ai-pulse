@@ -1,0 +1,47 @@
+{
+  "schema": "xo-eth-origin-media-v1",
+  "collectorSha256": "b4f466f7547981f2f618512fd27c930e3ef7677ed5e13557c7422401e0fdf4c0",
+  "recordsSha256": "8f155d17c5ec8975112c3da0d35da6a5db63e4b7ed0d68f651c99510a131a589",
+  "images": [
+    {
+      "postId": "1937448336279105751",
+      "mediaId": "GuMy_cEWYAAlFLj",
+      "photoOrdinal": 1,
+      "sourceUrl": "https://pbs.twimg.com/media/GuMy_cEWYAAlFLj?format=webp&name=large",
+      "file": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-1-GuMy_cEWYAAlFLj.webp",
+      "bytes": 46094,
+      "sha256": "aa9c67bf9f1558c77145aca68a4857fa9a959fb422f27003ae0546c603f9997b",
+      "capturedAt": "2026-10-24T12:05:22.522Z"
+    },
+    {
+      "postId": "1937448336279105751",
+      "mediaId": "GuMy_cFWIAECOA8",
+      "photoOrdinal": 2,
+      "sourceUrl": "https://pbs.twimg.com/media/GuMy_cFWIAECOA8?format=webp&name=large",
+      "file": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-2-GuMy_cFWIAECOA8.webp",
+      "bytes": 40676,
+      "sha256": "26d68febe93945208334de2d34331aa058b39068374ca63577c52e0ed5cd68ca",
+      "capturedAt": "2026-10-24T12:05:23.518Z"
+    },
+    {
+      "postId": "1937448336279105751",
+      "mediaId": "GuMy_cIX0AASLpm",
+      "photoOrdinal": 3,
+      "sourceUrl": "https://pbs.twimg.com/media/GuMy_cIX0AASLpm?format=webp&name=large",
+      "file": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1937448336279105751-3-GuMy_cIX0AASLpm.webp",
+      "bytes": 41140,
+      "sha256": "8ea160ffdf8b5e4b2d47d4de0870495fe3b041fdd370eb737fd4582d08b691df",
+      "capturedAt": "2026-10-24T12:05:24.292Z"
+    },
+    {
+      "postId": "1947019929858756919",
+      "mediaId": "GwU0TeuW0AIKw3n",
+      "photoOrdinal": 1,
+      "sourceUrl": "https://pbs.twimg.com/media/GwU0TeuW0AIKw3n?format=webp&name=large",
+      "file": "docs/backtests/xo-trade-record-audit/eth-origin-2026-10-24/source-images/1947019929858756919-1-GwU0TeuW0AIKw3n.webp",
+      "bytes": 59010,
+      "sha256": "e442ad169ed66c2797c68922b93bf97e4876fdab1897d13bbbd0498368b7a085",
+      "capturedAt": "2026-10-24T12:05:25.368Z"
+    }
+  ]
+}

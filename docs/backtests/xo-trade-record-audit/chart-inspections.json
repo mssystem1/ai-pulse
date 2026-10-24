@@ -1,0 +1,337 @@
+{
+  "schema": "xo-original-chart-inspection-v1",
+  "inspectedAt": "2026-10-22T18:38:04.673Z",
+  "method": "Original local images viewed with view_image at original detail. No editing, cropping, image-generated reconstruction or added chart annotations.",
+  "scope": "Visible numeric facts and separate approximate axis readings. Neither set creates an execution order or verifies private account fills.",
+  "observations": [
+    {
+      "mediaId": "HMKKHk9W4AARzcz",
+      "kind": "text_excerpt",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {},
+      "approximateReadings": {},
+      "notes": "Conditional failed sweep and return inside; no complete order or numerical stop.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMKLKDQWgAAOSWh",
+      "kind": "value_area_chart",
+      "chartCreatedAtUTC": "2026-07-01T17:28:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 60141.7
+      },
+      "approximateReadings": {},
+      "notes": "Established 2024 profile/value area; colored levels are not identified as protective orders.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMKMhW-XMAAEDCF",
+      "kind": "price_structure_chart",
+      "chartCreatedAtUTC": "2026-07-01T17:34:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 60102.6
+      },
+      "approximateReadings": {},
+      "notes": "Recent repeated lows and descending structure; exact timeframe and SL are not displayed.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMKMjMeXYAA8f40",
+      "kind": "footprint_and_orderbook",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {
+        "greenReferenceLevels": [
+          58832.8,
+          58043.6
+        ]
+      },
+      "approximateReadings": {},
+      "notes": "BTCUSDT 1D footprint/DOM. Reference lines are not labeled initial stops; full exchange/settings and execution history absent.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMPiGEAWcAA4I8R",
+      "kind": "range_chart",
+      "chartCreatedAtUTC": "2026-07-02T18:25:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 66.993
+      },
+      "approximateReadings": {
+        "rangeLow": 54.4,
+        "rangeMid": 65.3,
+        "rangeHigh": 76
+      },
+      "notes": "Range levels read approximately from the axis, not exact order prices.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMPidM3WUAApPDW",
+      "kind": "ema_context_chart",
+      "chartCreatedAtUTC": "2026-07-02T18:28:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 67.052,
+        "visibleLowerEmaValue": 64.029
+      },
+      "approximateReadings": {},
+      "notes": "Macro Trend Scanner attribution visible; current candle has a countdown and is not a final daily close.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMdNluXXMAAQ_6p",
+      "kind": "event_vwap_and_ema_chart",
+      "chartCreatedAtUTC": "2026-07-05T10:11:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 68.817
+      },
+      "approximateReadings": {
+        "anchorWindow": "mid-May 2026"
+      },
+      "notes": "Event anchor marker and deviation bands visible. Exact anchor bar, variance formula and settings not supplied.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMdO0WOWYAAVFQl",
+      "kind": "profile_and_range_chart",
+      "chartCreatedAtUTC": "2026-07-05T10:17:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 68.823
+      },
+      "approximateReadings": {
+        "valueLow": 56.4,
+        "poc": 62.8,
+        "valueHigh": 68.4,
+        "localHigh": 71.5
+      },
+      "notes": "Profile/range context; approximate axis readings are not confirmed stop/target orders.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMOOU04WUAAt38n",
+      "kind": "earlier_post_screenshot",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {},
+      "approximateReadings": {},
+      "notes": "Screenshot references March 5 February-range preparation; original post ID and year still need verification.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMOOcqlWoAArflb",
+      "kind": "february_range_chart",
+      "chartCreatedAtUTC": "2026-07-02T12:21:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 61148
+      },
+      "approximateReadings": {
+        "februaryHigh": 79400,
+        "februaryLow": 60000
+      },
+      "notes": "USD chart, named February highs/lows; axis-derived bounds remain approximate.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMOOpH9XoAAWMij",
+      "kind": "higher_horizon_chart",
+      "chartCreatedAtUTC": "2026-07-02T12:22:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 61139,
+        "visibleReferenceLevels": [
+          122575,
+          100005,
+          96781,
+          74401,
+          71746,
+          49935,
+          45762,
+          18831
+        ]
+      },
+      "approximateReadings": {},
+      "notes": "Long-horizon context, not a published entry/SL/TP sequence. Exact chart timeframe is cropped.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMOOwXsXoAA0nff",
+      "kind": "higher_horizon_ema_chart",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {
+        "displayedCurrentPrice": 61174,
+        "visibleEmaValues": [
+          73804,
+          68096
+        ]
+      },
+      "approximateReadings": {},
+      "notes": "EMA context with a developing-candle countdown. No copied fresh entry or full order instruction.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HL1jr0HXgAA61Q3",
+      "kind": "prior_february_range_chart",
+      "chartCreatedAtUTC": "2026-06-27T17:23:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 60562.7
+      },
+      "approximateReadings": {
+        "februaryHigh": 79400,
+        "februaryLow": 60000
+      },
+      "notes": "Predecessor plan chart; lower edge reaction/acceptance still conditions execution.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HL1nDt4XgAArr6f",
+      "kind": "prior_footprint_chart",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {},
+      "approximateReadings": {
+        "februaryLowLabel": 59869
+      },
+      "notes": "Daily BTCUSDT footprint/absorption context. Small label is an approximate reading; no stop order is established.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HKCBXJnWAAAx9kv",
+      "kind": "position_roi_card",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {
+        "reportedEntryPrice": 81506.67,
+        "displayedCurrentPrice": 61878.8,
+        "reportedLeverage": 10,
+        "displayedRoiPercent": 314.69
+      },
+      "approximateReadings": {},
+      "notes": "Current-price field is not exit confirmation. Margin, size, account return and complete fills are not supplied.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMUFLhYXoAEnESE",
+      "kind": "reused_range_chart",
+      "chartCreatedAtUTC": "2026-07-02T18:25:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 66.993
+      },
+      "approximateReadings": {},
+      "notes": "July 3 post reuses the exact July 2 chart bytes. It is not a second independent trade/chart observation.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMUFNMUXoAA_qqH",
+      "kind": "first_objective_structure_chart",
+      "chartCreatedAtUTC": "2026-07-03T15:38:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 70.417
+      },
+      "approximateReadings": {
+        "rangeLow": 54.3,
+        "rangeMid": 64.9,
+        "rangeHigh": 76
+      },
+      "notes": "First-objective update and local higher lows. Numeric current price is distinct from an actual exit fill.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HMUFlLcXIAAc6cB",
+      "kind": "first_objective_profile_chart",
+      "chartCreatedAtUTC": "2026-07-03T15:40:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 70.24
+      },
+      "approximateReadings": {
+        "poc": 62.8,
+        "valueHigh": 68.4,
+        "valueLow": 56.4
+      },
+      "notes": "Move above value-area high visible; no complete quantity/exit statement in the image.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "HTeZAnLW4AEXkKs",
+      "kind": "spot_hedge_context_chart",
+      "chartCreatedAtUTC": "2026-09-30T15:31:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "visibleUpperReference": 122.71,
+        "displayedCurrentPrice": 118.89,
+        "visibleLowerReference": 52.52
+      },
+      "approximateReadings": {},
+      "notes": "SOL long-term context and measured move. The post describes a spot hedge; portfolio exposure and exact fill remain absent.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "Gw86sKyWgAAAS_-",
+      "kind": "session_profile_chart",
+      "chartCreatedAtUTC": "2025-07-28T14:30:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 3775.95
+      },
+      "approximateReadings": {
+        "npocZone": "around 3650"
+      },
+      "notes": "Session profile context. Exact session boundaries, row size and venue are not supplied.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "Gw86sKOWUAE3MOG",
+      "kind": "intraday_structure_chart",
+      "chartCreatedAtUTC": "2025-07-28T14:34:00Z",
+      "chartTimestampMeaning": "Visible creation time converted from chart's explicit UTC+1 header; publication is later.",
+      "visibleNumbers": {
+        "displayedCurrentPrice": 3788.5,
+        "visibleLowerReference": 3481.01
+      },
+      "approximateReadings": {
+        "shadedZone": [
+          3660,
+          3705
+        ]
+      },
+      "notes": "Current decline and a lower area of interest; no full new long order. Approximate shaded bounds are not SL/TP.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "Gw86sIaXkAA4SG0",
+      "kind": "substack_note_screenshot",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {},
+      "approximateReadings": {},
+      "notes": "Earlier note relates local highs to aggressive buyers meeting absorption/stacked offers. Original note URL/time not yet established.",
+      "actualExecutionOrdersVerified": false
+    },
+    {
+      "mediaId": "Gw86sIXWEAAseHy",
+      "kind": "position_roi_card",
+      "chartCreatedAtUTC": null,
+      "chartTimestampMeaning": null,
+      "visibleNumbers": {
+        "reportedEntryPrice": 3879.85,
+        "displayedCurrentPrice": 3776.42,
+        "reportedLeverage": 20,
+        "displayedRoiPercent": 52.71
+      },
+      "approximateReadings": {},
+      "notes": "Separate current-price card and conditional 3650 interest; neither proves a partial exit fill at 3650.",
+      "actualExecutionOrdersVerified": false
+    }
+  ]
+}

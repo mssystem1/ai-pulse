@@ -1,5 +1,7 @@
 import {globalTradeCardLines,globalHistoricalLevelLines} from "./globalTradeDisplay.js";
 import {globalStrategyLines} from "./globalStrategy.js";
+import {globalHorizonContextLines} from "./globalHorizonContext.js";
+import {globalOrderFlowLines} from "./globalOrderFlow.js";
 import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
@@ -226,6 +228,8 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
   return [
     {title:zh?"当前决策":"Current decision",lines:globalDecisionLines(report),featured:true},
     ...(report.strategy?[{title:zh?"交易策略与持有周期":"Strategy and holding horizon",lines:globalStrategyLines(report),featured:true}]:[]),
+    ...(report.horizonContext?[{title:zh?"本周期结构与价值":"Timeframe structure and value",lines:globalHorizonContextLines(report),featured:true}]:[]),
+    ...(report.orderFlow?[{title:zh?"实际成交量与价值区间":"Executed volume and value area",lines:globalOrderFlowLines(report),featured:true}]:[]),
     {title:zh?"下一步条件":"Next condition",lines:d.checklist,featured:true},
     {title:report.decisionVersion==="decision-v5"?(zh?"所选入场证据":"Selected entry evidence"):(zh?"买卖入场证据":"BUY / SELL entry evidence"),lines:d.scenarios.map(s=>s.line)},
     {title:report.decisionVersion==="decision-v5"?(zh?"所选计划 · 入场 / 止损 / 止盈":"Selected setup · Entry / SL / TP"):(zh?"交易计划 · 入场 / 止损 / 止盈":"Trade plans · Entry / SL / TP"),lines:globalNextSetupLines(report),featured:true},
@@ -236,7 +240,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
       ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),
       ...(report.tier === "pro" ? [`${globalLabel("context", lang)}: ${globalTimeframeLabel(report.context.timeframe ?? "—", lang)}${report.context.status === "available" ? "" : ` · ${globalLabel("unavailable", lang)}`}`] : []),
     ] },
-    { title: globalLabel("moves", lang), lines: globalSetupMap(report).paths.filter(p => report.view.pathIds.includes(p.id)).flatMap(p => [globalPathTitle(report, p), ...globalPathLines(report, p).filter(line=>line!==globalHumanText(report,p.thesis)).slice(0,2)]), featured: true },
+    { title: report.discretionaryPlan?(zh?"计划路径":"Setup route"):globalLabel("moves", lang), lines: report.discretionaryPlan?[d.route,d.entryInstruction,d.changeView]:globalSetupMap(report).paths.filter(p => report.view.pathIds.includes(p.id)).flatMap(p => [globalPathTitle(report, p), ...globalPathLines(report, p).filter(line=>line!==globalHumanText(report,p.thesis)).slice(0,2)]), featured: true },
     { title: globalLabel("wave", lang), lines: [report.waveCount.status === "unclear" ? globalLabel("unclear", lang) : `${lang === "zh" ? "候选" : "Candidate"} · ${report.waveCount.structure.replaceAll("_", " ")} · ${globalWavePhase(report).recovered?(lang==="zh"?"C 后恢复假设":"post-C recovery hypothesis"):report.waveCount.activeWave}`, ...globalWaveExplanationLines(report)] },
     ...(report.tier==="pro"?[{title:zh?"斐波那契锚点":"Fibonacci anchors",lines:globalFibonacciDescription(report)}]:[]),
     { title: globalLabel("evidence", lang), lines: globalEvidenceLines(report), featured: true },

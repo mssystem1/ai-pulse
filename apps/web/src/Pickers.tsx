@@ -8,6 +8,7 @@ import { marketPairLabel } from "./marketPreview";
 import type { Lang } from "./i18n";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 import { NetworkLogo } from "./NetworkLogo";
+import {globalSetupStrategyProfile} from "@pulse/domain";
 
 export type SpotInstrument = {
   instId: string;
@@ -349,7 +350,8 @@ export function TimeframePicker({
             <span className="timeframe-code">{item.value}</span>
             <span>
               <strong>{item.label}</strong>
-              <small>{item.note}</small>
+              <small>{purpose==="analysis"?globalSetupStrategyProfile(item.value)?.description??item.note:item.note}</small>
+              {purpose==="analysis"&&globalSetupStrategyProfile(item.value)&&<small>{globalSetupStrategyProfile(item.value)!.objectives} objectives · {globalSetupStrategyProfile(item.value)!.entry} entry study</small>}
             </span>
             <em>{item.value === selected.value ? "✓" : item.horizon}</em>
           </button>
@@ -358,7 +360,7 @@ export function TimeframePicker({
       <footer>
         <i /> {purpose === "strategy"
           ? "Selected timeframe controls the candidate candle and strategy decision cadence."
-          : "Selected timeframe controls candles, indicators and Premium chart overlays."}
+          : "Each timeframe selects its own setup mix, indicators, objectives and entry study."}
       </footer>
     </div>
   ) : null;

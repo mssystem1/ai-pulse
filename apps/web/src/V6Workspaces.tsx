@@ -7679,7 +7679,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
                   and scenario depth.
                 </li>
                 <li data-no-localize>
-                  {lang === "zh" ? "每个周期只有 LONG、SHORT 或 SIDEWAYS 一个判断，并显示一个有依据的计划。横盘只选择一个区间边界反应。阅读 Entry、SL、可用 TP 及条件走势；确认信号并满足收益要求后，再复核交易。现货卖出仅减持已有资产；Autopilot 独立启动。" : "Each timeframe gives one LONG, SHORT or SIDEWAYS assessment and one supported setup. A sideways market selects one range-edge reaction. Read Entry, SL, available TPs and the conditional chart projection. Confirm the signal and reward before reviewing a Spot order. SELL reduces owned inventory; Autopilot starts independently."}
+                  {lang === "zh" ? "阅读市场判断与独立入场条件，再查看Entry、SL和可用目标。是否交易由您决定；签名前须检查当前报价与保护。" : "Read the assessment and separate entry conditions, then inspect Entry, SL and available targets on the chart. You decide whether to trade. Review the current quote, size and protection before signing."}
                 </li>
               </ol>
               <div className="docs-callout">
@@ -7694,7 +7694,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
               <div className="docs-callout">
                 <b>How to read a setup</b>
                 <span data-no-localize>
-                  {lang === "zh" ? "先按结构、均线趋势和 RSI 动能选择策略，再判断入场。Entry 是计划或已观察区间；SL 保护入场结构。TP 只使用仍有效的确认支撑阻力，缺少后续目标时不编造。虚线走势时间仅为示意。旧快照可免费复核为单一计划与有效目标；SHORT 研究不建立杠杆仓位。" : "Structure, moving-average trend and RSI momentum select the strategy before entry qualification. Entry is planned or observed; SL protects entry structure. TPs use active confirmed support/resistance, with fewer targets when evidence ends. The dashed projected move has schematic timing. Older snapshots offer a free setup and target review. SHORT research does not open leverage."}
+                  {lang === "zh" ? "新的Pro报告显示EMA趋势带、可用VWAP及偏差带与区间参考。结构视图提供更广的指标。条件入场不预测必然回落；TP、SL随资产和周期变化。" : "New Pro reports show a focused EMA ribbon, available anchored VWAP with bands and evidenced range references. Structure view opens wider studies. A conditional entry does not predict a required pullback; targets and protection depend on the asset and timeframe. The saved plan is shared by the chart and export."}
                 </span>
               </div>
               <div className="docs-callout">
