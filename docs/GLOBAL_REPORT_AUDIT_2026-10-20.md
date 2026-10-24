@@ -2,6 +2,8 @@
 
 ## Current report behavior — 24 October 2026
 
+The [deployment follow-up audit](GLOBAL_REPORT_DEPLOYED_AUDIT_2026-10-24.md) records the later attached reports and supersedes the v2 target-freshness and viewport behavior described below. Current corrections preserve zoom under polling, exclude already-reached objectives, require a new post-snapshot test and update reviewed prose consistently. Original snapshots remain unchanged.
+
 The user clarified the active scope: [apply XO's documented methods to current markets](GLOBAL_XO_CURRENT_MARKET_SCOPE.md), generating fresh setups across supported assets and all five horizons. Strategy backtests and win-rate optimization remain stopped. The [original setup and management review](xo-published-setups/index.html) preserves eighteen publication versions, seventeen canonical posts and forty-four original image references as evidence for those methods. Generated PULSE setups use documented implementation assumptions; they are separate from XO's published trades or personal performance.
 
 This document retains the original October 20 audit below. Its earlier signal-only display policy and release-version instructions are historical. The existing PULSE chart workflow is described in the [Global chart guide](GLOBAL_REPORT_CHART_GUIDE.md) and README. The timeframe table below describes the current PULSE calculations; it does not establish XO's undisclosed indicator settings or a universal strategy for each interval.

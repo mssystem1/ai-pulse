@@ -346,7 +346,7 @@ export function finishGlobalReport(prepared: GlobalReport, narrative: GlobalNarr
   const missing = report.candles.length < 55 ? report.lang === "zh" ? "完整 K 线不足，SMA55 和波浪结构可能不可用。" : "Insufficient completed history for SMA55 or a defensible wave count." : "";
   const contextMissing = report.tier === "pro" && report.context.status !== "available" ? report.lang === "zh" ? "未取得同一标的、同一报价货币的独立高周期背景。" : "Independent context for this instrument and quote currency is unavailable." : "";
   const decision=globalDecision(report),unsafe=(line:string)=>/\b(?:no_trade|technical_valid|tradePlan|setup\.state|mainPathId|eligibility)\b|\b(?:buy|sell|enter) (?:now|immediately)\b|\bgo (?:long|short)\b/i.test(line);
-  const clean=(lines:string[])=>lines.filter(line=>!unsafe(line)&&!(/\bdecision is frozen\b|\bsetup selection\b/i.test(line)));
+  const clean=(lines:string[])=>lines.filter(line=>!unsafe(line)&&!(/\bdecision is frozen\b|\bsetup selection\b/i.test(line))).map(line=>line.replace(/\bfrozen\s+/gi,"").replace(/\s*\(?\b(?:structure-v\d+|discretionary-plan-v\d+|single-setup-v\d+)\b\)?/gi,"").trim());
   report.narrative = { headline:`${report.snapshot.instId} · ${report.snapshot.timeframe} · ${decision.heading}`, summary:`${decision.entryInstruction} ${decision.route}`,
     reasons:clean(narrative.reasons).slice(0,report.tier==="pro"?4:2),riskNotes:clean(narrative.riskNotes), limitations: [...new Set([...clean(narrative.limitations), missing, contextMissing].filter(Boolean))], disclaimer: narrative.disclaimer };
   return GlobalReportSchema.parse(report);

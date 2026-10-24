@@ -69,9 +69,15 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
 export function reviewGlobalTargetReport(saved:GlobalReport):GlobalReport {
   if(saved.decisionVersion!=="decision-v5")return saved;
   if(saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v4"){
-    if(saved.horizonContext&&(saved.discretionaryPlan?.version==="discretionary-plan-v2"||saved.tradePlan?.state==="confirmed"))return saved;
+    if(saved.horizonContext&&(saved.discretionaryPlan?.version==="discretionary-plan-v3"||saved.tradePlan?.state==="confirmed"))return saved;
     const report=structuredClone(saved);restoreGlobalSetupStudies(report);applyGlobalDiscretionaryPlan(report);
     if(report.discretionaryPlan||report.horizonContext)report.targetReviewOf=globalArtifactReference(saved);
+    if(report.discretionaryPlan){
+      const d=globalDecision(report),zh=report.lang==="zh";
+      // Old AI prose may name a target that this correction has removed.
+      // Keep it in the original; this review explains its computed prices.
+      report.narrative={headline:`${report.snapshot.instId} · ${d.heading}`,summary:`${d.entryInstruction} ${d.route}`,reasons:[],riskNotes:[],limitations:[zh?"使用原始保存K线免费复核计划及目标，未生成新的AI分析；早先叙述保留在原报告。":"Free setup and target review from the original saved candles; no new AI analysis. Earlier narrative remains in the original report."],disclaimer:saved.narrative.disclaimer};
+    }
     return GlobalReportSchema.parse(report);
   }
   const report=rebuildSavedGlobalCandidates(saved),sourceRef=globalArtifactReference(saved);

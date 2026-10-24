@@ -15,7 +15,7 @@ export function globalHorizonContextLines(report:GlobalReport){
   const value=report.indicators.vwap?.points.at(-1)?.value,close=report.snapshot.price;
   const valueLine=value!==undefined&&close!==null?(zh?`主周期收盘 ${price(close)} ${close>=value?"高于":"低于"}锚定价值 ${price(value)}。`:`Primary close ${price(close)} is ${close>=value?"above":"below"} anchored value ${price(value)}.`):"";
   return [`${names[h.reading]} · ${h.timeframe.replace(/utc$/," (UTC)")}`,
-    ...h.ranges.map(r=>`${ranges[r.kind]}: ${price(r.lower)}–${price(r.upper)} · ${new Date(r.startTs).toISOString().slice(0,10)}`),
+    ...h.ranges.map(r=>`${r.kind==="session"&&h.reading==="intraday"?(zh?"本周范围":"Week range"):ranges[r.kind]}: ${price(r.lower)}–${price(r.upper)} · ${new Date(r.startTs).toISOString().slice(0,10)}`),
     ...zoneLines,valueLine,globalVwapContextLine(report)].filter(Boolean);
 }
 

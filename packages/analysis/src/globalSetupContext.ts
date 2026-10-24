@@ -20,7 +20,8 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   const upper=band(2,"upper"),lower=band(2,"lower");
   const upperReject=upper!==undefined&&lower!==undefined&&upper>lower&&primary.high>=upper&&primary.close<upper;
   const lowerReject=lower!==undefined&&upper!==undefined&&upper>lower&&lower>0&&primary.low<=lower&&primary.close>lower;
-  if(globalSetupStrategyProfile(tf)?.families.some(f=>f==="vwap_reversion")&&balanced&&upperReject!==lowerReject){
+  const first=band(1,upperReject?"upper":"lower"),unplayedValue=first!==undefined&&(upperReject?last.close>first:last.close<first);
+  if(globalSetupStrategyProfile(tf)?.families.some(f=>f==="vwap_reversion")&&balanced&&upperReject!==lowerReject&&unplayedValue){
     return pick(upperReject?"short":"long","vwap_reversion","vwap_band",upperReject?upper!:lower!,tf,primaryClosed);
   }
 

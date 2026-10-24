@@ -12,6 +12,10 @@ Fresh setups apply documented trend, range, reclaim/retest and value-reversion m
 
 Use Setup view, Value context, Structure view, Full history and individual study controls to inspect the saved evidence. Downloaded PNG charts use the same saved series and selected layers. Web, mobile and Telegram preserve the plan's prices. Chart titles identify the market and timeframe without opaque internal reference codes.
 
+Zoom and pan remain in place through parent report refreshes, resizing, language changes, indicator switches and the Setup/Structure study presets within the same snapshot. Drag the chart to pan, scroll or pinch to zoom time, and drag the price axis to adjust price scale. **Reset view** restores the default time window and automatic price scale. **Reset studies** restores indicators without moving the viewport. Axis double-click does not reset the view. **Full history** and **Show measured swing** explicitly fit their requested history. Opening a different snapshot starts its own view. On mobile, use **Inspect candles** for gestures; the overview is a full saved map. PNG export is also a full report map using the selected layers, rather than a screenshot of temporary inspection zoom.
+
+A conditional entry requires a new completed test after the snapshot. Earlier touches and completed moves do not establish that entry. Current targets are checked against both primary candles and newer execution candles, including wick touches. A recent primary extreme can be an objective before pivot confirmation; the displayed basis identifies it as an observed extreme. Nearby execution barriers remain separate from primary-horizon targets. Dates on target anchors describe their origin; they do not replace the report capture time or reference-candle close time. Free technical review corrects a saved snapshot from its retained candles without turning it into a live report.
+
 Read each timeframe for its own market question:
 
 | Chart | Context to inspect |

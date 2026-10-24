@@ -51,7 +51,8 @@ test("daily range protection uses the daily low and daily volatility; 4H barrier
   assert.equal(p.family,"breakout_retest");assert.equal(p.entry,82291.1);
   assert.equal(p.stopBasis.price,79775.1);assert.ok(Math.abs(p.stop-(79775.1-atr*.2))<1e-6);
   assert.ok(p.stop<79775.1);assert.ok(Math.abs(p.entry-p.stop)>atr);
-  assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);assert.ok(p.barriers.some(t=>t.price===83168.2&&t.timeframe==="4H"));
+  assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);assert.ok(p.barriers.some(t=>t.price===83439.9&&t.timeframe==="4H"));
+  assert.ok(!p.barriers.some(t=>t.price===83168.2),"The earlier 4H level was already reached by the newer wick");
   assert.ok(globalTradeCards(report)[0].rr!<1.5,"A priced setup is not hidden by the legacy reward gate");
   const changed=structuredClone(report);changed.discretionaryPlan!.targets[0].price+=1;
   assert.notEqual(globalArtifactReference(changed),globalArtifactReference(report));
@@ -84,7 +85,7 @@ test("a displayed daily setup rejects lower-frame protection and future barrier 
 test("VWAP rejection uses primary-frame band entry, outer-band protection and first-band/center exits",()=>{
   const report=make("1Dutc"),primary=report.candles.at(-1)!,vwap=report.indicators.vwap!,two=vwap.bands!.find(b=>b.multiple===2)!.upper.at(-1)!.value;
   const three=vwap.bands!.find(b=>b.multiple===3)!.upper.at(-1)!.value,one=vwap.bands!.find(b=>b.multiple===1)!.upper.at(-1)!.value;
-  primary.high=two+100;primary.close=two-100;report.snapshot.price=primary.close;
+  primary.high=two+100;primary.close=two-100;report.snapshot.price=primary.close;report.entryStudy!.candles.at(-1)!.close=two-100;
   applyGlobalDiscretionaryPlan(report);const p=report.discretionaryPlan!;
   assert.equal(p.family,"vwap_reversion");assert.equal(p.side,"short");assert.equal(p.entry,two);assert.ok(p.stop>three);
   assert.deepEqual(p.targets.map(t=>[t.price,t.timeframe,t.basis]),[[one,"1Dutc","vwap_band"],[vwap.points.at(-1)!.value,"1Dutc","vwap_band"]]);
@@ -150,18 +151,19 @@ test("an obsolete crossed level cannot override the latest local structural sequ
   assert.notEqual(p.entry,82800);assert.ok(p.targets.every(t=>t.price<=report.range!.upper[1]));
 });
 
-test("old conditional plans receive an explicit v2 review without changing saved source data",()=>{
+test("old conditional plans receive an explicit current review without changing saved source data",()=>{
   const original=make("1Dutc");original.discretionaryPlan!.version="discretionary-plan-v1";
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v2");assert.equal(review.discretionaryPlan!.entry,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v3");assert.equal(review.discretionaryPlan!.entry,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 
 test("conditional barriers retain both primary and entry evidence, rejecting foreign frames",()=>{
-  const report=balanced(),study=report.entryStudy!,bar=report.candles.at(-1)!,price=bar.high;
-  const entryAnchor=make("1Dutc").entryStudy!.pivots.find(a=>a.price===83168.2)!;
+  const report=balanced(),study=report.entryStudy!,bar=report.candles.at(-1)!,mid=(report.range!.lower[1]+report.range!.upper[0])/2,price=mid-50;
+  bar.high=price;const lastEntry=study.candles.at(-1)!;lastEntry.high=mid-100;
+  const entryAnchor={id:"entry-barrier",kind:"high" as const,price:lastEntry.high,ts:lastEntry.ts,confirmedAt:lastEntry.ts};
   report.indicators.pivots=[{id:"primary-barrier",kind:"high",price,ts:bar.ts,confirmedAt:bar.ts}];
   study.pivots=[entryAnchor];
   applyGlobalDiscretionaryPlan(report);
@@ -171,7 +173,7 @@ test("conditional barriers retain both primary and entry evidence, rejecting for
   assert.equal(GlobalReportSchema.safeParse(wrong).success,false);
 });
 
-test("v2 range geometry is validated against its source rather than accepted as arbitrary targets",()=>{
+test("current range geometry is validated against its source rather than accepted as arbitrary targets",()=>{
   const report=make("1Dutc");report.entryStudy!.pivots=[];report.indicators.vwap=null;applyGlobalDiscretionaryPlan(report);
   assert.equal(report.discretionaryPlan!.family,"range_rotation");assert.equal(GlobalReportSchema.safeParse(report).success,true);
   report.discretionaryPlan!.targets[0].price+=10;assert.equal(GlobalReportSchema.safeParse(report).success,false);

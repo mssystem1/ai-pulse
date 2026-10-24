@@ -1,5 +1,5 @@
 import { z } from "zod";
-import {candleCloseTime} from "./candleTimeframe.js";
+import {candleCloseTime,candleLevelTouchedAfter} from "./candleTimeframe.js";
 import {GlobalOrderFlowSchema} from "./globalOrderFlow.js";
 
 const price = z.number().finite().positive();
@@ -87,7 +87,7 @@ export const GlobalHorizonContextSchema=z.object({
 /** A priced scenario for the trader's decision, separate from observed signal
  * and order authorization. Every price retains its saved candle provenance. */
 export const GlobalDiscretionaryPlanSchema=z.object({
-  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2"]),side:z.enum(["long","short"]),
+  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3"]),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
   family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest"]),objectiveTimeframe:z.string(),
   entry:price,stop:price,
   entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band"]),timeframe:z.string(),knownAt:time,price}),
@@ -138,7 +138,7 @@ export const GlobalReportSchema = z.object({
     if(sign*(discretionary.entry-discretionary.stop)<=0||discretionary.targets.some((t,i)=>sign*(t.price-discretionary.entry)<=0||i>0&&sign*(t.price-discretionary.targets[i-1].price)<=0||t.knownAt>Date.parse(report.snapshot.observedAt))||discretionary.stopBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan requires ordered protection, targets and available evidence"});
     if(discretionary.objectiveTimeframe!==report.snapshot.timeframe||discretionary.stopBasis.timeframe!==report.snapshot.timeframe||discretionary.targets.some(t=>t.timeframe!==report.snapshot.timeframe)||sign*(discretionary.stopBasis.price-discretionary.stop)<=0)ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional protection and objectives must retain the primary horizon and protect beyond invalidation"});
     if(discretionary.stopBasis.anchorTs>discretionary.stopBasis.knownAt||discretionary.targets.some(t=>t.anchorTs>t.knownAt)||discretionary.barriers.some(b=>b.anchorTs>b.knownAt||b.knownAt>Date.parse(report.snapshot.observedAt)||b.timeframe!==report.entryStudy?.timeframe&&b.timeframe!==report.snapshot.timeframe||sign*(b.price-discretionary.entry)<=0||sign*(discretionary.targets[0].price-b.price)<=0))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional levels must retain available source times and intermediate-barrier ordering"});
-    if(discretionary.version==="discretionary-plan-v2"){
+    if(discretionary.version!=="discretionary-plan-v1"){
       const range=report.range,near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
       if(discretionary.targets.some(t=>{
         if(!["range_midpoint","range_quartile","range_boundary"].includes(t.basis))return false;
@@ -147,6 +147,10 @@ export const GlobalReportSchema = z.object({
         const expected=t.basis==="range_boundary"?(discretionary.side==="long"?high:low):low+(high-low)*fraction;
         return !near(t.price,expected)||t.anchorTs!==range.startTs;
       }))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional range objectives must match the saved geometric range"});
+    }
+    if(discretionary.version==="discretionary-plan-v3"){
+      const cutoff=Date.parse(report.snapshot.observedAt),sources=[{candles:report.candles,timeframe:report.snapshot.timeframe},...(report.entryStudy?.source===report.snapshot.source?[report.entryStudy]:[])];
+      if(discretionary.requiresNewTestAfter!==cutoff||discretionary.targets.some(t=>sign*(t.price-r.price)<=0||["confirmed_swing","observed_extreme"].includes(t.basis)&&sources.some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,t.price,discretionary.side,t.knownAt,cutoff))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"A fresh conditional setup requires a new test after its snapshot and objectives not already reached by completed execution candles"});
     }
   }
   if(report.decisionVersion){

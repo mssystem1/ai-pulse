@@ -35,3 +35,8 @@ export function candleCloseTime(ts: number, value: string): number | null {
   return Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + frame.count,
     date.getUTCDate(), date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds(), date.getUTCMilliseconds()) - offset;
 }
+/** Whether a completed candle reached a known static level. Wicks count;
+ * unfinished candles and observations before the level was known do not. */
+export function candleLevelTouchedAfter(candles:ReadonlyArray<{ts:number;high:number;low:number}>,timeframe:string,price:number,side:"long"|"short",knownAt:number,cutoff:number):boolean{
+  return candles.some(c=>{const closed=candleCloseTime(c.ts,timeframe);return c.ts>=knownAt&&closed!==null&&closed<=cutoff&&(side==="long"?c.high>=price:c.low<=price);});
+}

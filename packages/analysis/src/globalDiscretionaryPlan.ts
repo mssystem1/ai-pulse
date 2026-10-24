@@ -1,4 +1,4 @@
-import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
+import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
 
 /** A complete conditional scenario when an observed signal is not established.
@@ -14,6 +14,8 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
   const completedAt=candleCloseTime(last.ts,timeframe),cutoff=Date.parse(report.snapshot.observedAt);
   const primaryClosed=candleCloseTime(primaryLast.ts,primaryTimeframe);
   if(completedAt===null||completedAt>cutoff||primaryClosed===null||primaryClosed>cutoff)return;
+  const lower=report.entryStudy?.source===report.snapshot.source?report.entryStudy:null,lowerLast=lower?.candles.at(-1),lowerClosed=lowerLast?candleCloseTime(lowerLast.ts,lower!.timeframe):null;
+  const reference=lowerLast&&lowerClosed!==null&&lowerClosed>=completedAt&&lowerClosed<=cutoff?{timeframe:lower!.timeframe,candleTs:lowerLast.ts,completedAt:lowerClosed,price:lowerLast.close}:{timeframe,candleTs:last.ts,completedAt,price:last.close};
   let entry=last.close;
   const atr=(study?.atr??report.indicators.atr.points).at(-1)?.value??Math.max(last.high-last.low,entry*.001),tick=10**-report.snapshot.pricePrecision;
   const round=(p:number)=>Number(p.toPrecision(12));
@@ -34,36 +36,44 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
   let stop=round(side==="long"?Math.max(tick,Math.min(entry-primaryAtr*.5,stopBasis.price-primaryAtr*.2)):Math.max(entry+primaryAtr*.5,stopBasis.price+primaryAtr*.2));
   if(family==="vwap_reversion"){const outer=band(3,side==="long"?"lower":"upper");if(outer!==undefined&&outer>tick){stop=round(side==="long"?Math.max(tick,Math.min(outer,primaryLast.low)-primaryAtr*.2):Math.max(outer,primaryLast.high)+primaryAtr*.2);stopBasis={price:outer,timeframe:primaryTimeframe,anchorTs:vwap?.anchorTs??report.candles[0].ts,knownAt:primaryClosed};}}
   if(!(stop>0)||sign*(entry-stop)<=0)return;
-  const candidates=known.filter(a=>a.timeframe===report.snapshot.timeframe&&a.kind===(side==="long"?"high":"low")&&sign*(a.price-entry)>tick).sort((a,b)=>sign*(a.price-b.price));
+  const targetSources=[...sources,...(!study&&lower?[{bars:lower.candles,timeframe:lower.timeframe}]:[])];
+  const forward=(price:number)=>sign*(price-entry)>tick&&sign*(price-reference.price)>tick;
+  const unplayed=(price:number,knownAt:number)=>!targetSources.some(source=>candleLevelTouchedAfter(source.bars,source.timeframe,price,side,knownAt,cutoff));
+  const horizonStart=report.candles.at(-Math.min(report.strategy.lookbackBars,report.candles.length))!.ts;
+  const candidates:NonNullable<GlobalReport["discretionaryPlan"]>["targets"]=known.filter(a=>a.timeframe===primaryTimeframe&&a.anchorTs>=horizonStart&&a.kind===(side==="long"?"high":"low")&&forward(a.price)&&unplayed(a.price,a.knownAt)).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,basis:a.basis}));
+  // The latest primary swing extreme is a nearer objective even before a
+  // multi-candle pivot confirms it. Keep its observed, unconfirmed basis.
+  const objective=report.candles.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));
+  const observedPrice=side==="long"?objective.high:objective.low,observedAt=candleCloseTime(objective.ts,primaryTimeframe)!;
+  if(forward(observedPrice)&&unplayed(observedPrice,observedAt)&&!candidates.some(a=>a.price===observedPrice))candidates.push({price:observedPrice,timeframe:primaryTimeframe,anchorTs:objective.ts,knownAt:observedAt,basis:"observed_extreme"});
+  candidates.sort((a,b)=>sign*(a.price-b.price));
   const targets:NonNullable<GlobalReport["discretionaryPlan"]>["targets"]=[];
   if(family==="range_rotation"&&report.range){
     const low=report.range.lower[1],high=report.range.upper[0],span=high-low;
     for(const [price,basis] of [[low+span*.5,"range_midpoint"],[low+span*(side==="long"?.75:.25),"range_quartile"],[side==="long"?high:low,"range_boundary"]] as const){
-      if(sign*(price-entry)>tick&&(!targets.length||Math.abs(price-targets.at(-1)!.price)>tick))targets.push({price,timeframe:primaryTimeframe,anchorTs:report.range.startTs,knownAt:primaryClosed,basis});
+      if(forward(price)&&(!targets.length||Math.abs(price-targets.at(-1)!.price)>tick))targets.push({price,timeframe:primaryTimeframe,anchorTs:report.range.startTs,knownAt:primaryClosed,basis});
     }
   }
   if(family==="vwap_reversion"&&vwap){
-    for(const [price,multiple] of [[band(1,side==="long"?"lower":"upper"),side==="long"?-1:1],[vwap.points.at(-1)?.value,0]] as const)if(price!==undefined&&sign*(price-entry)>tick)targets.push({price,timeframe:primaryTimeframe,anchorTs:vwap.anchorTs??report.candles[0].ts,knownAt:primaryClosed,basis:"vwap_band",bandMultiple:multiple});
+    for(const [price,multiple] of [[band(1,side==="long"?"lower":"upper"),side==="long"?-1:1],[vwap.points.at(-1)?.value,0]] as const)if(price!==undefined&&forward(price))targets.push({price,timeframe:primaryTimeframe,anchorTs:vwap.anchorTs??report.candles[0].ts,knownAt:primaryClosed,basis:"vwap_band",bandMultiple:multiple});
   }
   for(const a of candidates)if(!targets.length||Math.abs(a.price-targets.at(-1)!.price)>Math.max(tick,primaryAtr*.3)){
     if(family==="vwap_reversion"||family==="range_rotation"&&targets.length)break;
-    targets.push({price:a.price,anchorTs:a.anchorTs,knownAt:a.knownAt,timeframe:a.timeframe,basis:a.basis});if(targets.length===3)break;
-  }
-  if(!targets.length){
-    const objective=report.candles.slice(-20).filter(c=>sign*((side==="long"?c.high:c.low)-entry)>tick).sort((a,b)=>sign*((side==="long"?a.high:a.low)-(side==="long"?b.high:b.low)))[0];
-    if(objective)targets.push({price:side==="long"?objective.high:objective.low,anchorTs:objective.ts,knownAt:candleCloseTime(objective.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"observed_extreme"});
+    targets.push(a);if(targets.length===3)break;
   }
   // A range objective remains within its established opposite edge. Nearby
   // entry-frame obstacles are retained separately, never silently skipped.
   if(report.range&&entry>=report.range.lower[0]&&entry<=report.range.upper[1]&&!rangeBreak){const boundary=side==="long"?report.range.upper[0]:report.range.lower[1];
     for(let i=targets.length-1;i>=0;i--)if(sign*(targets[i].price-boundary)>tick)targets.splice(i,1);
-    if(!targets.length&&sign*(boundary-entry)>tick)targets.push({price:boundary,timeframe:report.snapshot.timeframe,anchorTs:report.range.startTs,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,basis:"range_boundary"});
+    if(!targets.length&&forward(boundary))targets.push({price:boundary,timeframe:report.snapshot.timeframe,anchorTs:report.range.startTs,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,basis:"range_boundary"});
   }
   if(!targets.length){
-    const measured=Math.max(primaryAtr,Math.max(...report.candles.slice(-20).map(c=>c.high))-Math.min(...report.candles.slice(-20).map(c=>c.low))),price=round(entry+sign*measured);
+    const measured=Math.max(primaryAtr,Math.max(...report.candles.slice(-20).map(c=>c.high))-Math.min(...report.candles.slice(-20).map(c=>c.low))),price=round((sign*(reference.price-entry)>0?reference.price:entry)+sign*measured);
     if(price>0)targets.push({price,anchorTs:report.candles.at(-Math.min(20,report.candles.length))!.ts,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"measured_projection"});
   }
   if(!targets.length)return;
-  const barriers=known.filter(a=>a.kind===(side==="long"?"high":"low")&&sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
-  report.discretionaryPlan={family,entryBasis,objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v2",side,entry,stop,reference:{timeframe,candleTs:last.ts,completedAt,price:last.close},stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
+  const barrierCandidates=known.map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,kind:a.kind}));
+  if(study){const extreme=bars.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));barrierCandidates.push({price:side==="long"?extreme.high:extreme.low,timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,timeframe)!,kind:side==="long"?"high":"low"});}
+  const barriers=barrierCandidates.filter(a=>a.kind===(side==="long"?"high":"low")&&forward(a.price)&&unplayed(a.price,a.knownAt)&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).filter((a,i,all)=>all.findIndex(b=>b.price===a.price&&b.timeframe===a.timeframe)===i).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
+  report.discretionaryPlan={family,entryBasis,objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v3",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
 }
