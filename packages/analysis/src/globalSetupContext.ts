@@ -1,15 +1,17 @@
-import {candleCloseTime,type GlobalCandle,type GlobalReport} from "@pulse/schemas";
+import {candleCloseTime,parseCandleTimeframe,type GlobalCandle,type GlobalReport} from "@pulse/schemas";
 import {globalSetupStrategyProfile} from "@pulse/domain";
 
 type PricedPlan=NonNullable<GlobalReport["discretionaryPlan"]>;
-type Choice=Pick<PricedPlan,"side"|"family"|"entryBasis">;
+type Choice=Pick<PricedPlan,"side"|"family"|"entryBasis"|"evidence">;
 
 /** Select a current conditional setup from location and retained structure.
  * These numerical conventions implement public methods, not private XO rules. */
 export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalCandle[];timeframe:string;completedAt:number;primaryClosed:number;primaryAtr:number;cutoff:number}):Choice{
   const {bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff}=input;
   const last=bars.at(-1)!,primary=report.candles.at(-1)!,tf=report.snapshot.timeframe;
+  const latest=[{timeframe,candles:bars},...(report.currentMarket?.frames??[])].flatMap(f=>{const c=f.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,f.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]!.price;
   const assessment=report.setupSelection?.assessment,regime=report.setupSelection?.regime;
+  const macro=["week","month"].includes(parseCandleTimeframe(tf)?.unit??"");
   const fast=report.indicators.ema?.find(e=>e.period===12)?.points.at(-1)?.value;
   const slow=report.indicators.ema?.find(e=>e.period===25)?.points.at(-1)?.value;
   const range=report.range;
@@ -39,21 +41,54 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
     const knownAt=anchor.confirmedAt===null?null:candleCloseTime(anchor.confirmedAt,timeframe);
     if(knownAt===null||knownAt>cutoff||Math.abs(last.close-anchor.price)>primaryAtr)return [];
     const side:Choice["side"]=anchor.kind==="high"?"long":"short",sign=side==="long"?1:-1;
-    if(sign*(last.close-anchor.price)<0)return [];
+    if(sign*(last.close-anchor.price)<=0||sign*(latest-anchor.price)<=0)return [];
     // An interior range rotation respects its location. A tiny local break
     // beside the opposite edge does not turn that edge into trend support.
     if(range&&regime==="range"&&rangeMid!==undefined&&(side==="long"?anchor.price>rangeMid:anchor.price<rangeMid))return [];
-    if(regime!=="range"&&(assessment==="long"||assessment==="short")&&side!==assessment)return [];
+    // An opposing reclaim needs the newest local swing after the last opposite
+    // extreme. A slow trend assessment cannot veto that actual recovery.
+    if(regime!=="range"&&(assessment==="long"||assessment==="short")&&side!==assessment){
+      if(macro)return [];
+      const opposite=availablePivots.filter(a=>a.kind!==anchor.kind).at(-1);
+      if(!opposite||anchor.ts<=opposite.ts)return [];
+    }
     return bars.flatMap((bar,index)=>{
       if(index<bars.length-6)return [];
       const previous=bars[index-1];
       if(!previous||knownAt>bar.ts||sign*(previous.close-anchor.price)>0||sign*(bar.close-anchor.price)<=0)return [];
       if(bars.slice(index+1).some(later=>sign*(later.close-anchor.price)<0))return [];
-      return [{side,price:anchor.price,knownAt,at:bar.ts}];
+      return [{side,price:anchor.price,knownAt,at:bar.ts,extreme:side==="long"?Math.min(...bars.slice(index).map(c=>c.low)):Math.max(...bars.slice(index).map(c=>c.high))}];
     });
   }).sort((a,b)=>b.at-a.at||Math.abs(last.close-a.price)-Math.abs(last.close-b.price));
   const cross=crosses[0];
-  if(cross)return pick(cross.side,"breakout_retest","reclaimed_level",cross.price,timeframe,cross.knownAt);
+  const localChoice=cross?{...pick(cross.side,"breakout_retest","reclaimed_level",cross.price,timeframe,cross.knownAt),evidence:{kind:"local_reclaim" as const,timeframe,level:cross.price,testTs:cross.at,completedAt:candleCloseTime(cross.at,timeframe)!,extreme:cross.extreme}}:undefined;
+
+  // A sweep/reclaim of a known primary level is a different opportunity from
+  // continuing the older trend. Daily/weekly reports retain the newer hourly
+  // recovery separately; it never becomes an invented completed daily candle.
+  const recentSource=[{timeframe,candles:bars},...(report.currentMarket?.frames.filter(f=>f.timeframe==="1H")??[])].sort((a,b)=>(candleCloseTime(b.candles.at(-1)!.ts,b.timeframe)??0)-(candleCloseTime(a.candles.at(-1)!.ts,a.timeframe)??0))[0];
+  const current=recentSource.candles.at(-1)!,horizonStart=report.candles.at(-Math.min(report.strategy?.lookbackBars??120,report.candles.length))!.ts;
+  const reclaims=report.indicators.pivots.filter(a=>a.ts>=horizonStart&&a.confirmedAt!==null).flatMap(anchor=>{
+    if(macro||regime==="range"||assessment==="sideways")return [];
+    const knownAt=candleCloseTime(anchor.confirmedAt!,tf);if(knownAt===null||knownAt>cutoff)return [];
+    const side:Choice["side"]=anchor.kind==="low"?"long":"short",sign=side==="long"?1:-1;
+    if(side===assessment)return [];
+    if(sign*(current.close-anchor.price)<=0||sign*(latest-anchor.price)<=0||Math.abs(current.close-anchor.price)>primaryAtr)return [];
+    const recent=recentSource.candles.slice(-6);
+    let tested=-1;recent.forEach((c,i)=>{if(c.ts>=knownAt&&(side==="long"?c.low<anchor.price:c.high>anchor.price))tested=i;});
+    if(tested<0)return [];
+    const recovery=recent.findIndex((c,i)=>i>=tested&&sign*(c.close-anchor.price)>0);
+    if(recovery<0||recent.slice(recovery+1).some(c=>sign*(c.close-anchor.price)<0))return [];
+    // A same-bar wick alone cannot oppose the trend: retain a later completed
+    // hold, or a subsequent close through the rejection bar's directional edge.
+    const recoveredAt=candleCloseTime(recent[recovery].ts,recentSource.timeframe)!;
+    const later=(report.currentMarket?.frames??[]).flatMap(f=>f.candles.filter(c=>c.ts>=recoveredAt));
+    if(recovery===recent.length-1&&assessment!==side&&(!later.length||later.some(c=>sign*(c.close-anchor.price)<0)))return [];
+    return [{side,price:anchor.price,knownAt,test:recent[tested],completedAt:candleCloseTime(recent[recovery].ts,recentSource.timeframe)!,extreme:side==="long"?Math.min(...recent.slice(tested,recovery+1).map(c=>c.low)):Math.max(...recent.slice(tested,recovery+1).map(c=>c.high))}];
+  }).sort((a,b)=>b.completedAt-a.completedAt||Math.abs(current.close-a.price)-Math.abs(current.close-b.price));
+  const reclaim=reclaims[0];
+  if(reclaim&&(!localChoice||reclaim.completedAt>localChoice.evidence.completedAt))return {...pick(reclaim.side,"breakout_retest","reclaimed_level",reclaim.price,tf,reclaim.knownAt),evidence:{kind:"primary_reclaim",timeframe:recentSource.timeframe,level:reclaim.price,testTs:reclaim.test.ts,completedAt:reclaim.completedAt,extreme:reclaim.extreme}};
+  if(localChoice)return localChoice;
 
   if(range&&rangeMid!==undefined){
     const side=regime!=="range"&&(assessment==="long"||assessment==="short")?assessment:last.close<=rangeMid?"long":"short";

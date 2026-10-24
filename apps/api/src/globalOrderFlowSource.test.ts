@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {summarizeCandles,type SpotMarketContext,type MarketTradeCapture,type Candle} from "@pulse/market";
 import {createGlobalOrderFlowSource,loadGlobalReportMarketSet} from "./globalOrderFlowSource.js";
 
-const DAY=86_400_000,start=Math.floor(Date.now()/DAY)*DAY-3*DAY,end=start+DAY;
+const DAY=86_400_000,start=Math.floor(Date.now()/DAY)*DAY-DAY,end=start+DAY;
 function fixture(){
   const now=Date.now(),events:string[]=[],candle:Candle={ts:start,open:69,high:70,low:69,close:70,volume:3,volumeCcy:209,confirmed:true},capture:MarketTradeCapture={source:'okx-public-spot',instId:'HYPE-USDT',priceCurrency:'USDT',marketType:'spot',quantityUnit:'base',capturedAt:new Date(now-2000).toISOString(),coverage:{start,end,knownAt:now-2000,complete:true,sha256:['a'.repeat(64)]},trades:[{id:'1',ts:start+1,price:69,size:1,side:'buy'},{id:'2',ts:end-1,price:70,size:2,side:'sell'}]};
   const feed=createGlobalOrderFlowSource({client:{captureRecentUtcDay:async instId=>{events.push('capture');assert.equal(instId,'HYPE-USDT');return {capture,archives:[]}}},history:async(instId,frame,limit,after)=>{events.push('daily-reference');assert.equal(instId,'HYPE-USDT');assert.equal(frame,'1Dutc');assert.equal(limit,1);assert.equal(after,end);return [candle]}});

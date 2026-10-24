@@ -12,7 +12,8 @@ const fixture=JSON.parse(fs.readFileSync('packages/analysis/src/globalReport.oct
 const args=process.argv.slice(2),currentIndex=args.indexOf('--current-dir'),currentDir=currentIndex<0?null:args[currentIndex+1],flowFile=args[0]&&!args[0].startsWith('--')?args[0]:null;
 if(currentIndex>=0&&!currentDir)throw Error('--current-dir requires a captured source directory');
 const cutoffs={'15m':fixture.observedAt,'1H':'2026-10-20T17:42:42.267Z','4H':'2026-10-20T17:40:51.719Z','1Dutc':'2026-10-20T17:38:13.365Z','1Wutc':'2026-10-20T17:44:09.991Z'};
-const out=path.resolve(currentDir?'.tmp/global-current-market-browser':'.tmp/global-setup-context-browser');fs.mkdirSync(out,{recursive:true});
+const outputIndex=args.indexOf('--output-dir');
+const out=path.resolve(outputIndex>=0?args[outputIndex+1]:currentDir?'.tmp/global-current-market-browser':'.tmp/global-setup-context-browser');assert.ok(out.startsWith(process.cwd()+path.sep));fs.mkdirSync(out,{recursive:true});
 const origin='http://127.0.0.1:5268',dist=path.resolve('apps/web/dist');
 const types={'.js':'application/javascript','.css':'text/css','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.wasm':'application/wasm','.html':'text/html'};
 const server=http.createServer((request,response)=>{
@@ -67,7 +68,8 @@ try{
     const r=prepareGlobalReport({market:markets.find(m=>m.bar===frame),contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:'premium',lang});r.snapshot.venue='Synthetic test fixture';reports.push(r);
   }
   if(flowFile){const report=JSON.parse(fs.readFileSync(flowFile,'utf8'));assert.ok(report.orderFlow);for(const lang of ['en','zh'])reports.push({...report,lang});}
-  for(const report of reports){
+  const frameFilter=args.find(a=>a.startsWith('--frames='))?.slice('--frames='.length).split(',');
+  for(const report of reports.filter(r=>!frameFilter||frameFilter.includes(r.snapshot.timeframe))){
     currentReport=report;
     const frame=report.snapshot.timeframe,tier=report.tier==='pro'?'premium':'base',lang=report.lang,shotFrame=(report.snapshot.instId==='BTC-USDT'?'':report.snapshot.instId+'-')+frame;
     const card=globalTradeCards(currentReport)[0],decision=globalDecision(currentReport);

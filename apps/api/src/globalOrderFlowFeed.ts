@@ -11,7 +11,7 @@ const near=(a:number,b:number)=>Number.isFinite(b)&&Math.abs(a-b)<=Math.max(1e-9
 /** Assemble the optional source feed before fetching a new report's candles.
  * attach() never changes an existing market's observation time or prices. */
 export function createGlobalOrderFlowFeed(options:Options){
-  const now=options.now??Date.now,cacheMs=options.cacheMs??3_600_000,maxAge=options.maxProfileAgeMs??4*DAY,maxEntries=options.maxEntries??12,maxPending=options.maxPending??12;
+  const now=options.now??Date.now,cacheMs=options.cacheMs??3_600_000,maxAge=options.maxProfileAgeMs??DAY,maxEntries=options.maxEntries??12,maxPending=options.maxPending??12;
   if(![cacheMs,maxAge,maxEntries,maxPending].every(v=>Number.isSafeInteger(v)&&v>0))throw Error("Invalid order-flow feed bound");
   const cache=new Map<string,CachedFlow>(),pending=new Map<string,Promise<void>>();let tail:Promise<void>=Promise.resolve();
   async function warm(instId:string){

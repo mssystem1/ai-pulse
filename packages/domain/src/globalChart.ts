@@ -13,6 +13,7 @@ import {globalCoverageLine} from "./globalCoverage.js";
 import {globalWavePhase} from "./globalSetupSelection.js";
 import {globalSetupStudySeries,globalSetupStudyReadings} from "./globalSetupStudies.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
+import {globalCurrentMarketLines,globalSetupEvidenceLines} from "./globalMarketNow.js";
 import {globalHorizonContextAnnotations,globalHorizonContextLines} from "./globalHorizonContext.js";
 import {globalDefaultChartLayers,globalStructuralScaleValues,globalStructuralWindow,globalMeasuredFib,globalChannelAvailability} from "./globalViewport.js";
 
@@ -248,7 +249,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,layers={...globalDefaultChartLayers(report),...options.layers},entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId),flow=pro&&layers.footprint?globalOrderFlowStudy(report,1250):null,flowTop=entryTop+(entryImage?240:0),footerTop=flowTop+(flow?flow.height+15:0);
   const decision=globalDecision(report),primary=globalTradePlan(report);
-  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
+  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...globalSetupEvidenceLines(report),...globalCurrentMarketLines(report),...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
     ...(decision.rewardLine&&decision.direction!=="BUY / SELL"?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
     ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?[...globalHorizonContextLines(report),...globalOrderFlowLines(report),...globalChannelLines(report)]:[])].filter(Boolean))];
   const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?100:70):(index?185:140),rows:string[]=[];let rest=value;while(rest.length>max){const space=report.lang==="en"?rest.lastIndexOf(" ",max):-1,at=space>max/2?space:max;rows.push(rest.slice(0,at));rest=rest.slice(at).trimStart();}if(rest)rows.push(rest);return rows;});
@@ -264,6 +265,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" rx="16" fill="#0f1826"/><g font-family="Inter, Noto Sans SC, Arial, sans-serif">`;
   svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)}`, "#55dfb5", 20);
   svg += text(25, 54, `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.lang==="zh"?"获取":"Fetched"} ${report.snapshot.observedAt} · ${globalCompletedPriceLine(report)}`, "#a5b7cd", 10);
+  const quoteLine=globalCurrentMarketLines(report)[0];if(quoteLine)svg+=text(25,66,quoteLine,"#b9c6d8",9);
   svg += text(left, 77, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}${report.strategy?` · ${report.strategy.holding}`:""}`, "#b9c6d8", 12);
   svg += text(left,101,`${decision.marketView} · ${globalDecisionTitle(report)}`,"#cce8f2",14);
   for (let i = 0; i < 6; i += 1) { const value = min + (max - min) * i / 5, py = y(value);
@@ -283,6 +285,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   svg += globalChartAnnotations(report, g, { ...options, layers });
   const unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
   const axisDate = (ts: number) => ["day", "week", "month"].includes(unit ?? "") ? new Date(ts).toISOString().slice(0, 10) + " UTC" : new Date(ts).toISOString().slice(5, 16).replace("T", " ") + " UTC";
+  svg += text(right, priceBottom + 25, new Date(report.snapshot.observedAt).toISOString().slice(11,19)+" (UTC)", "#a5b7cd", 10, "end");
   svg += text(left, priceBottom + 25, axisDate(start), "#8298b5", 10) + text(historyEnd, priceBottom + 25, axisDate(end), "#8298b5", 10, "end");
   svg += text(left, priceBottom + 44, [...report.indicators.sma.filter(s => periods.includes(s.period)).map(s => `SMA${s.period} ${globalPrice(report, s.points.at(-1)?.value)}`),...globalSetupStudyReadings(report,layers).map(s=>`${s.name} ${globalPrice(report,s.value)}`)].join(" · "), "#bda8df", 10);
   if (pro) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type {MarketTradeCapture} from "@pulse/market";
 import {createGlobalOrderFlowFeed} from "./globalOrderFlowFeed.js";
 
-const DAY=86_400_000,start=Date.UTC(2026,6,5),end=start+DAY,now=end+DAY;
+const DAY=86_400_000,start=Date.UTC(2026,6,5),end=start+DAY,now=end+DAY-60_000;
 const capture:MarketTradeCapture={source:"okx-public-spot",instId:"HYPE-USDT",priceCurrency:"USDT",marketType:"spot",quantityUnit:"base",capturedAt:new Date(now-1000).toISOString(),coverage:{start,end,knownAt:now-1000,complete:true,sha256:["a".repeat(64)]},trades:[{id:"1",ts:start+1,price:69,size:1,side:"buy"},{id:"2",ts:end-1,price:70,size:2,side:"sell"}]};
 const candle={ts:start,open:69,high:70,low:69,close:70,volume:3,confirmed:true};
 const reference={source:"okx-public-spot",instId:"HYPE-USDT",bar:"1Dutc",fetchedAt:new Date(now-500).toISOString(),candle};
@@ -31,6 +31,10 @@ test("a failed refresh retains the last independently available window and stale
 });
 test("unsupported identities do not start downloads and pending work is bounded",async()=>{
   let release!:()=>void;const {feed,state}=setup({maxPending:1,capture:async()=>{await new Promise<void>(resolve=>release=resolve);return {capture:structuredClone(capture)}}});await feed.warm('HYPE-USDT-SWAP');assert.equal(state.captures,0);const pending=feed.warm('HYPE-USDT');await assert.rejects(feed.warm('BTC-USDT'),/queue is full/);await new Promise(resolve=>setImmediate(resolve));release();await pending;
+});
+
+test("a multi-day-old archive cannot attach to a newly generated current report",async()=>{
+  const {feed}=setup({now:()=>end+3*DAY});await assert.rejects(feed.warm('HYPE-USDT'),/Incomplete/);assert.equal(feed.attach(market(end+3*DAY)).orderFlow,undefined);
 });
 test("asynchronous source verification must finish successfully before the cache is usable",async()=>{
   let release!:()=>void;const {feed}=setup({reconcile:()=>new Promise<void>((_,reject)=>{release=()=>reject(Error('asynchronous source mismatch'));})}),pending=feed.warm('HYPE-USDT');await new Promise(resolve=>setImmediate(resolve));assert.equal(feed.attach(market()).orderFlow,undefined);release();await assert.rejects(pending,/asynchronous source mismatch/);assert.equal(feed.attach(market()).orderFlow,undefined);

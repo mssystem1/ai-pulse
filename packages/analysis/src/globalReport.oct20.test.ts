@@ -27,7 +27,7 @@ test("Oct 20 1H: current primary extreme supplies the first objective; older res
 
 test("Oct 20 4H: a middle-of-range price cannot manufacture a short entry with a 24R claim",()=>{
   const r=make("4H"),cards=globalTradeCards(r),d=globalDecision(r);
-  assert.equal(r.snapshot.price,82610.4);assert.equal(d.direction,"SIDEWAYS");assert.equal(cards.length,1);
+  assert.equal(r.snapshot.price,82610.4);assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(d.direction,r.discretionaryPlan!.side==="long"?"LONG":"SHORT");assert.equal(cards.length,1);
   assert.equal(r.tradePlan!.referenceEntry,null);assert.equal(r.tradePlan!.referenceStop,null);assert.equal(r.tradePlan!.grossRewardRisk,null);
   assert.equal(d.currentAction,"WAIT");assert.ok(r.discretionaryPlan);assert.ok(cards[0].rr!<24);
   assert.ok(r.discretionaryPlan.targets.every(t=>t.timeframe==="4H"));

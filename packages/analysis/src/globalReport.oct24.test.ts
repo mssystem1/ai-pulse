@@ -20,10 +20,10 @@ test("attached hourly setup drops the wick-consumed target while retaining the c
   assert.match(globalHorizonContextLines(r).join(" "),/Week range/);
 });
 
-test("daily objectives stay ahead of newer execution data and keep its nearer observed barrier",()=>{
+test("daily objectives stay ahead of newer context and retain the observed recovery evidence",()=>{
   const r=make("1Dutc"),p=r.discretionaryPlan!;assert.equal(p.reference.price,79803.6);
-  assert.ok(!p.targets.some(t=>t.price===80400));assert.ok(p.targets.every(t=>t.price<p.reference.price));
-  assert.ok(p.barriers.some(b=>b.price===79220.1&&b.timeframe==="4H"));
+  const latest=r.currentMarket!.frames.find(f=>f.timeframe==="1H")!.candles.at(-1)!.close,sign=p.side==="long"?1:-1;
+  assert.ok(p.targets.every(t=>sign*(t.price-latest)>0));assert.ok(p.evidence);assert.equal(p.side,"long");
   const invalid=structuredClone(r);invalid.discretionaryPlan!.targets[0]={...p.targets[0],price:80400};assert.equal(GlobalReportSchema.safeParse(invalid).success,false);
 });
 
@@ -34,7 +34,7 @@ test("4H keeps the latest primary low before distant old objectives",()=>{
 
 test("all attached horizons require a new post-snapshot test and preserve their distinct source clocks",()=>{
   for(const frame of Object.keys(cutoffs)){
-    const r=make(frame),p=r.discretionaryPlan!;assert.equal(p.version,"discretionary-plan-v3");assert.equal(p.requiresNewTestAfter,Date.parse(cutoffs[frame]));
+    const r=make(frame),p=r.discretionaryPlan!;assert.equal(p.version,"discretionary-plan-v4");assert.equal(p.requiresNewTestAfter,Date.parse(cutoffs[frame]));
     assert.ok(p.reference.completedAt<=p.requiresNewTestAfter!);assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.reference.price)>0));
     assert.match(globalTradeCards(r)[0].condition,/new test formed after this snapshot/);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   }
@@ -44,7 +44,7 @@ test("free review repairs v2 target freshness without rewriting the purchased so
   const r=make("1H");r.discretionaryPlan!.version="discretionary-plan-v2";r.discretionaryPlan!.targets=[{...r.discretionaryPlan!.targets[0],price:79775.1}];
   r.narrative.reasons=["TP1 79,775.10 is the current objective."];
   const before=structuredClone(r),fixed=reviewGlobalTargetReport(r);assert.deepEqual(r,before);assert.deepEqual(fixed.candles,r.candles);assert.deepEqual(fixed.entryStudy,r.entryStudy);
-  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v3");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
+  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v4");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
   assert.deepEqual(fixed.narrative.reasons,[]);assert.match(fixed.narrative.summary,/79,220.10/);
 });
 

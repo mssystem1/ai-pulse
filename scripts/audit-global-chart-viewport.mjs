@@ -8,7 +8,8 @@ import {spawn,execFileSync} from 'node:child_process';
 import {build} from 'esbuild';
 const baseline=process.argv.includes('--baseline'),file=process.argv.slice(2).find(a=>!a.startsWith('--'));
 assert.ok(file,'Provide a saved report JSON');const report=JSON.parse(fs.readFileSync(file,'utf8'));
-const out=path.resolve('.tmp/global-chart-viewport'+(baseline?'-baseline':''));fs.mkdirSync(out,{recursive:true});
+const suffix=process.argv.find(a=>a.startsWith('--output-suffix='))?.split('=')[1]??'';
+assert.ok(/^[a-zA-Z0-9-]*$/.test(suffix));const out=path.resolve('.tmp/global-chart-viewport'+(baseline?'-baseline':'')+(suffix?'-'+suffix:''));fs.mkdirSync(out,{recursive:true});
 const component=path.resolve('apps/web/src/GlobalMarketChart.tsx');
 const plugins=baseline?[{name:'retained-baseline',setup(b){
  b.onLoad({filter:/GlobalMarketChart\.tsx$/},()=>({contents:execFileSync('git',['show','69c19c1:apps/web/src/GlobalMarketChart.tsx'],{encoding:'utf8'}).replace('previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange();','previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange(); if(ref.current){ref.current.dataset.viewportFrom=String(previousRange?.from??0);ref.current.dataset.viewportTo=String(previousRange?.to??0);}'),loader:'tsx',resolveDir:path.dirname(component)}));
@@ -32,6 +33,7 @@ try{
  const samePrices=(a,b)=>Math.abs(a.priceFrom-b.priceFrom)<1e-5&&Math.abs(a.priceTo-b.priceTo)<1e-5;
  const click=label=>evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent===${JSON.stringify(label)}).click()`);
  await call('Page.enable');await call('Runtime.enable');await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});
+ await call('Emulation.setTimezoneOverride',{timezoneId:'Europe/Samara'});
  for(const width of [1454,390]){
   await call('Emulation.setDeviceMetricsOverride',{width,height:1200,deviceScaleFactor:1,mobile:width<600});await call('Page.navigate',{url:origin});await wait('Boolean(document.querySelector("[data-viewport-from]"))');
   if(width<600)await click('Inspect candles');await evaluate('document.querySelector(".global-chart-stage").scrollIntoView({block:"center"})');await pause(350);
@@ -40,6 +42,8 @@ try{
   await call('Input.dispatchMouseEvent',{type:'mouseWheel',x:box.x+box.width*.55,y:box.y+150,deltaX:0,deltaY:-300});await pause(80);const zoomed=await read();
   assert.ok(zoomed.to-zoomed.from<before.to-before.from,'Actual wheel gesture must zoom');await pause(1200);const refreshed=await read();assert.ok(refreshed.ticks>zoomed.ticks);
   if(baseline){assert.equal(same(zoomed,refreshed),false,'The retained original must reproduce the parent-refresh reset');cases.push({width,baselineResetReproduced:true});break;}
+  const clock=await evaluate('({at:document.querySelector("[data-chart-clock]").dateTime,text:document.querySelector("[data-chart-clock]").textContent})');await pause(1100);
+  const nextClock=await evaluate('document.querySelector("[data-chart-clock]").dateTime');assert.ok(Date.parse(nextClock)>Date.parse(clock.at),'Clock must advance independently of the saved report');assert.ok(clock.text.includes('UTC+04:00'),'Clock must show the local UTC offset');assert.ok(same(zoomed,await read()),'Clock ticks must preserve zoom');
   assert.ok(same(zoomed,refreshed),'Parent report parsing must preserve zoom');assert.equal(await evaluate('window.qaCanvas===document.querySelector(".global-chart-stage canvas")'),true,'Polling must preserve the native chart instance');
   for(const label of ['EMA 12 / 25','Structure view','Setup view','Reset studies']){await click(label);await pause(150);assert.ok(same(zoomed,await read()),label+' changed time zoom');}
   const axis=await evaluate('(()=>{const b=document.querySelector(".global-chart-stage").getBoundingClientRect();return {x:b.right-18,y:b.top+220}})()');

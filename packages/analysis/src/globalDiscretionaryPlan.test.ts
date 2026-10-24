@@ -96,6 +96,7 @@ test("VWAP rejection uses primary-frame band entry, outer-band protection and fi
 
 function balanced(){
   const report=make("1Dutc");report.indicators.vwap=null;report.indicators.pivots=[];report.entryStudy!.pivots=[];
+  delete report.currentMarket; // Synthetic range prices below supply their own execution evidence.
   return report;
 }
 function choose(report:ReturnType<typeof make>){
@@ -156,7 +157,7 @@ test("old conditional plans receive an explicit current review without changing 
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v3");assert.equal(review.discretionaryPlan!.entry,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v4");assert.equal(review.discretionaryPlan!.entry,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 
@@ -169,7 +170,7 @@ test("conditional barriers retain both primary and entry evidence, rejecting for
   applyGlobalDiscretionaryPlan(report);
   assert.ok(report.discretionaryPlan!.barriers.some(b=>b.timeframe==="1Dutc"));
   assert.ok(report.discretionaryPlan!.barriers.some(b=>b.timeframe==="4H"));
-  const wrong=make("1Dutc");wrong.discretionaryPlan!.barriers[0].timeframe="15m";
+  const wrong=make("1Dutc");wrong.discretionaryPlan!.barriers[0].timeframe="2H";
   assert.equal(GlobalReportSchema.safeParse(wrong).success,false);
 });
 

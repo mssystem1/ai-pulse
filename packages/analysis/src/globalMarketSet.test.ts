@@ -13,7 +13,7 @@ function market(frame:string):SpotMarketContext {
 test("all new reports request the same UTC hierarchy, history depth and observation cutoff",async()=>{
   const calls:Array<{timeframe:string;candleLimit:number}>=[];
   const set=await loadGlobalMarketSet({instId:"BTC-USDT",timeframe:"1D"},async input=>{calls.push(input);return market(input.timeframe);},cutoff);
-  assert.equal(set.market.bar,"1Dutc");assert.equal(set.contextMarket!.bar,"1Wutc");assert.equal(calls.length,4);assert.ok(calls.every(c=>c.candleLimit===520));assert.ok(set.hierarchyMarkets.every(m=>m.fetchedAt===cutoff));
+  assert.equal(set.market.bar,"1Dutc");assert.equal(set.contextMarket!.bar,"1Wutc");assert.equal(calls.length,6);assert.ok(["15m","5m"].every(tf=>calls.some(c=>c.timeframe===tf)));assert.ok(calls.every(c=>c.candleLimit===520));assert.ok(set.hierarchyMarkets.every(m=>m.fetchedAt===cutoff));
   assert.equal(globalCanonicalTimeframe("1W"),"1Wutc");assert.equal(globalCanonicalTimeframe("15m"),"15m");
 });
 test("a missing context is retained as missing rather than replaced with another timeframe",async()=>{

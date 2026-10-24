@@ -2,6 +2,7 @@ import {globalTradeCardLines,globalHistoricalLevelLines} from "./globalTradeDisp
 import {globalStrategyLines} from "./globalStrategy.js";
 import {globalHorizonContextLines} from "./globalHorizonContext.js";
 import {globalOrderFlowLines} from "./globalOrderFlow.js";
+import {globalCurrentMarketLines} from "./globalMarketNow.js";
 import { GlobalReportSchema, parseCandleTimeframe, candleCloseTime, type GlobalReport, type GlobalPath } from "@pulse/schemas";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalConfirmationEvidence } from "./globalConfirmation.js";
@@ -227,6 +228,7 @@ export function globalSections(report: GlobalReport): Array<{title: string; line
   const { lang } = report,d=globalDecision(report),zh=lang==="zh";
   return [
     {title:zh?"当前决策":"Current decision",lines:globalDecisionLines(report),featured:true},
+    {title:zh?"快照时市场":"Market at snapshot",lines:globalCurrentMarketLines(report),featured:true},
     ...(report.strategy?[{title:zh?"交易策略与持有周期":"Strategy and holding horizon",lines:globalStrategyLines(report),featured:true}]:[]),
     ...(report.horizonContext?[{title:zh?"本周期结构与价值":"Timeframe structure and value",lines:globalHorizonContextLines(report),featured:true}]:[]),
     ...(report.orderFlow?[{title:zh?"实际成交量与价值区间":"Executed volume and value area",lines:globalOrderFlowLines(report),featured:true}]:[]),

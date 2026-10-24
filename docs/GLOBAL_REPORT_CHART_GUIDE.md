@@ -1,5 +1,9 @@
 # Global report charts
 
+The clock below the chart shows current local date/time with seconds and the UTC offset. Candle axes, snapshot times and source times remain UTC. The latest quote captured for a report is separate from its completed daily/weekly and execution closes. The moving clock does not refresh saved analysis, move levels or reset zoom. PNGs show their saved snapshot time with seconds.
+
+A primary downtrend can coexist with a conditional support-reclaim long; the selected setup heading follows the actual displayed plan. Read the dated structural reaction and subsequent entry condition rather than treating averages as automatic orders. Weekly plans retain macro context and weekly protection; the 15m report uses 5m execution evidence. New current-feed reports reject multi-day-old profile windows. Historical profiles in saved reports retain their original dates and do not establish current order flow.
+
 Choose the instrument, report depth and timeframe, then read the assessment and its separate entry conditions. Each supported horizon provides a priced setup with Entry, SL and available objectives. SIDEWAYS setups retain range context and an explicit execution trigger.
 
 New Pro reports open with broad price history containing an EMA ribbon, available anchored VWAP and deviation bands, volume and evidenced range references. Defaults are 120 candles for 15m/1H, 180 for 4H and 260 for daily/weekly, limited by available source data. Zoom changes the view; Full history shows all saved candles. Entry, protective SL and supported targets use the saved plan. Structure view provides the wider available studies. Older reports retain their available saved indicators.
