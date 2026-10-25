@@ -149,6 +149,8 @@ Web, TXT, PNG and Telegram preserve the saved plan's prices. Chart titles identi
 
 See the [chart user guide](docs/GLOBAL_REPORT_CHART_GUIDE.md) or the English/Chinese in-app **Docs > Chart & indicator guide** (`/docs#docs-global-chart`). Public documentation covers the workflow and visible chart tools. Proprietary strategy recipes, tuning and private research artifacts are excluded. Software verification does not establish a guaranteed win rate or mirroring of a trader's private account.
 
+Global reports follow the selected appearance, including a light Clarity chart and PNG export. Each conditional setup explains its primary direction, entry source, invalidation and nearest obstacle. Mixed primary structure uses its own supported price location rather than deriving a trend from EMA order alone. Shared market levels across horizons retain separate confirmation and protection. Payoff below 1R is explained alongside the visible plan; targets and stops are not moved to improve its displayed ratio.
+
 ### Prediction Market
 
 Prediction discovery is free and lives inside the main application rather than on a separate page. The user opens the market picker, chooses one active crypto price/direction question, reviews its probabilities, order books, liquidity, volume, open interest, restriction status, and resolution rules, then purchases Quick or Pro prediction analysis. PULSE validates condition/outcome identity, order-book availability, freshness, liquidity, spread, depth, history, and horizon. Restricted markets remain usable as public read-only evidence when active and orderbook-enabled, but the restriction is always disclosed and PULSE never places an order.

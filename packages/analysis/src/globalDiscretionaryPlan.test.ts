@@ -157,7 +157,7 @@ test("old conditional plans receive an explicit current review without changing 
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v4");assert.equal(review.discretionaryPlan!.entry,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v5");assert.equal(review.discretionaryPlan!.entry,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 

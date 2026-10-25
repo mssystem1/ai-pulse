@@ -1,7 +1,9 @@
+import {themeGlobalChartSvg,type GlobalChartAppearance} from "./globalChartTheme";
 import { globalArtifactTag, globalReportChartSvg, type GlobalReport, type GlobalChartOptions, type GlobalChartLayers } from "@pulse/domain";
 
-export function downloadGlobalChart(report: GlobalReport, layers: GlobalChartLayers, options: Pick<GlobalChartOptions,"structure"|"fullHistory"|"fitFibonacci"|"selectedPathId"> = {}) {
-  const svg = globalReportChartSvg(report, { layers, ...options });
+export function downloadGlobalChart(report: GlobalReport, layers: GlobalChartLayers, options: Pick<GlobalChartOptions,"structure"|"fullHistory"|"fitFibonacci"|"selectedPathId"> = {}, appearance:GlobalChartAppearance="dark") {
+  const raw = globalReportChartSvg(report, { layers, ...options });
+  const svg=raw?themeGlobalChartSvg(raw,appearance):null;
   if (!svg) return;
   const url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
   const image = new Image();

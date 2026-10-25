@@ -1,5 +1,11 @@
 # Global report charts
 
+Clarity uses a light report, chart and entry-study palette with contrasting text and candles. Other appearances use dark charts. PNG downloads follow the selected appearance and preserve saved prices. Appearance changes preserve the inspection range.
+
+Read the direction evidence alongside the priced setup: primary trend or mixed structure, entry source and timestamp, protective invalidation, and reward before the nearest obstacle. EMA location is a conditional pullback reference, not an observed rejection. Mixed primary structure can use a support/resistance retest; weekly recovery does not establish an intraday entry. A sub-1R first target offers less reward than the full stop risk. Later targets do not remove that limitation.
+
+Different horizons can share a market swing or support level. Their confirmation, stop basis and objectives retain their own source timeframe. An earlier touch does not fill a new plan. Review an older saved report for free to apply the current rules to its original candles; generate a new report when current market evidence is needed.
+
 The clock below the chart shows current local date/time with seconds and the UTC offset. Candle axes, snapshot times and source times remain UTC. The latest quote captured for a report is separate from its completed daily/weekly and execution closes. The moving clock does not refresh saved analysis, move levels or reset zoom. PNGs show their saved snapshot time with seconds.
 
 A primary downtrend can coexist with a conditional support-reclaim long; the selected setup heading follows the actual displayed plan. Read the dated structural reaction and subsequent entry condition rather than treating averages as automatic orders. Weekly plans retain macro context and weekly protection; the 15m report uses 5m execution evidence. New current-feed reports reject multi-day-old profile windows. Historical profiles in saved reports retain their original dates and do not establish current order flow.

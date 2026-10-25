@@ -1,3 +1,4 @@
+import {globalSetupRationale} from "./globalSetupRationale.js";
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference} from "./globalContext.js";
 
@@ -14,7 +15,7 @@ export function globalCurrentMarketLines(report:GlobalReport):string[]{
   return [...(current.quote?[`${zh?"快照时最新报价":"Latest quote at snapshot"}: ${price(current.quote.price)} ${report.snapshot.priceCurrency} · ${at(current.quote.ts)}`]:[]),...(latest?[`${zh?"最新完整市场K线":"Latest completed market candle"}: ${globalFrameReference(latest.timeframe)} · ${price(latest.price)} · ${at(latest.end)}`]:[])];
 }
 export function globalSetupEvidenceLines(report:GlobalReport):string[]{
-  const d=report.discretionaryPlan,e=d?.evidence;if(!d||!e)return [];
+  const d=report.discretionaryPlan,e=d?.evidence;const rationale=globalSetupRationale(report,globalCurrentMarketPrice(report));if(!d||!e)return rationale;
   const zh=report.lang==="zh",level=e.level.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision});
-  return [zh?`${globalFrameReference(e.timeframe)} 已完整收盘${d.side==="long"?"收复并守住":"跌破并受阻于"} ${level}（${at(e.completedAt)}）；主周期趋势与此入场机会分别评估。`:`${globalFrameReference(e.timeframe)} completed ${d.side==="long"?"reclaim and hold above":"break and hold below"} ${level} at ${at(e.completedAt)}. The primary trend and this entry opportunity are assessed separately.`];
+  return [...rationale,zh?`${globalFrameReference(e.timeframe)} 已完整收盘${d.side==="long"?"收复并守住":"跌破并受阻于"} ${level}（${at(e.completedAt)}）；主周期趋势与此入场机会分别评估。`:`${globalFrameReference(e.timeframe)} completed ${d.side==="long"?"reclaim and hold above":"break and hold below"} ${level} at ${at(e.completedAt)}. The primary trend and this entry opportunity are assessed separately.`];
 }

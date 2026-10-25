@@ -1,4 +1,4 @@
-import {globalTradeCards,globalFrameReference,globalNextSetupLines,type GlobalReport} from "@pulse/domain";
+import {globalSetupEvidenceLines,globalTradeCards,globalFrameReference,globalNextSetupLines,type GlobalReport} from "@pulse/domain";
 
 export function GlobalTradePlans({report,onSelect}:{report:GlobalReport;onSelect:(key:string)=>void}){
   const cards=globalTradeCards(report),zh=report.lang==="zh";
@@ -10,6 +10,7 @@ export function GlobalTradePlans({report,onSelect}:{report:GlobalReport;onSelect
     <div className="global-trade-plan-grid" style={{gridTemplateColumns:"minmax(0,1fr)"}}>{cards.map(c=><article className={`global-trade-plan-card is-${c.side}`} key={c.key} data-trade-card={c.key}>
       <header><strong>{c.direction}</strong><span>{c.state}</span></header>
       <dl><dt>Entry{c.confirmed||report.discretionaryPlan?"":" (planned)"}</dt><dd>{c.entry}</dd><dt>SL{c.confirmed||report.discretionaryPlan?"":" (planned)"}</dt><dd>{c.stop}</dd>{c.targets.map((t,i)=><div className="global-trade-target" key={t.id}><dt>TP{i+1}</dt><dd>{t.price.toLocaleString(zh?"zh-CN":"en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision})}{t.movePercent!==null&&<> ({t.movePercent>=0?"+":""}{t.movePercent.toFixed(2)}%)</>}<small className="global-meta" style={{display:"block"}}>{t.source}</small></dd></div>)}</dl>
+      {globalSetupEvidenceLines(report).map(line=><p key={line}>{line}</p>)}
       <p><b>{zh?"触发条件":"Trigger"}:</b> {c.condition}</p>
       {c.location&&<p>{c.location}</p>}
       {c.plan.entryObstacle&&<p>{zh?"最近途中障碍":"Nearest intervening level"}: {globalFrameReference(c.plan.entryObstacle.timeframe)} {c.plan.entryObstacle.price.toLocaleString("en-US",{maximumFractionDigits:report.snapshot.pricePrecision})} · {c.plan.firstObstacleRewardRisk?.toFixed(2)??"—"}R</p>}

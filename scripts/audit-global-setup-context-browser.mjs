@@ -55,15 +55,16 @@ try{
   const evaluate=async expression=>{const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});assert.ok(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));return result.result.value;};
   const wait=async expression=>{for(let i=0;i<100;i++){if(await evaluate(expression))return;await pause(100);}const diagnostics={frame:currentReport?.snapshot.timeframe,tier:currentReport?.tier,lang:currentReport?.lang,errors,screen:await evaluate('({width:innerWidth,stage:document.querySelector(".global-chart-stage")?.clientWidth,overlay:document.querySelector(".global-chart-overlay")?.outerHTML.slice(0,500),canvases:document.querySelectorAll("canvas").length})')};fs.writeFileSync(path.join(out,'failure.json'),JSON.stringify(diagnostics,null,2));throw Error('Timed out: '+expression+'; '+JSON.stringify(diagnostics));};
   await call('Page.enable');await call('Runtime.enable');await call('Fetch.enable',{patterns:[{urlPattern:'*'}]});
-  const reports=[];
+  const reports=[],reportDir=args.find(a=>a.startsWith('--report-dir='))?.slice('--report-dir='.length);
+  if(reportDir)for(const frame of ['15m','1H','4H','1Dutc','1Wutc'])for(const lang of ['en','zh'])reports.push({...JSON.parse(fs.readFileSync(path.join(reportDir,frame+'.json'),'utf8')),lang});
   if(currentDir)for(const asset of ['BTC','ETH','HYPE','SOL','BNB','XRP'])for(const frame of ['15m','1H','4H','1Dutc','1Wutc'])for(const lang of ['en','zh']){
     const report=JSON.parse(fs.readFileSync(path.join(currentDir,asset,frame+'.json'),'utf8'));assert.equal(report.snapshot.instId,asset+'-USDT');assert.equal(report.snapshot.timeframe,frame);reports.push({...report,lang});
   }
-  if(!currentDir&&!process.argv.includes('--only-flow'))for(const [frame,observedAt] of Object.entries(cutoffs))for(const tier of ['base','premium'])for(const lang of ['en','zh']){
+  if(!reportDir&&!currentDir&&!process.argv.includes('--only-flow'))for(const [frame,observedAt] of Object.entries(cutoffs))for(const tier of ['base','premium'])for(const lang of ['en','zh']){
     const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:'BTC-USDT',source:'okx-public-spot',fetchedAt:observedAt,ticker:{priceCurrency:'USDT'},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
     reports.push(prepareGlobalReport({market:markets.find(m=>m.bar===frame),contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier,lang}));
   }
-  if(!currentDir&&!process.argv.includes('--only-flow'))for(const frame of ['1Dutc','1Wutc'])for(const lang of ['en','zh']){
+  if(!reportDir&&!currentDir&&!process.argv.includes('--only-flow'))for(const frame of ['1Dutc','1Wutc'])for(const lang of ['en','zh']){
     const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:'BEARISH-SYNTHETIC-USDT',source:'synthetic-test-fixture',fetchedAt:cutoffs[frame],ticker:{priceCurrency:'USDT'},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open:300000-open,high:300000-low,low:300000-high,close:300000-close,volume,confirmed:true}))}));
     const r=prepareGlobalReport({market:markets.find(m=>m.bar===frame),contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:'premium',lang});r.snapshot.venue='Synthetic test fixture';reports.push(r);
   }
@@ -73,11 +74,22 @@ try{
     currentReport=report;
     const frame=report.snapshot.timeframe,tier=report.tier==='pro'?'premium':'base',lang=report.lang,shotFrame=(report.snapshot.instId==='BTC-USDT'?'':report.snapshot.instId+'-')+frame;
     const card=globalTradeCards(currentReport)[0],decision=globalDecision(currentReport);
-    for(const width of [1454,390]){
+    for(const width of [1454,390])for(const theme of (args.find(a=>a.startsWith('--themes='))?.slice('--themes='.length).split(',')??['xlayer'])){
       await call('Emulation.setDeviceMetricsOverride',{width,height:1100,deviceScaleFactor:1,mobile:width<600});
-      await call('Page.navigate',{url:'about:blank'});await call('Page.navigate',{url:origin+'/shared-report#share=deployment_fixture_oct20_000000000000000000'});
+      await call('Page.navigate',{url:'about:blank'});await call('Page.navigate',{url:origin+'/shared-report?pulseTheme='+theme+'#share=deployment_fixture_oct20_000000000000000000'});
       await wait('Boolean(document.querySelector("[data-global-version]"))');
       await wait('Boolean(document.querySelector(".global-chart-overlay [data-trade-price-ledger], .global-chart-overlay [data-setup-status]"))');
+      assert.equal(await evaluate('document.documentElement.dataset.pulseTheme'),theme);
+      if(theme==='base'){
+        const contrast=await evaluate(`(()=>{
+          const lum=rgb=>rgb.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
+          const rgb=value=>value.match(/[0-9.]+/g)?.slice(0,3).map(Number);
+          return Array.from(document.querySelectorAll('.global-heading h2,.global-meta,.global-trade-plan-card dt,.global-trade-plan-card dd,.global-trade-plan-card p,.global-decision-card h3,.global-horizon-context p,.global-chart-toolbar strong')).filter(e=>e.getClientRects().length).map(e=>{let p=e,bg;while(p){const c=getComputedStyle(p).backgroundColor;if(c!=='rgba(0, 0, 0, 0)'&&c!=='transparent'){bg=rgb(c);break;}p=p.parentElement;}const fg=rgb(getComputedStyle(e).color),a=lum(fg),b=lum(bg??[255,255,255]);return {tag:e.tagName,cls:e.className,text:e.textContent.slice(0,70),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};});
+        })()`);
+        fs.writeFileSync(path.join(out,'contrast-'+shotFrame+'-'+theme+'-'+lang+'-'+width+'.json'),JSON.stringify(contrast,null,2));
+        assert.ok(contrast.every(c=>c.ratio>=4.5),'Clarity text contrast: '+JSON.stringify(contrast.filter(c=>c.ratio<4.5)));
+        assert.ok(['#f8fbff','#eaf0f8'].includes(await evaluate('document.querySelector(".global-mobile-overview svg>rect")?.getAttribute("fill")')));
+      }
       const text=await evaluate('document.querySelector(".global-report").textContent');
       if(card){assert.ok(text.includes(card.entry)&&text.includes(card.stop));assert.ok(text.includes(card.location));}
       else assert.ok(text.includes(currentReport.setupSelection.limitations[0]));
@@ -136,7 +148,7 @@ try{
           assert.equal(await evaluate('window.qaFlowCanvas===document.querySelector(".global-chart-stage canvas")'),true);
         }
         await evaluate('document.querySelector("[data-executed-footprint]").scrollIntoView({block:"start"})');
-        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,'footprint-'+shotFrame+'-'+lang+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,'footprint-'+shotFrame+'-'+theme+'-'+lang+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
       }else assert.equal(await evaluate('document.querySelectorAll("[data-order-flow-profile], [data-executed-footprint]").length'),0);
       if(tier==='premium'&&lang==='en'){
         assert.equal(await evaluate('Array.from(document.querySelectorAll(".global-layer-controls button")).find(b=>b.textContent==="Range references").disabled'),false,'Every horizon retains its available context controls');
@@ -145,7 +157,7 @@ try{
         await evaluate('Array.from(document.querySelectorAll(".global-layer-controls button")).find(b=>b.textContent==="Range references").click()');
         await wait('document.querySelectorAll(".global-chart-overlay [data-horizon-context]").length===1');
         await evaluate('document.querySelector(".global-chart-panel").scrollIntoView({block:"start"});window.qaCanvas=document.querySelector(".global-chart-stage canvas")');
-        const setupShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,'setup-'+shotFrame+'-'+width+'.png'),Buffer.from(setupShot.data,'base64'));
+        const setupShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,'setup-'+shotFrame+'-'+theme+'-'+width+'.png'),Buffer.from(setupShot.data,'base64'));
         await evaluate('Array.from(document.querySelectorAll("button")).find(b=>b.textContent==="Structure view").click()');
         await wait('document.querySelectorAll(".global-mobile-overview [data-setup-study]").length===0');
         assert.equal(await evaluate('window.qaCanvas===document.querySelector(".global-chart-stage canvas")'),true,'Presets keep the native chart instance');
@@ -162,9 +174,9 @@ try{
         }
 
         await evaluate('document.querySelector(".global-trade-plans").scrollIntoView({block:"start"})');
-        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,shotFrame+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
+        const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});fs.writeFileSync(path.join(out,shotFrame+'-'+theme+'-'+width+'.png'),Buffer.from(shot.data,'base64'));
       }
-      cases.push({instrument:currentReport.snapshot.instId,executedOrderFlow:Boolean(currentReport.orderFlow),setupPreset:currentReport.tier==='pro',frame,tier:currentReport.tier,lang,width,historyBars,overflow:false,cards:card?1:0,entry:card?.entry??null,stop:card?.stop??null,projection:false});
+      cases.push({theme,instrument:currentReport.snapshot.instId,executedOrderFlow:Boolean(currentReport.orderFlow),setupPreset:currentReport.tier==='pro',frame,tier:currentReport.tier,lang,width,historyBars,overflow:false,cards:card?1:0,entry:card?.entry??null,stop:card?.stop??null,projection:false});
     }
   }
   assert.deepEqual(errors,[]);assert.deepEqual(mutations,[]);

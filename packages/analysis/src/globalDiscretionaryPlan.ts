@@ -33,13 +33,17 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
   const recent=report.candles.slice(-3),extreme=recent.reduce((a,b)=>side==="long"?(b.low<a.low?b:a):(b.high>a.high?b:a));
   const rangeBreak=report.range&&family==="breakout_retest"&&entryBasis.kind==="range_edge";
   let stopBasis:NonNullable<GlobalReport["discretionaryPlan"]>["stopBasis"]=report.range&&family==="range_rotation"?{price:side==="long"?report.range.lower[0]:report.range.upper[1],timeframe:primaryTimeframe,anchorTs:report.range.startTs,knownAt:primaryClosed}:rangeBreak?{price:side==="long"?report.range!.upper[0]:report.range!.lower[1],timeframe:primaryTimeframe,anchorTs:report.range!.startTs,knownAt:primaryClosed}:protection??{price:side==="long"?extreme.low:extreme.high,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,primaryTimeframe)!,timeframe:primaryTimeframe};
+  if(entryBasis.kind==="structure_zone"){
+    const zone=report.horizonContext!.zones.find(z=>z.role===(side==="long"?"support":"resistance")&&(side==="long"?z.upper:z.lower)===entry)!;
+    stopBasis={price:side==="long"?zone.lower:zone.upper,timeframe:primaryTimeframe,anchorTs:zone.startTs,knownAt:zone.knownAt};
+  }
   if(evidence?.kind==="primary_reclaim"){
     const zone=report.horizonContext?.zones.find(z=>entry>=z.lower-primaryAtr&&entry<=z.upper+primaryAtr&&(side==="long"?z.lower<evidence.extreme:z.upper>evidence.extreme));
     const observed=report.candles.slice(-3).filter(c=>side==="long"?c.low<=evidence.extreme:c.high>=evidence.extreme).at(-1);
     if(zone)stopBasis={price:side==="long"?zone.lower:zone.upper,timeframe:primaryTimeframe,anchorTs:zone.startTs,knownAt:zone.knownAt};
     else if(observed)stopBasis={price:side==="long"?observed.low:observed.high,timeframe:primaryTimeframe,anchorTs:observed.ts,knownAt:candleCloseTime(observed.ts,primaryTimeframe)!};
   }
-  if(family==="ema_pullback"&&report.strategy.id==="fast"){
+  if(report.strategy.id==="fast"&&(family==="ema_pullback"||evidence?.kind==="local_reclaim")){
     // Fast protection follows a completed primary reaction and a later break
     // of its high/low. An old session extreme cannot override that newer test.
     const recent=report.candles.slice(-12),reaction=recent.flatMap((c,i)=>{
@@ -91,8 +95,11 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
     if(price>0)targets.push({price,anchorTs:report.candles.at(-Math.min(20,report.candles.length))!.ts,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"measured_projection"});
   }
   if(!targets.length)return;
-  const barrierCandidates=known.map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,kind:a.kind}));
-  if(study){const extreme=bars.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));barrierCandidates.push({price:side==="long"?extreme.high:extreme.low,timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,timeframe)!,kind:side==="long"?"high":"low"});}
-  const barriers=barrierCandidates.filter(a=>a.kind===(side==="long"?"high":"low")&&forward(a.price)&&unplayed(a.price,a.knownAt)&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).filter((a,i,all)=>all.findIndex(b=>b.price===a.price&&b.timeframe===a.timeframe)===i).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
-  report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v4",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
+  const barrierCandidates=known.map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,kind:a.kind,retestable:false}));
+  // A tested zone can obstruct a future retest route even when its earlier
+  // target touch prevents presenting it as a new, unplayed objective.
+  for(const zone of report.horizonContext?.zones??[])if(zone.role===(side==="long"?"resistance":"support"))barrierCandidates.push({price:side==="long"?zone.lower:zone.upper,timeframe:primaryTimeframe,anchorTs:zone.startTs,knownAt:zone.knownAt,kind:side==="long"?"high":"low",retestable:true});
+  if(study){const extreme=bars.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));barrierCandidates.push({price:side==="long"?extreme.high:extreme.low,timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,timeframe)!,kind:side==="long"?"high":"low",retestable:false});}
+  const barriers=barrierCandidates.filter(a=>a.kind===(side==="long"?"high":"low")&&forward(a.price)&&(a.retestable||unplayed(a.price,a.knownAt))&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).filter((a,i,all)=>all.findIndex(b=>b.price===a.price&&b.timeframe===a.timeframe)===i).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
+  report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
 }

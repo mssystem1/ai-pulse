@@ -87,11 +87,11 @@ export const GlobalHorizonContextSchema=z.object({
 /** A priced scenario for the trader's decision, separate from observed signal
  * and order authorization. Every price retains its saved candle provenance. */
 export const GlobalDiscretionaryPlanSchema=z.object({
-  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3","discretionary-plan-v4"]),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
+  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3","discretionary-plan-v4","discretionary-plan-v5"]),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
   evidence:z.object({kind:z.enum(["local_reclaim","primary_reclaim"]),timeframe:z.string(),level:price,testTs:time,completedAt:time,extreme:price}).optional(),
-  family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest"]),objectiveTimeframe:z.string(),
+  family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest","level_retest"]),objectiveTimeframe:z.string(),
   entry:price,stop:price,
-  entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band"]),timeframe:z.string(),knownAt:time,price}),
+  entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band","structure_zone"]),timeframe:z.string(),knownAt:time,price}),
   reference:z.object({timeframe:z.string(),candleTs:time,completedAt:time,price}),
   stopBasis:z.object({timeframe:z.string(),anchorTs:time,knownAt:time,price}),
   targets:z.array(z.object({price,timeframe:z.string(),anchorTs:time,knownAt:time,basis:z.enum(["confirmed_swing","observed_extreme","structure_zone","measured_projection","vwap_band","range_boundary","range_midpoint","range_quartile"]),bandMultiple:z.number().int().min(-3).max(3).optional()})).min(1).max(3),
@@ -138,6 +138,10 @@ export const GlobalReportSchema = z.object({
   }
   const discretionary=report.discretionaryPlan;
   if(discretionary){
+    if(discretionary.entryBasis.kind==="structure_zone"){
+      const zone=report.horizonContext?.zones.find(z=>z.role===(discretionary.side==="long"?"support":"resistance")&&(discretionary.side==="long"?z.upper:z.lower)===discretionary.entry&&z.knownAt===discretionary.entryBasis.knownAt);
+      if(!zone||discretionary.entryBasis.timeframe!==report.snapshot.timeframe||discretionary.stopBasis.price!==(discretionary.side==="long"?zone.lower:zone.upper)||discretionary.stopBasis.anchorTs!==zone.startTs)ctx.addIssue({code:z.ZodIssueCode.custom,message:"A structural retest must retain its primary entry zone and outer invalidation boundary"});
+    }
     const r=discretionary.reference,bars=r.timeframe===report.snapshot.timeframe?report.candles:r.timeframe===report.entryStudy?.timeframe?report.entryStudy.candles:[],bar=bars.find(c=>c.ts===r.candleTs),sign=discretionary.side==="long"?1:-1;
     if(!bar||bar.close!==r.price||candleCloseTime(r.candleTs,r.timeframe)!==r.completedAt||r.completedAt>Date.parse(report.snapshot.observedAt)||discretionary.entryBasis.price!==discretionary.entry||discretionary.entryBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan entry must retain its saved completed reference and entry basis"});
     if(sign*(discretionary.entry-discretionary.stop)<=0||discretionary.targets.some((t,i)=>sign*(t.price-discretionary.entry)<=0||i>0&&sign*(t.price-discretionary.targets[i-1].price)<=0||t.knownAt>Date.parse(report.snapshot.observedAt))||discretionary.stopBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan requires ordered protection, targets and available evidence"});
@@ -153,12 +157,12 @@ export const GlobalReportSchema = z.object({
         return !near(t.price,expected)||t.anchorTs!==range.startTs;
       }))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional range objectives must match the saved geometric range"});
     }
-    if(discretionary.version==="discretionary-plan-v3"||discretionary.version==="discretionary-plan-v4"){
+    if(discretionary.version==="discretionary-plan-v3"||["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)){
       const cutoff=Date.parse(report.snapshot.observedAt),sources=[{candles:report.candles,timeframe:report.snapshot.timeframe},...(report.entryStudy?.source===report.snapshot.source?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])];
       const latest=sources.flatMap(s=>{const c=s.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]?.price??r.price;
-      const current=discretionary.version==="discretionary-plan-v4"?report.currentMarket?.quote?.price??latest:r.price;
+      const current=["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)?report.currentMarket?.quote?.price??latest:r.price;
       if(discretionary.requiresNewTestAfter!==cutoff||discretionary.targets.some(t=>sign*(t.price-current)<=0||["confirmed_swing","observed_extreme","structure_zone"].includes(t.basis)&&sources.some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,t.price,discretionary.side,t.knownAt,cutoff))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"A fresh conditional setup requires a new test after its snapshot and objectives not already reached by completed execution candles"});
-      if(discretionary.version==="discretionary-plan-v4"&&discretionary.targets.some(t=>{
+      if(["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)&&discretionary.targets.some(t=>{
         if(t.basis==="confirmed_swing")return !report.indicators.pivots.some(a=>a.kind===(discretionary.side==="long"?"high":"low")&&a.ts===t.anchorTs&&a.price===t.price&&a.confirmedAt!==null&&candleCloseTime(a.confirmedAt,report.snapshot.timeframe)===t.knownAt);
         if(t.basis==="observed_extreme")return !report.candles.some(c=>c.ts===t.anchorTs&&(discretionary.side==="long"?c.high:c.low)===t.price&&candleCloseTime(c.ts,report.snapshot.timeframe)===t.knownAt);
         if(t.basis==="structure_zone")return !report.horizonContext?.zones.some(z=>z.role===(discretionary.side==="long"?"resistance":"support")&&(discretionary.side==="long"?z.lower:z.upper)===t.price&&z.startTs===t.anchorTs&&z.knownAt===t.knownAt);

@@ -11,7 +11,7 @@ const make=(tf:string,quote?:{last:number;ts:string})=>{const markets=Object.ent
 for(const tf of ["1H","4H","1Dutc"])test(`${tf} evaluates the October 24 support recovery separately from the older bearish trend`,()=>{
   const r=make(tf),p=r.discretionaryPlan!;assert.equal(r.setupSelection!.assessment,"short");assert.equal(p.side,"long");assert.ok(p.evidence);assert.equal(globalDecision(r).direction,"LONG");
   assert.equal(p.stopBasis.timeframe,tf);assert.equal(p.objectiveTimeframe,tf);assert.ok(p.stop<p.entry&&p.targets.every(t=>t.price>p.entry));
-  assert.match(globalSetupEvidenceLines(r)[0],/reclaim and hold/);assert.ok(globalTradeCards(r)[0].lines.some(l=>/reclaim and hold/.test(l)));
+  assert.ok(globalSetupEvidenceLines(r).some(line=>/reclaim and hold/.test(line)));assert.ok(globalTradeCards(r)[0].lines.some(l=>/reclaim and hold/.test(l)));
   assert.equal(GlobalReportSchema.safeParse(r).success,true);
 });
 test("the daily report retains newer completed hourly context without inventing a completed daily close",()=>{
@@ -19,9 +19,9 @@ test("the daily report retains newer completed hourly context without inventing 
   assert.equal(r.currentMarket!.frames.find(f=>f.timeframe==="1H")!.candles.at(-1)!.close,80539.7);
   assert.equal(r.discretionaryPlan!.evidence!.timeframe,"1H");assert.ok(r.discretionaryPlan!.stop<79220.1);
 });
-test("15m fast protection uses the newer completed reaction rather than the distant session low",()=>{
+test("15m fast protection retains its own reaction or structural zone rather than the distant session low",()=>{
   const r=make("15m"),p=r.discretionaryPlan!,basis=r.candles.find(c=>c.ts===p.stopBasis.anchorTs)!;
-  assert.equal(p.stopBasis.timeframe,"15m");assert.equal(p.stopBasis.price,basis.low);assert.ok(p.stopBasis.price>79220.1);assert.ok(p.stop<p.entry);
+  assert.equal(p.stopBasis.timeframe,"15m");if(p.entryBasis.kind==="structure_zone"){assert.ok(r.horizonContext!.zones.some(z=>z.role===(p.side==="long"?"support":"resistance")&&(p.side==="long"?z.lower:z.upper)===p.stopBasis.price&&z.startTs===p.stopBasis.anchorTs));return;}assert.equal(p.stopBasis.price,basis.low);assert.ok(p.stopBasis.price>79220.1);assert.ok(p.stop<p.entry);
   assert.ok(r.candles.some(c=>c.ts>basis.ts&&c.close>basis.high));
   assert.ok(p.entry-p.stop<r.indicators.atr.points.at(-1)!.value);
 });
@@ -39,7 +39,7 @@ test("entry instructions use the captured quote's side of entry while retaining 
   const daily=make("1Dutc",{last:80510.1,ts:String(now-1000)});assert.ok(daily.discretionaryPlan!.reference.price<daily.discretionaryPlan!.entry);assert.match(globalTradeCards(daily)[0].condition,/buy if a support test holds/);
 });
 for(const tf of ["15m","1H","4H","1Dutc","1Wutc"])test(`${tf} preserves its own protection, objectives and available current-clock evidence`,()=>{
-  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v4");assert.equal(p.requiresNewTestAfter,Date.parse(fixture.observedAt));
+  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v5");assert.equal(p.requiresNewTestAfter,Date.parse(fixture.observedAt));
   assert.equal(p.stopBasis.timeframe,tf);assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(r.currentMarket!.frames.length);
   for(const f of r.currentMarket!.frames)assert.ok(f.candles.every(c=>c.confirmed&&candleCloseTime(c.ts,f.timeframe)!<=Date.parse(fixture.observedAt)));
   globalTradeCards(r);assert.equal(JSON.stringify(r),before);assert.equal(r.entryStudy!.timeframe,tf==="15m"?"5m":tf==="1H"?"15m":tf==="4H"?"1H":tf==="1Dutc"?"4H":"1Dutc");

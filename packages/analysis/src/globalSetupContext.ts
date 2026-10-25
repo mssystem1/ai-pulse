@@ -52,6 +52,10 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
       const opposite=availablePivots.filter(a=>a.kind!==anchor.kind).at(-1);
       if(!opposite||anchor.ts<=opposite.ts)return [];
     }
+    if(assessment==="sideways"&&!range){
+      const opposite=availablePivots.filter(a=>a.kind!==anchor.kind).at(-1);
+      if(!opposite||anchor.ts<=opposite.ts)return [];
+    }
     return bars.flatMap((bar,index)=>{
       if(index<bars.length-6)return [];
       const previous=bars[index-1];
@@ -93,6 +97,18 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   if(range&&rangeMid!==undefined){
     const side=regime!=="range"&&(assessment==="long"||assessment==="short")?assessment:last.close<=rangeMid?"long":"short";
     return pick(side,"range_rotation","range_edge",side==="long"?range.lower[1]:range.upper[0],tf,primaryClosed);
+  }
+  // A mixed primary market has no trend to continue. Plan from its own
+  // supported price location instead of letting EMA order manufacture a bias.
+  if(assessment==="sideways"){
+    const current=report.currentMarket?.quote?.price??latest;
+    const support=report.horizonContext?.zones.filter(z=>z.role==="support"&&z.upper<=current).sort((a,b)=>b.upper-a.upper)[0];
+    const resistance=report.horizonContext?.zones.filter(z=>z.role==="resistance"&&z.lower>=current).sort((a,b)=>a.lower-b.lower)[0];
+    if(support||resistance){
+      const side:Choice["side"]=support&&(!resistance||current-support.upper<=resistance.lower-current)?"long":"short";
+      const zone=side==="long"?support!:resistance!;
+      return pick(side,"level_retest","structure_zone",side==="long"?zone.upper:zone.lower,tf,zone.knownAt);
+    }
   }
   const recent=report.candles.slice(-20),mid=(Math.max(...recent.map(c=>c.high))+Math.min(...recent.map(c=>c.low)))/2;
   const side=assessment==="long"||assessment==="short"?assessment:fast!==undefined&&slow!==undefined&&fast!==slow?fast>slow?"long":"short":primary.close<=mid?"long":"short";
