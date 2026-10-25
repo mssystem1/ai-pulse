@@ -11,6 +11,6 @@ export function globalSetupStrategyProfile(timeframe:string){
   return profiles[frame as keyof typeof profiles]??null;
 }
 export function globalSetupFamilyName(family:string,lang:"en"|"zh"="en"){
-  const names:Record<string,[string,string]>={level_retest:["Structural level retest","??????"],range_rotation:["Range rotation","区间轮动"],ema_pullback:["Trend pullback","趋势回调"],vwap_reversion:["VWAP value reversion","VWAP价值回归"],breakout_retest:["Breakout retest","突破回测"]};
+  const names:Record<string,[string,string]>={level_retest:["Structural level retest","结构价位回测"],range_rotation:["Range rotation","区间轮动"],ema_pullback:["Trend pullback","趋势回调"],vwap_reversion:["VWAP value reversion","VWAP价值回归"],breakout_retest:["Breakout retest","突破回测"]};
   return names[family]?.[lang==="zh"?1:0]??family;
 }

@@ -5,6 +5,14 @@ import {globalRangeSummary} from "./globalRange.js";
 import {globalCoverageLine} from "./globalCoverage.js";
 import {globalDecision} from "./globalDecision.js";
 import {globalFrameReference} from "./globalContext.js";
+import {globalHumanText} from "./globalPresentation.js";
+
+test("saved model prose explains field names without exposing internal identifiers or mutating the report",()=>{
+  const r=globalDesignFixture(),before=structuredClone(r);
+  const text=globalHumanText(r,"setupSelection assessment is mixed; test after requiresNewTestAfter; waveCandidate unclear on 1Dutc.");
+  assert.equal(text,"primary view assessment is mixed; test after this snapshot; Elliott candidate unclear on 1D (UTC).");assert.deepEqual(r,before);
+  r.lang="zh";assert.doesNotMatch(globalHumanText(r,"setupSelection requiresNewTestAfter waveCandidate"),/setupSelection|requiresNewTestAfter|waveCandidate/);
+});
 
 test("range text separates outer boundaries from its tradable support/resistance zones",()=>{
   const r=globalDesignFixture();r.range={lower:[80,81],upper:[84,85],anchorIds:[],startTs:0,touches:4};r.paths[0].direction="range";

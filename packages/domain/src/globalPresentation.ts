@@ -65,7 +65,8 @@ export function globalTimeframeLabel(timeframe: string, lang: "en" | "zh"): stri
 /** Resolve known internal references in provider prose through the saved map.
  * Older saved narratives remain immutable; presentation never prints ID codes. */
 export function globalHumanText(report:GlobalReport,value:string):string {
-  const human=value.replace(/\b(\d+[DWM])utc\b/gi,frame=>globalFrameReference(frame));
+  const zh=report.lang==="zh";
+  const human=value.replace(/\bsetupSelection\b/g,zh?"主周期观点":"primary view").replace(/\brequiresNewTestAfter\b/g,zh?"本次快照":"this snapshot").replace(/\bwaveCandidate\b/g,zh?"艾略特候选结构":"Elliott candidate").replace(/\b(\d+[DWM])utc\b/gi,frame=>globalFrameReference(frame));
   return report.levels.filter(level=>level.id.startsWith("level-")).sort((a,b)=>b.id.length-a.id.length).reduce((text,level)=>text.split(level.id).join(`${globalPrice(report,level.price)} ${report.snapshot.priceCurrency}`),human);
 }
 export function globalPathTitle(report: GlobalReport, path: GlobalPath): string {

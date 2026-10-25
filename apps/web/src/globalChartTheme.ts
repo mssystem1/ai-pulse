@@ -10,9 +10,9 @@ export function globalChartColor(color:string,appearance:GlobalChartAppearance,r
   let rgb=channels(base);
   if(role==="fill"&&luminance(rgb)<.065)return "#eaf0f8"+alpha;
   if(role!=="text"&&luminance(rgb)<.065)return "#a7b6ca"+alpha;
-  // Text meets 4.5:1 against the lightest chart panels; price/study lines
+  // Text meets 7:1 against the lightest chart panels; price/study lines
   // retain their hue with enough contrast to be visible on the light canvas.
-  const required=role==="text"?6:3.5;
+  const required=role==="text"?9:3.5;
   while((1.05)/(luminance(rgb)+.05)<required)rgb=rgb.map(v=>Math.floor(v*.94));
   return '#'+rgb.map(v=>v.toString(16).padStart(2,'0')).join('')+alpha;
 }

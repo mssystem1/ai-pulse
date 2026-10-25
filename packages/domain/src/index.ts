@@ -33,3 +33,5 @@ export * from "./globalHorizonContext.js";
 export * from "./globalOrderFlow.js";
 export * from "./globalSetupStrategies.js";
 export * from "./globalMarketNow.js";
+
+export * from "./globalPriceZones.js";

@@ -1,6 +1,7 @@
 import type {GlobalReport} from "@pulse/schemas";
 import type {GlobalChartCoordinates,GlobalChartOptions} from "./globalChart.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
+import {globalPriceBandText} from "./globalPriceZones.js";
 
 const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
 /** One position drawing and one conditional route through saved entry/target
@@ -16,6 +17,9 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   }
   const entry=card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0];
   const rows=[{role:"Entry",price:entry,color:"#ffcb76"},{role:"SL",price:p.referenceStop,color:"#f0738c"},...card.targets.map((t,i)=>({role:`TP${i+1}`,price:t.price,color:"#53dabb"}))];
+  const zones=report.discretionaryPlan?.priceZones;
+  const rowBand=(index:number)=>zones?(index===0?zones.entry:index===1?zones.stop:zones.targets[index-2]):undefined;
+  const rowText=(index:number)=>{const zone=rowBand(index);return zone?globalPriceBandText(report,zone):index===0?card.entry:price(rows[index].price);};
   let svg=`<g data-trade-plan="${escape(card.key)}" data-confirmed="${card.confirmed}" data-price-labels="exact">`;
   // Start at the conditional entry. Connecting today's close to a remote entry
   // invents an unsupported pullback/rebound forecast, even with a dashed line.
@@ -36,19 +40,22 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const labeled:number[]=[];
   rows.forEach((row,i)=>{
     const y=g.y(row.price);if(y===null||y<g.top||y>g.bottom)return;
+    const zone=rowBand(i),a=zone?g.y(zone.lower):null,b=zone?g.y(zone.upper):null;
+    if(zone&&a!==null&&b!==null){const top=Math.max(g.top,Math.min(a,b)),bottom=Math.min(g.bottom,Math.max(a,b));if(bottom>=top)svg+=`<rect data-trade-zone="${row.role}" data-lower="${zone.lower}" data-upper="${zone.upper}" x="${g.historyEnd+4}" y="${top}" width="${future+3}" height="${Math.max(1,bottom-top)}" fill="${row.color}" fill-opacity=".11" stroke="${row.color}" stroke-opacity=".35"/>`;}
     svg+=`<g data-trade-role="${row.role}" data-price="${row.price}"><line x1="${g.historyEnd+4}" x2="${g.right+7}" y1="${y}" y2="${y}" stroke="${row.color}" stroke-width="${row.role==="SL"?1.5:1.1}"${card.confirmed?"":' stroke-dasharray="5 4"'}/>`;
     // Stagger role tags horizontally, never move a numeric price vertically.
     svg+=txt(g.historyEnd+8+(i%4)*future*.21,y-5,row.role,row.color,10);
     if(labeled.every(prior=>Math.abs(prior-y)>=17)){
-      labeled.push(y);svg+=`<rect x="${g.right+8}" y="${y-10}" width="132" height="18" rx="3" fill="${row.color}" fill-opacity=".12"/>`+txt(g.right+132,y+3,price(row.price),row.color,11,"end");
+      labeled.push(y);svg+=`<rect x="${g.right+8}" y="${y-10}" width="132" height="18" rx="3" fill="${row.color}" fill-opacity=".12"/>`+txt(g.right+132,y+3,rowText(i),row.color,zones?9:11,"end");
     }
     svg+="</g>";
   });
-  const ledgerHeight=44+rows.length*18,mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;
+  const ledgerHeight=44+rows.length*18+(zones?20:0),mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;
   const ledgerY=mean>(g.top+g.bottom)/2?g.top+42:g.bottom-ledgerHeight-14,lx=g.historyEnd+14,lw=Math.max(100,future-30);
   svg+=`<g data-trade-price-ledger="${escape(card.key)}"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
   svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"}${report.discretionaryPlan?"":` · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`}`,card.side==="long"?"#53dabb":"#f0738c",11);
-  rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,row.role==="Entry"?card.entry:price(row.price),row.color,10,"end");});
+  rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,rowText(i),row.color,zones?9:10,"end");});
+  if(zones)svg+=txt(lx+10,ledgerY+37+rows.length*18,`${zh?"硬止损":"Hard SL"}: ${price(p.referenceStop)}`,"#f0738c",10);
   svg+="</g>";
   const alternative=cards.find(c=>c.key!==card.key&&c.side!==card.side);
   if(alternative)svg+=txt(g.historyEnd+14,g.bottom-4,zh?"反向计划的 Entry / SL / TP 见下表。":"Other side: Entry / SL / TP in the plan below.","#9eafc5",8);

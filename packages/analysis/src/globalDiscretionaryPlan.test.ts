@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {GlobalReportSchema,candleCloseTime} from "@pulse/schemas";
-import {globalTradeCards,globalRiskMeasurement,globalSetupStrategyProfile,globalReportChartSvg,globalEntryStudySvg,globalArtifactReference,globalDecision,globalSections} from "@pulse/domain";
+import {globalTargetReference,globalTradeCards,globalRiskMeasurement,globalSetupStrategyProfile,globalReportChartSvg,globalEntryStudySvg,globalArtifactReference,globalDecision,globalSections} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
@@ -19,7 +19,7 @@ test("all five horizons retain their own objective and protection frames with a 
     assert.equal(p.objectiveTimeframe,frame);assert.equal(p.stopBasis.timeframe,frame);assert.equal(risk.timeframe,frame);
     const decision=globalDecision(report);
     assert.equal(decision.nextSetup.trigger,p.entry);assert.equal(decision.nextSetup.planningStop,p.stop);
-    assert.deepEqual(decision.nextSetup.targets.map(t=>t.price),p.targets.map(t=>t.price));assert.equal(decision.currentAction,"WAIT");
+    assert.deepEqual(decision.nextSetup.targets.map(t=>t.price),p.targets.map((_t,i)=>globalTargetReference(report,i)));assert.equal(decision.currentAction,"WAIT");
     assert.ok(decision.changeView.includes(p.stopBasis.price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision})));
     assert.deepEqual(globalSections(report).find(s=>s.title==="Setup route")!.lines,[decision.route,decision.entryInstruction,decision.changeView]);
     assert.ok(p.targets.every(t=>t.timeframe===frame));assert.equal(card.confirmed,false);
@@ -48,9 +48,9 @@ test("a distant weekly SL cannot flatten the daily entry detail or change any pl
 
 test("daily range protection uses the daily low and daily volatility; 4H barriers never become daily targets",()=>{
   const report=make("1Dutc"),p=report.discretionaryPlan!,atr=report.indicators.atr.points.at(-1)!.value;
-  assert.equal(p.family,"breakout_retest");assert.equal(p.entry,82291.1);
-  assert.equal(p.stopBasis.price,79775.1);assert.ok(Math.abs(p.stop-(79775.1-atr*.2))<1e-6);
-  assert.ok(p.stop<79775.1);assert.ok(Math.abs(p.entry-p.stop)>atr);
+  assert.equal(p.family,"level_retest");assert.equal(p.priceZones!.entry.sourcePrice,81760);assert.equal(p.evidence!.level,82291.1);
+  assert.equal(p.stopBasis.price,80400);assert.ok(Math.abs(p.stop-(80400-atr*.2))<1e-6);
+  assert.ok(p.stop<80400);assert.ok(Math.abs(p.entry-p.stop)>atr*.5);
   assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);assert.ok(p.barriers.some(t=>t.price===83439.9&&t.timeframe==="4H"));
   assert.ok(!p.barriers.some(t=>t.price===83168.2),"The earlier 4H level was already reached by the newer wick");
   assert.ok(globalTradeCards(report)[0].rr!<1.5,"A priced setup is not hidden by the legacy reward gate");
@@ -78,7 +78,7 @@ test("a displayed daily setup rejects lower-frame protection and future barrier 
   const report=make("1Dutc"),wrong=structuredClone(report);
   wrong.discretionaryPlan!.stopBasis.timeframe="4H";
   assert.equal(GlobalReportSchema.safeParse(wrong).success,false);
-  const future=structuredClone(report);future.discretionaryPlan!.barriers[0].knownAt=Date.parse(future.snapshot.observedAt)+1;
+  const future=structuredClone(report);future.discretionaryPlan!.barriers.push({price:future.discretionaryPlan!.entry+1,timeframe:"4H",anchorTs:future.candles.at(-1)!.ts,knownAt:Date.parse(future.snapshot.observedAt)+1});
   assert.equal(GlobalReportSchema.safeParse(future).success,false);
 });
 
@@ -87,7 +87,7 @@ test("VWAP rejection uses primary-frame band entry, outer-band protection and fi
   const three=vwap.bands!.find(b=>b.multiple===3)!.upper.at(-1)!.value,one=vwap.bands!.find(b=>b.multiple===1)!.upper.at(-1)!.value;
   primary.high=two+100;primary.close=two-100;report.snapshot.price=primary.close;report.entryStudy!.candles.at(-1)!.close=two-100;
   applyGlobalDiscretionaryPlan(report);const p=report.discretionaryPlan!;
-  assert.equal(p.family,"vwap_reversion");assert.equal(p.side,"short");assert.equal(p.entry,two);assert.ok(p.stop>three);
+  assert.equal(p.family,"vwap_reversion");assert.equal(p.side,"short");assert.equal(p.priceZones!.entry.sourceLower,two);assert.ok(p.entry>=two&&p.entry<=three);assert.ok(p.stop>three);
   assert.deepEqual(p.targets.map(t=>[t.price,t.timeframe,t.basis]),[[one,"1Dutc","vwap_band"],[vwap.points.at(-1)!.value,"1Dutc","vwap_band"]]);
   assert.equal(p.entryBasis.knownAt,candleCloseTime(primary.ts,"1Dutc"));assert.equal(p.stopBasis.timeframe,"1Dutc");
   const lowerOnly=make("1Dutc"),bar=lowerOnly.entryStudy!.candles.at(-1)!;bar.high=two+100;bar.close=two-100;
@@ -148,7 +148,7 @@ test("a lost structural cross and future pivot cannot supply the current entry",
 
 test("an obsolete crossed level cannot override the latest local structural sequence",()=>{
   const report=make("4H"),p=report.discretionaryPlan!;
-  assert.equal(p.side,"long");assert.equal(p.family,"breakout_retest");assert.equal(p.entry,82276.2);
+  assert.equal(p.side,"long");assert.equal(p.family,"level_retest");assert.equal(p.evidence!.level,82276.2);assert.equal(p.priceZones!.entry.sourcePrice,82291.1);
   assert.notEqual(p.entry,82800);assert.ok(p.targets.every(t=>t.price<=report.range!.upper[1]));
 });
 
@@ -157,7 +157,7 @@ test("old conditional plans receive an explicit current review without changing 
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v5");assert.equal(review.discretionaryPlan!.entry,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v6");assert.equal(review.discretionaryPlan!.evidence!.level,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 
@@ -170,7 +170,7 @@ test("conditional barriers retain both primary and entry evidence, rejecting for
   applyGlobalDiscretionaryPlan(report);
   assert.ok(report.discretionaryPlan!.barriers.some(b=>b.timeframe==="1Dutc"));
   assert.ok(report.discretionaryPlan!.barriers.some(b=>b.timeframe==="4H"));
-  const wrong=make("1Dutc");wrong.discretionaryPlan!.barriers[0].timeframe="2H";
+  const wrong=make("1Dutc");wrong.discretionaryPlan!.barriers.push({price:wrong.discretionaryPlan!.entry+1,timeframe:"2H",anchorTs:wrong.candles.at(-1)!.ts,knownAt:Date.parse(wrong.snapshot.observedAt)});
   assert.equal(GlobalReportSchema.safeParse(wrong).success,false);
 });
 

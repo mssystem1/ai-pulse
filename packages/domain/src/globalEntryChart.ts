@@ -3,6 +3,7 @@ import {globalTradePlan} from "./globalTradePlan.js";
 import {globalFrameReference} from "./globalContext.js";
 import {globalDecision} from "./globalDecision.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
+import {globalPriceBandText} from "./globalPriceZones.js";
 
 const esc=(x:unknown)=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
 /** The lower-frame signal is marked on its actual bar, never as a larger-frame close. */
@@ -30,7 +31,11 @@ export function globalEntryStudySvg(report:GlobalReport,width=660,selectedPathId
   const priceRows=tradeView?[{role:"Entry",value:p.referenceEntry?.[p.side==="long"?1:0],color:"#ffcb76"},{role:"SL",value:p.referenceStop,color:"#f0738c"},{role:"TP1",value:card?.targets[0]?.price??report.levels.find(l=>l.id===p.targetIds[0])?.price,color:"#53dabb"}]:[{role:"",value:p.referenceEntry?.[0],color:"#829ab4"},{role:"",value:p.referenceStop,color:"#829ab4"}];
   const outside=showPlan?priceRows.filter(row=>row.value!==undefined&&row.value!==null&&(row.value<min||row.value>max)):[];
   svg+=`<metadata data-entry-local-scale="true" data-entry-offscale-levels="${esc(outside.map(row=>row.role).join(","))}"/>`;
-  for(const [i,row] of priceRows.entries())if(showPlan&&row.value&&row.value>=min&&row.value<=max){svg+=`<g data-entry-price-role="${row.role}" data-price="${row.value}"><line x1="${left}" y1="${y(row.value)}" x2="${right}" y2="${y(row.value)}" stroke="${row.color}" stroke-dasharray="4 5" opacity=".8"/>`+(tradeView?txt(left+5+i*90,y(row.value)-4,`${row.role} ${price(row.value)}`,row.color,9):"")+"</g>";}
+  for(const [i,row] of priceRows.entries())if(showPlan&&row.value&&row.value>=min&&row.value<=max){
+    const zones=report.discretionaryPlan?.priceZones,zone=zones?(row.role==="Entry"?zones.entry:row.role==="SL"?zones.stop:zones.targets[0]):undefined;
+    if(zone){const a=Math.max(top,Math.min(bottom,y(zone.upper))),b=Math.max(top,Math.min(bottom,y(zone.lower)));if(b>=a)svg+=`<rect data-entry-price-zone="${row.role}" data-lower="${zone.lower}" data-upper="${zone.upper}" x="${left}" y="${a}" width="${right-left}" height="${Math.max(1,b-a)}" fill="${row.color}" fill-opacity=".10"/>`;}
+    svg+=`<g data-entry-price-role="${row.role}" data-price="${row.value}"><line x1="${left}" y1="${y(row.value)}" x2="${right}" y2="${y(row.value)}" stroke="${row.color}" stroke-dasharray="4 5" opacity=".8"/>`+(tradeView?txt(left+5+i*90,y(row.value)-4,`${row.role} ${zone?globalPriceBandText(report,zone):price(row.value)}`,row.color,9):"")+"</g>";
+  }
 
   const closed=candleCloseTime(last.ts,study.timeframe),date=(ts:number)=>new Date(ts).toISOString().slice(5,16).replace("T"," ");
   svg+=txt(left,193,`${date(bars[0].ts)} → ${closed?date(closed):"—"} UTC · ${zh?"最后收盘":"last close"} ${price(last.close)}`,"#a5b7cd",10);

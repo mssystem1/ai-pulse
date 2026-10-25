@@ -1,5 +1,6 @@
 import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
+import {applyGlobalPriceZones} from "./globalPriceZones.js";
 
 /** A complete conditional scenario when an observed signal is not established.
  * It does not change the canonical signal, history or execution permission. */
@@ -102,4 +103,5 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
   if(study){const extreme=bars.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));barrierCandidates.push({price:side==="long"?extreme.high:extreme.low,timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,timeframe)!,kind:side==="long"?"high":"low",retestable:false});}
   const barriers=barrierCandidates.filter(a=>a.kind===(side==="long"?"high":"low")&&forward(a.price)&&(a.retestable||unplayed(a.price,a.knownAt))&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).filter((a,i,all)=>all.findIndex(b=>b.price===a.price&&b.timeframe===a.timeframe)===i).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
   report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
+  applyGlobalPriceZones(report);
 }

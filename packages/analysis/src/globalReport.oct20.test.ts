@@ -17,7 +17,7 @@ function make(frame:string,tier:"base"|"premium"="premium",lang:"en"|"zh"="en"){
 test("Oct 20 1H: current primary extreme supplies the first objective; older resistance remains context",()=>{
   const r=make("1H"),card=globalTradeCards(r)[0];
   assert.equal(r.snapshot.price,82770.1);assert.equal(r.setupSelection!.assessment,"long");
-  assert.equal(card.side,"long");assert.equal(card.targets[0].price,83439.9);
+  assert.equal(card.side,"long");assert.equal(card.targets[0].price,83272);assert.equal(r.discretionaryPlan!.targets[0].price,83439.9);
   assert.equal(r.discretionaryPlan!.targets[0].basis,"observed_extreme");
   assert.ok(card.plan.referenceEntry);assert.ok(card.plan.referenceStop);
   assert.equal(card.confirmed,false);assert.equal(globalDecision(r).currentAction,"WAIT");
@@ -47,14 +47,14 @@ test("Oct 20 daily: old support is not a justified entry; newer 4H structure has
   assert.equal(reclaimed.ts,r.entryStudy!.candles.at(-1)!.ts,"No later completed retest exists after this local reclaim");
   assert.ok(r.entryStudy!.pivots.some(a=>a.kind==="high"&&a.price===83168.2&&a.confirmedAt!==null));
   assert.equal(globalDecision(r).currentAction,"WAIT");assert.equal(globalTradeCards(r).length,1);
-  assert.equal(r.discretionaryPlan!.entry,82291.1);assert.notEqual(r.discretionaryPlan!.entry,80400);
+  assert.equal(r.discretionaryPlan!.evidence!.level,82291.1);assert.ok(r.discretionaryPlan!.entry<82291.1);assert.notEqual(r.discretionaryPlan!.entry,80400);
   assert.deepEqual(r.discretionaryPlan!.targets.map(t=>t.price),[84361.6,87238.3]);
   assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe==="1Dutc"));
   assert.ok(r.discretionaryPlan!.barriers.some(t=>t.timeframe==="4H"&&t.price===83439.9));
   assert.ok(!r.discretionaryPlan!.barriers.some(t=>t.price===83168.2),"A newer completed wick reached the old barrier");
   assert.doesNotMatch(svg,/data-scenario-projection=|NO VALIDATED ENTRY/);assert.match(svg,/data-trade-price-ledger=/);
   assert.match(r.setupSelection!.evidence.join(' '),/81,200 \(higher low\).*83,168.2/);
-  assert.match(globalSections(r).flatMap(s=>s.lines).join(' '),/82,291.10/);
+  assert.match(globalSections(r).flatMap(s=>s.lines).join(' '),/82,291.1(?:0)?/);
   assert.doesNotMatch(svg,/PULSE · GLOBAL[^<]*#[0-9a-f]{8}/);
 });
 

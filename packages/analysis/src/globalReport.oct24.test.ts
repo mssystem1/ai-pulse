@@ -34,7 +34,7 @@ test("4H keeps the latest primary low before distant old objectives",()=>{
 
 test("all attached horizons require a new post-snapshot test and preserve their distinct source clocks",()=>{
   for(const frame of Object.keys(cutoffs)){
-    const r=make(frame),p=r.discretionaryPlan!;assert.equal(p.version,"discretionary-plan-v5");assert.equal(p.requiresNewTestAfter,Date.parse(cutoffs[frame]));
+    const r=make(frame),p=r.discretionaryPlan!;assert.equal(p.version,"discretionary-plan-v6");assert.equal(p.requiresNewTestAfter,Date.parse(cutoffs[frame]));
     assert.ok(p.reference.completedAt<=p.requiresNewTestAfter!);assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.reference.price)>0));
     assert.match(globalTradeCards(r)[0].condition,/new test formed after this snapshot/);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   }
@@ -44,7 +44,7 @@ test("free review repairs v2 target freshness without rewriting the purchased so
   const r=make("1H");r.discretionaryPlan!.version="discretionary-plan-v2";r.discretionaryPlan!.targets=[{...r.discretionaryPlan!.targets[0],price:79775.1}];
   r.narrative.reasons=["TP1 79,775.10 is the current objective."];
   const before=structuredClone(r),fixed=reviewGlobalTargetReport(r);assert.deepEqual(r,before);assert.deepEqual(fixed.candles,r.candles);assert.deepEqual(fixed.entryStudy,r.entryStudy);
-  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v5");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
+  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v6");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
   assert.deepEqual(fixed.narrative.reasons,[]);assert.match(fixed.narrative.summary,/79,220.10/);
 });
 

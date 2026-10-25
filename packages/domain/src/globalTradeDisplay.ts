@@ -61,8 +61,9 @@ export function globalTradeCardLines(report:GlobalReport){return globalTradeCard
 export function globalHistoricalLevelLines(report:GlobalReport){
   const close=report.entryStudy?.candles.at(-1)?.close??report.snapshot.price;if(close===null)return [];
   const active=new Set(report.strategy?.routes.flatMap(r=>[...r.objectiveIds,r.protectionLevelId])??[]);
-  const priced=report.discretionaryPlan,usedPrices=new Set(priced?[priced.entry,priced.stop,...priced.targets.map(t=>t.price)]:[]);
-  const levels=(report.strategy?.contextLevelIds??[]).flatMap(id=>{const l=report.levels.find(l=>l.id===id);return l&&!active.has(id)&&!usedPrices.has(l.price)&&l.basis==="swing"&&l.anchorIds.some(id=>report.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null))?[l]:[];});
+  const priced=report.discretionaryPlan,usedPrices=new Set(priced?[priced.entry,priced.stop,...priced.targets.map(t=>t.price),...(priced.priceZones?[priced.priceZones.entry.lower,priced.priceZones.entry.upper,priced.priceZones.entry.sourcePrice,priced.priceZones.stop.lower,priced.priceZones.stop.upper,...priced.priceZones.targets.flatMap(z=>[z.lower,z.upper])]:[])]:[]);
+  const usedBands=priced?.priceZones?[priced.priceZones.entry,priced.priceZones.stop,...priced.priceZones.targets]:[];
+  const levels=(report.strategy?.contextLevelIds??[]).flatMap(id=>{const l=report.levels.find(l=>l.id===id);return l&&!active.has(id)&&!usedPrices.has(l.price)&&!usedBands.some(b=>l.price>=b.lower&&l.price<=b.upper)&&l.basis==="swing"&&l.anchorIds.some(id=>report.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null))?[l]:[];});
   const show=[...levels.filter(l=>l.price>close).sort((a,b)=>a.price-b.price).slice(0,3),...levels.filter(l=>l.price<close).sort((a,b)=>b.price-a.price).slice(0,3)];
   const extremes=[levels.reduce<typeof levels[number]|undefined>((a,b)=>!a||b.price>a.price?b:a,undefined)];
   for(const level of extremes)if(level&&!show.includes(level))show.push(level);

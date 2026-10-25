@@ -151,6 +151,12 @@ See the [chart user guide](docs/GLOBAL_REPORT_CHART_GUIDE.md) or the English/Chi
 
 Global reports follow the selected appearance, including a light Clarity chart and PNG export. Each conditional setup explains its primary direction, entry source, invalidation and nearest obstacle. Mixed primary structure uses its own supported price location rather than deriving a trend from EMA order alone. Shared market levels across horizons retain separate confirmation and protection. Payoff below 1R is explained alongside the visible plan; targets and stops are not moved to improve its displayed ratio.
 
+Current conditional reports show evidenced Entry/SL/TP intervals and a fixed **Hard SL**. Reward calculations use the least favorable entry and the first-touch target boundary, including nearer obstacles; entry ranges may be restricted within their actual source zone. Overlapping targets are consolidated. Mixed daily/weekly direction follows completed primary reactions rather than live-quote midpoint crossings. A free review upgrades older conditional snapshots using their saved data; confirmed prices remain intact.
+
+Confirmation is separate from execution: entry still requires a price inside the displayed Entry range. If confirmation closes outside it, wait for a return or reassess; the range's reward/risk is not a claim about a different fill price.
+
+The [October 25 report audit](docs/GLOBAL_REPORT_ZONE_AUDIT_2026-10-25.md) records the source corrections and five paid timeframe deliveries. The [chart guide](docs/GLOBAL_REPORT_CHART_GUIDE.md) explains zones, source clocks, timeframe context and inspection controls.
+
 ### Prediction Market
 
 Prediction discovery is free and lives inside the main application rather than on a separate page. The user opens the market picker, chooses one active crypto price/direction question, reviews its probabilities, order books, liquidity, volume, open interest, restriction status, and resolution rules, then purchases Quick or Pro prediction analysis. PULSE validates condition/outcome identity, order-book availability, freshness, liquidity, spread, depth, history, and horizon. Restricted markets remain usable as public read-only evidence when active and orderbook-enabled, but the restriction is always disclosed and PULSE never places an order.

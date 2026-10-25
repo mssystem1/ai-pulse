@@ -101,11 +101,15 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   // A mixed primary market has no trend to continue. Plan from its own
   // supported price location instead of letting EMA order manufacture a bias.
   if(assessment==="sideways"){
-    const current=report.currentMarket?.quote?.price??latest;
+    const current=primary.close;
     const support=report.horizonContext?.zones.filter(z=>z.role==="support"&&z.upper<=current).sort((a,b)=>b.upper-a.upper)[0];
     const resistance=report.horizonContext?.zones.filter(z=>z.role==="resistance"&&z.lower>=current).sort((a,b)=>a.lower-b.lower)[0];
     if(support||resistance){
-      const side:Choice["side"]=support&&(!resistance||current-support.upper<=resistance.lower-current)?"long":"short";
+      // Prefer the completed primary reaction. A live quote crossing the
+      // midpoint between two zones must not reverse a daily/weekly thesis.
+      const held=Boolean(support&&primary.low<=support.upper&&primary.close>support.upper);
+      const rejected=Boolean(resistance&&primary.high>=resistance.lower&&primary.close<resistance.lower);
+      const side:Choice["side"]=held!==rejected?(held?"long":"short"):support&&(!resistance||current-support.upper<=resistance.lower-current)?"long":"short";
       const zone=side==="long"?support!:resistance!;
       return pick(side,"level_retest","structure_zone",side==="long"?zone.upper:zone.lower,tf,zone.knownAt);
     }

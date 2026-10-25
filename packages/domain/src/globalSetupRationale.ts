@@ -1,5 +1,6 @@
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference,globalContextLine} from "./globalContext.js";
+import {globalPriceBandText,globalTargetReference,globalPriceZonePayoff} from "./globalPriceZones.js";
 
 /** Explain saved evidence without converting a conditional level into a signal. */
 export function globalSetupRationale(report:GlobalReport,current:number|null):string[]{
@@ -23,14 +24,16 @@ export function globalSetupRationale(report:GlobalReport,current:number|null):st
     const rsi=report.indicators.rsi.points.at(-1)?.value;if(rsi!==undefined)lines.push(`${tf} RSI14: ${rsi.toFixed(2)}.`);
   }
   lines.push(zh?'本快照之后仍需新的入场反应；主周期方向本身不构成入场信号。':'A new entry reaction after this snapshot is still required; the primary direction alone is not an entry signal.');
-  const kind=d.entryBasis.kind,source=globalFrameReference(d.entryBasis.timeframe);
-  if(kind==="ema_ribbon")lines.push(zh?`入场依据：${source} EMA 区域 ${price(d.entry)}，截至 ${at(d.entryBasis.knownAt)}；尚需新的回测反应。`:`Entry basis: ${source} EMA ribbon ${price(d.entry)}, as of ${at(d.entryBasis.knownAt)}; a new retest reaction is still required.`);
+  const kind=d.entryBasis.kind,source=globalFrameReference(d.entryBasis.timeframe),sourcePrice=d.priceZones?.entry.sourcePrice??d.entry;
+  if(kind==="ema_ribbon")lines.push(zh?`入场依据：${source} EMA 区域 ${price(d.entry)}，截至 ${at(d.entryBasis.knownAt)}；尚需新的回测反应。`:`Entry basis: ${source} EMA ribbon ${price(sourcePrice)}, as of ${at(d.entryBasis.knownAt)}; a new retest reaction is still required.`);
   if(kind==="structure_zone"){
-    const zone=report.horizonContext?.zones.find(z=>z.role===(d.side==="long"?'support':'resistance')&&(d.side==="long"?z.upper:z.lower)===d.entry);
+    const zone=report.horizonContext?.zones.find(z=>z.role===(d.side==="long"?'support':'resistance')&&(d.side==="long"?z.upper:z.lower)===sourcePrice);
     if(zone)lines.push(zh?`入场依据：${tf} ${d.side==="long"?'支撑':'阻力'} ${price(zone.lower)}–${price(zone.upper)}；等待新的回测。`:`Entry basis: ${tf} ${d.side==="long"?'support':'resistance'} ${price(zone.lower)}–${price(zone.upper)}; await a new held or rejected retest.`);
   }
   lines.push(zh?`止损依据：${tf} 失效价 ${price(d.stopBasis.price)}，时间 ${at(d.stopBasis.anchorTs)}；止损 ${price(d.stop)} 位于其外侧。`:`Protection basis: ${tf} invalidation ${price(d.stopBasis.price)}, dated ${at(d.stopBasis.anchorTs)}; SL ${price(d.stop)} is beyond it.`);
-  const sign=d.side==="long"?1:-1,risk=Math.abs(d.entry-d.stop),rr=sign*(d.targets[0].price-d.entry)/risk,barrier=d.barriers[0];
+  const sign=d.side==="long"?1:-1,risk=Math.abs(d.entry-d.stop),rr=sign*(globalTargetReference(report,0)!-d.entry)/risk,barrier=d.barriers[0];
+  const payoff=globalPriceZonePayoff(report);
+  if(d.priceZones&&payoff)lines.push(zh?`入场区 ${globalPriceBandText(report,d.priceZones.entry)}；止损区 ${globalPriceBandText(report,d.priceZones.stop)}，硬止损 ${price(d.stop)}。按最不利入场计算，最近障碍 ${payoff.worstToObstacle.toFixed(2)}R。`:`Entry zone ${globalPriceBandText(report,d.priceZones.entry)}; SL zone ${globalPriceBandText(report,d.priceZones.stop)}, hard SL ${price(d.stop)}. At the least favorable fill, the nearest obstacle offers ${payoff.worstToObstacle.toFixed(2)}R.`);
   if(current!==null&&sign*(current-d.entry)>0)lines.push(zh?`当前价格与入场相差 ${price(Math.abs(current-d.entry))}；只有价格重新回测入场区域时本计划才适用，当前价格不代表入场。`:`Price is ${price(Math.abs(current-d.entry))} beyond entry; this plan applies only if price returns to the entry area and reacts. The current quote is not an entry fill.`);
   if(barrier)lines.push(zh?`最近障碍 ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)}：${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R；TP1 ${rr.toFixed(2)}R。`:`Nearest obstacle: ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)} offers ${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R; TP1 offers ${rr.toFixed(2)}R.`);
   if(rr<1)lines.push(zh?`TP1 仅提供 ${rr.toFixed(2)}R，低于完整止损风险；这些价位不构成具备收益优势的结论。`:`TP1 offers ${rr.toFixed(2)}R, less than the full stop risk; these levels do not establish a favorable payoff.`);

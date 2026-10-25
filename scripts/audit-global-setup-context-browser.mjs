@@ -6,7 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {prepareGlobalReport,globalContextTimeframe} from '../packages/analysis/dist/globalReport.js';
-import {globalTradeCards,globalDecision,globalSetupWindow} from '../packages/domain/dist/index.js';
+import {globalTradeCards,globalDecision,globalSetupWindow,globalPriceBandText} from '../packages/domain/dist/index.js';
 
 const fixture=JSON.parse(fs.readFileSync('packages/analysis/src/globalReport.oct20-fixture.json','utf8'));
 const args=process.argv.slice(2),currentIndex=args.indexOf('--current-dir'),currentDir=currentIndex<0?null:args[currentIndex+1],flowFile=args[0]&&!args[0].startsWith('--')?args[0]:null;
@@ -105,6 +105,16 @@ try{
       assert.equal(await evaluate('document.querySelectorAll("[data-trade-card]").length'),card?1:0);
       assert.equal(await evaluate('document.querySelectorAll(".global-chart-overlay [data-scenario-projection]").length'),0);
       if(card&&card.plan.referenceStop!==null){
+        const priceZones=currentReport.discretionaryPlan?.priceZones;
+        if(priceZones){
+          const rendered=await evaluate('Array.from(document.querySelectorAll(".global-chart-overlay [data-trade-zone]")).map(e=>({role:e.dataset.tradeZone,lower:Number(e.dataset.lower),upper:Number(e.dataset.upper)}))');
+          const expected=[{role:'Entry',lower:priceZones.entry.lower,upper:priceZones.entry.upper},{role:'SL',...priceZones.stop},...priceZones.targets.map((z,i)=>({role:'TP'+(i+1),...z}))];
+          assert.deepEqual(rendered,expected,'Native zone boundaries must match the saved source-backed intervals');
+          const ledger=await evaluate('document.querySelector(".global-chart-overlay [data-trade-price-ledger]").textContent');
+          assert.ok(ledger.includes(card.entry)&&ledger.includes(card.stop));
+          for(const z of priceZones.targets)assert.ok(ledger.includes(globalPriceBandText(currentReport,z)),'Ledger must retain the complete TP interval');
+          for(const z of priceZones.targets)assert.ok(text.includes(globalPriceBandText(currentReport,z)),'Report card must match its drawn TP interval');
+        }
         assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-role="+JSON.stringify("SL")+"]").dataset.price'),String(card?.plan.referenceStop));
         if(currentReport.entryStudy?.status==='available'){
           const detail=await evaluate('({visible:document.querySelector(".global-entry-detail [data-entry-price-role=SL]")?.dataset.price,offscale:document.querySelector(".global-entry-detail [data-entry-local-scale]")?.dataset.entryOffscaleLevels})');

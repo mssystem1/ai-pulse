@@ -87,7 +87,8 @@ export const GlobalHorizonContextSchema=z.object({
 /** A priced scenario for the trader's decision, separate from observed signal
  * and order authorization. Every price retains its saved candle provenance. */
 export const GlobalDiscretionaryPlanSchema=z.object({
-  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3","discretionary-plan-v4","discretionary-plan-v5"]),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
+  version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3","discretionary-plan-v4","discretionary-plan-v5","discretionary-plan-v6"]),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
+  priceZones:z.object({version:z.literal("price-zones-v1"),entry:z.object({lower:price,upper:price,sourceLower:price,sourceUpper:price,sourcePrice:price}),stop:z.object({lower:price,upper:price}),targets:z.array(z.object({lower:price,upper:price})).min(1).max(3),payoffFloor:z.literal(1),payoffLimited:z.boolean()}).optional(),
   evidence:z.object({kind:z.enum(["local_reclaim","primary_reclaim"]),timeframe:z.string(),level:price,testTs:time,completedAt:time,extreme:price}).optional(),
   family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest","level_retest"]),objectiveTimeframe:z.string(),
   entry:price,stop:price,
@@ -139,8 +140,33 @@ export const GlobalReportSchema = z.object({
   const discretionary=report.discretionaryPlan;
   if(discretionary){
     if(discretionary.entryBasis.kind==="structure_zone"){
-      const zone=report.horizonContext?.zones.find(z=>z.role===(discretionary.side==="long"?"support":"resistance")&&(discretionary.side==="long"?z.upper:z.lower)===discretionary.entry&&z.knownAt===discretionary.entryBasis.knownAt);
+      const sourcePrice=discretionary.priceZones?.entry.sourcePrice??discretionary.entry;
+      const zone=report.horizonContext?.zones.find(z=>z.role===(discretionary.side==="long"?"support":"resistance")&&(discretionary.side==="long"?z.upper:z.lower)===sourcePrice&&z.knownAt===discretionary.entryBasis.knownAt);
       if(!zone||discretionary.entryBasis.timeframe!==report.snapshot.timeframe||discretionary.stopBasis.price!==(discretionary.side==="long"?zone.lower:zone.upper)||discretionary.stopBasis.anchorTs!==zone.startTs)ctx.addIssue({code:z.ZodIssueCode.custom,message:"A structural retest must retain its primary entry zone and outer invalidation boundary"});
+    }
+    if(discretionary.version==="discretionary-plan-v6"){
+      const p=discretionary,z=p.priceZones,near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b)),sign=p.side==="long"?1:-1;
+      const point=(a:number)=>({lower:a,upper:a}),band=(a:number,b:number)=>({lower:Math.min(a,b),upper:Math.max(a,b)});
+      let expected=z?point(z.entry.sourcePrice):point(p.entry);
+      if(z){
+        const original=z.entry.sourcePrice;
+        if(p.entryBasis.kind==="structure_zone"){const source=report.horizonContext?.zones.find(s=>s.role===(p.side==="long"?"support":"resistance")&&(p.side==="long"?s.upper:s.lower)===original&&s.knownAt===p.entryBasis.knownAt);if(source)expected=band(source.lower,source.upper);}
+        else if(p.entryBasis.kind==="ema_ribbon"){const values=report.indicators.ema?.filter(e=>e.period===12||e.period===25).flatMap(e=>e.points.at(-1)?.value??[])??[];if(values.length===2)expected=band(values[0],values[1]);}
+        else if(p.entryBasis.kind==="range_edge"&&report.range){const source=p.side==="long"?(p.family==="range_rotation"?report.range.lower:report.range.upper):(p.family==="range_rotation"?report.range.upper:report.range.lower);expected=band(source[0],source[1]);}
+        else if(p.entryBasis.kind==="vwap_band"){const outer=report.indicators.vwap?.bands?.find(b=>b.multiple===3)?.[p.side==="long"?"lower":"upper"].at(-1)?.value;if(outer!==undefined&&outer>0)expected=band(original,outer);}
+        else if(p.evidence){const e=p.evidence,source=[{timeframe:report.snapshot.timeframe,candles:report.candles},...(report.entryStudy?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])].find(s=>s.timeframe===e.timeframe)?.candles.find(c=>c.ts===e.testTs);if(source)expected=band(original,source.close);}
+      }
+      const invalid=!z||z.entry.lower>z.entry.upper||sign*((p.side==="long"?z.entry.lower:z.entry.upper)-p.stop)<=0||z.entry.lower<z.entry.sourceLower&&!near(z.entry.lower,z.entry.sourceLower)||z.entry.upper>z.entry.sourceUpper&&!near(z.entry.upper,z.entry.sourceUpper)||!near(z.entry.sourceLower,expected.lower)||!near(z.entry.sourceUpper,expected.upper)||!near(p.entry,p.side==="long"?z.entry.upper:z.entry.lower)||!near(z.stop.lower,Math.min(p.stop,p.stopBasis.price))||!near(z.stop.upper,Math.max(p.stop,p.stopBasis.price))||z.targets.length!==p.targets.length||z.targets.some((b,i)=>{
+        const t=p.targets[i];if(b.lower>b.upper||sign*((p.side==="long"?b.lower:b.upper)-p.entry)<=0)return true;
+        if(near(b.lower,t.price)&&near(b.upper,t.price))return false;
+        if(t.basis==="structure_zone")return !report.horizonContext?.zones.some(s=>s.startTs===t.anchorTs&&s.knownAt===t.knownAt&&near(s.lower,b.lower)&&near(s.upper,b.upper)&&(p.side==="long"?s.lower:s.upper)===t.price);
+        if(t.basis==="confirmed_swing"||t.basis==="observed_extreme"){const c=report.candles.find(c=>c.ts===t.anchorTs);if(!c)return true;const source=p.side==="long"?band(Math.max(c.open,c.close),c.high):band(c.low,Math.min(c.open,c.close));return !near(b.lower,source.lower)||!near(b.upper,source.upper);}
+        return true;
+      });
+      if(invalid)ctx.addIssue({code:"custom",message:"Price zones must retain evidenced entry bounds, hard-stop protection and primary target bands"});
+      if(z){const first=p.side==="long"?z.targets[0].lower:z.targets[0].upper,obstacle=p.barriers[0]?.price??first,rr=sign*(obstacle-p.entry)/Math.abs(p.entry-p.stop);
+        if(p.barriers.some(b=>sign*(first-b.price)<=0)||z.payoffLimited!==(rr<1-1e-9)||z.targets.some((b,i)=>i>0&&(p.side==="long"?b.lower<=z.targets[i-1].upper:b.upper>=z.targets[i-1].lower)))ctx.addIssue({code:"custom",message:"Price-zone payoff must use the worst entry, hard stop and nearest obstacle, with nonoverlapping targets"});
+      }
     }
     const r=discretionary.reference,bars=r.timeframe===report.snapshot.timeframe?report.candles:r.timeframe===report.entryStudy?.timeframe?report.entryStudy.candles:[],bar=bars.find(c=>c.ts===r.candleTs),sign=discretionary.side==="long"?1:-1;
     if(!bar||bar.close!==r.price||candleCloseTime(r.candleTs,r.timeframe)!==r.completedAt||r.completedAt>Date.parse(report.snapshot.observedAt)||discretionary.entryBasis.price!==discretionary.entry||discretionary.entryBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan entry must retain its saved completed reference and entry basis"});
@@ -157,12 +183,12 @@ export const GlobalReportSchema = z.object({
         return !near(t.price,expected)||t.anchorTs!==range.startTs;
       }))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional range objectives must match the saved geometric range"});
     }
-    if(discretionary.version==="discretionary-plan-v3"||["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)){
+    if(discretionary.version==="discretionary-plan-v3"||["discretionary-plan-v4","discretionary-plan-v5","discretionary-plan-v6"].includes(discretionary.version)){
       const cutoff=Date.parse(report.snapshot.observedAt),sources=[{candles:report.candles,timeframe:report.snapshot.timeframe},...(report.entryStudy?.source===report.snapshot.source?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])];
       const latest=sources.flatMap(s=>{const c=s.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]?.price??r.price;
-      const current=["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)?report.currentMarket?.quote?.price??latest:r.price;
+      const current=["discretionary-plan-v4","discretionary-plan-v5","discretionary-plan-v6"].includes(discretionary.version)?report.currentMarket?.quote?.price??latest:r.price;
       if(discretionary.requiresNewTestAfter!==cutoff||discretionary.targets.some(t=>sign*(t.price-current)<=0||["confirmed_swing","observed_extreme","structure_zone"].includes(t.basis)&&sources.some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,t.price,discretionary.side,t.knownAt,cutoff))))ctx.addIssue({code:z.ZodIssueCode.custom,message:"A fresh conditional setup requires a new test after its snapshot and objectives not already reached by completed execution candles"});
-      if(["discretionary-plan-v4","discretionary-plan-v5"].includes(discretionary.version)&&discretionary.targets.some(t=>{
+      if(["discretionary-plan-v4","discretionary-plan-v5","discretionary-plan-v6"].includes(discretionary.version)&&discretionary.targets.some(t=>{
         if(t.basis==="confirmed_swing")return !report.indicators.pivots.some(a=>a.kind===(discretionary.side==="long"?"high":"low")&&a.ts===t.anchorTs&&a.price===t.price&&a.confirmedAt!==null&&candleCloseTime(a.confirmedAt,report.snapshot.timeframe)===t.knownAt);
         if(t.basis==="observed_extreme")return !report.candles.some(c=>c.ts===t.anchorTs&&(discretionary.side==="long"?c.high:c.low)===t.price&&candleCloseTime(c.ts,report.snapshot.timeframe)===t.knownAt);
         if(t.basis==="structure_zone")return !report.horizonContext?.zones.some(z=>z.role===(discretionary.side==="long"?"resistance":"support")&&(discretionary.side==="long"?z.lower:z.upper)===t.price&&z.startTs===t.anchorTs&&z.knownAt===t.knownAt);

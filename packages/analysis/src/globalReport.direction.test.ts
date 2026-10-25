@@ -33,13 +33,13 @@ test("fresh dated quotes are retained separately; old or future quotes cannot ma
   assert.ok(globalPromptEvidence(r).currentMarket);
 });
 test("entry instructions use the captured quote's side of entry while retaining the completed reference",()=>{
-  const now=Date.parse(fixture.observedAt),r=make("1H",{last:80510.1,ts:String(now-1000)});
-  assert.ok(r.discretionaryPlan!.reference.price>r.discretionaryPlan!.entry);assert.ok(r.currentMarket!.quote!.price<r.discretionaryPlan!.entry);
-  assert.match(globalTradeCards(r)[0].condition,/must first reclaim/);
-  const daily=make("1Dutc",{last:80510.1,ts:String(now-1000)});assert.ok(daily.discretionaryPlan!.reference.price<daily.discretionaryPlan!.entry);assert.match(globalTradeCards(daily)[0].condition,/buy if a support test holds/);
+  const now=Date.parse(fixture.observedAt),original=make("1H"),boundary=original.discretionaryPlan!.priceZones!.entry.sourceUpper;
+  const below=make("1H",{last:boundary-1,ts:String(now-1000)}),above=make("1H",{last:boundary+1,ts:String(now-1000)});
+  assert.match(globalTradeCards(below)[0].condition,/must first reclaim/);assert.match(globalTradeCards(above)[0].condition,/buy if a support test holds/);
+  assert.equal(below.discretionaryPlan!.reference.price,above.discretionaryPlan!.reference.price);
 });
 for(const tf of ["15m","1H","4H","1Dutc","1Wutc"])test(`${tf} preserves its own protection, objectives and available current-clock evidence`,()=>{
-  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v5");assert.equal(p.requiresNewTestAfter,Date.parse(fixture.observedAt));
+  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v6");assert.equal(p.requiresNewTestAfter,Date.parse(fixture.observedAt));
   assert.equal(p.stopBasis.timeframe,tf);assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(r.currentMarket!.frames.length);
   for(const f of r.currentMarket!.frames)assert.ok(f.candles.every(c=>c.confirmed&&candleCloseTime(c.ts,f.timeframe)!<=Date.parse(fixture.observedAt)));
   globalTradeCards(r);assert.equal(JSON.stringify(r),before);assert.equal(r.entryStudy!.timeframe,tf==="15m"?"5m":tf==="1H"?"15m":tf==="4H"?"1H":tf==="1Dutc"?"4H":"1Dutc");
@@ -51,7 +51,7 @@ test("reclaim selection is symmetric rather than hard-coded long",()=>{
   r.indicators.pivots=r.indicators.pivots.map(a=>({...a,price:mirror(a.price),kind:a.kind==="high"?"low":"high"}));r.entryStudy!.pivots=r.entryStudy!.pivots.map(a=>({...a,price:mirror(a.price),kind:a.kind==="high"?"low":"high"}));
   r.indicators.ema?.forEach(e=>e.points=e.points.map(p=>({...p,value:mirror(p.value)})));r.indicators.vwap=null;r.range=null;r.setupSelection!.assessment="long";
   const bars=r.entryStudy!.candles,choice=selectGlobalSetupContext(r,{bars,timeframe:r.entryStudy!.timeframe,completedAt:candleCloseTime(bars.at(-1)!.ts,r.entryStudy!.timeframe)!,primaryClosed:candleCloseTime(r.candles.at(-1)!.ts,"1H")!,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(fixture.observedAt)});
-  assert.equal(choice.side,"short");assert.ok(choice.evidence);assert.ok(Math.abs(choice.entryBasis.price-mirror(original.discretionaryPlan!.entry))<1e-8);
+  assert.equal(choice.side,"short");assert.ok(choice.evidence);assert.ok(Math.abs(choice.entryBasis.price-mirror(original.discretionaryPlan!.evidence!.level))<1e-8);
 });
 
 test("a newer fast completed candle can invalidate an older held reclaim",()=>{

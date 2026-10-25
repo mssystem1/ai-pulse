@@ -1,6 +1,12 @@
 # Global report charts
 
-Clarity uses a light report, chart and entry-study palette with contrasting text and candles. Other appearances use dark charts. PNG downloads follow the selected appearance and preserve saved prices. Appearance changes preserve the inspection range.
+Entry, SL and targets can be shown as source-backed price ranges. Entry uses a supported part of its source zone; the stop retains structural invalidation and a protective margin. **Hard SL** is the fixed outer stop used in risk calculations. It is not permission to widen a stop after entry. Percentages and R use the least favorable entry and the target zone's first-touch boundary. The report also retains any nearer obstacle. Overlapping target bands are consolidated; an exact reference stays a point when no supported interval is available.
+
+Confirmation and execution have separate prices. After the stated reaction is confirmed, entry remains limited to the displayed Entry range. If price has left that interval, wait for a return or reassess; a confirmation close outside the range does not inherit its payoff calculation.
+
+In a mixed market, direction follows completed primary reactions and location. A small live-quote change across a support/resistance midpoint cannot by itself reverse a daily or weekly plan. Historical anchor dates describe where a still-relevant level originated; quote timestamps separately show market-data freshness. Different timeframes retain their own volatility and invalidation distances.
+
+Clarity uses a light report, chart and entry-study palette with chart text tested at a minimum 7:1 contrast. Other appearances use dark charts. PNG downloads follow the selected appearance and preserve saved prices. Appearance changes preserve the inspection range.
 
 Read the direction evidence alongside the priced setup: primary trend or mixed structure, entry source and timestamp, protective invalidation, and reward before the nearest obstacle. EMA location is a conditional pullback reference, not an observed rejection. Mixed primary structure can use a support/resistance retest; weekly recovery does not establish an intraday entry. A sub-1R first target offers less reward than the full stop risk. Later targets do not remove that limitation.
 
