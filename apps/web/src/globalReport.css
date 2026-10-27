@@ -45,3 +45,22 @@ html:not([data-pulse-theme="base"]) .global-report{--global-up:#53dabb}
 .global-scenario-evidence{margin:18px 0;padding:18px;border:1px solid var(--line);border-radius:10px}.global-scenario-evidence p{font-size:13px;line-height:1.65}.global-layer-controls button:disabled{cursor:default;opacity:.45}.global-fib-readings p{font-size:12px}
 .global-trade-plans{margin:18px 0}.global-trade-plan-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.global-trade-plan-card{min-width:0;padding:18px;border:1px solid var(--line);border-top:3px solid var(--global-up);border-radius:10px;background:var(--card)}.global-trade-plan-card.is-short{border-color:var(--line);border-top-color:var(--fail)}.global-trade-plan-card header{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;margin-bottom:16px}.global-trade-plan-card header strong{color:var(--global-up)}.global-trade-plan-card.is-short header strong{color:var(--fail)}.global-trade-plan-card header span{font-size:12px;color:var(--text)}.global-trade-plan-card dl{display:grid;grid-template-columns:minmax(95px,.8fr) minmax(0,1.2fr);gap:10px 12px;font-size:14px}.global-trade-plan-card dt{color:var(--muted)}.global-trade-plan-card dd{margin:0;text-align:right;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}.global-trade-target{display:contents}.global-trade-plan-card p{font-size:12px;line-height:1.65}.global-trade-plan-card button{margin-top:6px}@media(max-width:760px){.global-trade-plan-grid{grid-template-columns:1fr}.global-trade-plan-card{padding:15px}.global-trade-plan-card dl{font-size:13px}}
 @container(max-width:760px){.global-trade-plan-grid{grid-template-columns:1fr}.global-trade-plan-card{padding:15px}.global-trade-plan-card dl{font-size:13px}}
+
+/* Chart controls keep their explanations next to the controls on desktop and touch screens. */
+.global-report p.global-control-hint{margin:0 0 12px;color:var(--text);font-size:12px;line-height:1.6;max-width:96ch}
+.global-chart-controls-help{margin:0 0 12px;padding:8px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+.global-chart-controls-help summary{font-size:12px;font-weight:600}
+.global-chart-controls-help dl{display:grid;grid-template-columns:minmax(110px,.25fr) minmax(0,1fr);gap:10px 18px;margin:10px 0;font-size:12px;line-height:1.6}
+.global-chart-controls-help dt{font-weight:700;color:var(--text)}.global-chart-controls-help dd{margin:0;color:var(--text)}
+.global-report .global-layer-controls button[aria-pressed=true],.global-report .global-chart-presets button[aria-pressed=true]{border-color:var(--mint);box-shadow:inset 0 0 0 1px var(--mint);background:color-mix(in srgb,var(--mint) 10%,var(--card))}
+.global-report button:focus-visible,.global-chart-controls-help summary:focus-visible,.global-study-options summary:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+html[data-pulse-theme="base"] .global-report p.global-control-hint{font-size:13px;color:#263a55}
+.global-guide-updated{margin:12px 0 18px;color:var(--muted);font-size:13px;line-height:1.65}
+.global-guide-examples{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:14px 0}
+.global-guide-examples button{min-height:42px;padding:9px 14px;background:var(--card);border:1px solid var(--line);border-radius:7px;color:var(--text);font:600 13px/1.4 Inter,system-ui,sans-serif;cursor:pointer}
+.global-guide-examples button[aria-pressed=true]{border-color:var(--mint);box-shadow:inset 0 0 0 1px var(--mint)}
+.global-guide-examples button:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.global-guide-controls{width:100%;overflow-x:auto;margin:16px 0;border-radius:8px}
+.global-guide-controls table{margin:0;min-width:460px}.global-guide-controls th:first-child,.global-guide-controls td:first-child{width:25%;min-width:130px}
+.global-guide-steps{padding-left:24px;margin:16px 0}.global-guide-steps li{padding-left:4px;margin:10px 0}
+@media(max-width:600px){.global-chart-controls-help dl{grid-template-columns:1fr;gap:3px}.global-chart-controls-help dd{margin-bottom:10px}.global-report p.global-control-hint{font-size:12px}.global-guide-examples{gap:7px}.global-guide-examples button{min-height:44px;padding:9px 12px}.global-guide-controls th,.global-guide-controls td{padding:9px;font-size:12px}}

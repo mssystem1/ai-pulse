@@ -1,122 +1,232 @@
 {
-  "purpose": "Historical educational examples, not current trade signals",
-  "method": "decision-v5 / structure-v5 / horizon-v2 / active-zones-v1 / single-setup-v4",
-  "sources": [
-    {
-      "path": "packages/analysis/src/globalReport.oct17-fixtures.json",
-      "sha256": "01ace8553652a48bdc6f310d76d7d2c56dcf7315d0986b135fb43d027af1ae6b"
-    },
-    {
-      "path": "packages/analysis/src/globalReport.oct17-2116-fixtures.json",
-      "sha256": "78f8f62c6afe64cfcc6737c3fa7cd5e791dd3cc3065849b112b29b2f4dfc3bdf"
-    }
-  ],
+  "purpose": "Public historical chart and control illustrations",
+  "layoutVersion": "20261027",
+  "source": {
+    "path": "packages/analysis/src/globalReport.oct20-fixture.json",
+    "sha256": "e37c26996aa2f8fe7b48b3b710343721889ca7cfc209c714159fb3fb55cfd162",
+    "observedAt": "2026-10-20T17:45:00.000Z"
+  },
   "reports": {
-    "1H": {
-      "reference": "06fadd6f",
-      "observedAt": "2026-10-17T21:16:16.779Z",
+    "15m": {
+      "observedAt": "2026-10-20T17:45:00.000Z",
       "savedCandles": 520,
-      "shownCandles": 123
+      "shownCandles": 120
+    },
+    "1H": {
+      "observedAt": "2026-10-20T17:45:00.000Z",
+      "savedCandles": 520,
+      "shownCandles": 120
     },
     "4H": {
-      "reference": "81f75473",
-      "observedAt": "2026-10-17T21:14:44.983Z",
+      "observedAt": "2026-10-20T17:45:00.000Z",
       "savedCandles": 520,
       "shownCandles": 180
     },
     "1Dutc": {
-      "reference": "e5c7f9cd",
-      "observedAt": "2026-10-17T21:10:34.259Z",
+      "observedAt": "2026-10-20T17:45:00.000Z",
       "savedCandles": 520,
       "shownCandles": 260
     },
     "1Wutc": {
-      "reference": "7df0a652",
-      "observedAt": "2026-10-17T21:12:39.757Z",
-      "savedCandles": 457,
+      "observedAt": "2026-10-20T17:45:00.000Z",
+      "savedCandles": 458,
       "shownCandles": 260
-    },
-    "15m": {
-      "reference": "a4227db8",
-      "observedAt": "2026-10-17T21:16:16.779Z",
-      "savedCandles": 520,
-      "shownCandles": 96
     }
   },
-  "examples": [
+  "files": [
     {
-      "name": "directional-plan",
-      "frame": "4H"
+      "name": "chart-guide-20261027-15m-light-en.png",
+      "frame": "15m",
+      "lang": "en",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "f9ae7fa8e2673fa6e8b9488d5e2a8fb729d334a488d834dc00ff0bd5e65aab79"
     },
     {
-      "name": "risk-no-trade",
-      "frame": "1Dutc"
+      "name": "chart-guide-20261027-15m-dark-en.png",
+      "frame": "15m",
+      "lang": "en",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "00b4a2fdfe8d5adee6e0b358998888fc72ab74c56f9d22b3ad26fc55928b1cf7"
     },
     {
-      "name": "risk-setup",
-      "frame": "1Wutc"
+      "name": "chart-guide-20261027-15m-light-zh.png",
+      "frame": "15m",
+      "lang": "zh",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "b8399c5126e9317673ee25b0c951eb82299a2f509671bf729d0318fd9e697327"
     },
     {
-      "name": "setup",
-      "frame": "4H",
-      "box": [
-        0,
-        0,
-        1300,
-        774
-      ]
+      "name": "chart-guide-20261027-15m-dark-zh.png",
+      "frame": "15m",
+      "lang": "zh",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "b6afc12904be08fc70a00a8e8cba3811233a41821521bbd4d6057dd302a48620"
     },
     {
-      "name": "trend",
+      "name": "chart-guide-20261027-1H-light-en.png",
       "frame": "1H",
-      "box": [
-        0,
-        0,
-        1300,
-        595
-      ],
-      "options": {
-        "structure": true
-      }
+      "lang": "en",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "58fa60ac38177730b2cc18c16f3cba1754105aacf92f0bcee33d55aceeee015b"
     },
     {
-      "name": "fibonacci",
+      "name": "chart-guide-20261027-1H-dark-en.png",
       "frame": "1H",
-      "box": [
-        0,
-        0,
-        1300,
-        595
-      ],
-      "options": {
-        "structure": true
-      }
+      "lang": "en",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "60cd79650e45fd2df88c495943f0fac78d03c1724c8667d67ed71a6d53269ffb"
     },
     {
-      "name": "vwap-atr-pivots",
+      "name": "chart-guide-20261027-1H-light-zh.png",
+      "frame": "1H",
+      "lang": "zh",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "e0d51d81b20f7c4bfb881f5ed25ff412714690850997f20676066c611038c723"
+    },
+    {
+      "name": "chart-guide-20261027-1H-dark-zh.png",
+      "frame": "1H",
+      "lang": "zh",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "4f100a80ee1c9a6ec3a76f3e11f970aac6703f51b97020431a0baf7e0cf2e51f"
+    },
+    {
+      "name": "chart-guide-20261027-4H-light-en.png",
       "frame": "4H",
-      "box": [
-        0,
-        0,
-        1300,
-        595
-      ],
-      "options": {
-        "layers": {
-          "vwap": true,
-          "atr": true,
-          "pivots": true
-        }
-      }
+      "lang": "en",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "bfa0defbf5dc800a05e00bc45b2f8f0155605db85eebbe3c6f085856ebd88938"
     },
     {
-      "name": "rsi-context",
-      "frame": "4H"
+      "name": "chart-guide-20261027-4H-dark-en.png",
+      "frame": "4H",
+      "lang": "en",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "37ae120c785a3f3e7dc9b6568ad3a9ac7f366370b6e27638c02ab2ef6ea1a2bc"
+    },
+    {
+      "name": "chart-guide-20261027-4H-light-zh.png",
+      "frame": "4H",
+      "lang": "zh",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "fde2d311aab18266dd3cc51c30649caed922d64a6c8e1754885ec0927ab9adfd"
+    },
+    {
+      "name": "chart-guide-20261027-4H-dark-zh.png",
+      "frame": "4H",
+      "lang": "zh",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "51f58f84361e7beb140d2dccf60e7f2f98e08e11678d9760752d33fbe8c6e104"
+    },
+    {
+      "name": "chart-guide-20261027-1Dutc-light-en.png",
+      "frame": "1Dutc",
+      "lang": "en",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "ea17e3538b8838544e3ee403ce859f4060cf85afc451f6ecca29cfff349e036e"
+    },
+    {
+      "name": "chart-guide-20261027-1Dutc-dark-en.png",
+      "frame": "1Dutc",
+      "lang": "en",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "40918d4c158e9fb876ac44d462913dac5c884b6e2ff160b5b884999a713e7a2a"
+    },
+    {
+      "name": "chart-guide-20261027-1Dutc-light-zh.png",
+      "frame": "1Dutc",
+      "lang": "zh",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "de6b0968344f6d8f680ed44a14b5da53949bce4a0a100b9646361014a24f3f55"
+    },
+    {
+      "name": "chart-guide-20261027-1Dutc-dark-zh.png",
+      "frame": "1Dutc",
+      "lang": "zh",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "a6d7c240f0775e2673864e05526532ba74cbef7c6b875b123e844c9c0f546791"
+    },
+    {
+      "name": "chart-guide-20261027-1Wutc-light-en.png",
+      "frame": "1Wutc",
+      "lang": "en",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "54518a3d784bea2de4bd3a29fb1aa43a3fc02597c81d3519c12ca500b434bc7a"
+    },
+    {
+      "name": "chart-guide-20261027-1Wutc-dark-en.png",
+      "frame": "1Wutc",
+      "lang": "en",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "8430e07ab9884cc8374db1a1479796c5537ef87545205bb8f7adf5f2c09d1190"
+    },
+    {
+      "name": "chart-guide-20261027-1Wutc-light-zh.png",
+      "frame": "1Wutc",
+      "lang": "zh",
+      "appearance": "light",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "93a8d839da4a14a6f7789038a12d24308de1c009ed1a220b2753879fbcaf713d"
+    },
+    {
+      "name": "chart-guide-20261027-1Wutc-dark-zh.png",
+      "frame": "1Wutc",
+      "lang": "zh",
+      "appearance": "dark",
+      "width": 1800,
+      "height": 1404,
+      "sha256": "02e7d8813788b7ea27c63ef638a7234f4f3d902916683524db20ce72a1860578"
     }
   ],
-  "additionalImages": {
-    "setup-review-flow": "Authored workflow; no forecast"
-  },
+  "legacyUrls": [
+    "setup-context.png",
+    "directional-plan.png",
+    "risk-no-trade.png",
+    "risk-setup.png",
+    "setup.png",
+    "trend.png",
+    "fibonacci.png",
+    "vwap-atr-pivots.png",
+    "rsi-context.png",
+    "setup-review-flow.png"
+  ],
   "regenerate": "npm run build -w @pulse/analysis && node scripts/render-global-guide.mjs",
   "networkCalls": 0,
   "modelCalls": 0,
