@@ -1,6 +1,6 @@
 import {globalTradeAnnotations} from "./globalTradeAnnotations.js";
-import { parseCandleTimeframe, type GlobalReport } from "@pulse/schemas";
-import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalCompletedPriceLine, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
+import { parseCandleTimeframe, candleCloseTime, type GlobalReport } from "@pulse/schemas";
+import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
 import { globalSetupMap, globalSetupWindow, globalRiskMeasurement, globalEligibility } from "./globalPolicy.js";
 import {globalDecision,globalDecisionTitle} from "./globalDecision.js";
@@ -249,11 +249,15 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,layers={...globalDefaultChartLayers(report),...options.layers},entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId),flow=pro&&layers.footprint?globalOrderFlowStudy(report,1250):null,flowTop=entryTop+(entryImage?240:0),footerTop=flowTop+(flow?flow.height+15:0);
   const decision=globalDecision(report),primary=globalTradePlan(report);
-  const footerLines=[...new Set([globalDecisionTitle(report),decision.route,...globalSetupEvidenceLines(report),...globalCurrentMarketLines(report),...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
+  const legacyFooterLines=[...new Set([globalDecisionTitle(report),decision.route,...globalSetupEvidenceLines(report),...globalCurrentMarketLines(report),...(decision.direction==="BUY / SELL"?decision.scenarios.map(s=>s.line):[decision.nextCondition]),...globalNextSetupLines(report).slice(report.decisionVersion==="decision-v5"?0:1).filter(line=>!line.startsWith("First-objective")&&!line.startsWith("Reassess")),decision.changeView,
     ...(decision.rewardLine&&decision.direction!=="BUY / SELL"?[decision.rewardLine]:[]),...(decision.qualified&&decision.risk?[`${report.lang==="zh"?"风险参考":"Risk reference"}: ${decision.risk.percent.toFixed(2)}% · ${decision.risk.atr?.toFixed(2)} ATR14`]:[]),
     ...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?[...globalHorizonContextLines(report),...globalOrderFlowLines(report),...globalChannelLines(report)]:[])].filter(Boolean))];
-  const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?100:70):(index?185:140),rows:string[]=[];let rest=value;while(rest.length>max){const space=report.lang==="en"?rest.lastIndexOf(" ",max):-1,at=space>max/2?space:max;rows.push(rest.slice(0,at));rest=rest.slice(at).trimStart();}if(rest)rows.push(rest);return rows;});
-  const footerHeight=wrapped.length*19+32,height=footerTop+footerHeight+35;
+  const card=globalTradeCards(report)[0];
+  const footerLines=report.discretionaryPlan&&card?[...new Set([globalDecisionTitle(report),decision.route,...globalSetupEvidenceLines(report),...globalCurrentMarketLines(report),card.condition,card.location,...card.lines.filter(line=>/^TP\d+ (?:basis|\u4f9d\u636e):|^Least to most favorable|^\u4ece\u6700\u4e0d\u5229/.test(line)),decision.changeView,...(globalCoverageLine(report)?[globalCoverageLine(report)!]:[]),...(pro?[...globalHorizonContextLines(report),...globalOrderFlowLines(report),...globalChannelLines(report)]:[])].filter(Boolean))]:legacyFooterLines;
+  const closed=report.snapshot.lastCandleTs===null?null:candleCloseTime(report.snapshot.lastCandleTs,report.snapshot.timeframe);
+  footerLines.splice(2,0,(report.lang==="zh"?"\u5feb\u7167 ":"Snapshot ")+new Date(report.snapshot.observedAt).toISOString().slice(0,19).replace("T"," ")+" UTC",`${report.lang==="zh"?"主周期收盘":"Primary close"} · ${globalFrameReference(report.snapshot.timeframe)} · ${globalPrice(report,report.snapshot.price)} ${report.snapshot.priceCurrency}${closed===null?"":" · "+new Date(closed).toISOString().slice(0,19).replace("T"," ")+" UTC"}`);
+  const wrapped=footerLines.flatMap((value,index)=>{const max=report.lang==="zh"?(index?90:65):(index?170:125),rows:string[]=[];let rest=value;while(rest.length>max){const space=report.lang==="en"?rest.lastIndexOf(" ",max):-1,at=space>max/2?space:max;rows.push(rest.slice(0,at));rest=rest.slice(at).trimStart();}if(rest)rows.push(rest);return rows;});
+  const footerHeight=wrapped.length*21+36,height=footerTop+footerHeight+35;
   const periods = layers.sma===false?[]:pro && layers.allSmas ? [21, 55, 89, 144, 233] : [55];
   const candles = options.fullHistory?report.candles:report.candles.slice(options.fitFibonacci?-globalStructuralWindow(report,true):options.structure?-Math.max(180,globalSetupWindow(report)):-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
   const refs = globalSetupMap(report).view.levelIds.flatMap(id => { const p = report.levels.find(l => l.id === id)?.price; return p === undefined ? [] : [p]; });
@@ -264,10 +268,8 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };
   let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}"><rect width="100%" height="100%" rx="16" fill="#0f1826"/><g font-family="Inter, Noto Sans SC, Arial, sans-serif">`;
   svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)}`, "#55dfb5", 20);
-  svg += text(25, 54, `${report.snapshot.venue} · ${report.snapshot.priceCurrency} · ${report.lang==="zh"?"获取":"Fetched"} ${report.snapshot.observedAt} · ${globalCompletedPriceLine(report)}`, "#a5b7cd", 10);
-  const quoteLine=globalCurrentMarketLines(report)[0];if(quoteLine)svg+=text(25,66,quoteLine,"#b9c6d8",9);
-  svg += text(left, 77, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}${report.strategy?` · ${report.strategy.holding}`:""}`, "#b9c6d8", 12);
-  svg += text(left,101,`${decision.marketView} · ${globalDecisionTitle(report)}`,"#cce8f2",14);
+  svg += text(left, 57, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}${report.strategy?` · ${report.strategy.holding}`:""}`, "#b9c6d8", 12);
+  svg += text(left,85,`${decision.marketView} · ${globalDecisionTitle(report)}`,"#cce8f2",14);
   for (let i = 0; i < 6; i += 1) { const value = min + (max - min) * i / 5, py = y(value);
     svg += line(left, py, right, py, "#28374a", .8, "2 5");
     if(refs.every(price=>Math.abs(y(price)-py)>22))svg+=text(width-18,py+4,globalPrice(report,value),"#8398b3",10,"end");
@@ -306,7 +308,7 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   if(entryImage)svg+=`<g transform="translate(25 ${entryTop})">${entryImage}</g>`;
   if(flow)svg+=`<g transform="translate(25 ${flowTop})">${flow.svg}</g>`;
   svg += `<rect x="25" y="${footerTop}" width="1250" height="${footerHeight}" rx="10" fill="#181c24" stroke="#695335"/>`;
-  wrapped.forEach((value,i)=>svg+=text(43,footerTop+24+i*19,value,i?"#c8d3e1":"#f6c368",i?12:16));
+  wrapped.forEach((value,i)=>svg+=text(43,footerTop+26+i*21,value,i?"#c8d3e1":"#f6c368",i?13:18));
   svg += text(26, height - 14, report.targetReviewOf ? report.lang === "zh" ? "原快照技术复核 · 相同 K 线 · 未调用新 AI · 研究用途" : "Technical review of saved snapshot · same saved candles · no new AI · research only" : report.lang === "zh" ? "原始快照 · 条件路径非保证预测 · 研究用途，非财务建议" : "Original snapshot · conditional routes, not guaranteed forecasts · research only / not financial advice", "#8196b2", 10);
   return svg + "</g></svg>";
 }

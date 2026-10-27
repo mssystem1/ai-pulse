@@ -1,8 +1,7 @@
 import {globalDecision,globalDecisionTitle,globalDecisionLines,globalNextSetupLines,globalConfirmationEvidence} from "@pulse/domain";
 import {globalCoverageLine,globalFrameReference} from "@pulse/domain";
 import {globalTradeCards,type GlobalReport} from "@pulse/domain";
-import { Resvg } from "@resvg/resvg-js";
-import { fileURLToPath } from "node:url";
+import {renderResearchPng} from "./researchPng.js";
 import { presentResearch, researchText, researchChartSvg, researchDate, researchStatus, type ResearchContext, type ResearchIdentity } from "@pulse/domain";
 import { readGlobalReport, globalLabel, globalSetupLines, globalMissingLabel, globalPathTitle, globalPathLines, globalLevelPrice, globalEvidenceLines, globalTimeframeLabel, globalHumanText, globalTradePlanLines, globalTradePlanTitle, globalTradePlan, globalPrice, globalConfirmationCorrection, globalCompletedPriceLine, globalRiskLines, globalSetupMap, globalArtifactTag } from "@pulse/domain";
 
@@ -79,6 +78,5 @@ export function telegramResearchFilename(report: unknown, context: ResearchConte
 }
 export function renderTelegramResearchChart(report: unknown, context: ResearchContext = {}): Uint8Array | null {
   const svg=researchChartSvg(report,context);if(!svg)return null;
-  const renderer=new Resvg(svg,{font:{fontFiles:[fileURLToPath(new URL("../../../assets/fonts/Inter.ttf",import.meta.url)),fileURLToPath(new URL("../../../assets/fonts/NotoSansSC-Regular.otf",import.meta.url))],loadSystemFonts:false,defaultFontFamily:"Inter"}});
-  return renderer.render().asPng();
+  return renderResearchPng(svg,Boolean(readGlobalReport(report)));
 }

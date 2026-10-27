@@ -9,13 +9,10 @@ import { executionPublicClient } from "./onchainDiscovery.js";
 import { getGenericOkxQuote, getOkxTradeTokens, executionAssetAliases, reviewedExecutionRepresentation } from "./okxDex.js";
 import { TradeSchema } from "./v6Routes.js";
 import { asyncRoute } from "./httpResilience.js";
+import {GlobalAccessSchema,type GlobalAccess} from "./globalReportAccess.js";
+import {createGlobalExportRouter} from "./globalExportRoutes.js";
 
-export const GlobalAccessSchema=z.discriminatedUnion("kind",[
-  z.object({kind:z.literal("job"),id:z.string().min(1).max(200),token:z.string().min(16).max(512)}).strict(),
-  z.object({kind:z.literal("history"),id:z.string().min(1).max(200),token:z.string().min(16).max(512)}).strict(),
-  z.object({kind:z.literal("share"),token:z.string().min(24).max(256)}).strict(),
-]);
-export type GlobalAccess=z.infer<typeof GlobalAccessSchema>;
+export {GlobalAccessSchema,type GlobalAccess} from "./globalReportAccess.js";
 type Quote=Awaited<ReturnType<typeof getGenericOkxQuote>>;
 type Dependencies={
   resolveReport:(access:GlobalAccess,req:Request)=>Promise<unknown>;
@@ -41,6 +38,7 @@ export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof bui
  * persistence mutation, model calls or transaction preparation. */
 export function createGlobalAssessmentRouter(cfg:AppConfig,deps:Dependencies){
   const router=Router(),inflight=new Set<string>();
+  router.use(createGlobalExportRouter(cfg,{resolveReport:async(access,req)=>access.kind==="telegram"?null:deps.resolveReport(access,req)}));
   const quote=deps.quote??(input=>getGenericOkxQuote(cfg,input)),tokens=deps.tokens??getOkxTradeTokens;
   const balance=deps.balance??(async(network,token,wallet)=>executionPublicClient(network).readContract({address:token as `0x${string}`,abi:erc20Abi,functionName:"balanceOf",args:[wallet as `0x${string}`]}));
   const body=z.object({access:GlobalAccessSchema,trade:TradeSchema.extend({takeProfit:z.number().positive().optional(),stopLoss:z.number().positive().optional(),orderType:z.enum(["market","limit"]).default("market"),limitPrice:z.number().positive().optional(),minimumOutputAmount:z.string().regex(/^[1-9]\d{0,77}$/).optional()}).strict().optional()}).strict();

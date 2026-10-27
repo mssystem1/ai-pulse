@@ -52,4 +52,10 @@ Review current execution prices, protection and position size before signing any
 
 This public guide describes product use. Proprietary selection rules, parameter tuning, private research records and strategy source are excluded. Historical examples and software validation do not establish guaranteed trading performance.
 
+Choose **Download chart PNG** or **Download report TXT**, wait for the file preview, then press **Save file** or **Share / Save to Files**. The second press opens the device's save/share interface directly. Supported Telegram clients use Telegram's native download prompt; older clients open the secure file in the browser. On iPhone or Android you can also touch and hold the image preview to save it. TXT remains fully selectable. Canceling a save leaves the preview open for another attempt.
+
+PNG exports use bundled Inter and Chinese fonts on the server, with a target width of 3,900 pixels. Long reports scale down to stay within 16 million pixels and mobile canvas limits. The image title is followed directly by the timeframe row. Snapshot time, captured quote and completed primary close appear in the evidence section. Full venue and source metadata remain in the app and TXT. Repeated setup paragraphs are consolidated and image body text is larger.
+
+Preparing an export reads the saved report without purchasing analysis or refreshing market data. Private reports keep their existing access checks. Secure file links expire after five minutes; close and reopen Download to prepare a new link. If the secure download cannot be prepared, the dialog offers a local preview and device sharing. PNGs preserve the selected appearance and study layers. Reopening a historical report does not make its prices current.
+
 The in-app English and Chinese guide is available at `/docs#docs-global-chart`.

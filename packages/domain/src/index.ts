@@ -10,6 +10,7 @@ export * from "./researchPresentation.js";
 export * from "./researchChart.js";
 export * from "./globalPresentation.js";
 export * from "./globalChart.js";
+export * from "./globalChartAppearance.js";
 export { parseCandleTimeframe } from "@pulse/schemas";
 export * from "./globalTradePlan.js";
 export * from "./globalConfirmation.js";

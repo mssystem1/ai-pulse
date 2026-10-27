@@ -8,6 +8,7 @@ import { asyncRoute } from "./httpResilience.js";
 import { TelegramWalletLink } from "./telegramWalletLink.js";
 import { researchIdentity, researchRecord } from "@pulse/domain";
 import { isArcMarket } from "./arcMarkets.js";
+import {createGlobalExportRouter} from "./globalExportRoutes.js";
 
 function researchContext(serviceId:string,input:unknown,networkKey:string,createdAt:number|string) {
   const source=researchRecord(input);
@@ -181,7 +182,7 @@ export class TelegramCommerce {
     const history = await this.walletLinks?.history(userId) || [];
     return [...orders.filter((order):order is NonNullable<typeof order>=>Boolean(order)), ...history.map(job=>({id:`wallet:${job.id}`,...researchIdentity(researchContext(jobServiceId(job),job.input,job.networkKey,job.createdAt)),stars:null,source:"wallet",networkKey:job.networkKey,createdAt:Date.parse(job.createdAt),status:job.stage,hasReport:Boolean(job.reportId)}))].sort((a,b)=>b.createdAt-a.createdAt).slice(0,60);
   }
-  async readOwned(userId: number, id: string) {
+  async readOwned(userId: number, id: string, recover=true) {
     if (id.startsWith("wallet:")) {
       const job = await this.walletLinks?.ownedJob(userId,id.slice(7));
       if (!job) throw new Error("Wallet report not found");
@@ -190,7 +191,7 @@ export class TelegramCommerce {
     }
     const order = await this.get(id);
     if (!order || order.userId !== userId || !this.visible(order)) throw new Error("Order not found");
-    if(order.chargeId&&!order.jobId&&!order.refunded) await this.locked(id,async()=>{const current=await this.get(id);if(current?.chargeId&&!current.jobId&&!current.refunded)await this.enqueue(current);order.jobId=current?.jobId;});
+    if(recover&&order.chargeId&&!order.jobId&&!order.refunded) await this.locked(id,async()=>{const current=await this.get(id);if(current?.chargeId&&!current.jobId&&!current.refunded)await this.enqueue(current);order.jobId=current?.jobId;});
     const job=order.jobId?await this.dependencies!.jobs.get(order.jobId):null;
     const record=job?.reportId?await this.dependencies!.reports.get(job.reportId):null;
     return {orderId:id,serviceId:order.serviceId,context:researchContext(order.serviceId,order.input,order.networkKey,order.createdAt),stars:order.stars,status:order.refunded?"refunded":job?.stage||(order.chargeId?"payment_received":"awaiting_payment"),report:record?.ownerWallet===this.account(userId)?await this.dependencies!.reports.read(record):null};
@@ -202,6 +203,13 @@ export class TelegramCommerce {
   router() {
     const prefix=this.profile.apiPrefix || "/v1/telegram";
     const router = Router();
+    router.use(createGlobalExportRouter(this.cfg,{path:`${prefix}/global-export`,resolveReport:async access=>{
+      if(access.kind!=="telegram"||access.surface!==(this.profile.allowEvm===false?"ton":"pulse")||this.profile.botOnly||!this.cfg.FEATURE_TELEGRAM||!this.token||!this.dependencies)return null;
+      try{
+        const user=validateTelegramInitData(access.token,this.token),owned=await this.readOwned(user.id,access.id,false);
+        return owned.serviceId.startsWith("global")&&["completed","completed_partial"].includes(owned.status)?owned.report:null;
+      }catch{return null;}
+    }}));
     router.get(`${prefix}/services`, (_req, res) => res.json({ services: this.catalog(), checkoutReady: this.ready(), currency: "XTR",mode:this.profile.allowEvm===false?"ton_miniapp":"pulse" }));
     router.use([`${prefix}/session`, `${prefix}/orders`, `${prefix}/wallet`], (req, res, next) => {
       res.setHeader("Cache-Control", "no-store");

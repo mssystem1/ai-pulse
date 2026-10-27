@@ -1,3 +1,4 @@
+import type {ReportExportAccess} from "./reportDownload";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { buildReportBuyIntent } from "./reportTradeHandoff";
@@ -267,10 +268,10 @@ export function SafetyPreflightReport({ data }: { data: AnyRec }) {
   );
 }
 
-export function AnalysisReport({ data, nfa, onTrade, assessmentAccess }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void; assessmentAccess?:GlobalAssessmentAccess }) {
+export function AnalysisReport({ data, nfa, onTrade, assessmentAccess, exportAccess }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void; assessmentAccess?:GlobalAssessmentAccess;exportAccess?:ReportExportAccess }) {
   const global = readGlobalReport(data);
   const {_setupAccess,...displayData}=data;
-  return global ? <GlobalResearchReport key={`${global.snapshot.instId}:${global.snapshot.timeframe}:${global.snapshot.observedAt}`} report={global} onTrade={onTrade} assessmentAccess={assessmentAccess??_setupAccess as GlobalReportAccess|undefined} /> : <LegacyAnalysisReport data={displayData} nfa={nfa} onTrade={onTrade} />;
+  return global ? <GlobalResearchReport key={`${global.snapshot.instId}:${global.snapshot.timeframe}:${global.snapshot.observedAt}`} report={global} onTrade={onTrade} assessmentAccess={assessmentAccess??_setupAccess as GlobalReportAccess|undefined} exportAccess={exportAccess} /> : <LegacyAnalysisReport data={displayData} nfa={nfa} onTrade={onTrade} />;
 }
 
 function LegacyAnalysisReport({ data, nfa, onTrade }: { data: AnyRec; nfa: string; onTrade?: (intent: ReportTradeIntent) => void }) {

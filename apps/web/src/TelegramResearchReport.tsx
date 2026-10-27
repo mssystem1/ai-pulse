@@ -1,11 +1,12 @@
+import type {ReportExportAccess} from "./reportDownload";
 import { presentResearch, researchChartSvg, researchText, type ResearchContext } from "@pulse/domain";
 import { useEffect, useState } from "react";
 import { GlobalResearchReport, readGlobalReport } from "./GlobalResearchReport";
 import type { ReportTradeIntent } from "./Report";
 
-export function TelegramResearchReport({report,context,onTrade}:{report:unknown;context?:ResearchContext;onTrade?:(intent:ReportTradeIntent)=>void}) {
+export function TelegramResearchReport({report,context,onTrade,exportAccess}:{report:unknown;context?:ResearchContext;onTrade?:(intent:ReportTradeIntent)=>void;exportAccess?:ReportExportAccess}) {
   const global=readGlobalReport(report);
-  return global ? <GlobalResearchReport report={global} onTrade={onTrade}/> : <LegacyTelegramResearchReport report={report} context={context}/>;
+  return global ? <GlobalResearchReport report={global} onTrade={onTrade} exportAccess={exportAccess}/> : <LegacyTelegramResearchReport report={report} context={context}/>;
 }
 function LegacyTelegramResearchReport({report,context}:{report:unknown;context?:ResearchContext}) {
   const presentation=presentResearch(report,context),chart=researchChartSvg(report,context);

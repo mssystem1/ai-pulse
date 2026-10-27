@@ -1,3 +1,4 @@
+@import "./reportDownload.css";
 .global-report{--global-up:#08765c;--global-study:var(--cyan)}
 html[data-pulse-theme="base"] .global-report{--text:#102039;--muted:#263a55;font-family:Inter,"Segoe UI",system-ui,sans-serif;font-size:16px;font-weight:500;line-height:1.65}
 html[data-pulse-theme="base"] .global-report h2,html[data-pulse-theme="base"] .global-report h3{font-weight:700;letter-spacing:normal}
