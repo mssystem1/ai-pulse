@@ -7,6 +7,7 @@ import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
+import {globalRouteObstacles} from "./globalRouteObstacles.js";
 
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
@@ -51,9 +52,13 @@ test("daily range protection uses the daily low and daily volatility; 4H barrier
   assert.equal(p.family,"level_retest");assert.equal(p.priceZones!.entry.sourcePrice,81760);assert.equal(p.evidence!.level,82291.1);
   assert.equal(p.stopBasis.price,80400);assert.ok(Math.abs(p.stop-(80400-atr*.2))<1e-6);
   assert.ok(p.stop<80400);assert.ok(Math.abs(p.entry-p.stop)>atr*.5);
-  assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);assert.ok(p.barriers.some(t=>t.price===83439.9&&t.timeframe==="4H"));
-  assert.ok(!p.barriers.some(t=>t.price===83168.2),"The earlier 4H level was already reached by the newer wick");
-  assert.ok(globalTradeCards(report)[0].rr!<1.5,"A priced setup is not hidden by the legacy reward gate");
+  assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);const obstacles=globalRouteObstacles(report,p.side);
+  assert.ok(obstacles.some(t=>t.price===83439.9&&t.timeframe==="4H"));
+  assert.ok(obstacles.some(t=>t.price===83168.2&&t.timeframe==="4H"),"A newer wick does not establish completed 4H acceptance beyond the obstacle");
+  assert.equal(p.barriers[0].price,82213.9);assert.equal(p.barriers[0].timeframe,"1Dutc");
+  assert.ok(report.horizonContext!.zones.some(z=>z.role==="resistance"&&(z.lower===p.barriers[0].price||z.upper===p.barriers[0].price)));
+  const card=globalTradeCards(report)[0],worstTarget=p.priceZones!.targets[0].lower;
+  assert.ok(Math.abs(card.rr!-(worstTarget-p.entry)/(p.entry-p.stop))<1e-9);assert.equal(card.confirmed,false);
   const changed=structuredClone(report);changed.discretionaryPlan!.targets[0].price+=1;
   assert.notEqual(globalArtifactReference(changed),globalArtifactReference(report));
 });
@@ -96,6 +101,7 @@ test("VWAP rejection uses primary-frame band entry, outer-band protection and fi
 
 function balanced(){
   const report=make("1Dutc");report.indicators.vwap=null;report.indicators.pivots=[];report.entryStudy!.pivots=[];
+  report.horizonContext!.zones=[]; // Isolate synthetic range behavior from unrelated public-fixture zones.
   delete report.currentMarket; // Synthetic range prices below supply their own execution evidence.
   return report;
 }
@@ -157,7 +163,7 @@ test("old conditional plans receive an explicit current review without changing 
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v6");assert.equal(review.discretionaryPlan!.evidence!.level,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v7");assert.equal(review.discretionaryPlan!.evidence!.level,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 

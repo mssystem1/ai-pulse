@@ -1,6 +1,6 @@
 {
   "purpose": "Public historical chart and control illustrations",
-  "layoutVersion": "20261027",
+  "layoutVersion": "20261028",
   "source": {
     "path": "packages/analysis/src/globalReport.oct20-fixture.json",
     "sha256": "e37c26996aa2f8fe7b48b3b710343721889ca7cfc209c714159fb3fb55cfd162",
@@ -35,184 +35,184 @@
   },
   "files": [
     {
-      "name": "chart-guide-20261027-15m-light-en.png",
+      "name": "chart-guide-20261028-15m-light-en.png",
       "frame": "15m",
       "lang": "en",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "f9ae7fa8e2673fa6e8b9488d5e2a8fb729d334a488d834dc00ff0bd5e65aab79"
+      "sha256": "90f9428dd76a610f2b580d5f9ec1505bb68e34be8a990224c8aeb0cf04835f38"
     },
     {
-      "name": "chart-guide-20261027-15m-dark-en.png",
+      "name": "chart-guide-20261028-15m-dark-en.png",
       "frame": "15m",
       "lang": "en",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "00b4a2fdfe8d5adee6e0b358998888fc72ab74c56f9d22b3ad26fc55928b1cf7"
+      "sha256": "9133fbb7aaf57ce5b06ab803c22fb08b7c4f4c61a7c502539755ae1c024e7387"
     },
     {
-      "name": "chart-guide-20261027-15m-light-zh.png",
+      "name": "chart-guide-20261028-15m-light-zh.png",
       "frame": "15m",
       "lang": "zh",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "b8399c5126e9317673ee25b0c951eb82299a2f509671bf729d0318fd9e697327"
+      "sha256": "4cacda8fbac670b00d14250ece847864bf2ce1abd64ff069e8b86782d505d569"
     },
     {
-      "name": "chart-guide-20261027-15m-dark-zh.png",
+      "name": "chart-guide-20261028-15m-dark-zh.png",
       "frame": "15m",
       "lang": "zh",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "b6afc12904be08fc70a00a8e8cba3811233a41821521bbd4d6057dd302a48620"
+      "sha256": "b785d8ea7cbe1e2992c5a55bd40b3d4ce6be1e16389c179263e680cbf3412047"
     },
     {
-      "name": "chart-guide-20261027-1H-light-en.png",
+      "name": "chart-guide-20261028-1H-light-en.png",
       "frame": "1H",
       "lang": "en",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "58fa60ac38177730b2cc18c16f3cba1754105aacf92f0bcee33d55aceeee015b"
+      "sha256": "23ef128c27b544c5f6dc517e3efc676a8afb20ebd69bd8fdd3384cbe1243dc32"
     },
     {
-      "name": "chart-guide-20261027-1H-dark-en.png",
+      "name": "chart-guide-20261028-1H-dark-en.png",
       "frame": "1H",
       "lang": "en",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "60cd79650e45fd2df88c495943f0fac78d03c1724c8667d67ed71a6d53269ffb"
+      "sha256": "73ba0b304c28015aca9b38e85254ab72229cc0be931b8f054bcb41b8440d83c0"
     },
     {
-      "name": "chart-guide-20261027-1H-light-zh.png",
+      "name": "chart-guide-20261028-1H-light-zh.png",
       "frame": "1H",
       "lang": "zh",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "e0d51d81b20f7c4bfb881f5ed25ff412714690850997f20676066c611038c723"
+      "sha256": "9da483f299c7cc39d7110042e2cf6bc8765a5d563118a8c955ba2602cd52755e"
     },
     {
-      "name": "chart-guide-20261027-1H-dark-zh.png",
+      "name": "chart-guide-20261028-1H-dark-zh.png",
       "frame": "1H",
       "lang": "zh",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "4f100a80ee1c9a6ec3a76f3e11f970aac6703f51b97020431a0baf7e0cf2e51f"
+      "sha256": "fc24dda6491ea90d0a9fa4f3d9ddd6db14b0e759b39aee4a0e6d04d40faaf54c"
     },
     {
-      "name": "chart-guide-20261027-4H-light-en.png",
+      "name": "chart-guide-20261028-4H-light-en.png",
       "frame": "4H",
       "lang": "en",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "bfa0defbf5dc800a05e00bc45b2f8f0155605db85eebbe3c6f085856ebd88938"
+      "sha256": "4baf76755ac5fd9efa8af2c6b941480d84ba3a8d961f1ef4f8f08e6dc5aa77f6"
     },
     {
-      "name": "chart-guide-20261027-4H-dark-en.png",
+      "name": "chart-guide-20261028-4H-dark-en.png",
       "frame": "4H",
       "lang": "en",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "37ae120c785a3f3e7dc9b6568ad3a9ac7f366370b6e27638c02ab2ef6ea1a2bc"
+      "sha256": "67c24d5675dcd96abda2d2c711ef9408298fdd990297e35db3e773665665eda3"
     },
     {
-      "name": "chart-guide-20261027-4H-light-zh.png",
+      "name": "chart-guide-20261028-4H-light-zh.png",
       "frame": "4H",
       "lang": "zh",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "fde2d311aab18266dd3cc51c30649caed922d64a6c8e1754885ec0927ab9adfd"
+      "sha256": "062a1df1434f20fe25718254eaa48bbc2f27db0362d58728b620e76843185ec7"
     },
     {
-      "name": "chart-guide-20261027-4H-dark-zh.png",
+      "name": "chart-guide-20261028-4H-dark-zh.png",
       "frame": "4H",
       "lang": "zh",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "51f58f84361e7beb140d2dccf60e7f2f98e08e11678d9760752d33fbe8c6e104"
+      "sha256": "253a42e654b154fb0f8a1a75d9bc582360ea08eb7451bd01c09e5a854531e561"
     },
     {
-      "name": "chart-guide-20261027-1Dutc-light-en.png",
+      "name": "chart-guide-20261028-1Dutc-light-en.png",
       "frame": "1Dutc",
       "lang": "en",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "ea17e3538b8838544e3ee403ce859f4060cf85afc451f6ecca29cfff349e036e"
+      "sha256": "089ef71f38999a5dee6e4ed8a8fb44b7827485014a089d0f43f1acbf011f1249"
     },
     {
-      "name": "chart-guide-20261027-1Dutc-dark-en.png",
+      "name": "chart-guide-20261028-1Dutc-dark-en.png",
       "frame": "1Dutc",
       "lang": "en",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "40918d4c158e9fb876ac44d462913dac5c884b6e2ff160b5b884999a713e7a2a"
+      "sha256": "b5d3fdbf97d83bb7896ed4a6a954c555641961030f61f5e2c1b4f03992f8e282"
     },
     {
-      "name": "chart-guide-20261027-1Dutc-light-zh.png",
+      "name": "chart-guide-20261028-1Dutc-light-zh.png",
       "frame": "1Dutc",
       "lang": "zh",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "de6b0968344f6d8f680ed44a14b5da53949bce4a0a100b9646361014a24f3f55"
+      "sha256": "469edc3e25d1b42c72f7009664d476157c30d1a1ce8acd41309731751ffe74ca"
     },
     {
-      "name": "chart-guide-20261027-1Dutc-dark-zh.png",
+      "name": "chart-guide-20261028-1Dutc-dark-zh.png",
       "frame": "1Dutc",
       "lang": "zh",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "a6d7c240f0775e2673864e05526532ba74cbef7c6b875b123e844c9c0f546791"
+      "sha256": "9446458206d807cb5f72146c5cc8c2d8b8b6652f1fea416132de3fd76ccc28ad"
     },
     {
-      "name": "chart-guide-20261027-1Wutc-light-en.png",
+      "name": "chart-guide-20261028-1Wutc-light-en.png",
       "frame": "1Wutc",
       "lang": "en",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "54518a3d784bea2de4bd3a29fb1aa43a3fc02597c81d3519c12ca500b434bc7a"
+      "sha256": "6cd9568b1ac8ab644c0ffe8f2833d04fb2323e1e04284caf1fea22c8ad1c4d6b"
     },
     {
-      "name": "chart-guide-20261027-1Wutc-dark-en.png",
+      "name": "chart-guide-20261028-1Wutc-dark-en.png",
       "frame": "1Wutc",
       "lang": "en",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "8430e07ab9884cc8374db1a1479796c5537ef87545205bb8f7adf5f2c09d1190"
+      "sha256": "6bc2410ab1a1917d772fc1015a266030253ad5ff8e711fad00c60b2b407ddfb1"
     },
     {
-      "name": "chart-guide-20261027-1Wutc-light-zh.png",
+      "name": "chart-guide-20261028-1Wutc-light-zh.png",
       "frame": "1Wutc",
       "lang": "zh",
       "appearance": "light",
       "width": 1800,
       "height": 1404,
-      "sha256": "93a8d839da4a14a6f7789038a12d24308de1c009ed1a220b2753879fbcaf713d"
+      "sha256": "bd7492a882e0f05f5ecc62cf77e8d8e270162f5eb6545a6366c5cee46ac890e7"
     },
     {
-      "name": "chart-guide-20261027-1Wutc-dark-zh.png",
+      "name": "chart-guide-20261028-1Wutc-dark-zh.png",
       "frame": "1Wutc",
       "lang": "zh",
       "appearance": "dark",
       "width": 1800,
       "height": 1404,
-      "sha256": "02e7d8813788b7ea27c63ef638a7234f4f3d902916683524db20ce72a1860578"
+      "sha256": "5afa6ac240908c1c6b2b7a3fdb681605c9c4d1fabd2ff7d28a88a8ca65357980"
     }
   ],
   "legacyUrls": [

@@ -17,14 +17,14 @@ async function captureGuideFigure(name,selector,{call,evaluate},controls=false){
 }
 
 async function captureGuideControls({frame,lang,theme,width},bridge){
-  if(frame!=='1Wutc'||width!==1454)return;
+  if(process.argv.includes('--no-public-captures')||frame!=='1Wutc'||width!==1454)return;
   const appearance=theme==='base'?'light':'dark';
   await captureGuideFigure(`chart-controls-20261027-${appearance}-${lang}.png`,'.global-chart-panel',bridge,true);
   await captureGuideFigure(`chart-text-download-20261027-${appearance}-${lang}.png`,'.global-heading',bridge);
 }
 
 async function captureGuideSave({frame,lang,theme,width,format},bridge){
-  if(frame!=='1Wutc'||width!==1454||format!=='png')return;
+  if(process.argv.includes('--no-public-captures')||frame!=='1Wutc'||width!==1454||format!=='png')return;
   await captureGuideFigure(`chart-save-20261027-${theme==='base'?'light':'dark'}-${lang}.png`,'.report-download-dialog',bridge);
 }
 
@@ -43,9 +43,9 @@ function guideContrast(){
 }
 
 async function checkGuideDocs({call,evaluate,wait}){
-  if(process.argv.includes('--docs-only'))for(const appearance of ['light','dark'])for(const lang of ['en','zh'])for(const kind of ['chart-controls','chart-text-download','chart-save']){
+  if(process.argv.includes('--docs-only')||process.argv.includes('--no-public-captures'))for(const appearance of ['light','dark'])for(const lang of ['en','zh'])for(const kind of ['chart-controls','chart-text-download','chart-save']){
     const name=`${kind}-20261027-${appearance}-${lang}.png`,file=path.join('apps/web/public/docs/global-chart',name);
-    assert.ok(fs.existsSync(file),'Docs-only requires existing public UI captures: '+file);
+    assert.ok(fs.existsSync(file),'Reusing captures requires existing public UI captures: '+file);
     const bytes=fs.readFileSync(file);guideScreenshots.push({name,width:bytes.readUInt32BE(16),height:bytes.readUInt32BE(20),scale:2,reused:true});
     fs.mkdirSync('apps/web/dist/docs/global-chart',{recursive:true});fs.copyFileSync(file,path.join('apps/web/dist/docs/global-chart',name));
   }
@@ -59,7 +59,7 @@ async function checkGuideDocs({call,evaluate,wait}){
     await call('Page.navigate',{url:origin+'/docs?pulseTheme='+theme+'#docs-global-chart'});
     await wait('Boolean(document.querySelector("[data-global-guide-version]"))');
     assert.equal(await evaluate('document.documentElement.dataset.pulseTheme'),theme);
-    assert.equal(await evaluate('document.querySelector("[data-global-guide-version]").dataset.globalGuideVersion'),'20261027');
+    assert.equal(await evaluate('document.querySelector("[data-global-guide-version]").dataset.globalGuideVersion'),'20261028');
     assert.equal(await evaluate('document.querySelector("[data-global-guide-version] h2").textContent'),lang==='en'?'Use the Global chart':'\u4f7f\u7528Global\u56fe\u8868');
     await evaluate('document.querySelectorAll("[data-global-guide-version] img").forEach(image=>image.loading="eager")');
     await wait('Array.from(document.querySelectorAll("[data-global-guide-version] img")).every(image=>image.complete&&image.naturalWidth>0)');
@@ -67,13 +67,13 @@ async function checkGuideDocs({call,evaluate,wait}){
     const examples=[];
     for(const [index,frame] of ['15m','1H','4H','1Dutc','1Wutc'].entries()){
       await evaluate(`document.querySelectorAll('.global-guide-examples button')[${index}].click()`,true);
-      const expected=`chart-guide-20261027-${frame}-${appearance}-${lang}.png`;
+      const expected=`chart-guide-20261028-${frame}-${appearance}-${lang}.png`;
       await wait(`(()=>{const image=document.querySelector('.global-guide-figure img[src*="chart-guide-"]');return image?.src.endsWith(${JSON.stringify(expected)})&&image.complete&&image.naturalWidth>=1800;})()`);
       assert.equal(await evaluate('document.querySelectorAll(".global-guide-examples button[aria-pressed=true]").length'),1);
       examples.push({frame,path:expected,width:await evaluate('document.querySelector(".global-guide-figure img[src*=chart-guide-]").naturalWidth')});
     }
     const images=await evaluate('Array.from(document.querySelectorAll("[data-global-guide-version] img")).map(image=>({src:new URL(image.src).pathname,width:image.naturalWidth,height:image.naturalHeight,loaded:image.complete}))');
-    assert.ok(images.length>=3&&images.every(image=>image.loaded&&image.width>=1000&&image.src.includes('20261027')&&image.src.endsWith(`-${appearance}-${lang}.png`)));
+    assert.ok(images.length>=3&&images.every(image=>image.loaded&&image.width>=1000&&(image.src.includes('/chart-guide-20261028-')||/\/chart-(?:controls|text-download|save)-20261027-/.test(image.src))&&image.src.endsWith(`-${appearance}-${lang}.png`)));
     const contrast=await evaluate('('+guideContrast.toString()+')()');
     assert.ok(contrast.length>20&&contrast.every(item=>item.ratio>=4.5),'Guide contrast: '+JSON.stringify(contrast.filter(item=>item.ratio<4.5)));
     assert.equal(await evaluate('document.documentElement.scrollWidth>innerWidth'),false,'Docs overflow');
@@ -83,7 +83,7 @@ async function checkGuideDocs({call,evaluate,wait}){
     assert.ok(paintedImage.display!=='none'&&paintedImage.visibility==='visible'&&paintedImage.opacity>0&&paintedImage.width>0&&paintedImage.height>0&&paintedImage.inViewport,'Guide image is not visibly presented: '+JSON.stringify(paintedImage));
     const screenshot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     fs.writeFileSync(path.join(out,`docs-${lang}-${theme}-${width}.png`),Buffer.from(screenshot.data,'base64'));
-    guideCases.push({lang,theme,width,version:'20261027',examples,images,paintedImage,minTextContrast:Math.min(...contrast.map(item=>item.ratio)),overflow:false});
+    guideCases.push({lang,theme,width,version:'20261028',examples,images,paintedImage,minTextContrast:Math.min(...contrast.map(item=>item.ratio)),overflow:false});
   }
   assert.deepEqual(errors,[]);assert.deepEqual(mutations,[]);
   fs.writeFileSync(path.join(out,'guide-validation.json'),JSON.stringify({mode:process.argv.includes('--docs-only')?'docs-only':'full',cases:guideCases,screenshots:guideScreenshots,blockedTelemetry,remoteRequestsBlocked:true,physicalDevices:false,modelCalls:0,walletPayments:0,telegramSends:0},null,2));
@@ -97,7 +97,7 @@ function augmentGuideRunner(source){
   replace(reportCase,reportCase+"\n      console.log(JSON.stringify({phase:'report',frame,lang,theme,width}));");
   const helpers=[captureGuideFigure,captureGuideControls,captureGuideSave,guideContrast,checkGuideDocs].map(String).join('\n');
   replace('const server=http.createServer','const guideScreenshots=[],guideCases=[],blockedTelemetry=[];\n'+helpers+'\nconst server=http.createServer');
-  replace("if(!['GET','HEAD','OPTIONS'].includes(request.method))",`if(request.method==='POST'&&['https://cca-lite.coinbase.com/amp','https://pulse.walletconnect.org/batch'].includes(url.origin+url.pathname)){
+  replace("if(!['GET','HEAD','OPTIONS'].includes(request.method))",`if(request.method==='POST'&&['https://cca-lite.coinbase.com/amp','https://cca-lite.coinbase.com/metrics','https://pulse.walletconnect.org/batch'].includes(url.origin+url.pathname)){
       blockedTelemetry.push({method:request.method,origin:url.origin,path:url.pathname});await call('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'});return;
     }
     if(!['GET','HEAD','OPTIONS'].includes(request.method))`);

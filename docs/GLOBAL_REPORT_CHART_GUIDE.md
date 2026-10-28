@@ -70,6 +70,12 @@ Entry and TP zones come from saved source ranges or candle reactions. An exact r
 
 Percentages and reward/risk use the least favorable entry in the range and the first target-zone boundary. Read the nearer obstacle as well as TP1. If TP1 offers less than 1R, its reward is smaller than the full stop risk; later targets do not remove that limitation. Overlapping target zones are consolidated.
 
+A level that was visited earlier can still obstruct a new Entry-to-target route. A wick touching it does not by itself establish acceptance beyond it. Read its source timeframe: a lower-timeframe spike does not erase a primary support/resistance zone. The captured quote being past a level does not remove that obstacle from a future entry below or above it.
+
+If Entry overlaps an opposing zone, those fills have limited clear room ahead. The report keeps that limitation visible even when a farther target looks attractive. Review the least favorable fill and nearer obstacle together; the original source price and selected entry range are separate references.
+
+Earlier conditional plans can use **Review setup and targets · free** to correct their original saved snapshot. The purchased original is preserved, and a technical review does not obtain current market data.
+
 A conditional plan requires the new completed reaction stated in its entry condition. Earlier touches or a move that already reached an objective do not establish a new entry. Confirmation and execution have separate prices: after confirmation, entry remains limited to the displayed Entry range. If price has left it, wait for a return or reassess. A confirmation close outside the range does not inherit its reward/risk.
 
 An entry away from the latest quote does not predict a required trip to that price. Future chart space does not predict arrival time. A confirmed signal is not an order fill. Review a fresh executable quote, position size and protection if you choose to trade; Spot SELL reduces owned inventory, and SHORT research does not open leverage.
@@ -80,7 +86,7 @@ The in-app guide uses the current renderer with **historical public candles**. P
 
 Versioned illustrations cover all five primary horizons in English/Chinese and light/dark appearances. Controls examples identify view presets and indicator settings; save examples show the file preview and final Save/Share actions:
 
-- `apps/web/public/docs/global-chart/chart-guide-20261027-{15m,1H,4H,1Dutc,1Wutc}-{light,dark}-{en,zh}.png`
+- `apps/web/public/docs/global-chart/chart-guide-20261028-{15m,1H,4H,1Dutc,1Wutc}-{light,dark}-{en,zh}.png`
 - `apps/web/public/docs/global-chart/chart-controls-20261027-{light,dark}-{en,zh}.png`
 - `apps/web/public/docs/global-chart/chart-text-download-20261027-{light,dark}-{en,zh}.png`
 - `apps/web/public/docs/global-chart/chart-save-20261027-{light,dark}-{en,zh}.png`

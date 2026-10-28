@@ -1,4 +1,4 @@
-import {globalTradeAnnotations} from "./globalTradeAnnotations.js";
+import {globalTradeAnnotations,globalTradePriceBadgeYs} from "./globalTradeAnnotations.js";
 import { parseCandleTimeframe, candleCloseTime, type GlobalReport } from "@pulse/schemas";
 import { GLOBAL_PATH_COLORS, globalLabel, globalPrice, globalSetupLines, globalTimeframeLabel, globalTradePlanLines, globalRiskLines, globalNextSetupLines, globalPathTitle } from "./globalPresentation.js";
 import { globalTradePlan } from "./globalTradePlan.js";
@@ -270,9 +270,10 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   svg += text(25, 31, `PULSE · GLOBAL ${report.tier.toUpperCase()} · ${report.snapshot.instId} · ${globalFrameReference(report.snapshot.timeframe)}`, "#55dfb5", 20);
   svg += text(left, 57, `${globalTimeframeLabel(report.snapshot.timeframe, report.lang)} · ${candles.length} / ${report.candles.length} ${report.lang === "zh" ? "根完整 K 线（显示 / 保存）" : "COMPLETED CANDLES (shown / saved)"}${report.strategy?` · ${report.strategy.holding}`:""}`, "#b9c6d8", 12);
   svg += text(left,85,`${decision.marketView} · ${globalDecisionTitle(report)}`,"#cce8f2",14);
+  const priceBadgeYs=report.decisionVersion==="decision-v5"?globalTradePriceBadgeYs(globalSetupMap(report),g,options):[];
   for (let i = 0; i < 6; i += 1) { const value = min + (max - min) * i / 5, py = y(value);
     svg += line(left, py, right, py, "#28374a", .8, "2 5");
-    if(refs.every(price=>Math.abs(y(price)-py)>22))svg+=text(width-18,py+4,globalPrice(report,value),"#8398b3",10,"end");
+    if(refs.every(price=>Math.abs(y(price)-py)>22)&&priceBadgeYs.every(badgeY=>Math.abs(badgeY-py)>22))svg+=`<g data-price-axis-tick-y="${py}">`+text(width-18,py+4,globalPrice(report,value),"#8398b3",10,"end")+"</g>";
   }
   const maxVolume = Math.max(1, ...candles.map(c => c.volume)), candleWidth = Math.max(.8, Math.min(6, (historyEnd - left) / candles.length * .75));
   for (const c of candles) { const cx = x(c.ts), color = c.close >= c.open ? "#35d0aa" : "#ef6b85", vh = c.volume / maxVolume * 55;

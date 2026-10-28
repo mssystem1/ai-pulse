@@ -1,4 +1,5 @@
-import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
+import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
+import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles.js";
 
 type Plan=NonNullable<GlobalReport["discretionaryPlan"]>;
 type Band={lower:number;upper:number};
@@ -8,7 +9,7 @@ const band=(a:number,b:number):Band=>({lower:Math.min(a,b),upper:Math.max(a,b)})
  * favorable entry selection never moves protection or skips a nearer obstacle. */
 export function applyGlobalPriceZones(report:GlobalReport){
   const original=report.discretionaryPlan;if(!original)return;
-  const tf=report.snapshot.timeframe,cutoff=Date.parse(report.snapshot.observedAt),tick=10**-report.snapshot.pricePrecision;
+  const tf=report.snapshot.timeframe,tick=10**-report.snapshot.pricePrecision;
   const atr=report.indicators.atr.points.at(-1)?.value??0;
   const sources=[{timeframe:tf,candles:report.candles,pivots:report.indicators.pivots},...(report.entryStudy?[report.entryStudy]:[])];
   const latest=[...sources,...(report.currentMarket?.frames??[])].flatMap(s=>{const c=s.candles.at(-1);return c?[{price:c.close,end:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.end-a.end)[0]?.price??original.reference.price;
@@ -50,15 +51,10 @@ export function applyGlobalPriceZones(report:GlobalReport){
     for(const t of p.targets){const z=targetBand(p,t),prior=targets.at(-1);if(prior&&(p.side==="long"?z.lower<=prior.upper:z.upper>=prior.lower))continue;kept.push(t);targets.push(z);}
     if(!targets.length)return null;
     const near=p.side==="long"?targets[0].lower:targets[0].upper;
-    const rawBarriers:Plan["barriers"]=[...p.barriers,...sources.flatMap(s=>s.pivots.flatMap(a=>{
-      const knownAt=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,s.timeframe);
-      if(knownAt===null||knownAt>cutoff||a.kind!==(p.side==="long"?"high":"low")||s.candles.some(c=>c.ts>=knownAt&&(p.side==="long"?c.close>a.price:c.close<a.price)))return [];
-      if([...sources,...(report.currentMarket?.frames??[])].some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,a.price,p.side,knownAt,cutoff)))return [];
-      return [{price:a.price,timeframe:s.timeframe,anchorTs:a.ts,knownAt}];
-    }))];
-    for(const z of report.horizonContext?.zones??[])if(z.role===(p.side==="long"?"resistance":"support"))rawBarriers.push({price:p.side==="long"?z.lower:z.upper,timeframe:tf,anchorTs:z.startTs,knownAt:z.knownAt});
-    const obstacles=rawBarriers.filter(b=>sign*(b.price-current)>tick&&sign*(near-b.price)>tick&&sign*(b.price-(p.side==="long"?source.lower:source.upper))>tick).sort((a,b)=>sign*(a.price-b.price));
-    const first=obstacles[0]?.price??near;
+    const rawBarriers=globalRouteObstacles(report,p.side);
+    const obstacles=rawBarriers.filter(b=>sign*(near-b.price)>tick&&sign*(b.price-(p.side==="long"?source.lower:source.upper))>tick).sort((a,b)=>sign*(a.price-b.price));
+    const opposition=globalEntryOpposition(report,p.side,source);
+    const first=[near,...obstacles.map(b=>b.price),...opposition.map(z=>p.side==="long"?z.lower:z.upper)].sort((a,b)=>sign*(a-b))[0];
     // At least equal potential reward and full hard-stop risk, calculated
     // at the least favorable fill and the first real obstacle, before costs.
     const limit=(first+p.stop)/2;
@@ -71,10 +67,10 @@ export function applyGlobalPriceZones(report:GlobalReport){
     const worst=p.side==="long"?entry.upper:entry.lower;
     if(entry.lower>entry.upper||sign*((p.side==="long"?entry.lower:entry.upper)-p.stop)<=0||sign*(worst-p.stop)<=tick||sign*(near-worst)<=tick)return null;
     const barriers=obstacles.filter(b=>sign*(b.price-worst)>tick).filter((b,i,all)=>all.findIndex(a=>a.price===b.price&&a.timeframe===b.timeframe)===i).slice(0,5);
-    const firstActual=barriers[0]?.price??near,rr=sign*(firstActual-worst)/Math.abs(worst-p.stop);
+    const firstActual=barriers[0]?.price??near,rr=globalEntryOpposition(report,p.side,entry).length?0:sign*(firstActual-worst)/Math.abs(worst-p.stop);
     const sourcePrice=p.entryBasis.price;
-    p.entry=Number(worst.toPrecision(12));p.entryBasis.price=p.entry;p.targets=kept;p.barriers=barriers;
-    p.version="discretionary-plan-v6";
+    p.entry=Number(worst.toPrecision(12));p.targets=kept;p.barriers=barriers;
+    p.version="discretionary-plan-v7";
     p.priceZones={version:"price-zones-v1",entry:{lower:Number(entry.lower.toPrecision(12)),upper:Number(entry.upper.toPrecision(12)),sourceLower:source.lower,sourceUpper:source.upper,sourcePrice},stop:band(p.stop,p.stopBasis.price),targets,payoffFloor:1,payoffLimited:rr<1-1e-9};
     return {p,rr};
   }

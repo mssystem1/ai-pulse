@@ -4,10 +4,30 @@ import {globalTradeCards} from "./globalTradeDisplay.js";
 import {globalPriceBandText} from "./globalPriceZones.js";
 
 const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
+const selectedCard=(report:GlobalReport,options:GlobalChartOptions)=>{const cards=globalTradeCards(report);return cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];};
+/** The exact visible badge centers, shared with the export's ordinary axis.
+ * Reserving this gutter never moves a trade price or changes the scale. */
+export function globalTradePriceBadgeYs(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions={}){
+  const card=selectedCard(report,options),p=card?.plan,labeled:number[]=[];
+  if(!card||!p?.referenceEntry||p.referenceStop===null)return labeled;
+  for(const price of [card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],p.referenceStop,...card.targets.map(t=>t.price)]){
+    const y=g.y(price);if(y!==null&&y>=g.top&&y<=g.bottom&&labeled.every(prior=>Math.abs(prior-y)>=17))labeled.push(y);
+  }
+  return labeled;
+}
+function ledgerGap(top:number,bottom:number,height:number,occupied:Array<{top:number;bottom:number}>,preferTop:boolean){
+  const start=top+8,end=bottom-8,blocked=occupied.filter(r=>r.bottom>start&&r.top<end).map(r=>({top:Math.max(start,r.top),bottom:Math.min(end,r.bottom)})).sort((a,b)=>a.top-b.top),gaps:Array<{top:number;bottom:number}>=[];
+  let cursor=start;
+  for(const band of blocked){if(band.top>cursor)gaps.push({top:cursor,bottom:band.top});cursor=Math.max(cursor,band.bottom);}
+  if(cursor<end)gaps.push({top:cursor,bottom:end});
+  const available=gaps.filter(gap=>gap.bottom-gap.top>=height);
+  const gap=preferTop?available[0]:available.at(-1);
+  return gap?(preferTop?gap.top:gap.bottom-height):null;
+}
 /** One position drawing and one conditional route through saved entry/target
  * prices. Future horizontal spacing is illustrative, never a target date. */
 export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions){
-  const cards=globalTradeCards(report),card=cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];
+  const cards=globalTradeCards(report),card=selectedCard(report,options);
   const zh=report.lang==="zh",future=g.right-g.historyEnd,price=(n:number)=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
   const txt=(x:number,y:number,s:unknown,color="#c9d8e9",size=10,anchor="start")=>`<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${color}" font-size="${size}">${escape(s)}</text>`;
   const p=card?.plan;
@@ -37,26 +57,31 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
       if(bottom>top)svg+=`<rect data-trade-box="${kind}" x="${g.historyEnd+4}" y="${top}" width="${future*.48}" height="${bottom-top}" fill="${color}" fill-opacity=".10"/>`;
     }
   }
-  const labeled:number[]=[];
+  const labeled:number[]=[],occupied:Array<{top:number;bottom:number}>=[];
   rows.forEach((row,i)=>{
     const y=g.y(row.price);if(y===null||y<g.top||y>g.bottom)return;
     const zone=rowBand(i),a=zone?g.y(zone.lower):null,b=zone?g.y(zone.upper):null;
-    if(zone&&a!==null&&b!==null){const top=Math.max(g.top,Math.min(a,b)),bottom=Math.min(g.bottom,Math.max(a,b));if(bottom>=top)svg+=`<rect data-trade-zone="${row.role}" data-lower="${zone.lower}" data-upper="${zone.upper}" x="${g.historyEnd+4}" y="${top}" width="${future+3}" height="${Math.max(1,bottom-top)}" fill="${row.color}" fill-opacity=".11" stroke="${row.color}" stroke-opacity=".35"/>`;}
+    // Reserve complete bands plus role-text bounds, including an edge that is
+    // far from the representative target point. Averages cannot clear a band.
+    occupied.push({top:y-21,bottom:y+5});
+    if(zone&&a!==null&&b!==null){const top=Math.max(g.top,Math.min(a,b)),bottom=Math.min(g.bottom,Math.max(a,b));if(bottom>=top){occupied.push({top:top-5,bottom:bottom+5});svg+=`<rect data-trade-zone="${row.role}" data-lower="${zone.lower}" data-upper="${zone.upper}" x="${g.historyEnd+4}" y="${top}" width="${future+3}" height="${Math.max(1,bottom-top)}" fill="${row.color}" fill-opacity=".11" stroke="${row.color}" stroke-opacity=".35"/>`;}}
     svg+=`<g data-trade-role="${row.role}" data-price="${row.price}"><line x1="${g.historyEnd+4}" x2="${g.right+7}" y1="${y}" y2="${y}" stroke="${row.color}" stroke-width="${row.role==="SL"?1.5:1.1}"${card.confirmed?"":' stroke-dasharray="5 4"'}/>`;
     // Stagger role tags horizontally, never move a numeric price vertically.
     svg+=txt(g.historyEnd+8+(i%4)*future*.21,y-5,row.role,row.color,10);
     if(labeled.every(prior=>Math.abs(prior-y)>=17)){
-      labeled.push(y);svg+=`<rect x="${g.right+8}" y="${y-10}" width="132" height="18" rx="3" fill="${row.color}" fill-opacity=".12"/>`+txt(g.right+132,y+3,rowText(i),row.color,zones?9:11,"end");
+      labeled.push(y);svg+=`<rect data-trade-price-badge="${row.role}" x="${g.right+8}" y="${y-10}" width="132" height="18" rx="3" fill="${row.color}" fill-opacity=".12"/>`+txt(g.right+132,y+3,rowText(i),row.color,zones?9:11,"end");
     }
     svg+="</g>";
   });
   const ledgerHeight=44+rows.length*18+(zones?20:0),mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;
-  const ledgerY=mean>(g.top+g.bottom)/2?g.top+42:g.bottom-ledgerHeight-14,lx=g.historyEnd+14,lw=Math.max(100,future-30);
-  svg+=`<g data-trade-price-ledger="${escape(card.key)}"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
+  const ledgerY=ledgerGap(g.top,g.bottom,ledgerHeight,occupied,mean>(g.top+g.bottom)/2),lx=g.historyEnd+14,lw=Math.max(100,future-30);
+  if(ledgerY!==null){
+  svg+=`<g data-trade-price-ledger="${escape(card.key)}" data-layout-status="clear-forecast-gap"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
   svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"}${report.discretionaryPlan?"":` · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`}`,card.side==="long"?"#53dabb":"#f0738c",11);
   rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,rowText(i),row.color,zones?9:10,"end");});
   if(zones)svg+=txt(lx+10,ledgerY+37+rows.length*18,`${zh?"硬止损":"Hard SL"}: ${price(p.referenceStop)}`,"#f0738c",10);
   svg+="</g>";
+  }else svg+=`<g data-trade-price-ledger="${escape(card.key)}" data-layout-status="omitted-no-clear-gap"/>`;
   const alternative=cards.find(c=>c.key!==card.key&&c.side!==card.side);
   if(alternative)svg+=txt(g.historyEnd+14,g.bottom-4,zh?"反向计划的 Entry / SL / TP 见下表。":"Other side: Entry / SL / TP in the plan below.","#9eafc5",8);
   return svg+"</g>";

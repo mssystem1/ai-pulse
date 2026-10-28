@@ -1,6 +1,7 @@
 import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
 import {applyGlobalPriceZones} from "./globalPriceZones.js";
+import {globalRouteObstacles} from "./globalRouteObstacles.js";
 
 /** A complete conditional scenario when an observed signal is not established.
  * It does not change the canonical signal, history or execution permission. */
@@ -96,12 +97,7 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport){
     if(price>0)targets.push({price,anchorTs:report.candles.at(-Math.min(20,report.candles.length))!.ts,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"measured_projection"});
   }
   if(!targets.length)return;
-  const barrierCandidates=known.map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,kind:a.kind,retestable:false}));
-  // A tested zone can obstruct a future retest route even when its earlier
-  // target touch prevents presenting it as a new, unplayed objective.
-  for(const zone of report.horizonContext?.zones??[])if(zone.role===(side==="long"?"resistance":"support"))barrierCandidates.push({price:side==="long"?zone.lower:zone.upper,timeframe:primaryTimeframe,anchorTs:zone.startTs,knownAt:zone.knownAt,kind:side==="long"?"high":"low",retestable:true});
-  if(study){const extreme=bars.slice(-20).reduce((a,b)=>side==="long"?(b.high>a.high?b:a):(b.low<a.low?b:a));barrierCandidates.push({price:side==="long"?extreme.high:extreme.low,timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,timeframe)!,kind:side==="long"?"high":"low",retestable:false});}
-  const barriers=barrierCandidates.filter(a=>a.kind===(side==="long"?"high":"low")&&forward(a.price)&&(a.retestable||unplayed(a.price,a.knownAt))&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).filter((a,i,all)=>all.findIndex(b=>b.price===a.price&&b.timeframe===a.timeframe)===i).slice(0,5).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt}));
+  const barriers=globalRouteObstacles(report,side).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5);
   report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
   applyGlobalPriceZones(report);
 }

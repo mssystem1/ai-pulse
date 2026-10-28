@@ -2,12 +2,13 @@ import {useState} from "react";
 import {useGlobalChartAppearance} from "./useGlobalChartAppearance";
 import "./globalReport.css";
 
-const illustrationVersion="20261027";
+const illustrationVersion="20261028";
+const captureVersion="20261027";
 type ExampleFrame="15m"|"1H"|"4H"|"1Dutc"|"1Wutc";
 export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
   const tr=(en:string,zh:string)=>lang==="zh"?zh:en,appearance=useGlobalChartAppearance();
   const [frame,setFrame]=useState<ExampleFrame>("1Wutc");
-  const imagePath=(name:string)=>`/docs/global-chart/${name}-${illustrationVersion}-${appearance}-${lang}.png`;
+  const imagePath=(name:string)=>`/docs/global-chart/${name}-${captureVersion}-${appearance}-${lang}.png`;
   const figure=(src:string,title:string,caption:string)=><figure className="global-guide-figure"><a href={src} target="_blank" rel="noreferrer"><img src={src} alt={title} loading="lazy" decoding="async"/></a><figcaption><strong>{title}</strong><p>{caption}</p><a href={src} target="_blank" rel="noreferrer">{tr("Open full-size image ↗","打开完整尺寸图片 ↗")}</a></figcaption></figure>;
   const frames:Array<{id:ExampleFrame;label:string;reading:string;entry:string;context:string}>=[
     {id:"15m",label:tr("15m · Fast","15m · 快速"),reading:tr("Session value, nearby levels and fast reactions","时段价值、邻近价位与快速反应"),entry:"5m",context:"1H"},
@@ -40,7 +41,7 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
   ];
   const selected=frames.find(row=>row.id===frame)!;
   return <div className="global-chart-reading" data-no-localize data-global-guide-version={illustrationVersion}>
-    <p className="global-guide-updated">{tr("Updated 27 October 2026 · Current chart controls and export flow","更新于2026年10月27日 · 当前图表控件与导出流程")}</p>
+    <p className="global-guide-updated">{tr("Updated 28 October 2026 · Current chart controls and export flow","更新于2026年10月28日 · 当前图表控件与导出流程")}</p>
     <h2>{tr("Use the Global chart","使用Global图表")}</h2>
     <p>{tr("Use this panel to inspect a saved market setup, compare its timeframes and export what you have selected. View and indicator controls change the presentation; they do not generate another analysis.","此面板用于检查已保存市场计划、比较周期并导出所选内容。视图及指标控件调整展示方式，不会生成另一份分析。")}</p>
     <ol className="global-guide-steps">
@@ -71,6 +72,9 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
 
     <h3>{tr("Read the setup before deciding","决定前阅读交易计划")}</h3>
     <p>{tr("Entry and TP can be source-backed price ranges. The SL zone shows invalidation and its protective margin; Hard SL is the fixed outer stop. Read the entry trigger and nearest obstacle together with the reward/risk. A trend or a historical touch alone does not establish a new entry, and a confirmation close outside Entry does not inherit that range's payoff.","Entry与TP可以是有依据的价格区间；SL区域显示失效与保护余量，Hard SL为固定外侧止损。结合入场触发条件、最近障碍及收益风险比阅读；趋势或历史触及本身不构成新入场，Entry区间外的确认收盘也不继承该区间收益风险比。")}</p>
+    <p>{tr("Read obstacles along the planned Entry-to-target route, even when the captured quote is already beyond them. A visited level can still obstruct a fresh retest. A wick touching it does not by itself show acceptance beyond it; lower-timeframe spikes do not erase primary-timeframe zones.","应沿计划的Entry至目标路径阅读障碍，即使快照报价已越过该处。此前触及的价位仍可能阻碍新的回测。影线触及不等于确认突破；小周期尖峰不会抹去主周期区域。")}</p>
+    <p>{tr("If Entry overlaps an opposing support/resistance zone, those fills have limited clear room ahead. That limitation stays visible even when a farther TP looks attractive. Read the least favorable Entry fill and nearest obstacle together; the original source price and selected entry range are separate references.","若Entry与相反方向的支撑／阻力区域重叠，这些成交位置前方缺少清晰空间。即使较远TP看起来有吸引力，仍会显示该限制。请结合最不利Entry成交价与最近障碍阅读；原始来源价格与所选入场区间是不同参考。")}</p>
+    <p>{tr("Older conditional plans can use Review setup and targets · free to review their original saved candles. The review corrects that snapshot without replacing the purchased original or fetching current market data.","较早的条件计划可使用“免费复核计划与目标”，从原始保存K线重新复核。复核修正同一快照的解读，不会替换已购买原件，也不会获取当前行情。")}</p>
     <p>{tr("Green target areas can sit below Entry for a SHORT. Candle colors show that candle's move; support/resistance shading describes structure. These colors do not replace the LONG/SHORT direction or the written condition.","SHORT的绿色目标区可位于Entry下方；K线颜色表示该根K线涨跌，支撑阻力阴影描述结构。颜色不能替代LONG／SHORT方向及文字条件。")}</p>
 
     <h3>{tr("Save PNG or TXT on desktop and mobile","在电脑与手机保存PNG或TXT")}</h3>

@@ -1,6 +1,6 @@
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference,globalContextLine} from "./globalContext.js";
-import {globalPriceBandText,globalTargetReference,globalPriceZonePayoff} from "./globalPriceZones.js";
+import {globalPriceBandText,globalTargetReference,globalPriceZonePayoff,globalOpposingEntryZones} from "./globalPriceZones.js";
 
 /** Explain saved evidence without converting a conditional level into a signal. */
 export function globalSetupRationale(report:GlobalReport,current:number|null):string[]{
@@ -33,9 +33,11 @@ export function globalSetupRationale(report:GlobalReport,current:number|null):st
   lines.push(zh?`止损依据：${tf} 失效价 ${price(d.stopBasis.price)}，时间 ${at(d.stopBasis.anchorTs)}；止损 ${price(d.stop)} 位于其外侧。`:`Protection basis: ${tf} invalidation ${price(d.stopBasis.price)}, dated ${at(d.stopBasis.anchorTs)}; SL ${price(d.stop)} is beyond it.`);
   const sign=d.side==="long"?1:-1,risk=Math.abs(d.entry-d.stop),rr=sign*(globalTargetReference(report,0)!-d.entry)/risk,barrier=d.barriers[0];
   const payoff=globalPriceZonePayoff(report);
+  const opposingZones=globalOpposingEntryZones(report);
+  for(const zone of opposingZones)lines.push(zh?`入场区与主周期 ${tf} ${d.side==="long"?"阻力":"支撑"}区 ${globalPriceBandText(report,zone)} 重叠。入场前须${d.side==="long"?"完整收复该阻力区并回测守住":"完整跌破该支撑区并回测受阻"}；重叠未解决时，最不利入场至最近障碍为 0.00R。`:`Entry overlaps the primary ${tf} ${d.side==="long"?"resistance":"support"} zone ${globalPriceBandText(report,zone)}. A completed ${d.side==="long"?"reclaim and held retest of that resistance zone":"break and rejected retest of that support zone"} is required before entry; while the overlap remains, the least favorable fill offers 0.00R to the nearest obstacle.`);
   if(d.priceZones&&payoff)lines.push(zh?`入场区 ${globalPriceBandText(report,d.priceZones.entry)}；止损区 ${globalPriceBandText(report,d.priceZones.stop)}，硬止损 ${price(d.stop)}。按最不利入场计算，最近障碍 ${payoff.worstToObstacle.toFixed(2)}R。`:`Entry zone ${globalPriceBandText(report,d.priceZones.entry)}; SL zone ${globalPriceBandText(report,d.priceZones.stop)}, hard SL ${price(d.stop)}. At the least favorable fill, the nearest obstacle offers ${payoff.worstToObstacle.toFixed(2)}R.`);
   if(current!==null&&sign*(current-d.entry)>0)lines.push(zh?`当前价格与入场相差 ${price(Math.abs(current-d.entry))}；只有价格重新回测入场区域时本计划才适用，当前价格不代表入场。`:`Price is ${price(Math.abs(current-d.entry))} beyond entry; this plan applies only if price returns to the entry area and reacts. The current quote is not an entry fill.`);
-  if(barrier)lines.push(zh?`最近障碍 ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)}：${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R；TP1 ${rr.toFixed(2)}R。`:`Nearest obstacle: ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)} offers ${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R; TP1 offers ${rr.toFixed(2)}R.`);
+  if(barrier)lines.push(zh?`${opposingZones.length?"更远的已标注障碍":"最近障碍"} ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)}：${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R；TP1 ${rr.toFixed(2)}R。`:`${opposingZones.length?"Further plotted obstacle":"Nearest obstacle"}: ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)} offers ${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R; TP1 offers ${rr.toFixed(2)}R.`);
   if(rr<1)lines.push(zh?`TP1 仅提供 ${rr.toFixed(2)}R，低于完整止损风险；这些价位不构成具备收益优势的结论。`:`TP1 offers ${rr.toFixed(2)}R, less than the full stop risk; these levels do not establish a favorable payoff.`);
   return lines;
 }

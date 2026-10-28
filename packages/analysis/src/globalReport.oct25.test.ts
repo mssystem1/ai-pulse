@@ -33,8 +33,15 @@ test("1H and 4H retain independent trend evidence and price risk, while explaini
   const hour=make("1H"),swing=make("4H"),a=hour.discretionaryPlan!,b=swing.discretionaryPlan!;
   assert.equal(a.side,"short");assert.equal(b.side,"short");assert.notEqual(a.entry,b.entry);assert.notEqual(a.stop,b.stop);
   assert.deepEqual(a.targets.map(t=>t.price),b.targets.map(t=>t.price));
-  for(const r of [hour,swing]){const text=globalSetupEvidenceLines(r).join(" ");assert.match(text,/falling SMA55/);assert.match(text,/new retest reaction is still required/);assert.equal(globalTradeCards(r)[0].confirmed,false);}
-  assert.match(globalSetupEvidenceLines(hour).join(" "),/Nearest obstacle: 15m 80,306 offers 1.0[0-9]R/);
+  for(const r of [hour,swing]){
+    const p=r.discretionaryPlan!,card=globalTradeCards(r)[0],text=globalSetupEvidenceLines(r).join(" ");
+    assert.match(text,/falling SMA55/);assert.equal(p.requiresNewTestAfter,Date.parse(r.snapshot.observedAt));
+    assert.match(card.condition,/Use a new test formed after this snapshot/);assert.equal(card.confirmed,false);
+    if(p.entryBasis.kind==="structure_zone")assert.ok(r.horizonContext!.zones.some(z=>z.role==="resistance"&&z.lower===p.priceZones!.entry.sourceLower&&z.upper===p.priceZones!.entry.sourceUpper));
+  }
+  const near=a.barriers.find(o=>o.timeframe==="1H"&&o.price===80514.5)!,anchor=hour.indicators.pivots.find(p=>p.kind==="low"&&p.price===80514.5)!;
+  assert.ok(near&&anchor);assert.equal(near.anchorTs,anchor.ts);assert.equal(near.knownAt,candleCloseTime(anchor.confirmedAt!,"1H"));
+  assert.ok(hour.candles.at(-1)!.close>=near.price);assert.match(globalSetupEvidenceLines(hour).join(" "),/Nearest obstacle: 1H 80,514.5 offers 1.73R/);
   assert.match(globalSetupEvidenceLines(swing).join(" "),/nearest obstacle offers 1.00R/);
 });
 test("weekly recovery retains its limiting resistance and does not claim a confirmed trend",()=>{
@@ -52,7 +59,7 @@ test("fast protection uses the latest completed primary reaction for a new local
 test("all horizons preserve provenance and exact chart ledger without creating an observed fill",()=>{
   for(const tf of ["15m","1H","4H","1Dutc","1Wutc"]){
     const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r),svg=globalReportChartSvg(r)!;
-    assert.equal(GlobalReportSchema.safeParse(r).success,true,tf);assert.equal(p.version,"discretionary-plan-v6");assert.equal(p.stopBasis.timeframe,tf);
+    assert.equal(GlobalReportSchema.safeParse(r).success,true,tf);assert.equal(p.version,"discretionary-plan-v7");assert.equal(p.stopBasis.timeframe,tf);
     assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(svg.includes(`data-price="${p.entry}"`));assert.equal(globalTradeCards(r)[0].confirmed,false);assert.equal(JSON.stringify(r),before);
   }
 });

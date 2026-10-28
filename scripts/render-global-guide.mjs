@@ -6,7 +6,7 @@ import {Resvg} from '@resvg/resvg-js';
 import {prepareGlobalReport,globalContextTimeframe} from '../packages/analysis/dist/index.js';
 import {globalReportChartSvg,globalSetupWindow,themeGlobalChartSvg} from '../packages/domain/dist/index.js';
 
-const version='20261027',root='apps/web/public/docs/global-chart',out='.tmp/global-chart-guide-refresh',source='packages/analysis/src/globalReport.oct20-fixture.json';
+const version='20261028',root='apps/web/public/docs/global-chart',out='.tmp/global-chart-guide-refresh',source='packages/analysis/src/globalReport.oct20-fixture.json';
 const fixture=JSON.parse(fs.readFileSync(source,'utf8'));
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:'BTC-USDT',source:'okx-public-spot',fetchedAt:fixture.observedAt,ticker:{priceCurrency:'USDT'},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
 fs.mkdirSync(root,{recursive:true});fs.mkdirSync(out+'/reports',{recursive:true});
