@@ -3,7 +3,12 @@ import { API_BASE } from "./api";
 
 /** Kept in view state only; never included in TXT, PNG or URL query strings. */
 export type GlobalReportAccess={kind:"job"|"history";id:string;token:string}|{kind:"share";token:string};
-export type GlobalAssessmentAccess=GlobalReportAccess|(()=>Promise<GlobalReportAccess|{assessment:GlobalAssessment}>);
+export type GlobalAssessmentResolver=(()=>Promise<GlobalReportAccess|{assessment:GlobalAssessment}>)&{assessmentScope?:string};
+export type GlobalAssessmentAccess=GlobalReportAccess|GlobalAssessmentResolver;
+/** Session/order identity stays in memory, never in report exports, DOM or URLs. */
+export function scopedGlobalAssessmentAccess(scope:readonly string[],resolve:GlobalAssessmentResolver):GlobalAssessmentResolver{
+  return Object.assign(()=>resolve(),{assessmentScope:JSON.stringify(scope)});
+}
 export function withSetupAccess(report:Record<string,unknown>,access:GlobalReportAccess):Record<string,unknown>{
   return readGlobalReport(report)?{...report,_setupAccess:access}:report;
 }

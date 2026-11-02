@@ -1,24 +1,33 @@
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { globalPrice, type GlobalReport, type GlobalAssessment } from "@pulse/domain";
 import { assessmentTitle, recheckGlobalSetup, type GlobalAssessmentAccess, type GlobalReportAccess } from "./globalSetupClient";
 import type { ReportTradeIntent } from "./Report";
 import {globalAssessmentEntryDeadline} from "./globalAssessmentDeadline";
+import {createGlobalAssessmentRequestGuard,globalAssessmentSessionKey} from "./globalAssessmentSession";
 
-export function GlobalSetupAssessment({report,access,onTrade}:{report:GlobalReport;access?:GlobalAssessmentAccess;onTrade?:(intent:ReportTradeIntent)=>void}) {
+type AssessmentProps={report:GlobalReport;access?:GlobalAssessmentAccess;onTrade?:(intent:ReportTradeIntent)=>void};
+export function GlobalSetupAssessment(props:AssessmentProps){
+  return <ScopedGlobalSetupAssessment key={globalAssessmentSessionKey(props.report,props.access)} {...props}/>;
+}
+
+function ScopedGlobalSetupAssessment({report,access,onTrade}:AssessmentProps) {
   const [assessment,setAssessment]=useState<GlobalAssessment|null>(null),[resolved,setResolved]=useState<GlobalReportAccess|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState("");
+  const requests=useRef<ReturnType<typeof createGlobalAssessmentRequestGuard>|null>(null);
+  if(!requests.current)requests.current=createGlobalAssessmentRequestGuard();
   const [now,setNow]=useState(Date.now());
-  useEffect(()=>{setAssessment(null);setResolved(null);setError("");},[report]);
+  useLayoutEffect(()=>{const guard=requests.current!;guard.mount();return()=>guard.dispose();},[]);
   useEffect(()=>{const timer=setInterval(()=>setNow(Date.now()),1000);return()=>clearInterval(timer);},[]);
   const zh=report.lang==="zh",deadline=assessment?globalAssessmentEntryDeadline(assessment):null,overallExpiry=assessment?.scenario?.expiresAt??assessment?.expiresAt;
   const fresh=assessment&&now-Date.parse(assessment.assessedAt)<60_000&&deadline!==null&&now<deadline;
   const recheck=async()=>{
-    if(!access||busy)return;setBusy(true);setError("");
+    if(!access)return;const guard=requests.current!,request=guard.begin();if(request===null)return;setBusy(true);setError("");
     try{const capability=typeof access==="function"?await access():access;
-      if("assessment" in capability){setResolved(null);setAssessment(capability.assessment);}else{const result=await recheckGlobalSetup(capability);setResolved(capability);setAssessment(result.assessment);}setNow(Date.now());}
-    catch(reason){setError(reason instanceof Error?reason.message:"Recheck failed");}finally{setBusy(false);}
+      if(!guard.current(request))return;
+      if("assessment" in capability){setResolved(null);setAssessment(capability.assessment);}else{const result=await recheckGlobalSetup(capability);if(!guard.current(request))return;setResolved(capability);setAssessment(result.assessment);}setNow(Date.now());}
+    catch(reason){if(guard.current(request))setError(reason instanceof Error?reason.message:"Recheck failed");}finally{if(guard.finish(request))setBusy(false);}
   };
   const open=(orderType:"market"|"limit")=>{
-    if(!assessment||!fresh||assessment.side!=="long"||assessment.state!=="technical_valid"||!assessment.permittedEntry||assessment.observedStop===null||!resolved)return;
+    if(busy||!assessment||!fresh||assessment.side!=="long"||assessment.state!=="technical_valid"||!assessment.permittedEntry||assessment.observedStop===null||!resolved)return;
     const reference=assessment.lastCompletedClose,entry=reference!==null&&reference>=assessment.permittedEntry[0]&&reference<=assessment.permittedEntry[1]?reference:assessment.permittedEntry[0];
     onTrade?.({pair:report.snapshot.instId,timeframe:report.snapshot.timeframe,side:"buy",orderType,entryPrice:entry,observedPrice:assessment.lastCompletedClose??undefined,takeProfit:assessment.targets[0],stopLoss:assessment.observedStop,sourceTier:report.tier,reportSetupMode:"assessment",reportAccess:resolved,assessment,rationale:"Fresh completed entry signal and observed structural protection. Choose an amount and check the current route, balance and modeled net reward before order review."});
   };
@@ -32,7 +41,7 @@ export function GlobalSetupAssessment({report,access,onTrade}:{report:GlobalRepo
       {deadline!==null&&<p>{zh?"入场截止":"Entry deadline"}: {new Date(deadline).toISOString()}{overallExpiry!==null&&overallExpiry!==undefined&&deadline<overallExpiry&&<> · {zh?"整体计划到期":"Overall setup expiry"}: {new Date(overallExpiry).toISOString()}</>}</p>}
       {assessment.permittedEntry&&assessment.observedStop!==null&&<><p>{zh?"信号已观察 · 允许入场范围":"Signal observed · permitted entry range"}: {assessment.permittedEntry.map(n=>globalPrice(report,n)).join("–")} · SL {globalPrice(report,assessment.observedStop)} · TP1 {globalPrice(report,assessment.targets[0])}</p><p>{zh?"最不利允许入场价至止损距离":"Stop distance at the least favorable permitted entry"}: {assessment.stopDistancePercent?.toFixed(2)}% · {assessment.stopDistanceAtr?.toFixed(2)} × {assessment.entryTimeframe??assessment.timeframe} ATR14</p></>}
       {assessment.state==="technical_valid"&&!fresh&&<p role="status">{zh?"评估已过期；请重新检查。":"Assessment is stale; recheck before continuing."}</p>}
-      {onTrade&&resolved&&assessment.state==="technical_valid"&&assessment.side==="long"&&<div className="global-trade-actions">{(["market","limit"] as const).map(type=><button key={type} disabled={!fresh} onClick={()=>open(type)}>{zh?`检查 ${type} 报价`:`Check ${type==="market"?"Market":"Limit"} quote with observed TP/SL`}</button>)}</div>}
+      {onTrade&&resolved&&assessment.state==="technical_valid"&&assessment.side==="long"&&<div className="global-trade-actions">{(["market","limit"] as const).map(type=><button key={type} disabled={busy||!fresh} onClick={()=>open(type)}>{zh?`检查 ${type} 报价`:`Check ${type==="market"?"Market":"Limit"} quote with observed TP/SL`}</button>)}</div>}
     </>}
   </section>;
 }
