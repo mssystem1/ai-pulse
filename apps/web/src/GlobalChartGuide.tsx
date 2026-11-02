@@ -4,6 +4,7 @@ import "./globalReport.css";
 
 const illustrationVersion="20261028";
 const captureVersion="20261027";
+const guideVersion="20261101";
 type ExampleFrame="15m"|"1H"|"4H"|"1Dutc"|"1Wutc";
 export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
   const tr=(en:string,zh:string)=>lang==="zh"?zh:en,appearance=useGlobalChartAppearance();
@@ -40,12 +41,12 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
     [tr("Volume profile / Trade footprint","成交量分布／成交足迹"),tr("Appear only when the report retained executed-trade evidence. Read its venue, window and price rows; it does not supply resting order-book liquidity.","报告保留实际成交依据时才显示；阅读交易所、时段与价格档位；它不提供挂单簿流动性。")],
   ];
   const selected=frames.find(row=>row.id===frame)!;
-  return <div className="global-chart-reading" data-no-localize data-global-guide-version={illustrationVersion}>
-    <p className="global-guide-updated">{tr("Updated 28 October 2026 · Current chart controls and export flow","更新于2026年10月28日 · 当前图表控件与导出流程")}</p>
+  return <div className="global-chart-reading" data-no-localize data-global-guide-version={guideVersion}>
+    <p className="global-guide-updated">{tr("Updated 1 November 2026 · Execution policies, scenario state and chart controls","更新于2026年11月1日 · 入场规则、计划状态与图表控件")}</p>
     <h2>{tr("Use the Global chart","使用Global图表")}</h2>
     <p>{tr("Use this panel to inspect a saved market setup, compare its timeframes and export what you have selected. View and indicator controls change the presentation; they do not generate another analysis.","此面板用于检查已保存市场计划、比较周期并导出所选内容。视图及指标控件调整展示方式，不会生成另一份分析。")}</p>
     <ol className="global-guide-steps">
-      <li>{tr("Confirm the asset, report timeframe and saved source times. Read the priced setup and its exact entry condition.","确认资产、报告周期与保存的来源时间，阅读具体价格计划及确切入场条件。")}</li>
+      <li>{tr("Confirm the asset, report timeframe and saved source times. Read the priced setup and whether its policy is a passive limit or a confirmed retest.","确认资产、报告周期与保存的来源时间，阅读具体价格计划，并区分被动限价计划与确认后回测计划。")}</li>
       <li>{tr("Start with Setup view. Use Value context or Structure view for additional context, then inspect candles and the entry study.","从入场视图开始；需要更多背景时选择价值背景或结构视图，再检查K线及入场研究。")}</li>
       <li>{tr("Turn on the indicators you need. Compare the primary chart with the lower entry study and higher context.","启用所需指标，比较主图、小周期入场研究与高周期背景。")}</li>
       <li>{tr("Choose Download chart PNG or Download report TXT. Wait for preparation, then use Save file or Share / Save to Files.","选择下载图表PNG或报告TXT，准备完成后使用保存文件或分享／存储到文件。")}</li>
@@ -66,7 +67,7 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
     <p>{tr("Candle coordinates and source times use UTC. The moving clock shows current local time; it does not refresh a saved report. A completed weekly close can be older than the quote captured with the report or the lower-timeframe candles.","K线坐标及来源时间使用UTC；走动时钟显示当前本地时间，不会刷新已保存报告。完整周线收盘可能早于报告捕获的报价或小周期K线。")}</p>
 
     <h3>{tr("Compare the current chart illustrations","比较当前图表样例")}</h3>
-    <p className="global-guide-snapshot">{tr("These are historical examples from public candles, rendered with the current layout. Select a timeframe to see its own reading. They are chart excerpts; the full report and exported PNG also include the written evidence.","以下使用公开历史K线及当前布局绘制。选择周期查看其各自读法。图片为图表节选，完整报告及导出PNG还包含文字依据。")}</p>
+    <p className="global-guide-snapshot">{tr("These illustrations use historical public candles and their saved policy version. Their prices and older execution wording are examples, not current signals or the rules of a newer scenario. Select a timeframe to compare its reading; the full report and exported PNG also include written evidence.","这些样例使用公开历史K线及各自保存的规则版本。价格和较早的执行说明仅作示例，不代表当前信号或新版计划规则。选择周期比较其读法；完整报告及导出PNG还包含文字依据。")}</p>
     <div className="global-guide-examples" role="group" aria-label={tr("Choose an example timeframe","选择样例周期")}>{frames.map(row=><button type="button" key={row.id} aria-pressed={frame===row.id} onClick={()=>setFrame(row.id)}>{row.label}</button>)}</div>
     {figure(`/docs/global-chart/chart-guide-${illustrationVersion}-${frame}-${appearance}-${lang}.png`,selected.label+" · "+selected.reading,tr("Same saved candles and priced setup as the report renderer. Green/red support-resistance zones, VWAP references and entry/target/stop areas have different meanings; read their labels.","使用与报告绘制器相同的已保存K线及价格计划。绿／红支撑阻力区、VWAP参考及入场／目标／止损区含义不同，请阅读各自标注。")+(frame==="15m"?tr(" This historical example has no saved 5m candles, so its Entry study is explicitly unavailable."," 此历史样例未保存5m K线，因此入场研究明确显示不可用。"):""))}
 
@@ -76,6 +77,16 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
     <p>{tr("If Entry overlaps an opposing support/resistance zone, those fills have limited clear room ahead. That limitation stays visible even when a farther TP looks attractive. Read the least favorable Entry fill and nearest obstacle together; the original source price and selected entry range are separate references.","若Entry与相反方向的支撑／阻力区域重叠，这些成交位置前方缺少清晰空间。即使较远TP看起来有吸引力，仍会显示该限制。请结合最不利Entry成交价与最近障碍阅读；原始来源价格与所选入场区间是不同参考。")}</p>
     <p>{tr("Older conditional plans can use Review setup and targets · free to review their original saved candles. The review corrects that snapshot without replacing the purchased original or fetching current market data.","较早的条件计划可使用“免费复核计划与目标”，从原始保存K线重新复核。复核修正同一快照的解读，不会替换已购买原件，也不会获取当前行情。")}</p>
     <p>{tr("Green target areas can sit below Entry for a SHORT. Candle colors show that candle's move; support/resistance shading describes structure. These colors do not replace the LONG/SHORT direction or the written condition.","SHORT的绿色目标区可位于Entry下方；K线颜色表示该根K线涨跌，支撑阻力阴影描述结构。颜色不能替代LONG／SHORT方向及文字条件。")}</p>
+
+    <h3>{tr("Read the execution policy and scenario state","阅读入场规则与计划状态")}</h3>
+    <p>{tr("A passive limit uses the displayed source region without borrowing a confirmation that may happen later. A confirmed retest first requires the stated acceptance, reclaim or rejection, then a return to its defended Entry region before the fill deadline. A confirmation close is not an assumed fill. Entry is not moved deeper into an old zone just to improve reward/risk, and the structural hard stop stays fixed.","被动限价使用所示来源区域，不借用未来可能出现的确认。确认后回测需要先完成指定突破接受、收复或受阻，再于有效期内返回已守住的Entry区域。确认收盘不等于成交。不会为改善收益风险比而将Entry移向旧区域深处，结构性硬止损保持固定。")}</p>
+    <p>{tr("Use the displayed Entry deadline. After a price retest is observed, its return window can end before the overall setup expiry; the later date does not extend that entry. These are saved snapshot conditions, so recheck current eligibility before execution.","以所示入场截止时间为准。观察到价格回测后，其返回窗口可能早于整体计划到期；较晚日期不会延长该次入场。以上是已保存快照条件，执行前须重新检查当前入场资格。")}</p>
+    <p>{tr("New scenarios retain their source identity, priced revision and expiry across subsequent reports. The state separates waiting for location or an event, an observed price retest awaiting entry review, entry-price observation, invalidation, expiry and completion. A price event alone does not establish full entry eligibility. An objective reached before entry or a failed premise cancels that opportunity. Reopening an older report does not restart the clock or update its saved market data.","新版计划会在后续报告中保留来源身份、价格版本与到期时间。状态区分等待价位或事件、已观察到价格回测待入场复核、观察到入场价格、失效、到期与完成。价格事件本身不代表完整入场资格。入场前目标已触及或原有依据失效会取消本次机会。重新打开旧报告不会重置计时，也不会更新已保存行情。")}</p>
+    <p>{tr("Observed price touches are separate from actual orders, fills and realized PnL. If one candle touches several levels and their sequence is unknown, the result remains ambiguous. Daily weakness and weekly recovery can coexist; shared levels do not prove identical trades across timeframes.","观察到价格触及与实际订单、成交及已实现盈亏分别记录。若同一K线触及多个价位且先后不明，结果保持不确定。日线走弱与周线恢复可以并存；共享价位不代表不同周期的交易相同。")}</p>
+
+    <h3>{tr("Understand the strategy mix and its data","理解策略组合及数据依据")}</h3>
+    <p>{tr("The core range, trend-pullback, VWAP, breakout-retest and structural-retest methods remain available. Complementary value-area rotation, participation-backed breakout/retest and sweep/reclaim methods require their own completed events. They select one primary opportunity and retain opposing evidence; adding a study to the chart does not change the strategy.","区间、趋势回调、VWAP、突破回测及结构回测等核心方法继续保留。补充的价值区轮动、成交参与支持的突破回测及扫价收复方法需要各自已完成事件。只选择一个主要机会并保留反向依据；在图表增加指标不会改变策略。")}</p>
+    <p>{tr("Value-area rotation needs genuine completed profile coverage. Participation-backed continuation needs separately identified spot and perpetual executions. Sweep/reclaim needs a previously known level, an actual sweep and a held recovery. Missing, old or conflicting data cannot supply confirmation. External-provider evidence appears only when a real feed is connected and its market, units and time window are retained; volume bars do not supply footprints or resting liquidity.","价值区轮动需要真实完整的成交量分布覆盖；成交参与支持的延续需要分别识别的现货及永续成交；扫价收复需要预先已知价位、实际扫价及守住的恢复。缺失、过期或冲突数据不能成为确认。外部依据仅在真实数据源已连接并保留市场、单位及时间窗口时显示；普通成交量柱不能代替足迹或挂单流动性。")}</p>
 
     <h3>{tr("Save PNG or TXT on desktop and mobile","在电脑与手机保存PNG或TXT")}</h3>
     <ol className="global-guide-steps">

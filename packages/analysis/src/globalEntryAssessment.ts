@@ -2,8 +2,10 @@ import {candleCloseTime,GlobalAssessmentSchema,type GlobalReport} from "@pulse/s
 import type {SpotMarketContext} from "@pulse/market";
 import {deriveGlobalEntryPlan,globalArtifactReference,globalContextRelation,globalEntryCondition,globalFrameReference,selectSingleGlobalSetup} from "@pulse/domain";
 import {completedGlobalCandles,globalConfirmedPivots,globalFrameEvidence,globalSma,globalWilderIndicators} from "./globalReport.js";
+import {assessGlobalScenarioReport} from "./globalScenarioAssessment.js";
 
 export function assessGlobalEntryReport(saved:GlobalReport,market:SpotMarketContext,context:SpotMarketContext|null|undefined,entry:SpotMarketContext|null|undefined){
+  if(saved.discretionaryPlan?.version==="discretionary-plan-v8")return assessGlobalScenarioReport(saved,market,context,entry);
   const at=market.fetchedAt,cutoff=Date.parse(at),expected=saved.entryStudy!.timeframe;
   const identity=(m:SpotMarketContext|undefined|null,frame:string)=>!!m&&m.instId===saved.snapshot.instId&&m.bar===frame&&m.source===saved.snapshot.source&&(m.ticker.priceCurrency??m.instId.split("-").at(-1))===saved.snapshot.priceCurrency;
   const source=expected===market.bar?market:entry;

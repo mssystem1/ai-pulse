@@ -5,7 +5,7 @@ The English and Chinese app guide is at [Docs → Chart & indicator guide](https
 ## Start with the saved setup
 
 1. Check the instrument, primary timeframe, snapshot time and captured quote. A report describes its saved snapshot; the moving chart clock does not refresh its analysis.
-2. Read the direction evidence and exact entry condition, then locate **Entry**, **SL**, **Hard SL** and available **TP** zones. A conditional setup is a plan for a new reaction, not an order or a claim that a prior move is still available.
+2. Read the direction evidence and the saved execution policy, then locate **Entry**, **SL**, **Hard SL** and available **TP** zones. A passive limit at a source zone and an entry requiring a confirmed retest have different conditions; neither is an order or proof of a fill.
 3. Compare the primary chart with the lower-timeframe **Entry study** and broader **Context** chart. They answer different questions and can have different completed-close times.
 4. Use the controls below to inspect the evidence. Use **Download chart PNG** for the chart report or **Download report TXT** for its written analysis and source details.
 
@@ -60,7 +60,7 @@ The primary chart defines the selected horizon. The Entry study refines the stat
 | **1D · Position** | Multi-month recovery or decline, daily balance and position levels | 4H | 1W UTC |
 | **1W · Macro** | Cycle value, major decline/recovery legs and weekly support/resistance | 1D UTC | 1M UTC |
 
-Different horizons can share a swing or price level. Their entry conditions, protection and objectives still use their own source timeframe. Weekly recovery does not itself establish an intraday entry. The broader trend and a conditional reclaim or rejection can point in different directions; read the dated evidence and selected setup separately.
+Different horizons can share a swing or price level. Their entry conditions, protection and objectives still use their own source timeframe. Weekly recovery does not itself establish an intraday entry. A daily short premise can coexist with a weekly recovery hypothesis. Read the completed structure, opposing evidence and actual admission event rather than treating either direction as a current order.
 
 The chart clock shows current local time, seconds and timezone. Candle axes and saved source times use UTC. **Snapshot time**, the **quote captured at that snapshot**, and **last completed primary/entry closes** are distinct. A weekly close can be older than today's quote. An older anchor date identifies a level's origin, not the report's freshness. Reviewing or exporting saved analysis does not obtain current market data.
 
@@ -68,7 +68,7 @@ The chart clock shows current local time, seconds and timezone. Candle axes and 
 
 Entry and TP zones come from saved source ranges or candle reactions. An exact reference remains a point when no supported interval is available. The **SL zone** shows structural invalidation and its protective margin; **Hard SL** is the fixed outer stop used in risk calculations. A range does not authorize widening that stop after entry.
 
-Percentages and reward/risk use the least favorable entry in the range and the first target-zone boundary. Read the nearer obstacle as well as TP1. If TP1 offers less than 1R, its reward is smaller than the full stop risk; later targets do not remove that limitation. Overlapping target zones are consolidated.
+Percentages and reward/risk use the least favorable entry in the range and the first target-zone boundary. Read the nearer obstacle as well as TP1. If TP1 offers less than 1R, its reward is smaller than the full stop risk; later targets do not remove that limitation. Overlapping target zones are consolidated. Entry is not moved deeper into an old zone just to improve the displayed ratio, and a weak payoff does not replace the structural stop or silently select a different setup.
 
 A level that was visited earlier can still obstruct a new Entry-to-target route. A wick touching it does not by itself establish acceptance beyond it. Read its source timeframe: a lower-timeframe spike does not erase a primary support/resistance zone. The captured quote being past a level does not remove that obstacle from a future entry below or above it.
 
@@ -76,13 +76,30 @@ If Entry overlaps an opposing zone, those fills have limited clear room ahead. T
 
 Earlier conditional plans can use **Review setup and targets · free** to correct their original saved snapshot. The purchased original is preserved, and a technical review does not obtain current market data.
 
-A conditional plan requires the new completed reaction stated in its entry condition. Earlier touches or a move that already reached an objective do not establish a new entry. Confirmation and execution have separate prices: after confirmation, entry remains limited to the displayed Entry range. If price has left it, wait for a return or reassess. A confirmation close outside the range does not inherit its reward/risk.
+Read the execution policy before interpreting a touch:
+
+- **Passive limit plan:** the displayed Entry is the saved source region. It does not borrow a confirmation that might occur later. The premise, fixed stop, first obstacle and expiry remain relevant before considering an order.
+- **Confirmed retest:** the stated acceptance, reclaim or rejection must be observed first. Entry stays tied to its defended region and fill deadline. A confirmation close outside Entry is not a fill and does not inherit the range's reward/risk.
+
+Use the displayed **Entry deadline**. A confirmed return window can end before the **Overall setup expiry**; the later date does not extend the entry. The recorded state describes its saved snapshot, so recheck current eligibility before execution.
+
+New scenarios retain their source identity and priced revision across later reports. Reopening a saved report does not restart its event clock. The recorded state distinguishes waiting for location or an event, an observed price retest awaiting entry review, entry-price observation, invalidation, expiry and completion. A price event alone does not establish full entry eligibility. An objective reached before entry cancels that opportunity; a failed retest or broken premise is not renewed by drawing the same Entry again. Historical reports keep their original recorded rules.
+
+Lifecycle events describe observed price paths. An Entry touch is not a verified order fill, target observations are not realized profit, and an ambiguous candle cannot establish which level was reached first. A newer report can carry forward an active scenario; the older report remains a snapshot of what was known when it was saved.
+
+## Strategy methods and evidence coverage
+
+Range rotation, trend pullback, VWAP reversion, breakout retest and structural retest remain available. Complementary value-area rotation, participation-backed breakout/retest and sweep/reclaim methods require their own observed events. The selected method depends on the asset, timeframe, market condition and available evidence; switching a chart indicator does not choose or optimize a strategy.
+
+A value-area method needs genuine completed profile data. A participation-backed breakout needs separately identified spot and perpetual executions. Sweep/reclaim needs a previously known level, an observed sweep and a held recovery; available flow adds context. Missing, old or conflicting evidence cannot become an affirmative confirmation. A profile, footprint, open-interest value, funding rate and resting liquidity describe different observations. The report records their market, units and coverage when available; candle volume does not manufacture them.
+
+The strategy mix selects one primary opportunity and retains conflicts. Several indicators derived from the same prices do not count as independent confirmations. A method appearing in the selector does not establish its availability for every report or promise a win rate. External-provider coverage is shown only when actual source data are connected and retained.
 
 An entry away from the latest quote does not predict a required trip to that price. Future chart space does not predict arrival time. A confirmed signal is not an order fill. Review a fresh executable quote, position size and protection if you choose to trade; Spot SELL reduces owned inventory, and SHORT research does not open leverage.
 
 ## Current guide illustrations
 
-The in-app guide uses the current renderer with **historical public candles**. Prices are educational examples, not current signals. The gallery shows chart and Entry study excerpts; the full report and downloaded PNG also include written evidence. The 15m example has no saved 5m candles, so its Entry study explicitly shows that evidence as unavailable.
+The in-app gallery uses **historical public candles and the policy version saved for each illustration**. Prices and old execution wording are educational examples, not current signals or a specification for a newer scenario. The gallery shows chart and Entry study excerpts; the full report and downloaded PNG also include written evidence. The 15m example has no saved 5m candles, so its Entry study explicitly shows that evidence as unavailable.
 
 Versioned illustrations cover all five primary horizons in English/Chinese and light/dark appearances. Controls examples identify view presets and indicator settings; save examples show the file preview and final Save/Share actions:
 

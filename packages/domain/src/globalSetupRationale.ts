@@ -1,3 +1,4 @@
+import {globalScenarioLines} from "./globalExecutionInstructions.js";
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference,globalContextLine} from "./globalContext.js";
 import {globalPriceBandText,globalTargetReference,globalPriceZonePayoff,globalOpposingEntryZones} from "./globalPriceZones.js";
@@ -24,6 +25,7 @@ export function globalSetupRationale(report:GlobalReport,current:number|null):st
     const rsi=report.indicators.rsi.points.at(-1)?.value;if(rsi!==undefined)lines.push(`${tf} RSI14: ${rsi.toFixed(2)}.`);
   }
   lines.push(zh?'本快照之后仍需新的入场反应；主周期方向本身不构成入场信号。':'A new entry reaction after this snapshot is still required; the primary direction alone is not an entry signal.');
+  if(d.executionPolicy){lines.pop();lines.push(...globalScenarioLines(report));}
   const kind=d.entryBasis.kind,source=globalFrameReference(d.entryBasis.timeframe),sourcePrice=d.priceZones?.entry.sourcePrice??d.entry;
   if(kind==="ema_ribbon")lines.push(zh?`入场依据：${source} EMA 区域 ${price(d.entry)}，截至 ${at(d.entryBasis.knownAt)}；尚需新的回测反应。`:`Entry basis: ${source} EMA ribbon ${price(sourcePrice)}, as of ${at(d.entryBasis.knownAt)}; a new retest reaction is still required.`);
   if(kind==="structure_zone"){
@@ -39,5 +41,11 @@ export function globalSetupRationale(report:GlobalReport,current:number|null):st
   if(current!==null&&sign*(current-d.entry)>0)lines.push(zh?`当前价格与入场相差 ${price(Math.abs(current-d.entry))}；只有价格重新回测入场区域时本计划才适用，当前价格不代表入场。`:`Price is ${price(Math.abs(current-d.entry))} beyond entry; this plan applies only if price returns to the entry area and reacts. The current quote is not an entry fill.`);
   if(barrier)lines.push(zh?`${opposingZones.length?"更远的已标注障碍":"最近障碍"} ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)}：${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R；TP1 ${rr.toFixed(2)}R。`:`${opposingZones.length?"Further plotted obstacle":"Nearest obstacle"}: ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)} offers ${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R; TP1 offers ${rr.toFixed(2)}R.`);
   if(rr<1)lines.push(zh?`TP1 仅提供 ${rr.toFixed(2)}R，低于完整止损风险；这些价位不构成具备收益优势的结论。`:`TP1 offers ${rr.toFixed(2)}R, less than the full stop risk; these levels do not establish a favorable payoff.`);
+  if(d.executionPolicy)return lines.map(line=>line
+    .replace("a new retest reaction is still required.",d.executionPolicy!.mode==="passive_limit"?"the saved limit policy applies to this sourced region.":"use the saved event and entry policy.")
+    .replace("await a new held or rejected retest.",d.executionPolicy!.mode==="passive_limit"?"the sourced region defines the passive limit plan.":"use the saved defended-retest policy.")
+    .replace("this plan applies only if price returns to the entry area and reacts.","this plan applies only within its saved Entry area and execution policy; it does not predict a required return.")
+    .replace("\u5c1a\u9700\u65b0\u7684\u56de\u6d4b\u53cd\u5e94", "\u6309\u6240\u793a\u6267\u884c\u89c4\u5219\u590d\u6838")
+    .replace("\u7b49\u5f85\u65b0\u7684\u56de\u6d4b", "\u6309\u6240\u793a\u6267\u884c\u89c4\u5219\u590d\u6838"));
   return lines;
 }

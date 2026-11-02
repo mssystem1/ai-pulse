@@ -73,8 +73,14 @@ test("the schema rejects publishing a second setup or a side inconsistent with t
   const r=make("1Wutc");r.paths.push({...r.paths[0],id:"second"});assert.equal(GlobalReportSchema.safeParse(r).success,false);
   const opposite=make("1Wutc");opposite.setupSelection!.side="short";assert.equal(GlobalReportSchema.safeParse(opposite).success,false);
 });
-test("a fresh recheck blocks a changed strategy without replacing the saved direction",()=>{
-  const r=make("1Wutc"),before=JSON.stringify(r),market=structuredClone(current.find(m=>m.bar==="1Wutc")!),last=market.candles.at(-1)!;
+test("a legacy canonical recheck blocks a changed strategy without replacing the saved direction",()=>{
+  // A saved pre-v8 single-setup report has canonical selection and active
+  // targets but no priced lifecycle. legacy-pivots-v1 predates that selector
+  // too, so it cannot exercise the strategy-change guard.
+  const r=make("1Wutc");delete r.discretionaryPlan;delete r.scenario;delete r.strategyMix;
+  assert.equal(r.strategy!.targetPolicy,"active-zones-v1");assert.equal(r.setupSelection!.side,"long");
+  assert.equal(GlobalReportSchema.safeParse(r).success,true);
+  const before=JSON.stringify(r),market=structuredClone(current.find(m=>m.bar==="1Wutc")!),last=market.candles.at(-1)!;
   market.candles.push({...last,ts:last.ts+604800000,open:60000,high:61000,low:49000,close:50000});market.fetchedAt=new Date(Date.parse(market.fetchedAt)+604800000).toISOString();
   const result=assessGlobalEntryReport(r,market,current.find(m=>m.bar==="1Mutc"),current.find(m=>m.bar==="1Dutc"));
   assert.equal(result.state,"no_trade");assert.ok(result.blockers.includes("strategy_changed"));assert.notEqual(result.side,"short");assert.equal(r.setupSelection!.side,"long");assert.equal(JSON.stringify(r),before);

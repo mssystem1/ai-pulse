@@ -7,7 +7,7 @@ import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
-import {globalRouteObstacles} from "./globalRouteObstacles.js";
+import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles.js";
 
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
@@ -47,18 +47,25 @@ test("a distant weekly SL cannot flatten the daily entry detail or change any pl
   assert.equal(far.match(firstCandle)?.[1],detail.match(firstCandle)?.[1],'Moving only off-scale primary protection must not shrink entry candles');
 });
 
-test("daily range protection uses the daily low and daily volatility; 4H barriers never become daily targets",()=>{
+test("a daily reclaim keeps its actual source and daily protection; nearby opposition cannot move entry for R",()=>{
   const report=make("1Dutc"),p=report.discretionaryPlan!,atr=report.indicators.atr.points.at(-1)!.value;
-  assert.equal(p.family,"level_retest");assert.equal(p.priceZones!.entry.sourcePrice,81760);assert.equal(p.evidence!.level,82291.1);
-  assert.equal(p.stopBasis.price,80400);assert.ok(Math.abs(p.stop-(80400-atr*.2))<1e-6);
-  assert.ok(p.stop<80400);assert.ok(Math.abs(p.entry-p.stop)>atr*.5);
+  assert.equal(p.family,"breakout_retest");assert.equal(p.priceZones!.entry.sourcePrice,82291.1);assert.equal(p.evidence!.level,82291.1);
+  assert.equal(p.executionPolicy!.mode,"confirmed_retest");assert.equal(p.executionPolicy!.sourceBoundary,82291.1);
+  assert.equal(p.executionPolicy!.eventTimeframe,"4H");assert.equal(p.requiresNewTestAfter,undefined);
+  assert.equal(p.stopBasis.price,79775.1);assert.ok(Math.abs(p.stop-(79775.1-atr*.2))<1e-6);
+  assert.ok(p.stop<79775.1);assert.ok(Math.abs(p.entry-p.stop)>atr*.5);
+  assert.deepEqual([p.priceZones!.entry.lower,p.priceZones!.entry.upper],[82291.1,82610.4]);
+  assert.equal(p.entry,p.priceZones!.entry.upper);assert.equal(p.priceZones!.entry.sourceLower,p.priceZones!.entry.lower);
+  assert.equal(p.priceZones!.entry.sourceUpper,p.priceZones!.entry.upper);assert.equal(p.priceZones!.payoffLimited,true);
   assert.deepEqual(p.targets.map(t=>t.price),[84361.6,87238.3]);const obstacles=globalRouteObstacles(report,p.side);
   assert.ok(obstacles.some(t=>t.price===83439.9&&t.timeframe==="4H"));
   assert.ok(obstacles.some(t=>t.price===83168.2&&t.timeframe==="4H"),"A newer wick does not establish completed 4H acceptance beyond the obstacle");
-  assert.equal(p.barriers[0].price,82213.9);assert.equal(p.barriers[0].timeframe,"1Dutc");
-  assert.ok(report.horizonContext!.zones.some(z=>z.role==="resistance"&&(z.lower===p.barriers[0].price||z.upper===p.barriers[0].price)));
+  assert.equal(p.barriers[0].price,82842);assert.equal(p.barriers[0].timeframe,"1Dutc");
+  const opposition=globalEntryOpposition(report,p.side,p.priceZones!.entry);
+  assert.ok(opposition.some(z=>z.lower===82213.9&&z.upper===82473.6),"Overlapping resistance remains explicit instead of being hidden behind a fitted entry");
   const card=globalTradeCards(report)[0],worstTarget=p.priceZones!.targets[0].lower;
   assert.ok(Math.abs(card.rr!-(worstTarget-p.entry)/(p.entry-p.stop))<1e-9);assert.equal(card.confirmed,false);
+  assert.equal(card.plan.firstObstacleRewardRisk,0);assert.ok(card.rr!<1);
   const changed=structuredClone(report);changed.discretionaryPlan!.targets[0].price+=1;
   assert.notEqual(globalArtifactReference(changed),globalArtifactReference(report));
 });
@@ -152,9 +159,17 @@ test("a lost structural cross and future pivot cannot supply the current entry",
   assert.equal(choose(report).family,"range_rotation","A pivot learned at the close cannot establish the break earlier in that same candle");
 });
 
-test("an obsolete crossed level cannot override the latest local structural sequence",()=>{
+test("a current sweep and held reclaim can complement core structure without reviving an obsolete crossed entry",()=>{
   const report=make("4H"),p=report.discretionaryPlan!;
-  assert.equal(p.side,"long");assert.equal(p.family,"level_retest");assert.equal(p.evidence!.level,82276.2);assert.equal(p.priceZones!.entry.sourcePrice,82291.1);
+  assert.equal(p.side,"long");assert.equal(p.family,"level_retest");assert.equal(p.evidence!.level,81499.9);assert.equal(p.priceZones!.entry.sourcePrice,81499.9);
+  assert.equal(report.strategyMix!.primary.family,"breakout_retest");assert.equal(report.strategyMix!.selectedVariant,"sweep_reclaim");
+  const candidate=report.strategyMix!.candidates.find(c=>c.id==="sweep_reclaim")!,event=candidate.event!,bars=report.entryStudy!.candles;
+  assert.equal(candidate.status,"eligible");assert.equal(event.kind,"sweep_reclaim");assert.ok(candidate.source!.knownAt<event.testTs);
+  const testBar=bars.find(c=>c.ts===event.testTs)!,held=bars.find(c=>candleCloseTime(c.ts,report.entryStudy!.timeframe)===event.completedAt)!;
+  assert.ok(testBar.low<candidate.source!.price&&testBar.close>candidate.source!.price);
+  assert.equal(held.ts,candleCloseTime(testBar.ts,report.entryStudy!.timeframe));assert.ok(held.close>testBar.high&&held.low>=testBar.low);
+  assert.equal(p.evidence!.completedAt,event.completedAt);assert.equal(p.entryBasis.knownAt,candidate.source!.knownAt);
+  assert.equal(p.executionPolicy!.mode,"confirmed_retest");assert.deepEqual([p.priceZones!.entry.lower,p.priceZones!.entry.upper],[81499.9,testBar.close]);
   assert.notEqual(p.entry,82800);assert.ok(p.targets.every(t=>t.price<=report.range!.upper[1]));
 });
 
@@ -163,7 +178,7 @@ test("old conditional plans receive an explicit current review without changing 
   original.discretionaryPlan!.entry=80400;original.discretionaryPlan!.entryBasis.price=80400;
   const before=structuredClone(original),review=reviewGlobalTargetReport(original);
   assert.deepEqual(original,before);assert.deepEqual(review.candles,before.candles);assert.deepEqual(review.entryStudy,before.entryStudy);
-  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v7");assert.equal(review.discretionaryPlan!.evidence!.level,82291.1);
+  assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v8");assert.equal(review.discretionaryPlan!.evidence!.level,82291.1);
   assert.equal(review.targetReviewOf,globalArtifactReference(original));assert.equal(reviewGlobalTargetReport(review),review);
 });
 

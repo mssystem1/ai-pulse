@@ -1,16 +1,16 @@
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles.js";
+import {deriveGlobalExecutionPolicy,type GlobalExecutionSettings} from "./globalExecutionPolicy.js";
 
 type Plan=NonNullable<GlobalReport["discretionaryPlan"]>;
 type Band={lower:number;upper:number};
 const band=(a:number,b:number):Band=>({lower:Math.min(a,b),upper:Math.max(a,b)});
 
-/** Price intervals retain actual source bounds. The stop remains a hard cap;
- * favorable entry selection never moves protection or skips a nearer obstacle. */
-export function applyGlobalPriceZones(report:GlobalReport){
+/** Source-backed execution intervals are fixed before measuring payoff. The
+ * structural stop, first obstacle and genuine target bands remain unchanged. */
+export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={}){
   const original=report.discretionaryPlan;if(!original)return;
   const tf=report.snapshot.timeframe,tick=10**-report.snapshot.pricePrecision;
-  const atr=report.indicators.atr.points.at(-1)?.value??0;
   const sources=[{timeframe:tf,candles:report.candles,pivots:report.indicators.pivots},...(report.entryStudy?[report.entryStudy]:[])];
   const latest=[...sources,...(report.currentMarket?.frames??[])].flatMap(s=>{const c=s.candles.at(-1);return c?[{price:c.close,end:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.end-a.end)[0]?.price??original.reference.price;
   const current=report.currentMarket?.quote?.price??latest;
@@ -44,6 +44,10 @@ export function applyGlobalPriceZones(report:GlobalReport){
     // A partially traversed source wick cannot create reward behind today's
     // quote. Its remaining exact reference stays a point, with no fake width.
     if(p.side==="long"?result.lower<=current:result.upper>=current)return band(t.price,t.price);
+    // A candle body may straddle a future entry while its actual swing high/
+    // low remains ahead. Keep that exact objective as a point; do not shift
+    // Entry, invent a partial wick interval or skip to a farther objective.
+    if(["confirmed_swing","observed_extreme"].includes(t.basis)&&(p.side==="long"?result.lower<=p.entryBasis.price:result.upper>=p.entryBasis.price))return band(t.price,t.price);
     return result;
   };
   function fit(p:Plan){
@@ -51,41 +55,31 @@ export function applyGlobalPriceZones(report:GlobalReport){
     for(const t of p.targets){const z=targetBand(p,t),prior=targets.at(-1);if(prior&&(p.side==="long"?z.lower<=prior.upper:z.upper>=prior.lower))continue;kept.push(t);targets.push(z);}
     if(!targets.length)return null;
     const near=p.side==="long"?targets[0].lower:targets[0].upper;
+    p.targets=kept;
+    let {entry,policy}=deriveGlobalExecutionPolicy(report,p,source,settings);
+    const valid=(z:Band)=>z.lower<=z.upper&&sign*((p.side==="long"?z.lower:z.upper)-p.stop)>tick&&sign*(near-(p.side==="long"?z.upper:z.lower))>tick;
+    if(!valid(entry)){
+      // A complete passive interval cannot cross its structural stop or an
+      // existing objective. A distinct defended-boundary retest is coherent
+      // at the genuine source price; no reward/risk threshold selects it.
+      ({entry,policy}=deriveGlobalExecutionPolicy(report,p,source,{...settings,boundaryRetest:true}));
+    }
     const rawBarriers=globalRouteObstacles(report,p.side);
     const obstacles=rawBarriers.filter(b=>sign*(near-b.price)>tick&&sign*(b.price-(p.side==="long"?source.lower:source.upper))>tick).sort((a,b)=>sign*(a.price-b.price));
-    const opposition=globalEntryOpposition(report,p.side,source);
-    const first=[near,...obstacles.map(b=>b.price),...opposition.map(z=>p.side==="long"?z.lower:z.upper)].sort((a,b)=>sign*(a-b))[0];
-    // At least equal potential reward and full hard-stop risk, calculated
-    // at the least favorable fill and the first real obstacle, before costs.
-    const limit=(first+p.stop)/2;
-    const admissible={lower:p.side==="long"?Math.max(source.lower,p.stopBasis.price):source.lower,upper:p.side==="short"?Math.min(source.upper,p.stopBasis.price):source.upper};
-    const entry={...admissible};
-    if(p.side==="long")entry.upper=Math.min(entry.upper,Math.floor((limit+tick*1e-5)/tick)*tick);
-    else entry.lower=Math.max(entry.lower,Math.ceil((limit-tick*1e-5)/tick)*tick);
-    const fits=entry.lower<=entry.upper&&sign*((p.side==="long"?entry.lower:entry.upper)-p.stop)>tick;
-    if(!fits){entry.lower=admissible.lower;entry.upper=admissible.upper;}
     const worst=p.side==="long"?entry.upper:entry.lower;
     if(entry.lower>entry.upper||sign*((p.side==="long"?entry.lower:entry.upper)-p.stop)<=0||sign*(worst-p.stop)<=tick||sign*(near-worst)<=tick)return null;
     const barriers=obstacles.filter(b=>sign*(b.price-worst)>tick).filter((b,i,all)=>all.findIndex(a=>a.price===b.price&&a.timeframe===b.timeframe)===i).slice(0,5);
     const firstActual=barriers[0]?.price??near,rr=globalEntryOpposition(report,p.side,entry).length?0:sign*(firstActual-worst)/Math.abs(worst-p.stop);
     const sourcePrice=p.entryBasis.price;
     p.entry=Number(worst.toPrecision(12));p.targets=kept;p.barriers=barriers;
-    p.version="discretionary-plan-v7";
+    p.version="discretionary-plan-v8";
+    p.executionPolicy=policy;
+    delete p.requiresNewTestAfter;
     p.priceZones={version:"price-zones-v1",entry:{lower:Number(entry.lower.toPrecision(12)),upper:Number(entry.upper.toPrecision(12)),sourceLower:source.lower,sourceUpper:source.upper,sourcePrice},stop:band(p.stop,p.stopBasis.price),targets,payoffFloor:1,payoffLimited:rr<1-1e-9};
     return {p,rr};
   }
-  let selected=fit(structuredClone(original));
-  if(!selected||selected.p.priceZones!.payoffLimited){
-    // A narrow crossed level may have no viable entry interval. Evaluate an
-    // evidenced primary retest on the same side, rather than extending targets.
-    const zones=(report.horizonContext?.zones??[]).filter(z=>z.role===(original.side==="long"?"support":"resistance")).sort((a,b)=>Math.abs((a.lower+a.upper)/2-current)-Math.abs((b.lower+b.upper)/2-current));
-    for(const z of zones){
-      const p=structuredClone(original);p.family="level_retest";p.entry=p.side==="long"?z.upper:z.lower;p.entryBasis={kind:"structure_zone",price:p.entry,timeframe:tf,knownAt:z.knownAt};
-      p.stopBasis={price:p.side==="long"?z.lower:z.upper,timeframe:tf,anchorTs:z.startTs,knownAt:z.knownAt};
-      p.stop=p.side==="long"?Math.max(tick,Math.min(p.entry-atr*.5,z.lower-atr*.2)):Math.max(p.entry+atr*.5,z.upper+atr*.2);
-      p.stop=Number(p.stop.toPrecision(12));
-      const alternative=fit(p);if(alternative&&(!selected||alternative.rr>selected.rr)){selected=alternative;if(!alternative.p.priceZones!.payoffLimited)break;}
-    }
-  }
+  // Poor clearance remains visible. It cannot move a bid/offer to a deeper
+  // historical zone, change its family or borrow a different invalidation.
+  const selected=fit(structuredClone(original));
   if(selected)report.discretionaryPlan=selected.p;
 }

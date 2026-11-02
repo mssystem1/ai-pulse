@@ -1,7 +1,7 @@
 import type {ReportExportAccess} from "./reportDownload";
 import {GlobalExportButton} from "./GlobalExportButton";
 import {useEffect,useRef,useState} from "react";
-import {globalCoverageLine,globalFrameReference,globalStrategyLines,globalHorizonContextLines,globalHumanText} from "@pulse/domain";
+import {globalCoverageLine,globalFrameReference,globalStrategyLines,globalStrategyMixLines,globalHorizonContextLines,globalHumanText} from "@pulse/domain";
 import {readGlobalReport,globalDecision,globalDecisionTitle,globalNextSetupLines,globalSetupMap,globalPathTitle,globalPathLines,globalSetupLines,globalTradePlan,globalPrice,globalTimeframeLabel,globalCompletedPriceLine,globalFrameName,globalSession,globalWaveExplanationLines,globalRemoteLevelLines,globalArtifactTag,presentResearch,researchText,type GlobalReport} from "@pulse/domain";
 import {globalOrderFlowLines} from "@pulse/domain";
 import {GlobalMarketChart} from "./GlobalMarketChart";
@@ -25,7 +25,7 @@ export function GlobalResearchReport({report:original,onTrade:trade,assessmentAc
   const onTrade=trade?(intent:ReportTradeIntent)=>trade({...intent,reportAccess:intent.reportAccess??(typeof assessmentAccess==="object"?assessmentAccess:undefined)}):undefined;
   const selectedCard=globalTradeCards(report)[0],paths=globalSetupMap(report).paths.filter(p=>p.id===(report.setupSelection?.pathId??selectedCard?.pathId??plan.pathId)),next=globalNextSetupLines(report);
   const ready=d.qualified&&plan.side==="long"&&report.setup.state==="ready"&&report.setup.expiresAt!==null&&Date.now()<report.setup.expiresAt;
-  const needsReview=original.decisionVersion==="decision-v5"&&(original.setupSelection?.version!=="single-setup-v4"||original.strategy?.targetPolicy!=="active-zones-v1"||!original.horizonContext||(original.discretionaryPlan?original.discretionaryPlan.version!=="discretionary-plan-v7":original.tradePlan?.state!=="confirmed"));
+  const needsReview=original.decisionVersion==="decision-v5"&&(original.setupSelection?.version!=="single-setup-v4"||original.strategy?.targetPolicy!=="active-zones-v1"||!original.horizonContext||(original.discretionaryPlan?original.discretionaryPlan.version!=="discretionary-plan-v8":original.tradePlan?.state!=="confirmed"));
   return <article className="global-report" data-global-version={report.version}>
     {needsReview&&<section className="global-target-review"><p>{review?(zh?"正在显示免费策略、背景与目标复核；使用原快照 K 线，未生成新的 AI 分析。":"Showing a free setup, context and target review from the original saved candles; no new AI analysis."):(zh?"此快照使用较早的计划、背景或目标规则，可使用保存的 K 线免费复核。":"This snapshot uses earlier setup, context or target rules. Review it from its saved candles for free.")}</p>{typeof assessmentAccess==="object"&&!review&&<button disabled={reviewBusy} onClick={()=>void reviewTargets()}>{reviewBusy?(zh?"正在复核…":"Reviewing…"):(zh?"免费复核计划与目标":"Review setup and targets · free")}</button>}{reviewError&&<p role="alert">{reviewError}</p>}</section>}
     <header className="global-heading"><div className="global-kicker">GLOBAL {report.tier.toUpperCase()}</div><h2>{s.instId} <span>· {globalTimeframeLabel(s.timeframe,report.lang)}</span></h2><p className="global-meta">{s.venue} · {s.priceCurrency} · {zh?"获取":"Fetched"} {s.observedAt}</p><p className="global-meta">{globalCompletedPriceLine(report)}</p>{globalCoverageLine(report)&&<p className="global-meta">{globalCoverageLine(report)}</p>}<GlobalExportButton report={report} access={exportAccess??assessmentAccess} format="txt"/></header>
@@ -35,6 +35,7 @@ export function GlobalResearchReport({report:original,onTrade:trade,assessmentAc
       <p className="global-meta">{d.contextLine}</p><p>{d.relationship}</p>
     </section>
     {report.strategy&&<section className="global-scenario-evidence"><h3>{zh?"交易策略与持有周期":"Strategy and holding horizon"}</h3>{globalStrategyLines(report).map(line=><p key={line}>{line}</p>)}</section>}
+    {report.strategyMix&&<section className="global-scenario-evidence" data-global-strategy-mix><h3>{zh?"策略组合与方向依据":"Strategy mix and direction evidence"}</h3>{globalStrategyMixLines(report).map((line,i)=><p key={`mix-${i}`}>{line}</p>)}</section>}
     {report.horizonContext&&<section className="global-horizon-context"><h3>{zh?"本周期结构与价值":"Timeframe structure and value"}</h3>{globalHorizonContextLines(report).map(line=><p key={line}>{line}</p>)}</section>}
     {report.orderFlow&&<section className="global-order-flow"><h3>{zh?"实际成交量与价值区间":"Executed volume and value area"}</h3>{globalOrderFlowLines(report).map(line=><p key={line}>{line}</p>)}</section>}
     {report.decisionVersion==="decision-v5"&&<GlobalTradePlans report={report} onSelect={setSelected}/>}

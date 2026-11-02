@@ -1,3 +1,4 @@
+import {createGlobalScenarioStore,reconcileGlobalScenarioAssessment} from "./globalScenarioStore.js";
 import express from "express";
 import cors from "cors";
 import morgan from "morgan";
@@ -170,6 +171,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     observer: recordProvider,
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
+  const globalScenarios = createGlobalScenarioStore(cfg);
   const publicActivity = createPublicActivityStore(cfg);
   const observeDelivery = (delivery: ReturnType<typeof researchDelivery>) => {
     // Marketing telemetry must never fail or repeat a successfully paid delivery.
@@ -930,6 +932,12 @@ export function createApp(cfg: AppConfig, dependencies: {
   };
   app.use(createGlobalAssessmentRouter(cfg,{
     market:loadSpotContext,
+    reconcileAssessment:async(saved,assessment,access)=>{
+      if(access.kind==="share"||saved.discretionaryPlan?.version!=="discretionary-plan-v8"||!assessment.scenario)return assessment;
+      const job=await persistence.jobs.get(access.id);if(!job)return assessment;
+      const asOf=Date.parse(assessment.assessedAt),record=await globalScenarios.advance({ownerWallet:job.payer,networkKey:job.networkKey},assessment.scenario.definition,assessment.scenario.events,asOf,saved.discretionaryPlan);
+      return reconcileGlobalScenarioAssessment(saved,assessment,record);
+    },
     resolveReport:async(access,req)=>{
       if(access.kind==="share"){
         if(!cfg.REPORT_SHARE_LINK_ENABLED)return null;
@@ -1339,6 +1347,9 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   const buildSpotReport = async (req: express.Request, body: z.infer<typeof AnalysisBodySchema>, tier: "base" | "premium", canonical: boolean, onContextReady?: () => Promise<void>, onEnriching?: () => Promise<void>, signal?: AbortSignal, onGenerating?:()=>Promise<void>) => {
       signal?.throwIfAborted();
+      const scenarioNetwork=(req as express.Request & { pulseNetworkKey?: NetworkKey }).pulseNetworkKey||"xlayer";
+      const scenarioOwner=(req as express.Request & { pulseJobPayer?: string }).pulseJobPayer||paymentPayer(req.header("PAYMENT-SIGNATURE")||req.header("X-PAYMENT"));
+      const resolveGlobalScenario=async(report:Parameters<typeof globalScenarios.applyToReport>[1])=>{if(scenarioOwner)await globalScenarios.applyToReport({ownerWallet:scenarioOwner,networkKey:scenarioNetwork},report);};
       const {market,contextMarket,hierarchyMarkets}=await loadGlobalReportMarketSet({instId:body.instId,timeframe:body.timeframe},input=>observeProvider("okx","global_context",()=>loadSpotContext(input)),isArc(req)&&cfg.ARC_AI_MODE==="fixture"?null:globalOrderFlowFeed);
       signal?.throwIfAborted();
       await onContextReady?.();
@@ -1356,6 +1367,7 @@ export function createApp(cfg: AppConfig, dependencies: {
           usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 }, fixture: true,
         };
         const prepared = prepareGlobalReport({ market, tier, lang: body.lang, contextMarket,hierarchyMarkets });
+        await resolveGlobalScenario(prepared);
         const global = finishGlobalReport(prepared, { ...fixtureAnalysis, regime: "transition", bias: "neutral", confidence: 0, waveCandidateId: null, mainPathId: null, setupPathId: null, reasons: [], pathNotes: [], riskNotes: [] });
         const enhanced = { ...fixture, global, ...globalCompatibility(global), chart: { source: market.source, timeframe: market.bar, candles: global.candles } };
         return canonical ? { ...enhanced, service: `spot_analysis_${tier === "base" ? "standard" : "premium"}`, tier: tier === "base" ? "standard" : "premium" } : enhanced;
@@ -1364,7 +1376,7 @@ export function createApp(cfg: AppConfig, dependencies: {
       const normalizedTier = tier === "premium" ? "premium" : "standard";
       await reserveArcAi(req, normalizedTier);
       const analysisCfg = signal ? { ...grokCfg, fetchImpl: ((input, init) => fetch(input, { ...init, signal: AbortSignal.any([signal, ...(init?.signal ? [init.signal] : [])]) })) as typeof fetch } : grokCfg;
-      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(analysisCfg, { ...body, tier, contextMarket,hierarchyMarkets, ...modelLimits(normalizedTier) }, market,onGenerating));
+      const result = await observeProvider("xai", `spot_${normalizedTier}`, () => runPreparedSpotAnalysis(analysisCfg, { ...body, tier, contextMarket,hierarchyMarkets, resolveGlobalScenario, ...modelLimits(normalizedTier) }, market,onGenerating));
       signal?.throwIfAborted();
       await onEnriching?.();
       if (result.usage) {

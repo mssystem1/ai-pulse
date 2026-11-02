@@ -48,6 +48,7 @@ export async function runPreparedSpotAnalysis(cfg: GrokConfig, req: AnalysisRequ
   if (!cfg.apiKey) throw new Error("XAI_API_KEY not configured");
   const lang = req.lang ?? "en", timeframe = market.bar;
   const prepared = prepareGlobalReport({ market, tier: req.tier, lang, contextMarket: req.contextMarket,hierarchyMarkets:req.hierarchyMarkets });
+  await req.resolveGlobalScenario?.(prepared);
   const sys = systemPrompt(req.tier, lang), marketJson = JSON.stringify(globalPromptEvidence(prepared));
   const user = userPromptPayload({ tier: req.tier, lang, instId: market.instId, timeframe, marketJson, hasImage: false, userNote: req.userNote });
   const estimated = Math.ceil((sys.length + user.length) / 3);

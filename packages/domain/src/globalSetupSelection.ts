@@ -82,7 +82,7 @@ export function selectSingleGlobalSetup(report:GlobalReport):{selection:GlobalSe
       side=up?"long":"short";assessment=side;regime="recovery";rule="structural_reversal";
       evidence.push(say(`Structural ${up?"recovery":"downward reversal"}; close ${price(last.close)} ${up?"above rising":"below falling"} SMA21 ${price(ma21)}, RSI14 ${rsi.toFixed(2)}.`,`结构${up?"恢复":"向下反转"}；收盘 ${price(last.close)} 位于${up?"上行 SMA21 上方":"下行 SMA21 下方"} ${price(ma21)}，RSI14 ${rsi.toFixed(2)}。`));
       if(wave.recovered)evidence.push(say(`Price has reclaimed the historical ABC B level ${price(wave.b!.price)} after candidate C. This supports a recovery hypothesis; the old C label is not a current opposite-side forecast.`,`候选 C 之后价格已收复历史 ABC 的 B 位 ${price(wave.b!.price)}，支持恢复假设；旧 C 标签不代表当前反向预测。`));
-      if(ma55!==undefined&&slope55!==null&&(up?slope55<=0:slope55>=0))limitations.push(say("SMA55 has not turned with the recovery. This is a reversal hypothesis, not an established long-term trend.","SMA55 尚未随恢复转向；这是反转假设，并非已建立长期趋势。"));
+      if(ma55!==undefined&&slope55!==null&&(up?slope55<=0:slope55>=0))limitations.push(say("SMA55 has not turned with the structural reversal. This is a reversal hypothesis, not an established long-term trend.","SMA55 尚未随结构反转而转向；这是反转假设，并非已建立长期趋势。"));
     }
   }
   if(side==="none"&&regime!=="range")limitations.push(say("Structure and trend evidence do not establish a directional strategy. No simultaneous long/short setups are proposed.","结构与趋势证据尚未建立方向策略，不同时提出多空入场。"));

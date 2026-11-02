@@ -12,3 +12,6 @@ export * from "./globalOrderFlow.js";
 export * from "./globalAssessment.js";
 export * from "./autopilotSignal.js";
 export * from "./tokenRisk.js";
+
+export * from "./globalStrategyMix.js";
+export * from "./globalScenarioLifecycle.js";

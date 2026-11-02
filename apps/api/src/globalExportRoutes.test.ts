@@ -28,10 +28,19 @@ test("private mobile exports preserve PNG/TXT, resist tampering and expire witho
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 
-test("TON native exports verify the signed Telegram account, order ownership, surface and revocation without new work",async()=>{
+test("TON native exports verify the signed Telegram account, order ownership, surface and revocation without new work",async(t)=>{
+  // A developer's configured Redis/KV must never replace this fixture's memory
+  // stores or cause a read against an external archive during an export test.
+  const environment=["QUEUE_PROVIDER","STORAGE_PROVIDER","REDIS_URL","KV_REST_API_URL","KV_REST_API_TOKEN"] as const;
+  const previous=Object.fromEntries(environment.map(key=>[key,process.env[key]]));
+  process.env.QUEUE_PROVIDER="memory";process.env.STORAGE_PROVIDER="memory";for(const key of environment)if(key!=="QUEUE_PROVIDER"&&key!=="STORAGE_PROVIDER")delete process.env[key];
+  t.after(()=>{for(const key of environment){if(previous[key]===undefined)delete process.env[key];else process.env[key]=previous[key];}});
   const sign=(user:number,date=Math.floor(Date.now()/1000))=>{const p=new URLSearchParams({auth_date:String(date),user:JSON.stringify({id:user,first_name:"Export fixture"})});const data=[...p].sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>k+"="+v).join("\n");p.set("hash",createHmac("sha256",createHmac("sha256","WebAppData").update("fixture-token").digest()).update(data).digest("hex"));return p.toString();};
   const app=express();app.use(express.json());const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));const origin=`http://127.0.0.1:${(server.address()as {port:number}).port}`;
-  const cfg={...loadConfig(),BASE_URL:origin,REPORT_ENCRYPTION_KEY:"export-telegram-fixture-key",FEATURE_TELEGRAM:true};
+  const cfg={...loadConfig(),NODE_ENV:"test" as const,QUEUE_PROVIDER:"memory" as const,STORAGE_PROVIDER:"memory" as const,BASE_URL:origin,REPORT_ENCRYPTION_KEY:"export-telegram-fixture-key",FEATURE_TELEGRAM:true};
+  const nativeFetch=globalThis.fetch;
+  globalThis.fetch=(async(input,init)=>{const url=new URL(input instanceof Request?input.url:String(input));assert.equal(url.origin,origin,"The export fixture must not contact an external service");return nativeFetch(input,init);}) as typeof fetch;
+  t.after(()=>{globalThis.fetch=nativeFetch;});
   const jobs=new MemoryJobStore(),reports=new MemoryReportStore();let work=0;
   const acquired=await jobs.acquire({idempotencyKey:"export-fixture",requestHash:"export-fixture",resourceUrl:"/fixture",network:"telegram:stars",networkKey:"base",mode:"spot",tier:"premium",payer:"telegram:123",input:{instId:"TON-USDT",timeframe:"1H"},requesterIp:"fixture",maxRegenerationAttempts:2});
   const record=await reports.save("telegram:123",{global:globalDesignFixture()});await jobs.attachReport(acquired.job.id,record.id);

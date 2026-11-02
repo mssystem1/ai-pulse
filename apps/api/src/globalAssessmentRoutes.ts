@@ -1,3 +1,4 @@
+import type {GlobalReport,GlobalAssessment} from "@pulse/schemas";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { erc20Abi, formatUnits } from "viem";
@@ -17,6 +18,7 @@ type Quote=Awaited<ReturnType<typeof getGenericOkxQuote>>;
 type Dependencies={
   resolveReport:(access:GlobalAccess,req:Request)=>Promise<unknown>;
   market:typeof buildMarketContext;
+  reconcileAssessment?:(saved:GlobalReport,assessment:GlobalAssessment,access:GlobalAccess,req:Request)=>Promise<GlobalAssessment>;
   quote?:(input:Parameters<typeof getGenericOkxQuote>[1])=>Promise<Quote>;
   balance?:(network:Parameters<typeof executionPublicClient>[0],token:string,wallet:string)=>Promise<bigint>;
   tokens?:typeof getOkxTradeTokens;
@@ -28,14 +30,16 @@ export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof bui
   if(!original)throw new Error("A saved Global report is required");
   const saved=reviewGlobalTargetReport(original);
   const contextFrame=saved.decisionVersion||saved.tier==="pro"?saved.context.timeframe??globalContextTimeframe(saved.snapshot.timeframe):null;
-  const entryFrame=["decision-v2","decision-v3","decision-v4","decision-v5"].includes(saved.decisionVersion??"")?saved.entryStudy?.timeframe:null;
+  const entryFrame=["decision-v2","decision-v3","decision-v4","decision-v5"].includes(saved.decisionVersion??"")?saved.discretionaryPlan?.executionPolicy?.eventTimeframe??saved.entryStudy?.timeframe:null;
   const load=(timeframe:string)=>loadMarket({instId:saved.snapshot.instId,timeframe,candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true});
   const [market,context,entry]=await Promise.all([load(saved.snapshot.timeframe),contextFrame?load(contextFrame).catch(()=>null):null,entryFrame?load(entryFrame).catch(()=>null):null]);
-  return assessGlobalReport(saved,market,context,entry);
+  const fetchedAt=new Date(Math.max(...[market,context,entry].filter((m):m is NonNullable<typeof m>=>Boolean(m)).map(m=>Date.parse(m.fetchedAt)))).toISOString();
+  return assessGlobalReport(saved,{...market,fetchedAt},context?{...context,fetchedAt}:context,entry?{...entry,fetchedAt}:entry);
 }
 
 /** Capability-authenticated, read-only assessments. No payment middleware,
- * persistence mutation, model calls or transaction preparation. */
+ * report rewrites, model calls or transaction preparation. Authenticated owner
+ * observations may update their separate scenario ledger. */
 export function createGlobalAssessmentRouter(cfg:AppConfig,deps:Dependencies){
   const router=Router(),inflight=new Set<string>();
   router.use(createGlobalExportRouter(cfg,{resolveReport:async(access,req)=>access.kind==="telegram"?null:deps.resolveReport(access,req)}));
@@ -60,7 +64,8 @@ export function createGlobalAssessmentRouter(cfg:AppConfig,deps:Dependencies){
     if(inflight.has(key)||inflight.size>=100)return res.status(429).json({error:"A recheck is already running. Retry shortly."});
     inflight.add(key);
     try{
-      const assessment=await recheckSavedGlobalReport(saved,deps.market);
+      const observed=await recheckSavedGlobalReport(saved,deps.market);
+      const assessment=deps.reconcileAssessment&&input.access.kind!=="share"?await deps.reconcileAssessment(saved,observed,input.access,req):observed;
       if(!input.trade)return res.json({assessment});
       const trade=input.trade,network=getNetwork(trade.network),now=Date.now();
       const blocked=(reason:string)=>res.json({assessment,review:{state:"blocked",sourceRef:assessment.sourceRef,assessedAt:assessment.assessedAt,expiresAt:now,entry:null,takeProfit:assessment.targets[0]??null,stopLoss:assessment.observedStop,quantity:0,cashRisk:null,netRewardRisk:null,costsBps:null,blockers:[reason],lines:[reason]}});

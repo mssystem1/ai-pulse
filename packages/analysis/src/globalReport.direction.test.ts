@@ -32,14 +32,14 @@ test("fresh dated quotes are retained separately; old or future quotes cannot ma
   const bad=structuredClone(r);bad.currentMarket!.quote!.ts=now-121000;assert.equal(GlobalReportSchema.safeParse(bad).success,false);
   assert.ok(globalPromptEvidence(r).currentMarket);
 });
-test("entry instructions use the captured quote's side of entry while retaining the completed reference",()=>{
+test("entry instructions retain the actual defended source and event requirement across live quote moves",()=>{
   const now=Date.parse(fixture.observedAt),original=make("1H"),boundary=original.discretionaryPlan!.priceZones!.entry.sourceUpper;
   const below=make("1H",{last:boundary-1,ts:String(now-1000)}),above=make("1H",{last:boundary+1,ts:String(now-1000)});
-  assert.match(globalTradeCards(below)[0].condition,/must first reclaim/);assert.match(globalTradeCards(above)[0].condition,/buy if a support test holds/);
+  for(const r of [below,above]){const p=r.discretionaryPlan!,card=globalTradeCards(r)[0];assert.equal(p.executionPolicy!.mode,"confirmed_retest");assert.equal(p.executionPolicy!.sourceBoundary,original.discretionaryPlan!.entryBasis.price);assert.match(card.condition,r.scenario?.confirmationAt===undefined?/acceptance above and a defended retest/:/price-retest event has been observed/);assert.match(card.condition,/confirmation close is not an assumed fill|neither full entry eligibility nor a fill/);assert.equal(card.confirmed,false);}
   assert.equal(below.discretionaryPlan!.reference.price,above.discretionaryPlan!.reference.price);
 });
 for(const tf of ["15m","1H","4H","1Dutc","1Wutc"])test(`${tf} preserves its own protection, objectives and available current-clock evidence`,()=>{
-  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v7");assert.equal(p.requiresNewTestAfter,Date.parse(fixture.observedAt));
+  const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.requiresNewTestAfter,undefined);assert.ok(p.executionPolicy!.eventKnownAt<=Date.parse(fixture.observedAt));assert.ok(p.executionPolicy!.eventAfter<=p.reference.completedAt);assert.ok(p.executionPolicy!.expiresAt>Date.parse(fixture.observedAt));assert.ok(r.scenario);
   assert.equal(p.stopBasis.timeframe,tf);assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(r.currentMarket!.frames.length);
   for(const f of r.currentMarket!.frames)assert.ok(f.candles.every(c=>c.confirmed&&candleCloseTime(c.ts,f.timeframe)!<=Date.parse(fixture.observedAt)));
   globalTradeCards(r);assert.equal(JSON.stringify(r),before);assert.equal(r.entryStudy!.timeframe,tf==="15m"?"5m":tf==="1H"?"15m":tf==="4H"?"1H":tf==="1Dutc"?"4H":"1Dutc");

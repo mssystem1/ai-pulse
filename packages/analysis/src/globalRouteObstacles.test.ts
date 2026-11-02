@@ -95,18 +95,19 @@ function macroRoute(tf:"1Dutc"|"1Wutc"){
   return report;
 }
 
-test("daily and weekly future-entry routes keep nearer resistance despite a higher quote and clip only source-bounded fills",()=>{
+test("daily and weekly future-entry routes keep nearer resistance without payoff-fitted entry prices",()=>{
   for(const tf of ["1Dutc","1Wutc"] as const)for(const side of ["long","short"] as const){
     const report=side==="long"?macroRoute(tf):mirror(macroRoute(tf),170000),original=structuredClone(report.discretionaryPlan!),source=report.horizonContext!.zones.find(z=>z.id==="source-support")!;
     const opposing=report.horizonContext!.zones.find(z=>z.id.startsWith("near-"))!,near=side==="long"?opposing.lower:opposing.upper;
     assert.ok(side==="long"?report.currentMarket!.quote!.price>opposing.upper:report.currentMarket!.quote!.price<opposing.lower);
     applyGlobalPriceZones(report);const p=report.discretionaryPlan!,z=p.priceZones!,worst=side==="long"?z.entry.upper:z.entry.lower;
-    assert.equal(p.version,"discretionary-plan-v7");assert.equal(z.payoffLimited,false);
-    assert.ok(z.entry.lower>=source.lower&&z.entry.upper<=source.upper);assert.notEqual(worst,original.entry);
+    assert.equal(p.version,"discretionary-plan-v8");
+    assert.deepEqual([z.entry.lower,z.entry.upper],[source.lower,source.upper]);assert.equal(worst,original.entry);
     assert.equal(z.entry.sourceLower,source.lower);assert.equal(z.entry.sourceUpper,source.upper);assert.equal(z.entry.sourcePrice,original.entryBasis.price);
     assert.deepEqual(p.entryBasis,original.entryBasis);assert.equal(p.stop,original.stop);assert.deepEqual(p.targets,original.targets);
     assert.ok(p.barriers.some(b=>b.price===near&&b.timeframe===tf));
-    assert.ok((side==="long"?near-worst:worst-near)/Math.abs(worst-p.stop)>=1-1e-9);
+    const actual=(side==="long"?near-worst:worst-near)/Math.abs(worst-p.stop);
+    assert.equal(z.payoffLimited,actual<1-1e-9);
     const allowed=globalRouteObstacles(report,side);assert.ok(p.barriers.every(b=>allowed.some(a=>a.price===b.price&&a.timeframe===b.timeframe)));
   }
 });
@@ -121,7 +122,7 @@ test("unavoidable opposing-zone overlap is limited at zero reward while preservi
     if(side==="short")report=mirror(report,210);
     const original=structuredClone(report.discretionaryPlan!);
     applyGlobalPriceZones(report);const p=report.discretionaryPlan!,z=p.priceZones!;
-    assert.equal(p.version,"discretionary-plan-v7");assert.equal(z.payoffLimited,true);assert.equal(globalPriceZonePayoff(report)!.worstToObstacle,0);
+    assert.equal(p.version,"discretionary-plan-v8");assert.equal(z.payoffLimited,true);assert.equal(globalPriceZonePayoff(report)!.worstToObstacle,0);
     const card=globalTradeCards(report)[0];assert.ok(card,"A payoff-limited priced plan remains visible");assert.equal(card.confirmed,false);
     assert.deepEqual([z.entry.lower,z.entry.upper],[100,110]);assert.ok(globalEntryOpposition(report,side,z.entry).length>0);
     assert.deepEqual(p.entryBasis,original.entryBasis);assert.equal(z.entry.sourcePrice,original.entryBasis.price);assert.notEqual(p.entry,original.entryBasis.price);

@@ -27,6 +27,8 @@ export type AnalysisRequest = {
   reasoningEffort?: AnalysisReasoningEffort;
   contextMarket?: SpotMarketContext | null;
   hierarchyMarkets?: SpotMarketContext[];
+  /** Server-owned scenario persistence, resolved before model prose is requested. */
+  resolveGlobalScenario?: (report: GlobalReport) => Promise<void>;
 };
 
 export type AnalysisResult = {

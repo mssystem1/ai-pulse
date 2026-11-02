@@ -59,7 +59,7 @@ async function checkGuideDocs({call,evaluate,wait}){
     await call('Page.navigate',{url:origin+'/docs?pulseTheme='+theme+'#docs-global-chart'});
     await wait('Boolean(document.querySelector("[data-global-guide-version]"))');
     assert.equal(await evaluate('document.documentElement.dataset.pulseTheme'),theme);
-    assert.equal(await evaluate('document.querySelector("[data-global-guide-version]").dataset.globalGuideVersion'),'20261028');
+    assert.equal(await evaluate('document.querySelector("[data-global-guide-version]").dataset.globalGuideVersion'),'20261101');
     assert.equal(await evaluate('document.querySelector("[data-global-guide-version] h2").textContent'),lang==='en'?'Use the Global chart':'\u4f7f\u7528Global\u56fe\u8868');
     await evaluate('document.querySelectorAll("[data-global-guide-version] img").forEach(image=>image.loading="eager")');
     await wait('Array.from(document.querySelectorAll("[data-global-guide-version] img")).every(image=>image.complete&&image.naturalWidth>0)');
@@ -83,7 +83,7 @@ async function checkGuideDocs({call,evaluate,wait}){
     assert.ok(paintedImage.display!=='none'&&paintedImage.visibility==='visible'&&paintedImage.opacity>0&&paintedImage.width>0&&paintedImage.height>0&&paintedImage.inViewport,'Guide image is not visibly presented: '+JSON.stringify(paintedImage));
     const screenshot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
     fs.writeFileSync(path.join(out,`docs-${lang}-${theme}-${width}.png`),Buffer.from(screenshot.data,'base64'));
-    guideCases.push({lang,theme,width,version:'20261028',examples,images,paintedImage,minTextContrast:Math.min(...contrast.map(item=>item.ratio)),overflow:false});
+    guideCases.push({lang,theme,width,version:'20261101',examples,images,paintedImage,minTextContrast:Math.min(...contrast.map(item=>item.ratio)),overflow:false});
   }
   assert.deepEqual(errors,[]);assert.deepEqual(mutations,[]);
   fs.writeFileSync(path.join(out,'guide-validation.json'),JSON.stringify({mode:process.argv.includes('--docs-only')?'docs-only':'full',cases:guideCases,screenshots:guideScreenshots,blockedTelemetry,remoteRequestsBlocked:true,physicalDevices:false,modelCalls:0,walletPayments:0,telegramSends:0},null,2));

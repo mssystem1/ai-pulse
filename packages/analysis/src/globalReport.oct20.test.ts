@@ -5,7 +5,7 @@ import {GlobalReportSchema,candleCloseTime} from "@pulse/schemas";
 import {globalDecision,globalTradeCards,globalReportChartSvg,globalEntryStudySvg,globalSections} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
-import {globalRouteObstacles} from "./globalRouteObstacles.js";
+import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles.js";
 
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
@@ -35,7 +35,7 @@ test("Oct 20 4H: a middle-of-range price cannot manufacture a short entry with a
   assert.match(globalReportChartSvg(r)!,/data-trade-price-ledger=/);
 });
 
-test("Oct 20 daily: old support is not a justified entry; newer 4H structure has no later completed retest",()=>{
+test("Oct 20 daily: the actual 4H reclaim source stays separate from observed confirmation, opposition and a fill",()=>{
   const r=make("1Dutc"),svg=globalReportChartSvg(r)!;
   assert.equal(r.snapshot.price,81943.8);assert.equal(r.entryStudy!.candles.at(-1)!.close,82610.4);
   assert.equal(r.range!.lower[1],80400);assert.equal(r.tradePlan!.referenceEntry,null);assert.equal(r.tradePlan!.referenceStop,null);
@@ -48,14 +48,21 @@ test("Oct 20 daily: old support is not a justified entry; newer 4H structure has
   assert.equal(reclaimed.ts,r.entryStudy!.candles.at(-1)!.ts,"No later completed retest exists after this local reclaim");
   assert.ok(r.entryStudy!.pivots.some(a=>a.kind==="high"&&a.price===83168.2&&a.confirmedAt!==null));
   assert.equal(globalDecision(r).currentAction,"WAIT");assert.equal(globalTradeCards(r).length,1);
-  assert.equal(r.discretionaryPlan!.evidence!.level,82291.1);assert.ok(r.discretionaryPlan!.entry<82291.1);assert.notEqual(r.discretionaryPlan!.entry,80400);
+  const plan=r.discretionaryPlan!;
+  assert.equal(plan.evidence!.level,82291.1);assert.equal(plan.entryBasis.price,82291.1);assert.notEqual(plan.entry,80400);
+  assert.deepEqual([plan.priceZones!.entry.lower,plan.priceZones!.entry.upper],[82291.1,reclaimed.close]);
+  assert.equal(plan.executionPolicy!.sourceBoundary,82291.1);assert.equal(plan.executionPolicy!.eventTimeframe,"4H");
+  assert.equal(plan.executionPolicy!.mode,"confirmed_retest");assert.equal(plan.requiresNewTestAfter,undefined);
+  assert.ok(r.scenario!.confirmationAt!<=Date.parse(r.snapshot.observedAt));assert.equal(r.scenario!.state,"confirmed_awaiting_fill");
+  assert.equal(r.scenario!.observationOnly,true);assert.equal(r.scenario!.entryObservedAt,undefined);
   assert.deepEqual(r.discretionaryPlan!.targets.map(t=>t.price),[84361.6,87238.3]);
   assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe==="1Dutc"));
   const obstacles=globalRouteObstacles(r,r.discretionaryPlan!.side);
   assert.ok(obstacles.some(t=>t.timeframe==="4H"&&t.price===83439.9));
   assert.ok(obstacles.some(t=>t.timeframe==="4H"&&t.price===83168.2),"A newer wick does not establish completed 4H acceptance beyond the obstacle");
-  const near=r.discretionaryPlan!.barriers[0];assert.equal(near.price,82213.9);assert.equal(near.timeframe,"1Dutc");
-  assert.ok(r.horizonContext!.zones.some(z=>z.role==="resistance"&&(z.lower===near.price||z.upper===near.price)));
+  const near=r.discretionaryPlan!.barriers[0];assert.equal(near.price,82842);assert.equal(near.timeframe,"1Dutc");
+  assert.ok(globalEntryOpposition(r,plan.side,plan.priceZones!.entry).some(z=>z.lower===82213.9&&z.upper===82473.6));
+  assert.equal(globalTradeCards(r)[0].plan.firstObstacleRewardRisk,0,"The full causal source keeps its resistance overlap visible");
   assert.doesNotMatch(svg,/data-scenario-projection=|NO VALIDATED ENTRY/);assert.match(svg,/data-trade-price-ledger=/);
   assert.match(r.setupSelection!.evidence.join(' '),/81,200 \(higher low\).*83,168.2/);
   assert.match(globalSections(r).flatMap(s=>s.lines).join(' '),/82,291.1(?:0)?/);

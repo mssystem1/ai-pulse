@@ -49,14 +49,20 @@ test("the schema rejects inserting a consumed pivot back into a current target m
   const result=GlobalReportSchema.safeParse(r);assert.equal(result.success,false);
   if(!result.success)assert.ok(result.error.issues.some(i=>i.message.includes("unconsumed")));
 });
-test("a fresh recheck cannot reuse a target crossed after the saved snapshot",()=>{
+test("a legacy canonical recheck cannot reuse a target crossed after the saved snapshot",()=>{
   const saved=reviewGlobalTargetReport(make(true)),primary=structuredClone(markets.find(m=>m.bar==="1Dutc")!);
+  // Keep the pre-v8 canonical contract under test. Current priced scenarios
+  // have a separate target-before-entry lifecycle instead of this flag.
+  delete saved.discretionaryPlan;delete saved.scenario;delete saved.strategyMix;
+  assert.equal(saved.strategy!.targetPolicy,"active-zones-v1");assert.equal(GlobalReportSchema.safeParse(saved).success,true);
+  const before=JSON.stringify(saved);
   const selected=saved.tradePlan!,target=saved.levels.find(l=>l.id===selected.targetIds[0])!.price,sign=selected.side==="long"?1:-1,last=primary.candles.at(-1)!;
   primary.candles.push({...last,ts:last.ts+86400000,open:target,high:target+100,low:target-100,close:target+sign*50});
   primary.fetchedAt=new Date(Date.parse(primary.fetchedAt)+86400000).toISOString();
   const result=assessGlobalEntryReport(saved,primary,markets.find(m=>m.bar==="1Wutc"),markets.find(m=>m.bar==="4H"));
   assert.equal(result.state,"no_trade");assert.ok(result.blockers.includes("target_reached"));
   assert.ok(result.lines.some(l=>l.includes("cannot be reused as fresh reward")));
+  assert.equal(JSON.stringify(saved),before);assert.notEqual(result.side,selected.side==="long"?"short":"long");
 });
 test("a genuine active swing cannot be skipped merely because it is also a Fibonacci endpoint",()=>{
   const {r}=synthetic("short"),a=r.indicators.pivots[1];r.indicators.fibonacci=[{ratio:0,price:a.price,anchorIds:[r.indicators.pivots[0].id,a.id]}];

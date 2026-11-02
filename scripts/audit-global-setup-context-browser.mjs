@@ -6,7 +6,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {prepareGlobalReport,globalContextTimeframe} from '../packages/analysis/dist/globalReport.js';
-import {globalTradeCards,globalDecision,globalSetupWindow,globalPriceBandText} from '../packages/domain/dist/index.js';
+import {globalTradeCards,globalDecision,globalSetupWindow,globalPriceBandText,globalStrategyMixLines,globalScenarioStateName} from '../packages/domain/dist/index.js';
 
 const fixture=JSON.parse(fs.readFileSync('packages/analysis/src/globalReport.oct20-fixture.json','utf8'));
 const args=process.argv.slice(2),currentIndex=args.indexOf('--current-dir'),currentDir=currentIndex<0?null:args[currentIndex+1],flowFile=args[0]&&!args[0].startsWith('--')?args[0]:null;
@@ -84,7 +84,7 @@ try{
         const contrast=await evaluate(`(()=>{
           const lum=rgb=>rgb.map(v=>v/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[.2126,.7152,.0722][i],0);
           const rgb=value=>value.match(/[0-9.]+/g)?.slice(0,3).map(Number);
-          return Array.from(document.querySelectorAll('.global-heading h2,.global-meta,.global-trade-plan-card dt,.global-trade-plan-card dd,.global-trade-plan-card p,.global-decision-card h3,.global-horizon-context p,.global-chart-toolbar strong')).filter(e=>e.getClientRects().length).map(e=>{let p=e,bg;while(p){const c=getComputedStyle(p).backgroundColor;if(c!=='rgba(0, 0, 0, 0)'&&c!=='transparent'){bg=rgb(c);break;}p=p.parentElement;}const fg=rgb(getComputedStyle(e).color),a=lum(fg),b=lum(bg??[255,255,255]);return {tag:e.tagName,cls:e.className,text:e.textContent.slice(0,70),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};});
+          return Array.from(document.querySelectorAll('.global-heading h2,.global-meta,.global-trade-plan-card dt,.global-trade-plan-card dd,.global-trade-plan-card p,.global-decision-card h3,.global-horizon-context p,.global-scenario-evidence p,.global-chart-toolbar strong')).filter(e=>e.getClientRects().length).map(e=>{let p=e,bg;while(p){const c=getComputedStyle(p).backgroundColor;if(c!=='rgba(0, 0, 0, 0)'&&c!=='transparent'){bg=rgb(c);break;}p=p.parentElement;}const fg=rgb(getComputedStyle(e).color),a=lum(fg),b=lum(bg??[255,255,255]);return {tag:e.tagName,cls:e.className,text:e.textContent.slice(0,70),ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};});
         })()`);
         fs.writeFileSync(path.join(out,'contrast-'+shotFrame+'-'+theme+'-'+lang+'-'+width+'.json'),JSON.stringify(contrast,null,2));
         assert.ok(contrast.every(c=>c.ratio>=4.5),'Clarity text contrast: '+JSON.stringify(contrast.filter(c=>c.ratio<4.5)));
@@ -93,6 +93,18 @@ try{
       const text=await evaluate('document.querySelector(".global-report").textContent');
       if(card){assert.ok(text.includes(card.entry)&&text.includes(card.stop));assert.ok(text.includes(card.location));}
       else assert.ok(text.includes(currentReport.setupSelection.limitations[0]));
+      if(currentReport.strategyMix){
+        const mixText=await evaluate('document.querySelector("[data-global-strategy-mix]").textContent');
+        for(const line of globalStrategyMixLines(currentReport))assert.ok(mixText.includes(line),'Strategy evidence must match its saved mix and selected event');
+        assert.doesNotMatch(mixText,/configurationKey|fresh_spot_executed_flow|fresh_perpetual_executed_flow|accepted_breakout_retest|sweep_reclaim/);
+      }
+      if(currentReport.scenario)assert.ok(text.includes(globalScenarioStateName(currentReport)),'The observed scenario state must remain visible');
+      if(currentReport.discretionaryPlan?.executionPolicy){
+        const passive=currentReport.discretionaryPlan.executionPolicy.mode==='passive_limit';
+        const terminal=['invalidated','expired','completed'].includes(currentReport.scenario?.state);
+        assert.ok(card.condition.includes(terminal?(lang==='zh'?'不能作为新入场':'supplies no new entry'):lang==='zh'?passive?'被动限价计划':'回测区域':passive?'Passive limit plan':'retest region'),'Entry wording must follow its recorded execution policy and lifecycle');
+        assert.doesNotMatch(card.condition,/Use a new test formed after this snapshot/,'A new report does not reset the scenario event clock');
+      }
       assert.ok(text.includes(decision.heading));
       const historyBars=globalSetupWindow(currentReport);
       assert.ok(text.includes(`${historyBars} / ${currentReport.candles.length}`),`${frame}: overview must retain broad history`);
@@ -110,9 +122,13 @@ try{
           const rendered=await evaluate('Array.from(document.querySelectorAll(".global-chart-overlay [data-trade-zone]")).map(e=>({role:e.dataset.tradeZone,lower:Number(e.dataset.lower),upper:Number(e.dataset.upper)}))');
           const expected=[{role:'Entry',lower:priceZones.entry.lower,upper:priceZones.entry.upper},{role:'SL',...priceZones.stop},...priceZones.targets.map((z,i)=>({role:'TP'+(i+1),...z}))];
           assert.deepEqual(rendered,expected,'Native zone boundaries must match the saved source-backed intervals');
-          const ledger=await evaluate('document.querySelector(".global-chart-overlay [data-trade-price-ledger]").textContent');
-          assert.ok(ledger.includes(card.entry)&&ledger.includes(card.stop));
-          for(const z of priceZones.targets)assert.ok(ledger.includes(globalPriceBandText(currentReport,z)),'Ledger must retain the complete TP interval');
+          const ledger=await evaluate('({text:document.querySelector(".global-chart-overlay [data-trade-price-ledger]").textContent,status:document.querySelector(".global-chart-overlay [data-trade-price-ledger]").dataset.layoutStatus,roles:Array.from(document.querySelectorAll(".global-chart-overlay [data-trade-role]")).map(e=>({role:e.dataset.tradeRole,text:e.textContent}))})');
+          if(ledger.status==='omitted-no-clear-gap'){
+            for(const [role,zone] of [['Entry',priceZones.entry],['SL',priceZones.stop],...priceZones.targets.map((z,i)=>['TP'+(i+1),z])])assert.ok(ledger.roles.find(r=>r.role===role)?.text.includes(globalPriceBandText(currentReport,zone)),'An omitted floating ledger requires a complete visible numeric badge for '+role+': '+JSON.stringify(ledger));
+          }else{
+            assert.ok(ledger.text.includes(card.entry)&&ledger.text.includes(card.stop));
+            for(const z of priceZones.targets)assert.ok(ledger.text.includes(globalPriceBandText(currentReport,z)),'Ledger must retain the complete TP interval');
+          }
           for(const z of priceZones.targets)assert.ok(text.includes(globalPriceBandText(currentReport,z)),'Report card must match its drawn TP interval');
         }
         assert.equal(await evaluate('document.querySelector(".global-chart-overlay [data-trade-role="+JSON.stringify("SL")+"]").dataset.price'),String(card?.plan.referenceStop));

@@ -8,7 +8,7 @@ import {strategyFixture} from "../../../packages/analysis/dist/globalStrategy.fi
 import {tradePlanFixture} from "../../../packages/analysis/dist/globalTrade.fixtures.js";
 import { createGlobalAssessmentRouter } from "./globalAssessmentRoutes.js";
 import type { getOkxTradeTokens } from "./okxDex.js";
-import {deriveGlobalTradePlan} from "@pulse/domain";
+import {deriveGlobalTradePlan,readGlobalReport} from "@pulse/domain";
 import {readFileSync} from "node:fs";
 import {prepareGlobalReport} from "@pulse/analysis";
 import {summarizeCandles,type SpotMarketContext} from "@pulse/market";
@@ -71,6 +71,33 @@ test("production-shaped saved-report recheck and quoted review reach readiness w
     missingFees=true;const unknown=await post({access,trade});assert.equal(unknown.body.review.state,"blocked");assert.ok(unknown.body.review.blockers.includes("costs"));
     const foreign=await post({access,trade:{...trade,toTokenAddress:wallet}});assert.equal(foreign.body.review.state,"blocked");
     assert.equal(JSON.stringify(report),before);assert.ok(authorized>=5);
+  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
+});
+
+test("owner scenario reconciliation runs after access checks, leaves the report intact and blocks quote work; public shares stay read-only",async()=>{
+  const {report,market}=qualifiedGlobalFixture(),before=JSON.stringify(report),parsedBefore=readGlobalReport(report),token="saved-report-capability-0000";
+  let reconciled=0,markets=0,quotes=0;
+  const app=express();app.use(express.json());
+  app.use(createGlobalAssessmentRouter({...loadConfig(),NODE_ENV:"test",X402_MOCK:true},{
+    resolveReport:async access=>access.token===token?{global:report}:null,
+    market:async()=>{markets++;return market;},
+    reconcileAssessment:async(saved,assessment,access)=>{
+      reconciled++;assert.notEqual(access.kind,"share");assert.deepEqual(saved,parsedBefore);
+      return {...assessment,state:"invalidated",permittedEntry:null,observedStop:null,blockers:[...assessment.blockers,"scenario_already_resolved_or_observed"],lines:["The owner scenario already ended."]};
+    },
+    quote:async()=>{quotes++;throw Error("Resolved scenarios must not request a trade quote");},
+  }));
+  const server=app.listen(0,"127.0.0.1");await new Promise<void>(resolve=>server.once("listening",resolve));
+  const url=`http://127.0.0.1:${(server.address() as {port:number}).port}/v1/global/setup-assessment`;
+  const post=async(access:unknown,trade?:unknown)=>{const response=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({access,...(trade?{trade}:{})})}),text=await response.text();assert.match(response.headers.get("content-type")??"",/json/,text);return {status:response.status,data:JSON.parse(text)};};
+  try{
+    const access={kind:"job",id:"saved",token};
+    assert.equal((await post({...access,token:"invalid-report-capability-0000"})).status,404);assert.equal(markets,0);assert.equal(reconciled,0);
+    const owned=await post(access);assert.equal(owned.status,200);assert.equal(owned.data.assessment.state,"invalidated");assert.equal(reconciled,1);
+    const trade={network:"base",fromTokenAddress:"0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",toTokenAddress:"0xcbB7C0000aB88B473b1f5aFd9ef808440eed33Bf",userWalletAddress:"0x2222222222222222222222222222222222222222",amount:"300300000",slippagePercent:.05,maxAutoSlippagePercent:.1,slippageMode:"manual",orderType:"market"};
+    const blocked=await post(access,trade);assert.equal(blocked.status,200);assert.equal(blocked.data.review.state,"blocked");assert.equal(reconciled,2);assert.equal(quotes,0);
+    const shared=await post({kind:"share",token});assert.equal(shared.status,200);assert.equal(shared.data.assessment.state,"technical_valid");assert.equal(reconciled,2);
+    assert.equal(JSON.stringify(report),before);
   }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });
 

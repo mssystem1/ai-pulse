@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {candleCloseTime,candleLevelTouchedAfter,GlobalReportSchema} from "@pulse/schemas";
-import {globalHistoricalLevelLines,globalHorizonContextLines,globalTradeCards} from "@pulse/domain";
+import {globalHistoricalLevelLines,globalHorizonContextLines,globalScenarioEntryDeadline,globalTradeCards} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe,finishGlobalReport} from "./globalReport.js";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {systemPrompt} from "./prompts.js";
@@ -32,11 +32,16 @@ test("4H keeps the latest primary low before distant old objectives",()=>{
   assert.ok(!p.targets.some(t=>t.price===64163.6));
 });
 
-test("all attached horizons require a new post-snapshot test and preserve their distinct source clocks",()=>{
+test("all attached horizons retain their distinct source clocks and explicit causal execution policy",()=>{
   for(const frame of Object.keys(cutoffs)){
-    const r=make(frame),p=r.discretionaryPlan!;assert.equal(p.version,"discretionary-plan-v7");assert.equal(p.requiresNewTestAfter,Date.parse(cutoffs[frame]));
-    assert.ok(p.reference.completedAt<=p.requiresNewTestAfter!);assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.reference.price)>0));
-    assert.match(globalTradeCards(r)[0].condition,/new test formed after this snapshot/);assert.equal(GlobalReportSchema.safeParse(r).success,true);
+    const r=make(frame),p=r.discretionaryPlan!,policy=p.executionPolicy!;assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.requiresNewTestAfter,undefined);
+    assert.ok(p.reference.completedAt<=Date.parse(cutoffs[frame]));assert.ok(policy.eventKnownAt<=Date.parse(cutoffs[frame]));assert.ok(policy.expiresAt>Date.parse(cutoffs[frame]));assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.reference.price)>0));
+    const scenario=r.scenario!,deadline=policy.mode==="confirmed_retest"&&scenario.confirmationAt!==undefined?Math.min(policy.expiresAt,scenario.confirmationAt+scenario.definition.fillWindowMs):policy.expiresAt;
+    assert.equal(globalScenarioEntryDeadline(r),deadline);
+    const condition=globalTradeCards(r)[0].condition;
+    if(["expired","invalidated","completed"].includes(scenario.state))assert.match(condition,/supplies no new entry/);
+    else assert.ok(condition.includes(`Entry deadline ${new Date(deadline).toISOString().slice(0,19).replace("T"," ")} UTC`));
+    assert.doesNotMatch(condition,/new test formed after this snapshot/);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   }
 });
 
@@ -44,7 +49,7 @@ test("free review repairs v2 target freshness without rewriting the purchased so
   const r=make("1H");r.discretionaryPlan!.version="discretionary-plan-v2";r.discretionaryPlan!.targets=[{...r.discretionaryPlan!.targets[0],price:79775.1}];
   r.narrative.reasons=["TP1 79,775.10 is the current objective."];
   const before=structuredClone(r),fixed=reviewGlobalTargetReport(r);assert.deepEqual(r,before);assert.deepEqual(fixed.candles,r.candles);assert.deepEqual(fixed.entryStudy,r.entryStudy);
-  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v7");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
+  assert.equal(fixed.discretionaryPlan!.version,"discretionary-plan-v8");assert.equal(fixed.discretionaryPlan!.targets[0].price,79220.1);
   assert.deepEqual(fixed.narrative.reasons,[]);assert.match(fixed.narrative.summary,/79,220.10/);
 });
 
@@ -71,5 +76,5 @@ test("short lower-frame history still supplies objective-consumption evidence an
 test("model explanation preserves the computed plan and strips implementation names",()=>{
   const r=make("1H"),original=structuredClone(r.discretionaryPlan),finished=finishGlobalReport(r,{headline:"Example",summary:"Example",regime:"trend_down",bias:"bearish",confidence:50,waveCandidateId:r.waveCount.id,mainPathId:null,setupPathId:null,reasons:["Frozen setup uses (structure-v5) protection and the supplied targets."],pathNotes:[],riskNotes:[],limitations:[],disclaimer:"Research only."});
   assert.deepEqual(finished.discretionaryPlan,original);assert.doesNotMatch(finished.narrative.reasons.join(" "),/frozen|structure-v5/i);
-  const prompt=systemPrompt("premium","en");assert.match(prompt,/primary-horizon stopBasis/);assert.match(prompt,/new test after requiresNewTestAfter/);assert.doesNotMatch(prompt,/structure-v5 uses confirmed entry-frame protection/);
+  const prompt=systemPrompt("premium","en");assert.match(prompt,/primary-horizon stopBasis/);assert.match(prompt,/When executionPolicy is supplied, follow its saved passive-limit or confirmed-retest contract/);assert.match(prompt,/For older reports only, a supplied requiresNewTestAfter requires a test after that cutoff/);assert.doesNotMatch(prompt,/structure-v5 uses confirmed entry-frame protection/);
 });

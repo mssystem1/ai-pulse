@@ -1,3 +1,4 @@
+import {GlobalScenarioSchema} from "./globalScenario.js";
 import { z } from "zod";
 
 /** Separate from the purchased report. No provider narrative or wallet data. */
@@ -16,6 +17,7 @@ export const GlobalAssessmentSchema = z.object({
   context: z.enum(["supports","conflicts","neutral","unknown"]),
   analysisTimeframe:z.string().optional(),entryTimeframe:z.string().optional(),family:z.string().optional(),
   strategyId:z.string().optional(),structureConfirmationTs:z.number().finite().nullable().optional(),checkpointTargets:z.array(z.number().finite().positive()).optional(),firstObstacleRewardRisk:z.number().finite().nullable().optional(),
+  scenario:GlobalScenarioSchema.optional(),
   blockers: z.array(z.string()), lines: z.array(z.string()),
 });
 export type GlobalAssessment = z.infer<typeof GlobalAssessmentSchema>;

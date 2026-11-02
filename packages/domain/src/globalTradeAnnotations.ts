@@ -32,7 +32,7 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const txt=(x:number,y:number,s:unknown,color="#c9d8e9",size=10,anchor="start")=>`<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${color}" font-size="${size}">${escape(s)}</text>`;
   const p=card?.plan;
   if(!card||!p?.referenceEntry||p.referenceStop===null){
-    const range=report.range,trigger=report.levels.find(l=>l.id===card?.plan.triggerLevelId),lines=[zh?"暂无有效入场":"NO VALIDATED ENTRY",zh?"Entry / SL：等待实际反应":"Entry / SL: await observed reaction",...(range?[`${zh?"支撑参考":"Support"}: ${range.lower.map(price).join('–')}`,`${zh?"阻力参考":"Resistance"}: ${range.upper.map(price).join('–')}`]:trigger?[`${zh?"观察位":"Watch level"}: ${price(trigger.price)}`]:[]),zh?"须新的反应与后续确认":"Fresh reaction + later confirmation",zh?"参考价位不预测下一步走势":"References do not predict the next move"];
+    const range=report.range,trigger=report.levels.find(l=>l.id===card?.plan.triggerLevelId),lines=[zh?"计划依据":"SETUP EVIDENCE",zh?"Entry / SL：等待实际反应":"Entry / SL: await observed reaction",...(range?[`${zh?"支撑参考":"Support"}: ${range.lower.map(price).join('–')}`,`${zh?"阻力参考":"Resistance"}: ${range.upper.map(price).join('–')}`]:trigger?[`${zh?"观察位":"Watch level"}: ${price(trigger.price)}`]:[]),zh?"须新的反应与后续确认":"Fresh reaction + later confirmation",zh?"参考价位不预测下一步走势":"References do not predict the next move"];
     return `<g data-setup-status="unavailable">${lines.map((l,i)=>txt(g.historyEnd+12,g.top+36+i*21,l,i===0?"#ffcb76":"#a5b7cd",i===0?11:9)).join('')}</g>`;
   }
   const entry=card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0];
