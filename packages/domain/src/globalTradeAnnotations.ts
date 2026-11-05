@@ -5,13 +5,14 @@ import {globalPriceBandText} from "./globalPriceZones.js";
 
 const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
 const selectedCard=(report:GlobalReport,options:GlobalChartOptions)=>{const cards=globalTradeCards(report);return cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];};
+const clearsNativeQuoteLabel=(y:number,options:GlobalChartOptions)=>(options.priceBadgeAvoidYs??[]).every(reserved=>!Number.isFinite(reserved)||Math.abs(reserved-y)>=26);
 /** The exact visible badge centers, shared with the export's ordinary axis.
  * Reserving this gutter never moves a trade price or changes the scale. */
 export function globalTradePriceBadgeYs(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions={}){
   const card=selectedCard(report,options),p=card?.plan,labeled:number[]=[];
   if(!card||!p?.referenceEntry||p.referenceStop===null)return labeled;
   for(const price of [card.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],p.referenceStop,...card.targets.map(t=>t.price)]){
-    const y=g.y(price);if(y!==null&&y>=g.top&&y<=g.bottom&&labeled.every(prior=>Math.abs(prior-y)>=17))labeled.push(y);
+    const y=g.y(price);if(y!==null&&y>=g.top&&y<=g.bottom&&clearsNativeQuoteLabel(y,options)&&labeled.every(prior=>Math.abs(prior-y)>=17))labeled.push(y);
   }
   return labeled;
 }
@@ -68,9 +69,9 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
     svg+=`<g data-trade-role="${row.role}" data-price="${row.price}"><line x1="${g.historyEnd+4}" x2="${g.right+7}" y1="${y}" y2="${y}" stroke="${row.color}" stroke-width="${row.role==="SL"?1.5:1.1}"${card.confirmed?"":' stroke-dasharray="5 4"'}/>`;
     // Stagger role tags horizontally, never move a numeric price vertically.
     svg+=txt(g.historyEnd+8+(i%4)*future*.21,y-5,row.role,row.color,10);
-    if(labeled.every(prior=>Math.abs(prior-y)>=17)){
+    if(clearsNativeQuoteLabel(y,options)&&labeled.every(prior=>Math.abs(prior-y)>=17)){
       labeled.push(y);svg+=`<rect data-trade-price-badge="${row.role}" x="${g.right+8}" y="${y-10}" width="132" height="18" rx="3" fill="${row.color}" fill-opacity=".12"/>`+txt(g.right+132,y+3,rowText(i),row.color,zones?9:11,"end");
-    }
+    }else if(!clearsNativeQuoteLabel(y,options))svg+=`<g data-trade-price-badge-omitted="${row.role}" data-reason="native-quote-label"/>`;
     svg+="</g>";
   });
   const ledgerHeight=44+rows.length*18+(zones?20:0),mean=rows.reduce((s,r)=>s+(g.y(r.price)??g.bottom),0)/rows.length;

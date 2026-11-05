@@ -1,5 +1,5 @@
 import {candleCloseTime,candleTimeframeMs} from "@pulse/schemas";
-import {terminalFrameProfile,type TerminalMarketSnapshot,type TerminalMarketTools,type TerminalSourceStatus} from "@pulse/domain";
+import {terminalFrameProfile,type TerminalMarketSnapshot,type TerminalMarketTools,type TerminalSourceStatus,type TerminalFlowDisplayPoint} from "@pulse/domain";
 import {buildMarketContext,loadTerminalParticipation,type TerminalParticipation} from "@pulse/market";
 import {loadGlobalMarketSet} from "./globalMarketSet.js";
 import {prepareGlobalReport,completedGlobalCandles} from "./globalReport.js";
@@ -29,7 +29,10 @@ export function terminalToolsFromParticipation(p:TerminalParticipation,input:{ti
       const buy=trades.reduce((n,t)=>n+(t.side==="buy"?t.size:0),0),sell=trades.reduce((n,t)=>n+(t.side==="sell"?t.size:0),0),volume=buy+sell,tradeVwap=trades.reduce((n,t)=>n+t.price*t.size,0)/volume,sigma=Math.sqrt(trades.reduce((n,t)=>n+(t.price-tradeVwap)**2*t.size,0)/volume);
       if(![buy,sell,volume,tradeVwap,sigma].every(Number.isFinite)||volume<=0||tradeVwap<=0)throw Error("Invalid Terminal executed trade totals");
       const complete=capture.coverage.complete&&capture.coverage.start<=start&&capture.coverage.end>=asOf;
-      const meta:TerminalSourceStatus={id:"value",source:capture.source,knownAt:capture.coverage.knownAt,windowStart:complete?start:trades[0].ts,windowEnd:Math.min(capture.coverage.end,asOf),status:asOf-trades.at(-1)!.ts>120000?"stale":complete?"available":"partial",units:capture.quantityUnit,...(!complete?{reason:`Recent executed sample only; the ${frame.valueWindow} value window is not fully retained.`}:{})};
+      const capturedStart=Math.max(start,capture.coverage.start),capturedEnd=Math.min(capture.coverage.end,asOf);
+      const meta:TerminalSourceStatus={id:"value",source:capture.source,knownAt:capture.coverage.knownAt,windowStart:capturedStart,windowEnd:capturedEnd,status:asOf-trades.at(-1)!.ts>120000?"stale":complete?"available":"partial",units:capture.quantityUnit,
+        coverage:{requestedStart:start,requestedEnd:asOf,capturedStart,capturedEnd,firstTradeAt:trades[0].ts,lastTradeAt:trades.at(-1)!.ts,tradeCount:trades.length,completeRequestedWindow:complete,completeCapturedInterval:capture.coverage.complete,horizon:frame.valueWindow},
+        ...(!complete?{reason:`Recent executed sample only; the ${frame.valueWindow} value window is not fully retained.`}:{})};
       tools.value={...meta,label:"VWAP & value",tradeVwap:round(tradeVwap),sigma:round(sigma),bands:[1,2,3].map(deviations=>({deviations,lower:round(Math.max(0,tradeVwap-deviations*sigma)),upper:round(tradeVwap+deviations*sigma)}))};
       // Profile/footprint use the exact captured interval, never the requested
       // macro window. Value status still states missing broad-window coverage.
@@ -41,7 +44,15 @@ export function terminalToolsFromParticipation(p:TerminalParticipation,input:{ti
       const grouped=new Map<number,{ts:number;buy:number;sell:number;delta:number;cvd:number}>(),size=candleTimeframeMs(frame.execution);
       for(const t of trades){const ts=Math.floor(t.ts/size)*size,row=grouped.get(ts)??{ts,buy:0,sell:0,delta:0,cvd:0};row[t.side]+=t.size;grouped.set(ts,row);}
       let cvd=0;const points=[...grouped.values()].map(row=>{row.delta=round(row.buy-row.sell);row.cvd=round(cvd+=row.delta);return row;});
-      tools.flow={...meta,id:"flow",label:"Buy/sell flow",marketType:capture.marketType,buy:round(buy),sell:round(sell),delta:round(buy-sell),points};
+      // A minute-long weekly sample cannot be read as a one-point daily CVD.
+      // Show its exact tape in smaller UTC buckets while keeping the actual
+      // execution-frame points separate. Price and flow share the same prints;
+      // no OHLC candle is substituted for missing executed history.
+      const displayBucketMs=[1000,5000,15000,30000,60000,300000,900000,3600000,14400000,86400000].find(ms=>ms>=Math.max(1000,(capturedEnd-capturedStart)/24))??86400000;
+      const display=new Map<number,TerminalFlowDisplayPoint>();
+      for(const t of trades){const ts=Math.floor(t.ts/displayBucketMs)*displayBucketMs,row=display.get(ts)??{ts,end:Math.min(ts+displayBucketMs,capturedEnd),buy:0,sell:0,delta:0,cvd:0,priceOpen:t.price,priceHigh:t.price,priceLow:t.price,priceClose:t.price,tradeCount:0};row[t.side]+=t.size;row.priceHigh=Math.max(row.priceHigh,t.price);row.priceLow=Math.min(row.priceLow,t.price);row.priceClose=t.price;row.tradeCount++;display.set(ts,row);}
+      let displayCvd=0;const displayPoints=[...display.values()].map(row=>({...row,buy:round(row.buy),sell:round(row.sell),delta:round(row.buy-row.sell),cvd:round(displayCvd+=row.buy-row.sell)}));
+      tools.flow={...meta,id:"flow",label:"Buy/sell flow",marketType:capture.marketType,buy:round(buy),sell:round(sell),delta:round(buy-sell),points,displayPoints,displayBucketMs};
     }
   }}catch{
     const reason="Executed-trade capture failed validation; its quantities and price profile are unavailable. Independent price, derivative and depth sources are retained.";

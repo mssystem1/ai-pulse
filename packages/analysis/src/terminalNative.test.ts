@@ -59,6 +59,42 @@ test("actual trade sample yields exact value/flow and does not pretend macro cov
   const missing=terminalToolsFromParticipation({...p,capture:null},{timeframe:"1Dutc",start,asOf});assert.equal(missing.value.tradeVwap,undefined);assert.equal(missing.flow.delta,undefined);assert.equal(missing.flow.points.length,0);
   const duplicate=terminalToolsFromParticipation({...p,capture:{...capture,trades:[...capture.trades,capture.trades[0]]}},{timeframe:"1H",start,asOf});assert.equal(duplicate.value.status,"unavailable");assert.match(duplicate.value.reason!,/failed validation/);assert.equal(duplicate.flow.points.length,0);
 });
+
+test("recent tape exposes exact coverage and time-aligned price/delta without inventing weekly flow",()=>{
+  const asOf=Date.UTC(2026,10,5,10),start=asOf-60000;
+  const capture={source:"fixture-trades",instId:"BTC-USDT",priceCurrency:"USDT",marketType:"spot" as const,quantityUnit:"base" as const,capturedAt:new Date(asOf).toISOString(),coverage:{start,end:asOf,knownAt:asOf,complete:true,sha256:["a".repeat(64)]},trades:[
+    {id:"1",ts:start+1000,price:100,size:2,side:"buy" as const},
+    {id:"2",ts:start+2000,price:102,size:1,side:"sell" as const},
+    {id:"3",ts:start+16000,price:99,size:3,side:"sell" as const},
+    {id:"4",ts:start+59000,price:101,size:4,side:"buy" as const},
+  ]};
+  const requestedStart=Date.UTC(2022,0,1),tools=terminalToolsFromParticipation({capture,derivatives:{instId:"BTC-USDT-SWAP",knownAt:0},liquidity:{knownAt:0}},{timeframe:"1Wutc",start:requestedStart,asOf});
+  assert.deepEqual(tools.value.coverage,{requestedStart,requestedEnd:asOf,capturedStart:start,capturedEnd:asOf,firstTradeAt:start+1000,lastTradeAt:start+59000,tradeCount:4,completeRequestedWindow:false,completeCapturedInterval:true,horizon:"cycle"});
+  assert.deepEqual(tools.flow.coverage,tools.value.coverage);assert.equal(tools.value.status,"partial");
+  assert.equal(tools.flow.points.length,1);assert.equal(tools.flow.displayBucketMs,5000);assert.equal(tools.flow.displayPoints?.length,3);
+  const [first,second,last]=tools.flow.displayPoints!;
+  assert.deepEqual(first,{ts:start,end:start+5000,buy:2,sell:1,delta:1,cvd:1,priceOpen:100,priceHigh:102,priceLow:100,priceClose:102,tradeCount:2});
+  assert.equal(second.ts,start+15000);assert.equal(second.priceClose,99);assert.equal(second.delta,-3);assert.equal(second.cvd,-2);
+  assert.equal(last.ts,start+55000);assert.equal(last.end,asOf);assert.equal(last.priceClose,101);assert.equal(last.cvd,2);
+  assert.equal(tools.flow.displayPoints!.reduce((n,p)=>n+p.tradeCount,0),4);
+  assert.equal(tools.flow.displayPoints!.reduce((n,p)=>n+p.buy+p.sell,0),10);
+  // The display leaves the missing 5s/10s/etc buckets absent: no made-up
+  // zero-volume price candles or repeated prices are inserted across gaps.
+  assert.equal(tools.flow.displayPoints!.some(p=>p.ts===start+5000),false);
+});
+
+test("sample coverage and price/delta stay isolated for spot and contract streams",()=>{
+  const asOf=Date.UTC(2026,10,5,10),start=asOf-10000;
+  const capture={source:"fixture-spot",instId:"BTC-USDT",priceCurrency:"USDT",marketType:"spot" as const,quantityUnit:"base" as const,capturedAt:new Date(asOf).toISOString(),coverage:{start,end:asOf-1000,knownAt:asOf,complete:true,sha256:["a".repeat(64)]},trades:[{id:"1",ts:start,price:100,size:2,side:"buy" as const}]};
+  const perpetualCapture={...capture,source:"fixture-perp",instId:"BTC-USDT-SWAP",marketType:"perpetual" as const,quantityUnit:"contracts" as const,trades:[{id:"p1",ts:start+3000,price:101,size:20,side:"sell" as const}]};
+  const tools=terminalToolsFromParticipation({capture,perpetualCapture,derivatives:{instId:"BTC-USDT-SWAP",knownAt:0},liquidity:{knownAt:0}},{timeframe:"15m",start,asOf});
+  assert.equal(tools.flow.units,"base");assert.equal(tools.flow.displayPoints?.[0].priceClose,100);assert.equal(tools.flow.delta,2);
+  assert.equal(tools.perpetualFlow?.units,"contracts");assert.equal(tools.perpetualFlow?.displayPoints?.[0].priceClose,101);assert.equal(tools.perpetualFlow?.delta,-20);
+  assert.equal(tools.flow.coverage?.completeCapturedInterval,true);assert.equal(tools.flow.coverage?.completeRequestedWindow,false);assert.equal(tools.flow.coverage?.capturedEnd,asOf-1000);
+  assert.equal(tools.perpetualFlow?.coverage?.firstTradeAt,start+3000);
+  const complete=terminalToolsFromParticipation({capture:{...capture,coverage:{...capture.coverage,end:asOf}},derivatives:{instId:"BTC-USDT-SWAP",knownAt:0},liquidity:{knownAt:0}},{timeframe:"15m",start,asOf});
+  assert.equal(complete.flow.coverage?.completeRequestedWindow,true);assert.equal(complete.value.status,"available");
+});
 test("decimal Terminal display rows reconcile ordinary BTC decimals without inventing macro coverage",()=>{
   const asOf=Date.UTC(2026,10,4,13),start=asOf-10000;
   const capture={source:"fixture-trades",instId:"BTC-USDT",priceCurrency:"USDT",marketType:"spot" as const,quantityUnit:"base" as const,capturedAt:new Date(asOf).toISOString(),coverage:{start,end:asOf,knownAt:asOf,complete:true,sha256:["a".repeat(64)]},trades:[{id:"1",ts:start,price:77700.1,size:2,side:"buy" as const},{id:"2",ts:start+1,price:77711,size:1,side:"sell" as const}]};

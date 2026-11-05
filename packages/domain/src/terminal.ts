@@ -3,12 +3,29 @@ import type {GlobalReport, GlobalOrderFlow} from "@pulse/schemas";
 export const TERMINAL_TIMEFRAMES = ["15m", "1H", "4H", "1Dutc", "1Wutc"] as const;
 export type TerminalTimeframe = typeof TERMINAL_TIMEFRAMES[number];
 export type TerminalDataStatus = "available" | "partial" | "stale" | "unavailable";
+/** Distinguishes a validated recent capture from the much broader value horizon
+ * requested by the selected chart. Missing history is never candle-derived. */
+export type TerminalExecutedCoverage = {
+  requestedStart:number;requestedEnd:number;capturedStart:number;capturedEnd:number;
+  firstTradeAt:number;lastTradeAt:number;tradeCount:number;
+  completeRequestedWindow:boolean;completeCapturedInterval:boolean;horizon:string;
+};
 export type TerminalSourceStatus = {
   id:string; source:string; status:TerminalDataStatus; reason?:string;
   windowStart?:number; windowEnd?:number; knownAt:number; units?:string;
+  coverage?:TerminalExecutedCoverage;
 };
 export type TerminalToolBase = TerminalSourceStatus & {label:string};
-export type TerminalFlowTool = TerminalToolBase & {points:{ts:number;buy:number;sell:number;delta:number;cvd:number}[];buy?:number;sell?:number;delta?:number;marketType:"spot"|"perpetual"};
+export type TerminalFlowDisplayPoint = {
+  ts:number;end:number;buy:number;sell:number;delta:number;cvd:number;
+  priceOpen:number;priceHigh:number;priceLow:number;priceClose:number;tradeCount:number;
+};
+export type TerminalFlowTool = TerminalToolBase & {
+  points:{ts:number;buy:number;sell:number;delta:number;cvd:number}[];
+  /** Adaptive sample-only display; execution-frame observations stay in points. */
+  displayPoints?:TerminalFlowDisplayPoint[];displayBucketMs?:number;
+  buy?:number;sell?:number;delta?:number;marketType:"spot"|"perpetual";
+};
 export type TerminalMarketTools = {
   value:TerminalToolBase & {tradeVwap?:number;sigma?:number;bands?:{lower:number;upper:number;deviations:number}[];orderFlow?:GlobalOrderFlow};
   flow:TerminalFlowTool;

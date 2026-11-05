@@ -1,0 +1,30 @@
+.terminal-radar-planner,.terminal-radar-progress{width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.terminal-radar-planner{display:grid;gap:1rem;margin-top:1.2rem;padding:1.1rem;border:1px solid var(--terminal-line);border-radius:12px;background:var(--terminal-bg)}
+.terminal-radar-planner h4,.terminal-radar-progress h4{margin:0 0 .4rem}.terminal-radar-planner p,.terminal-radar-progress p{line-height:1.55}
+.terminal-radar-planner-intro p{margin:.3rem 0;color:var(--terminal-muted)}
+.terminal-radar-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;min-width:0}
+.terminal-radar-presets button{display:flex;flex-direction:column;align-items:flex-start;gap:.45rem;min-width:0;padding:.85rem;text-align:left;white-space:normal}
+.terminal-radar-presets button span{font-size:.86rem;font-weight:400;line-height:1.45;color:var(--terminal-muted)}
+.terminal-radar-presets button.is-selected{border-color:var(--terminal-accent);box-shadow:inset 0 0 0 1px var(--terminal-accent)}
+.terminal-radar-planner-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem;min-width:0}
+.terminal-radar-planner-fields label{display:flex;flex-direction:column;gap:.45rem;min-width:0;font-size:.9rem;font-weight:600}
+.terminal-radar-planner-fields input,.terminal-radar-planner-fields select{box-sizing:border-box;width:100%;max-width:100%;min-width:0}
+.terminal-radar-planner-fields small{font-size:.8rem;font-weight:400;line-height:1.45;color:var(--terminal-muted)}
+.terminal-radar-preview{padding:1rem;border:1px solid var(--terminal-line);border-radius:9px}
+.terminal-radar-preview ol,.terminal-radar-stage-list{display:grid;gap:.7rem;padding:0;margin:.7rem 0;list-style:none}
+.terminal-radar-preview li,.terminal-radar-stage-list li{display:flex;align-items:flex-start;gap:.7rem;min-width:0}
+.terminal-radar-preview li>span,.terminal-radar-stage-number{display:grid;place-items:center;flex:0 0 1.7rem;width:1.7rem;height:1.7rem;border:1px solid var(--terminal-line);border-radius:50%;font-weight:700}
+.terminal-radar-preview li>div,.terminal-radar-stage-list li>div{min-width:0}.terminal-radar-preview li strong,.terminal-radar-stage-list strong{font-size:.9rem}
+.terminal-radar-preview small,.terminal-radar-stage-list small{display:block;margin-top:.2rem;color:var(--terminal-muted);font-size:.8rem;line-height:1.5}
+.terminal-radar-preview p{margin:.7rem 0 0;font-size:.86rem}.terminal-radar-preview .terminal-radar-slow{font-weight:600}
+.terminal-radar-telegram{display:flex;align-items:flex-start;gap:.6rem;line-height:1.5;font-size:.9rem}.terminal-radar-telegram input{flex:0 0 auto;margin-top:.3rem}.terminal-radar-telegram small{display:block;color:var(--terminal-muted)}
+.terminal-radar-form-error{font-size:.9rem;font-weight:600}
+.terminal-radar-boundary{margin:.8rem 0}.terminal-radar-stage-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem;margin:1rem 0}
+.terminal-radar-stage-list li{padding:.85rem;border:1px solid var(--terminal-line);border-radius:9px;background:var(--terminal-bg)}
+.terminal-radar-stage-list li.is-observed .terminal-radar-stage-number{border-color:var(--terminal-accent);color:var(--terminal-accent)}
+.terminal-radar-stage-list li.is-next{border-color:var(--terminal-accent)}
+.terminal-radar-next{padding:.9rem;border-left:3px solid var(--terminal-accent);background:var(--terminal-bg);border-radius:0 7px 7px 0}.terminal-radar-next p{margin:.4rem 0 0}
+.terminal-radar-clock{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem 1rem;margin:1rem 0}.trading-terminal .terminal-radar-clock>div{display:block;min-width:0}.terminal-radar-clock dt{color:var(--terminal-muted);font-size:.8rem}.terminal-radar-clock dd{margin:.3rem 0 0;font-size:.86rem;overflow-wrap:anywhere}
+.terminal-radar-use{font-size:.86rem;color:var(--terminal-muted)}.terminal-radar-provenance{margin-top:.9rem}.terminal-radar-provenance p,.terminal-radar-provenance dl{font-size:.82rem}.terminal-radar-provenance dl>div{display:grid;grid-template-columns:7rem minmax(0,1fr);gap:.6rem;margin:.5rem 0}.terminal-radar-provenance dd{margin:0;overflow-wrap:anywhere}.terminal-radar-provenance dt{color:var(--terminal-muted)}
+@media(max-width:800px){.terminal-radar-stage-list{grid-template-columns:minmax(0,1fr)}.terminal-radar-clock{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:600px){.terminal-radar-planner{padding:.8rem}.terminal-radar-presets,.terminal-radar-planner-fields{grid-template-columns:minmax(0,1fr)}.terminal-radar-provenance dl>div{grid-template-columns:minmax(0,1fr);gap:.2rem}}

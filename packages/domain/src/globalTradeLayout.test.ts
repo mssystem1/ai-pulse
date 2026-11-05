@@ -62,3 +62,15 @@ test("ordinary export ticks reserve the actual discretionary badge gutter",()=>{
   }
   assert.equal(JSON.stringify(report),before);
 });
+
+test("native quote label omits colliding optional badges while retaining exact setup levels",()=>{
+  const report=fixture(),before=JSON.stringify(report),entryY=geometry.y(80)!;
+  const svg=globalTradeAnnotations(report,geometry,{priceBadgeAvoidYs:[entryY]});
+  assert.doesNotMatch(svg,/<rect data-trade-price-badge="Entry"/);
+  assert.match(svg,/<g data-trade-price-badge-omitted="Entry" data-reason="native-quote-label"/);
+  assert.match(svg,/<g data-trade-role="Entry" data-price="80">/);
+  assert.match(svg,/data-trade-zone="Entry" data-lower="78" data-upper="80"/);
+  assert.ok(svg.includes("78.00–80.00"),"Exact Entry remains in the floating ledger");
+  for(const badge of rects(svg).filter(rect=>rect["data-trade-price-badge"]))assert.ok(Math.abs(Number(badge.y)+10-entryY)>=26);
+  assert.equal(JSON.stringify(report),before);
+});

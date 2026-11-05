@@ -48,6 +48,8 @@ The [4 November Terminal acceptance record](docs/TRADING_TERMINAL_ACCEPTANCE_202
 
 Terminal and Portfolio show remaining paid access with a live server-anchored countdown for 24h, 7d and 30d passes. Refreshes preserve the recorded expiry and renewals extend the continuous access period. The [workflow follow-up and countdown validation](docs/TRADING_TERMINAL_WORKFLOW_ACCEPTANCE_2026-11-05.md) covers pinned setup/tool reviews, chart navigation, journal retries and monitoring races.
 
+The [Terminal usability and data audit](docs/TRADING_TERMINAL_USER_ISSUE_AUDIT_2026-11-05.md) covers the ten reported defects: full-width docs in every appearance, simpler entry-size recording, the wallet-linked bot workflow, actionable activity, visual native market tools, explained Radar stages, one current ticker across timeframes, correctly scoped volume profiles, visible enabled studies, and eight named crypto markets. A recent execution profile is labelled with its real duration and trade count; it is not a full daily, weekly or cycle profile. Current quotes and completed-candle closes have separate labels and clocks. Radar imports verified Tapeout logic and evaluates candle events locally; its completion is a review event, not an order or a profitability claim.
+
 Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
 
 See the [13–14 September deployment audit](docs/PULSE_POST_DEPLOY_AUDIT_2026-09-14.md) for verified live workflows, payment recovery, historical statistics, test coverage and remaining validation limits.

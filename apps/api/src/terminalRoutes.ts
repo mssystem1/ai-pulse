@@ -7,7 +7,7 @@ import { terminalFrameProfile, type TerminalMarketSnapshot, type TerminalRadarSt
 import { paymentPayer } from "./arcBudget.js";
 import { asyncRoute } from "./httpResilience.js";
 import { applyTerminalPositionEvent, appendTerminalActivity, terminalAccess, terminalDurationMs, type TerminalDuration, type TerminalPosition } from "./terminalStore.js";
-import { registerTerminalRuntime, terminalLimits, TerminalRuntime, type TerminalDependencies } from "./terminalRuntime.js";
+import { registerTerminalRuntime, terminalLimits, TerminalRuntime, TerminalRadarRequestConflictError, type TerminalDependencies } from "./terminalRuntime.js";
 import { TerminalPayments } from "./terminalPayments.js";
 import { replayTerminalRadar } from "@pulse/analysis";
 import { terminalAiContext, TerminalInspectionUnavailableError, type TerminalInspectionEvidence } from "./terminalAiContext.js";
@@ -71,6 +71,12 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   beforePayment.get("/v1/terminal/workspace", asyncRoute(async (_req, res) => { return res.json(await runtime!.workspace(res.locals.terminalOwner)); }));
   beforePayment.get("/v1/terminal/access", asyncRoute(async (_req, res) => { const value = await runtime!.store.get(res.locals.terminalOwner), serverNow = runtime!.now(); return res.json({ ...terminalAccess(value, serverNow), serverNow }); }));
   const active: RequestHandler = asyncRoute(async (_req, res, next) => { if (!terminalAccess(await runtime!.store.get(res.locals.terminalOwner), runtime!.now()).active) return res.status(403).json({ error: "An active Trading Terminal pass is required", code: "terminal_pass_required" }); return next(); });
+  beforePayment.get("/v1/terminal/quote", active, asyncRoute(async (req, res) => {
+    const parsed = z.object({ instId: marketSchema.shape.instId }).strict().safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: "Choose one exact supported Spot asset. A current quote does not depend on the chart timeframe.", code: "terminal_quote_asset_required" });
+    try { return res.json(await runtime!.quote(parsed.data.instId)); }
+    catch { return res.status(503).json({ error: "A fresh matching OKX Spot quote is unavailable. The last report close is not substituted; retry the live quote.", code: "terminal_quote_unavailable" }); }
+  }));
   beforePayment.get("/v1/terminal/market", active, asyncRoute(async (req, res) => {
     const input = marketSchema.parse(req.query);
     let snapshot: TerminalMarketSnapshot;
@@ -85,8 +91,8 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   }));
   beforePayment.post("/v1/terminal/watches", active, asyncRoute(async (req, res) => { const input = marketSchema.extend({ setupVersionId: z.string().regex(/^gsr_[\da-f]{32}$/), telegram: z.boolean().default(false) }).strict().parse(req.body); try { await runtime!.createWatch(res.locals.terminalOwner, input); return res.status(201).json(await runtime!.workspace(res.locals.terminalOwner)); } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : "Setup cannot be followed" }); } }));
   beforePayment.post("/v1/terminal/radars", active, asyncRoute(async (req, res) => {
-    const input = marketSchema.extend({ detector: z.enum(["sweep_reclaim", "breakout_acceptance", "breakout_failure"]), boundary: positive, side: z.enum(["above", "below"]), tolerance: z.number().finite().min(0).max(1e9), expiresAt: iso, telegram: z.boolean().default(false) }).strict().parse(req.body);
-    try { await runtime!.createRadar(res.locals.terminalOwner, input); return res.status(201).json(await runtime!.workspace(res.locals.terminalOwner)); } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : "Radar cannot be started" }); }
+    const input = marketSchema.extend({ requestId: requestIdSchema.optional(), detector: z.enum(["sweep_reclaim", "breakout_acceptance", "breakout_failure"]), boundary: positive, side: z.enum(["above", "below"]), tolerance: z.number().finite().min(0).max(1e9), expiresAt: iso, telegram: z.boolean().default(false) }).strict().parse(req.body);
+    try { await runtime!.createRadar(res.locals.terminalOwner, input); return res.status(201).json(await runtime!.workspace(res.locals.terminalOwner)); } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : "Radar cannot be started", ...(error instanceof TerminalRadarRequestConflictError ? { code: error.code } : {}) }); }
   }));
   for (const collection of ["watches", "radars", "positions"] as const) beforePayment.patch(`/v1/terminal/${collection}/:id`, asyncRoute(async (req, res) => {
     const input = z.object({ paused: z.boolean().optional(), telegram: z.boolean().optional() }).strict().refine(v => v.paused !== undefined || v.telegram !== undefined).parse(req.body), owner = res.locals.terminalOwner;
@@ -140,8 +146,14 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   }));
   beforePayment.post("/v1/terminal/telegram", asyncRoute(async (req, res) => {
     const input = z.object({ enabled: z.boolean(), events: z.array(z.enum(allowedEvents)).max(allowedEvents.length) }).strict().parse(req.body), owner = res.locals.terminalOwner;
-    if (input.enabled && (!terminalAccess(await runtime!.store.get(owner), runtime!.now()).active || !await runtime!.recipient(owner))) return res.status(409).json({ error: "Link your wallet in Telegram and activate a Terminal pass before enabling alerts" });
-    await runtime!.store.mutate(owner, value => { value.telegram = { enabled: input.enabled, events: [...new Set(input.events)] }; if (!input.enabled) for (const item of value.deliveries) if (item.state === "queued") item.state = "cancelled"; });
+    if (input.enabled && (!terminalAccess(await runtime!.store.get(owner), runtime!.now()).active || !await runtime!.recipient(owner))) return res.status(409).json({ error: "Link this wallet in the PULSE Telegram bot, confirm its address there, and activate a Terminal pass before enabling alerts", code: "terminal_telegram_link_required" });
+    if (input.enabled && !input.events.length) return res.status(400).json({ error: "Choose at least one Telegram alert type before enabling notifications", code: "terminal_telegram_events_required" });
+    await runtime!.store.mutate(owner, value => {
+      const events = [...new Set(input.events)], changed = value.telegram.enabled !== input.enabled || JSON.stringify([...value.telegram.events].sort()) !== JSON.stringify([...events].sort());
+      value.telegram = { enabled: input.enabled, events };
+      if (!input.enabled) for (const item of value.deliveries) if (item.state === "queued") item.state = "cancelled";
+      if (changed) appendTerminalActivity(value, { at: new Date(runtime!.now()).toISOString(), kind: input.enabled ? "telegram_enabled" : "telegram_paused", subjectId: "telegram", message: input.enabled ? `Telegram notifications enabled for ${events.length} selected alert types. Only individually selected setups, Radars and positions can send new alerts.` : "Telegram notifications paused. Queued notifications were cancelled; monitoring and position records remain available." });
+    });
     return res.json(await runtime!.workspace(owner));
   }));
   beforePayment.post("/v1/terminal/refresh", active, asyncRoute(async (_req, res) => { await runtime!.cycleOwner(res.locals.terminalOwner); return res.json(await runtime!.workspace(res.locals.terminalOwner)); }));

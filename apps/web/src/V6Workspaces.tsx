@@ -4,6 +4,7 @@ import { TradingTerminalGuide } from "./TradingTerminalGuide";
 import { GlobalSpotReview } from "./GlobalSpotReview";
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
+import "./docsLayout.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   decodeFunctionResult,

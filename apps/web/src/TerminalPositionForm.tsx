@@ -1,0 +1,28 @@
+import { useState, type FormEvent } from "react";
+import { terminalPositionQuantity } from "./terminalTradeReading";
+import { terminalPrice } from "./terminalClient";
+
+export function TerminalPositionForm({ market, active, busy, serverNow, onSubmit, onCancel }: { market: string; active: boolean; busy: boolean; serverNow?: number | null; onSubmit: (event: FormEvent<HTMLFormElement>) => void; onCancel: () => void }) {
+  const [instrument, setInstrument] = useState("spot"), [side, setSide] = useState("long"), [pair, setPair] = useState(market);
+  const [price, setPrice] = useState(""), [size, setSize] = useState(""), [unit, setUnit] = useState<"quote" | "base" | "margin">("quote"), [leverage, setLeverage] = useState("5");
+  const [targets, setTargets] = useState(1), [timeMode, setTimeMode] = useState("now");
+  const [openedAt] = useState(() => new Date(serverNow ?? Date.now()).toISOString().slice(0, 23));
+  const base = pair.trim().toUpperCase().split("-")[0] || "coin", quote = pair.trim().toUpperCase().split("-")[1] || "USDT";
+  const quantity = terminalPositionQuantity(Number(size), unit, Number(price), unit === "margin" ? Number(leverage) : 1);
+  return <form className="terminal-form terminal-position-form" onSubmit={onSubmit}>
+    <h3>Add your open trade</h3><p>Copy the entry and size from your exchange. You can add stop-loss and targets now or later.</p>
+    <div className="terminal-form-grid"><label>Market<input name="instId" value={pair} onChange={event => setPair(event.target.value)} required maxLength={35} /></label>
+      <label>Trade type<select name="instrumentType" value={instrument} onChange={event => { setInstrument(event.target.value); if (event.target.value === "spot") { setSide("long"); if (unit === "margin") setUnit("quote"); } }}><option value="spot">Spot · coins you bought</option><option value="perpetual">Futures · long or short</option></select></label>
+      <label>Direction<select name="side" value={side} onChange={event => setSide(event.target.value)}><option value="long">{instrument === "spot" ? "Buy / Long" : "Long · profit if price rises"}</option>{instrument === "perpetual" && <option value="short">Short · profit if price falls</option>}</select></label>
+      <label>Entry price · {quote}<input name="price" type="number" step="any" min="0" inputMode="decimal" required placeholder="Your average entry price" value={price} onChange={event => setPrice(event.target.value)} /></label>
+      <label>Size entered as<select aria-label="Size entered as" value={unit} onChange={event => setUnit(event.target.value as typeof unit)}><option value="quote">Position value at entry · {quote}</option><option value="base">Coin amount · {base}</option>{instrument === "perpetual" && <option value="margin">Initial margin × leverage</option>}</select></label>
+      <label>{unit === "base" ? `Amount · ${base}` : unit === "margin" ? `Initial margin · ${quote}` : `Position value at entry · ${quote}`}<input name="positionSize" type="number" step="any" min="0" inputMode="decimal" required value={size} onChange={event => setSize(event.target.value)} placeholder={unit === "base" ? "e.g. 0.01" : "e.g. 100"} /></label>
+      {unit === "margin" && <label>Leverage<input type="number" min="1" max="200" step="any" required value={leverage} onChange={event => setLeverage(event.target.value)} /><small>Use the leverage from this trade.</small></label>}
+    </div><input type="hidden" name="quantity" value={quantity ?? ""} />{timeMode === "now" && <input type="hidden" name="executedAt" value={openedAt} />}
+    {quantity && <p className="terminal-size-preview">Recorded size: <b>{terminalPrice(quantity, 8)} {base}</b> · position value <b>{terminalPrice(quantity * Number(price))} {quote}</b>{unit === "margin" && ` · ${leverage}× leverage`}</p>}
+    {unit !== "base" && <p className="terminal-hint">Use the value when you opened the trade, not today's position value.{instrument === "perpetual" && ` For initial margin of 100 ${quote} at 5×, enter 500 ${quote} or choose “Initial margin × leverage”.`}</p>}
+    <details className="terminal-position-options"><summary>Add stop-loss and take-profit · optional</summary><div className="terminal-form-grid"><label>Stop-loss price<input name="hardStop" type="number" step="any" min="0" inputMode="decimal" placeholder="Optional" /></label>{Array.from({ length: targets }, (_, index) => <label key={index}>Take-profit {index + 1} price<input name="target" type="number" step="any" min="0" inputMode="decimal" placeholder="Optional" /></label>)}</div>{targets < 3 && <button type="button" onClick={() => setTargets(value => value + 1)}>+ Add another target</button>}<p className="terminal-hint">These prices let PULSE watch your trade. Set protective orders on your exchange.</p></details>
+    <details className="terminal-position-options"><summary>When and where · optional</summary><div className="terminal-form-grid"><label>Opened<select value={timeMode} onChange={event => setTimeMode(event.target.value)}><option value="now">Just now · {openedAt.replace("T", " ").slice(0, 19)} UTC</option><option value="utc">Choose date and time · UTC</option></select></label>{timeMode === "utc" && <label>Opened at · UTC<input type="datetime-local" name="executedAt" step="1" defaultValue={openedAt.slice(0, 19)} required /></label>}<label>Exchange<input name="venue" placeholder="e.g. OKX, Binance · optional" maxLength={64} /></label></div></details>
+    <div className="terminal-actions"><button type="submit" className="terminal-primary" disabled={!active || busy || !quantity}>Save position</button><button type="button" onClick={onCancel} disabled={busy}>Cancel</button></div>
+  </form>;
+}

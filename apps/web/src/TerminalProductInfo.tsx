@@ -35,9 +35,9 @@ export function TerminalLandingSection({ href, guideHref }: {href:string;guideHr
   return <section id="trading-terminal" className="landing-width landing-section landing-terminal" aria-labelledby="landing-terminal-title">
     <div className="landing-section-heading"><p className="landing-kicker">PULSE TRADING TERMINAL</p><h2 id="landing-terminal-title">Read the move.<br/><span>Follow your plan.</span></h2><p>Explore value, executed buy/sell flow and liquidity. Detect developing market events, follow setup conditions, and track your positions with Telegram alerts.</p></div>
     <div className="landing-terminal-services">
-      <article><span>01 / MARKET TOOLS</span><h3>Read the evidence.</h3><p>Inspect VWAP, volume profiles, executed flow, footprint and derivative positioning. Each reading shows its source, window and coverage.</p></article>
-      <article><span>02 / MARKET RADAR</span><h3>Track the sequence.</h3><p>Watch a reclaim, breakout acceptance or failure develop around a selected level. Inspect its stages and choose when to be alerted.</p></article>
-      <article><span>03 / POSITIONS & ALERTS</span><h3>Keep your plan in view.</h3><p>Record your trades, review recorded protection and follow meaningful changes in the app or through your linked Telegram.</p></article>
+      <article><span>01 / MARKET TOOLS</span><h3>See where trading concentrates.</h3><p>Read a visual volume profile, compare price with buy/sell flow, and inspect executions at each price. Every view shows the exact data window it covers.</p></article>
+      <article><span>02 / MARKET RADAR</span><h3>Follow the response at your level.</h3><p>Start from a value-area edge or your own price. See the three required candle events, the next check and optional Telegram alerts.</p></article>
+      <article><span>03 / POSITIONS & ALERTS</span><h3>Keep your trade in view.</h3><p>Add your entry and size in coins, position value or futures margin. Link your wallet to the PULSE bot and choose the changes you want to receive.</p></article>
     </div>
     <TerminalPassPrices/>
     <div className="landing-actions"><a className="landing-button primary" href={href}>Explore Trading Terminal <span aria-hidden>↗</span></a><a className="landing-text-link" href={guideHref}>See how it works <span aria-hidden>↗</span></a></div>

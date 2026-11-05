@@ -1,0 +1,13 @@
+.terminal-market-selector{flex:1 1 100%;width:100%;max-width:100%;min-width:0}
+.terminal-market-selector-heading{display:flex;align-items:baseline;justify-content:space-between;gap:.7rem;flex-wrap:wrap;margin-bottom:.55rem}
+.terminal-market-selector-heading .terminal-field-label{margin:0}.terminal-market-selector-heading small{font-size:.75rem}
+.terminal-quick-markets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.5rem;min-width:0}
+.trading-terminal .terminal-quick-markets button{display:flex;align-items:flex-start;flex-direction:column;gap:.25rem;min-width:0;padding:.7rem .8rem;text-align:left;white-space:normal}
+.terminal-quick-markets strong{font-size:.91rem}.terminal-quick-markets span{font-size:.75rem;color:var(--terminal-muted);font-weight:400;overflow-wrap:anywhere}
+.trading-terminal .terminal-quick-markets button[aria-pressed=true]{border-color:var(--terminal-accent);box-shadow:inset 0 0 0 1px var(--terminal-accent);background:color-mix(in srgb,var(--terminal-accent) 8%,var(--terminal-bg));color:var(--terminal-accent)}
+.terminal-custom-market{max-width:100%;min-width:0;margin-top:.8rem}.terminal-custom-market label{display:block;font-size:.78rem;margin-bottom:.4rem;color:var(--terminal-muted)}
+.terminal-custom-market-row{display:flex;gap:.55rem;min-width:0;max-width:100%}
+.trading-terminal .terminal-custom-market-row input{flex:1 1 auto;width:0;max-width:30rem;min-width:0}.trading-terminal .terminal-custom-market-row button{flex:0 1 auto;max-width:60%;overflow-wrap:anywhere;white-space:normal}
+.terminal-custom-market>small{display:block;margin-top:.4rem;max-width:52rem;line-height:1.5;overflow-wrap:anywhere}
+@media(min-width:1250px){.terminal-quick-markets{grid-template-columns:repeat(8,minmax(0,1fr))}}
+@media(max-width:600px){.terminal-quick-markets{grid-template-columns:repeat(2,minmax(0,1fr))}.trading-terminal .terminal-quick-markets button{padding:.65rem .75rem}.terminal-custom-market-row{flex-wrap:wrap}.trading-terminal .terminal-custom-market-row input{flex:1 1 100%;width:100%;max-width:none}.trading-terminal .terminal-custom-market-row button{flex:1 1 100%;max-width:100%}}

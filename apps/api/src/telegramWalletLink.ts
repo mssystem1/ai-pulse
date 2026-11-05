@@ -56,7 +56,7 @@ export class TelegramWalletLink {
     const nonce = randomBytes(24).toString("base64url");
     const origin = new URL(process.env.TELEGRAM_MINI_APP_URL || "https://www.ai-pulse.tech").origin;
     attempt.wallet = wallet.toLowerCase();
-    attempt.message = ["PULSE — link wallet to Telegram", "", `Origin: ${origin}`, `Telegram account ID: ${attempt.userId}`, `Wallet: ${attempt.wallet}`, `Link request: ${attempt.id}`, `Nonce: ${nonce}`, `Expires: ${new Date(attempt.expiresAt).toISOString()}`, "", "I allow this Telegram account to read my PULSE report history across supported networks until I unlink this wallet. This signature does not authorize a payment, transfer or trade. Confirm the wallet inside Telegram to finish."].join("\n");
+    attempt.message = ["PULSE — link wallet to Telegram", "", `Origin: ${origin}`, `Telegram account ID: ${attempt.userId}`, `Wallet: ${attempt.wallet}`, `Link request: ${attempt.id}`, `Nonce: ${nonce}`, `Expires: ${new Date(attempt.expiresAt).toISOString()}`, "", "I link this wallet to this Telegram account for PULSE report history and optional Trading Terminal notifications until I unlink it. Notifications require separate opt-in in Trading Terminal. This signature does not authorize a payment, transfer or trade. Confirm the wallet inside Telegram to finish."].join("\n");
     await this.set(`attempt:${attempt.id}`, attempt, Math.max(1,Math.ceil((attempt.expiresAt-Date.now())/1000)));
     return { message: attempt.message, expiresAt: attempt.expiresAt, telegramUserId: attempt.userId };
   }

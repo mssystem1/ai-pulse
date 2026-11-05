@@ -54,6 +54,11 @@ html:not([data-pulse-theme="base"]) .global-report{--global-up:#53dabb}
 .global-chart-controls-help dt{font-weight:700;color:var(--text)}.global-chart-controls-help dd{margin:0;color:var(--text)}
 .global-report .global-layer-controls button[aria-pressed=true],.global-report .global-chart-presets button[aria-pressed=true]{border-color:var(--mint);box-shadow:inset 0 0 0 1px var(--mint);background:color-mix(in srgb,var(--mint) 10%,var(--card))}
 .global-report button:focus-visible,.global-chart-controls-help summary:focus-visible,.global-study-options summary:focus-visible{outline:3px solid var(--cyan);outline-offset:3px}
+.global-chart-panel .global-layer-controls button:not(:disabled)[aria-pressed=true],.global-chart-panel .global-chart-presets button:not(:disabled)[aria-pressed=true],.global-layer-controls button:not(:disabled)[aria-pressed=true],.global-chart-presets button:not(:disabled)[aria-pressed=true]{background:var(--mint);border-color:var(--mint);color:var(--bg);font-weight:750;box-shadow:inset 0 0 0 1px var(--mint)}
+.global-layer-controls button:not(:disabled)[aria-pressed=true]::before,.global-chart-presets button:not(:disabled)[aria-pressed=true]::before{content:"✓";display:inline-block;margin-right:7px;font-weight:900}
+.global-chart-quote-strip{display:flex;justify-content:space-between;gap:15px;flex-wrap:wrap;margin:10px 0 12px;padding:11px 13px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:12px;line-height:1.6}
+.global-chart-quote-strip>div{display:flex;flex-direction:column;min-width:0;gap:3px}.global-chart-quote-strip strong{color:var(--text);font-size:13px;font-variant-numeric:tabular-nums}.global-chart-quote-strip span{color:var(--muted);overflow-wrap:anywhere}.global-chart-quote-strip[data-chart-quote-kind=current]>div:first-child strong{color:var(--cyan)}
+.global-chart-profile-coverage{color:var(--muted);font-size:12px;line-height:1.6;margin:10px 0;overflow-wrap:anywhere}
 html[data-pulse-theme="base"] .global-report p.global-control-hint{font-size:13px;color:#263a55}
 .global-guide-updated{margin:12px 0 18px;color:var(--muted);font-size:13px;line-height:1.65}
 .global-guide-examples{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:14px 0}

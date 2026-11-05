@@ -26,7 +26,7 @@ export type TerminalPosition = { id: string; instId: string; timeframe: string; 
 export type TerminalWorkspace = {
   owner: string; revision: number; serverNow?: number; access: { active: boolean; expiresAt?: string | null; grants?: unknown[] };
   watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalEvent[];
-  telegram: { linked: boolean; enabled: boolean; events: string[] }; limits?: Record<string, number | string>;
+  telegram: { linked: boolean; enabled: boolean; events: string[]; configured?: boolean; botUsername?: string | null; botUrl?: string | null; linkUrl?: string | null; linkState?: "linked" | "not_linked" | "unavailable"; linkedWallet?: string | null; nextStep?: string }; limits?: Record<string, number | string>;
   deliveries?: Array<{ id: string; eventId: string; subjectId: string; state: string; createdAt: string; attemptedAt?: string; error?: string }>;
   answers?: Array<{ id: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; at: string }>;
   pendingPurchases?: Array<{ requestId: string; duration: TerminalDuration; priceUsd: string; amountAtomic: string; network: string; asset: string; createdAt: string; state: "authorizing" | "settled" | "granted"; paymentId: string; settlementTx?: string; settledAt?: string }>;

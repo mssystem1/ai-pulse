@@ -1,0 +1,28 @@
+import { useEffect, useState } from "react";
+import type { TerminalWorkspace } from "./terminalClient";
+
+const groups = [
+  { title: "Setup changes", events: ["conditions_satisfied", "watch_location_test", "watch_invalidation", "watch_invalidated", "watch_expired", "watch_target_touch", "watch_stop_touch", "watch_entry_observed"] },
+  { title: "Radar stages", events: ["radar_first_stage", "radar_second_stage", "radar_completed", "radar_failed", "radar_expired"] },
+  { title: "Position stop / targets", events: ["protection_touched", "target_touched"] },
+  { title: "Data and pass status", events: ["source_interruption", "pass_expired"] },
+];
+const defaults = groups.flatMap(group => group.events);
+export function TerminalTelegramPanel({ workspace, active, busy, onSave, onSync, onIncludeAll }: { workspace: TerminalWorkspace | null; active: boolean; busy: boolean; onSave: (enabled: boolean, events: string[]) => void; onSync: () => void; onIncludeAll: () => void }) {
+  const telegram = workspace?.telegram, [selected, setSelected] = useState<string[]>(telegram?.events.length ? telegram.events : defaults);
+  const settings = JSON.stringify(telegram?.events ?? []);
+  useEffect(() => { if (telegram) setSelected(telegram.events.length ? telegram.events : defaults); }, [settings, telegram?.enabled]);
+  const linked = Boolean(telegram?.linked && (!telegram.linkedWallet || telegram.linkedWallet.toLowerCase() === workspace?.owner.toLowerCase()));
+  const usableUrl = (value?: string | null) => { try { const url = new URL(value ?? ""); return url.protocol === "https:" && url.hostname === "t.me" ? url.href : null; } catch { return null; } };
+  const botUrl = usableUrl(telegram?.botUrl), linkUrl = usableUrl(telegram?.linkUrl) ?? botUrl;
+  const subjects = [...(workspace?.watches ?? []), ...(workspace?.radars ?? []), ...(workspace?.positions ?? [])].filter(item => !item.paused && !["completed", "expired", "invalidated", "entry_observed", "failed", "closed"].includes(String(item.state ?? item.status ?? "")));
+  const included = subjects.filter(item => item.telegram).length, enabled = Boolean(telegram?.enabled);
+  const canEnable = linked && active && !busy && selected.length > 0;
+  return <section className="terminal-panel terminal-telegram-panel" aria-labelledby="terminal-telegram-heading"><div className="terminal-section-heading"><div><h3 id="terminal-telegram-heading">Telegram alerts to your PULSE bot</h3><p>{enabled && linked ? `Notifications on · ${included} active item${included === 1 ? "" : "s"} included` : linked ? "Wallet linked · notifications paused" : "Link this wallet to your Telegram account first"}</p></div>{enabled ? <button type="button" disabled={busy || !workspace} onClick={() => onSave(false, telegram?.events ?? selected)}>Pause Telegram notifications</button> : <button type="button" className="terminal-primary" disabled={!canEnable} onClick={() => onSave(true, selected)}>Enable Telegram notifications</button>}</div>
+    {linked ? <div className="terminal-alert-help"><p><b>Linked wallet:</b> <code>{telegram?.linkedWallet ?? workspace?.owner}</code></p><p><b>Destination:</b> {botUrl ? <a href={botUrl} target="_blank" rel="noopener noreferrer">{telegram?.botUsername ? `@${telegram.botUsername}` : "PULSE Telegram bot"} ↗</a> : "Your verified PULSE Telegram chat"}. New selected events are delivered there even when the app is closed, while monitoring and your pass are active.</p></div> : <div className="terminal-alert-help"><ol><li>Open the PULSE bot below and choose <b>Link wallet</b> (or send <code>/wallet</code>).</li><li>Sign the ownership message in the browser, then return to the bot and <b>Confirm this wallet</b>. Use the same wallet shown in the PULSE header.</li><li>Return here, check the link, and enable notifications.</li></ol><p>{telegram?.nextStep ?? "Wallet ownership and confirmation in Telegram are required before delivery."}</p><div className="terminal-actions">{linkUrl ? <a className="terminal-bot-link" href={linkUrl} target="_blank" rel="noopener noreferrer">Open PULSE bot to link wallet ↗</a> : <a className="terminal-bot-link" href="/telegram">Open Telegram setup</a>}<button type="button" disabled={!workspace || busy} onClick={onSync}>Check wallet link</button></div></div>}
+    <fieldset className="terminal-notification-options" disabled={!linked || busy}><legend>Send me these changes</legend>{groups.map(group => <label className="terminal-checkbox" key={group.title}><input type="checkbox" checked={group.events.every(event => selected.includes(event))} onChange={event => setSelected(current => event.target.checked ? [...new Set([...current, ...group.events])] : current.filter(value => !group.events.includes(value)))} />{group.title}</label>)}</fieldset>
+    {enabled && <button type="button" disabled={!canEnable} onClick={() => onSave(true, selected)}>Save alert types</button>}{selected.length === 0 && <p className="terminal-warning">Choose at least one alert type to enable delivery.</p>}
+    {linked && <div className="terminal-alert-help"><p><b>{included} of {subjects.length} active items included.</b> Each setup, Radar and position has its own Telegram switch. Enable it on the items you want to follow, or include all current active items below.</p>{subjects.length > included && <button type="button" disabled={!active || busy} onClick={onIncludeAll}>Include all active watches and positions</button>}</div>}
+    <p className="terminal-hint">Pause stops Telegram delivery and cancels queued messages; monitoring continues. Alerts report new observations, never an exchange fill. Past events are not resent when you enable notifications. Delivery status appears in the timeline.</p>
+  </section>;
+}

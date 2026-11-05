@@ -19,7 +19,7 @@ import {globalHorizonContextAnnotations,globalHorizonContextLines} from "./globa
 import {globalDefaultChartLayers,globalStructuralScaleValues,globalStructuralWindow,globalMeasuredFib,globalChannelAvailability} from "./globalViewport.js";
 
 export type GlobalChartLayers = { studyScale?:"setup"|"context";allSmas?: boolean; sma?:boolean; ema?:boolean; vwapBands?:boolean; range?:boolean; volumeProfile?:boolean;footprint?:boolean; waves?:boolean; regression?: boolean; fibonacci?: boolean; vwap?: boolean; pivots?: boolean; atr?: boolean; channel?: boolean; localChannel?:boolean; channelMid?:boolean };
-export type GlobalChartOptions = { layers?: GlobalChartLayers; selectedPathId?: string | null; showScenarios?: boolean; fullHistory?: boolean; structure?: boolean; fitFibonacci?:boolean };
+export type GlobalChartOptions = { layers?: GlobalChartLayers; selectedPathId?: string | null; showScenarios?: boolean; fullHistory?: boolean; structure?: boolean; fitFibonacci?:boolean; quoteMarker?:{price:number;ts:number;kind:"current"|"snapshot"}; showQuoteMarker?:boolean; showCloseLabel?:boolean; priceBadgeAvoidYs?:number[] };
 export type GlobalChartCoordinates = { x: (ts: number) => number | null; y: (price: number) => number | null; left: number; right: number; top: number; bottom: number; historyEnd: number };
 export const escapeGlobalSvg = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&apos;" }[c]!));
 const line = (x1: number, y1: number, x2: number, y2: number, color: string, width = 1, dash = "") => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}"${dash ? ` stroke-dasharray="${dash}"` : ""}/>`;
@@ -145,6 +145,13 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     svg += `<g data-wave-label="${escapeGlobalSvg(a.id)}">` + (Math.abs(label.x-p.x)>2 || Math.abs(label.y-desiredY)>2 ? line(p.x, p.y, label.x, label.y - 5, "#a38ebd", .7) : "") + `<circle cx="${p.x}" cy="${p.y}" r="3" fill="#d0b7f7"/><rect x="${label.x-13}" y="${label.y-14}" width="26" height="20" rx="5" fill="#202036"/>` + text(label.x, label.y, a.label, "#e6d5ff", 13, "middle") + "</g>";
   }
   if (origin&&options.layers?.waves!==false) svg += text(left + 8, bottom - 8, globalWavePhase(report).recovered?(report.lang==="zh"?"C 后恢复 · 历史 ABC 候选":"POST-C RECOVERY · HISTORICAL ABC CANDIDATE"):`${report.lang === "zh" ? "候选" : "CANDIDATE"} · ${report.waveCount.activeWave}`, "#bba8d8", 10);
+  const last = report.candles.at(-1), lastY = last ? g.y(last.close) : null;
+  if(options.showCloseLabel!==false&&visible(lastY))svg+=text(historyEnd-8,lastY-7,`${report.lang==="zh"?"最后收盘":"LAST CLOSE"} ${globalPrice(report,last!.close)}`,"#d1dae8",10,"end");
+  const quote=options.quoteMarker??(report.currentMarket?.quote?{...report.currentMarket.quote,kind:"snapshot" as const}:null),quoteY=quote?g.y(quote.price):null;
+  if(options.showQuoteMarker!==false&&quote&&Number.isFinite(quote.price)&&quote.price>0&&visible(quoteY)){
+    const label=quote.kind==="current"?(report.lang==="zh"?"当前报价":"CURRENT QUOTE"):(report.lang==="zh"?"快照报价":"SNAPSHOT QUOTE");
+    svg+=`<g data-quote-kind="${quote.kind}" data-quote-price="${quote.price}" data-quote-ts="${quote.ts}">`+line(left,quoteY,right,quoteY,"#59c2ee",1,"2 5")+text(left+8,Math.max(top+12,quoteY-6),`${label} ${globalPrice(report,quote.price)}`,"#59c2ee",10)+"</g>";
+  }
   if (options.showScenarios === false) return svg;
   if(report.decisionVersion==="decision-v5")return svg+globalTradeAnnotations(report,g,options);
   const labels = report.view.levelIds.filter(id=>visibleIds.has(id)).flatMap(id => { const l = find(id), y = l ? g.y(l.price) : null; return l && visible(y) ? [{ level: l, y }] : []; }).sort((a,b)=>Number(b.level.id===plan.triggerLevelId||plan.targetIds.includes(b.level.id))-Number(a.level.id===plan.triggerLevelId||plan.targetIds.includes(a.level.id))).filter((item,i,all)=>!all.slice(0,i).some(prior=>Math.abs(prior.level.price-item.level.price)<10**-report.snapshot.pricePrecision)).sort((a, b) => a.y - b.y);
@@ -160,8 +167,6 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
     svg += line(Math.max(left,historyEnd-(historyEnd-left)*.25), y, right+7, y, color, .8).replace("/>",' stroke-opacity=".35"/>');
     if (labelY <= bottom - 3) svg += `<g data-level-id="${escapeGlobalSvg(l.id)}">${Math.abs(labelY-y)>2?line(right-10,y,right+8,labelY-2,color,.7):""}<rect x="${right + 8}" y="${labelY - 12}" width="132" height="20" rx="3" fill="${color}" fill-opacity=".12"/>` + text(right + 132, labelY + 2, globalPrice(report,l.price), color, 11,"end")+text(right+4,labelY+2,axisLabel,color,8,"end")+ "</g>";
   }
-  const last = report.candles.at(-1), lastY = last ? g.y(last.close) : null;
-  if (visible(lastY)) svg += text(historyEnd - 8, lastY - 7, `${report.lang === "zh" ? "最后收盘" : "LAST CLOSE"} ${globalPrice(report, last!.close)}`, "#d1dae8", 10, "end");
   const scenarioLabels: Array<{ y: number; value: string; color: string; size: number; dim: boolean }> = [];
   const stageRows: number[] = [];
   for (const path of visiblePaths) {
@@ -245,7 +250,8 @@ export function globalChartAnnotations(report: GlobalReport, g: GlobalChartCoord
   return svg;
 }
 
-/** Self-contained image of a saved report. No URLs, model calls or live prices. */
+/** Self-contained saved report image. The default quote is the immutable saved
+ * capture; an in-app overview may supply a separately labeled current marker. */
 export function globalReportChartSvg(report: GlobalReport, options: GlobalChartOptions = {}): string | null {
   if (report.candles.length < 2) return null;
   const pro = report.tier === "pro", width = 1300, priceBottom = 548, top = 132, left = 62, historyEnd = 818, right = 1110,layers={...globalDefaultChartLayers(report),...options.layers},entryTop=pro?774:595,entryImage=globalEntryStudySvg(report,1250,options.selectedPathId),flow=pro&&layers.footprint?globalOrderFlowStudy(report,1250):null,flowTop=entryTop+(entryImage?240:0),footerTop=flowTop+(flow?flow.height+15:0);
@@ -263,7 +269,8 @@ export function globalReportChartSvg(report: GlobalReport, options: GlobalChartO
   const candles = options.fullHistory?report.candles:report.candles.slice(options.fitFibonacci?-globalStructuralWindow(report,true):options.structure?-Math.max(180,globalSetupWindow(report)):-globalSetupWindow(report)), start = candles[0].ts, end = candles.at(-1)!.ts;
   const refs = globalSetupMap(report).view.levelIds.flatMap(id => { const p = report.levels.find(l => l.id === id)?.price; return p === undefined ? [] : [p]; });
   const plan=globalTradePlan(report),visiblePoints=(points:Array<{ts:number;value:number}>)=>points.filter(p=>p.ts>=start&&p.ts<=end);
-  const values = [...candles.flatMap(c => [c.low, c.high]), ...refs,...globalStructuralScaleValues(report,start,layers),...globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop===null?[]:[c.plan.referenceStop]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]), ...((decision.planningValid||report.decisionVersion==="decision-v5")?plan.referenceEntry??[]:[]),...((decision.planningValid||report.decisionVersion==="decision-v5")&&plan.referenceStop!==null?[plan.referenceStop]:[])];
+  const shownQuote=options.showQuoteMarker===false?null:options.quoteMarker??report.currentMarket?.quote;
+  const values = [...candles.flatMap(c => [c.low, c.high]), ...(shownQuote&&Number.isFinite(shownQuote.price)&&shownQuote.price>0?[shownQuote.price]:[]), ...refs,...globalStructuralScaleValues(report,start,layers),...globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop===null?[]:[c.plan.referenceStop]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]), ...((decision.planningValid||report.decisionVersion==="decision-v5")?plan.referenceEntry??[]:[]),...((decision.planningValid||report.decisionVersion==="decision-v5")&&plan.referenceStop!==null?[plan.referenceStop]:[])];
   const low = Math.min(...values), high = Math.max(...values), margin = Math.max(high - low, high * .01) * .1, min = Math.max(0, low - margin), max = high + margin;
   const y = (p: number) => top + (max - p) / (max - min) * (priceBottom - top), x = (ts: number) => left + (ts - start) / Math.max(1, end - start) * (historyEnd - left);
   const g = { x, y, left, right, top, bottom: priceBottom, historyEnd };

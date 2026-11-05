@@ -1,0 +1,69 @@
+/* Numbered guides use the first grid track for their section number. Articles
+   without a number must span the article, rather than occupy that 42px track. */
+.docs-product .docs-section > :only-child {
+  grid-column: 1 / -1;
+}
+
+.docs-product-layout,
+.docs-content,
+.docs-content > *,
+.docs-section > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.docs-product .docs-content :is(p, li),
+.docs-product .docs-content .docs-copy :is(p, li) {
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+.docs-product .docs-copy {
+  overflow-wrap: anywhere;
+}
+
+.docs-product .terminal-guide-tools {
+  table-layout: fixed;
+}
+
+.docs-product .terminal-guide-tools :is(th, td) {
+  overflow-wrap: anywhere;
+}
+
+/* Use the topic picker whenever the sidebar cannot fit beside the article.
+   This also prevents its search and all topic links becoming one wide row. */
+@media (max-width: 1050px) {
+  .docs-product .docs-product-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .docs-product .docs-nav {
+    display: none;
+  }
+
+  .docs-product .docs-mobile-topics {
+    display: grid;
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+
+  .docs-product .docs-mobile-topics label {
+    display: grid;
+    gap: 7px;
+    min-width: 0;
+    font-size: 14px;
+  }
+
+  .docs-product .docs-mobile-topics :is(input, select) {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px;
+    border: 1px solid var(--line2);
+    border-radius: 8px;
+    color: var(--text);
+    background: var(--card);
+    font: inherit;
+  }
+}

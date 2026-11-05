@@ -1,4 +1,4 @@
-import type {GlobalReport,GlobalAssessment} from "@pulse/schemas";
+import {GlobalScenarioSchema,type GlobalReport,type GlobalAssessment,type GlobalScenario} from "@pulse/schemas";
 import { Router, type Request } from "express";
 import { z } from "zod";
 import { erc20Abi, formatUnits } from "viem";
@@ -25,15 +25,22 @@ type Dependencies={
   settlementRate?:()=>Promise<{last:number;ts:string}>;
 };
 
-export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof buildMarketContext){
+export async function recheckSavedGlobalReport(raw:unknown,loadMarket:typeof buildMarketContext,options:{scenario?:GlobalScenario}={}){
   const original=readGlobalReport(raw);
   if(!original)throw new Error("A saved Global report is required");
   const saved=reviewGlobalTargetReport(original);
+  // A durable lifecycle can be newer than the immutable report's capture.
+  // Validate the source first, then supply that lifecycle out of band. Never
+  // insert future state into an old report before GlobalReportSchema parsing.
+  const retained=options.scenario?GlobalScenarioSchema.parse(options.scenario):null;
+  if(retained&&(!saved.scenario||retained.scenarioId!==saved.scenario.scenarioId||retained.revisionId!==saved.scenario.revisionId||JSON.stringify(retained.definition)!==JSON.stringify(saved.scenario.definition)))throw new Error("The retained lifecycle must match the saved priced scenario revision");
+  if(retained&&saved.scenario&&(retained.updatedAt<saved.scenario.updatedAt||["invalidated","expired","completed"].includes(saved.scenario.state)&&retained.state!==saved.scenario.state))throw new Error("Retained scenario progress cannot rewind or revive an ended opportunity");
   const contextFrame=saved.decisionVersion||saved.tier==="pro"?saved.context.timeframe??globalContextTimeframe(saved.snapshot.timeframe):null;
   const entryFrame=["decision-v2","decision-v3","decision-v4","decision-v5"].includes(saved.decisionVersion??"")?saved.discretionaryPlan?.executionPolicy?.eventTimeframe??saved.entryStudy?.timeframe:null;
   const load=(timeframe:string)=>loadMarket({instId:saved.snapshot.instId,timeframe,candleLimit:GLOBAL_HISTORY_LIMIT,completedOnly:true});
   const [market,context,entry]=await Promise.all([load(saved.snapshot.timeframe),contextFrame?load(contextFrame).catch(()=>null):null,entryFrame?load(entryFrame).catch(()=>null):null]);
   const fetchedAt=new Date(Math.max(...[market,context,entry].filter((m):m is NonNullable<typeof m>=>Boolean(m)).map(m=>Date.parse(m.fetchedAt)))).toISOString();
+  if(retained&&retained.updatedAt<=Date.parse(fetchedAt))saved.scenario=structuredClone(retained);
   return assessGlobalReport(saved,{...market,fetchedAt},context?{...context,fetchedAt}:context,entry?{...entry,fetchedAt}:entry);
 }
 

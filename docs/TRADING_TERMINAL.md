@@ -12,6 +12,10 @@ Trading Terminal is an independent PULSE workspace at `/trading-terminal`, with 
 
 The main website has an additional Terminal product section. Portfolio provides an entry to the owner's Terminal records while keeping unverified journal values outside verified Spot/Autopilot performance. The in-app handbook is `/docs#docs-trading-terminal`.
 
+Quick market choices are BTC, ETH, HYPE, SOL, DOGE, BNB, Zcash (ZEC) and OKB. Custom input retains the exact quoted Spot pair; unsupported pairs are not replaced with another asset. An independent timestamped ticker updates the current-price line across timeframe changes. Each timeframe's last completed close stays separately labelled. Ticker updates preserve chart inspection and never rewrite saved setup prices or report exports.
+
+To record a position, enter its market, direction, entry price and size. Choose coins, position value **at entry**, or initial futures margin and leverage; the journal converts these to base-asset quantity once. Stop-loss and individual target fields are optional, as are an earlier UTC opening time and exchange name. The default opening time is pinned when the form opens, and a lost-response retry reuses the same request identity and time.
+
 ## Distinct market functions
 
 | Function | Input | Result |
@@ -42,6 +46,10 @@ Published opportunities are bound to a durable owner-scoped scenario ledger. Ref
 ## Data and Tapeout boundaries
 
 Measurements come from explicitly identified exchange sources. Profiles/footprints use executed data only within their actual coverage; bounded current tape is partial when the requested historical window is larger. Candle-based anchored studies are distinguished from trade-based value. Spot/perpetual quantities are not silently merged. OI units and funding kind/time are explicit. A current order-book snapshot is not a retained sequenced heatmap. Missing data stays unavailable or unknown rather than becoming zero.
+
+Market tools show the actual execution count and covered duration before a profile, aligned price/CVD plot or footprint. “Recent executions” describes a bounded sample, not a full UTC session. The profile's quoted price is the quote retained at that evidence capture; Refresh evidence updates those views together. The chart's independent current ticker is labelled separately. Closely spaced POC/VAL/VAH prices can be correct for a short, narrow capture. Label spacing and display precision improve readability without manufacturing wider levels.
+
+Create Radar from a value-area edge or a saved chart level, then review its ordered stages, confirmation speed, first eligible candle close and expiry. Each stage requires a distinct new completed candle; the already-running candle is excluded. A macro daily sequence can require more than three days. The interface warns when paid access ends before the earliest completion. A reclaim detector's first stage means a new candle traded beyond the boundary; it does not establish liquidation, absorption or a crossing from inside on that candle. Starting the same reviewed Radar again after a lost response retains its original detector and expiry.
 
 Radar uses a registered Tapeout component from X Layer, retaining processor/circuit identity, pinned block/code/netlist provenance and verified evaluation semantics. Source-derived price comparisons feed the causal event layer; the chain component does not prove exchange-feed truth or predict outcomes. Dependency failure blocks supported Radar evaluation instead of silently substituting an unrelated local-only demonstration. Private position and strategy data are not published on-chain.
 
@@ -80,6 +88,10 @@ Use the existing long-lived worker with `AUTOMATION_WORKER_ENABLED=1`, or the au
 
 Telegram requires the owner's existing verified chat link, enabled Telegram support and explicit event preferences. An outbox records delivery attempts and acknowledgements; uncertain sends are not blindly repeated. Unlink/pause/expiry changes must be reflected before further authorized sends. An alert requests review; a stop/target touch is not evidence of a filled exit.
 
+In Alerts & activity, open the displayed PULSE bot, choose Link wallet (or `/wallet`), sign ownership in the browser and confirm the same wallet in the bot. Return to the app, check the link, select alert groups and enable notifications. Each setup, Radar and position also has an explicit Telegram switch; “Include all active watches and positions” opts in the current active items. Pause cancels queued messages while monitoring continues; enabling again does not resend historic events. The timeline shows the affected item, source time, delivery status and a link to inspect it.
+
+Watch source reports remain immutable. Evolving lifecycle state travels separately under definition/revision validation, preserving entry/stop/target prices and deadlines. Data-needed events expose safe source-specific reasons, including missing saved evidence, revised candles, incomplete history and unavailable quotes, so a user can distinguish a refreshable outage from a plan that needs a new review.
+
 After access expiry, journal/history can be read within retention, while monitoring and paid AI access show their stopped state. Expiry never closes an actual position or cancels an exchange order. A user-reported stop remains unverified unless an execution source confirms protection; current implementation does not invent exchange imports.
 
 ## Validation and release
@@ -89,3 +101,5 @@ Run the new feature paths with `FEATURE_TRADING_TERMINAL=1`, `NODE_ENV=test` and
 This task implements local application behavior. Deployment, public circuit publication, marketplace submission and live wallet transactions remain separate operator actions. Tests do not certify real-device wallet acceptance, complete retained historical depth or trading profitability.
 
 The [4 November acceptance record](TRADING_TERMINAL_ACCEPTANCE_2026-11-04.md) documents the approved 1.50 USDC Base purchase, final API/browser checks, five-timeframe audit and remaining validation limits.
+
+The [5 November usability and data audit](TRADING_TERMINAL_USER_ISSUE_AUDIT_2026-11-05.md) records the ten user-reported defects, their corrections, public-source observations and scoped API/browser evidence.

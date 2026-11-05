@@ -4,6 +4,13 @@ import type {GlobalChartCoordinates} from "./globalChart.js";
 const esc=(x:unknown)=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
 const when=(ts:number)=>new Date(ts).toISOString().slice(0,16).replace("T"," ");
 const amount=(n:number)=>n.toLocaleString("en-US",{maximumFractionDigits:4});
+/** Profile levels describe this captured execution window, not the primary
+ * candle horizon on which they happen to be displayed. */
+export function globalOrderFlowCoverageLabel(report:GlobalReport){
+  const profile=report.orderFlow?.profile;if(!profile)return "";
+  const at=(ts:number)=>new Date(ts).toISOString().slice(0,19).replace("T"," ");
+  return `${report.lang==="zh"?"成交样本":"Execution sample"} · ${profile.trades.toLocaleString("en-US")} ${report.lang==="zh"?"笔成交":"trades"} · ${at(profile.start)} → ${at(profile.end)} UTC`;
+}
 export function globalOrderFlowLines(report:GlobalReport){
   const f=report.orderFlow;if(!f)return [];
   const p=f.profile,zh=report.lang==="zh",price=(v:number)=>v.toLocaleString(zh?"zh-CN":"en-US",{maximumFractionDigits:report.snapshot.pricePrecision}),unit=f.quantityUnit==="base"?report.snapshot.instId.split("-")[0]:zh?"合约":"contracts";
@@ -23,17 +30,19 @@ export function globalOrderFlowAnnotations(report:GlobalReport,g:GlobalChartCoor
   const startBar=report.candles.find(c=>c.ts<=p.start&&(candleCloseTime(c.ts,report.snapshot.timeframe)??c.ts)>p.start)??report.candles.find(c=>c.ts>=p.start);
   const sourceX=startBar?g.x(startBar.ts):null,lastX=report.candles.length?g.x(report.candles.at(-1)!.ts):null;
   if(sourceX!==null&&sourceX>g.historyEnd+1||!startBar&&lastX!==null&&lastX>g.historyEnd+1)return "";
-  const from=Math.max(g.left,Math.min(g.historyEnd,sourceX??edge-width)),labelLeft=Math.max(g.left,Math.min(from,edge-width));
-  let svg=`<g data-order-flow-profile="executed_trades" data-profile-start="${p.start}" data-profile-end="${p.end}" data-profile-known-at="${p.knownAt}" data-profile-location="${startBar?"source_window":"recent_context"}">`;
+  const from=Math.max(g.left,Math.min(g.historyEnd,sourceX??edge-width)),labelLeft=Math.max(g.left,Math.min(from,edge-width)-110);
+  let svg=`<g data-order-flow-profile="executed_trades" data-profile-start="${p.start}" data-profile-end="${p.end}" data-profile-trades="${p.trades}" data-profile-known-at="${p.knownAt}" data-profile-location="${startBar?"source_window":"recent_context"}">`;
+  const caption=globalOrderFlowCoverageLabel(report),captionWidth=Math.min(Math.max(120,g.historyEnd-g.left-12),caption.length*5.2+16);
+  svg+=`<g data-profile-coverage-caption="true"><rect x="${g.left+5}" y="${g.top+29}" width="${captionWidth}" height="19" rx="3" fill="#142034" fill-opacity=".85"/><text x="${g.left+10}" y="${g.top+42}" fill="#a8b4c6" font-size="9">${esc(caption)}</text></g>`;
   for(const r of p.rows){const top=g.y(r.high),bottom=g.y(r.low);if(top===null||bottom===null)continue;const y=Math.max(g.top,top),end=Math.min(g.bottom,bottom);if(end<=y)continue;
     const sell=width*r.sell/max,buy=width*r.buy/max;
     svg+=`<g data-profile-row="${r.low}" data-buy="${r.buy}" data-sell="${r.sell}"><rect x="${edge-sell-buy}" y="${y}" width="${sell}" height="${end-y}" fill="#ed819a" fill-opacity=".3"/><rect x="${edge-buy}" y="${y}" width="${buy}" height="${end-y}" fill="#53dabb" fill-opacity=".3"/></g>`;
   }
   const labels=([["POC",p.poc,"#f0c77a"],["VAL",p.val,"#66b8cb"],["VAH",p.vah,"#66b8cb"]] as const).flatMap(([name,value,color])=>{const y=g.y(value);return y!==null&&y>=g.top&&y<=g.bottom?[{name,value,color,y,labelY:y-4}]:[];}).sort((a,b)=>a.y-b.y);
-  labels.forEach((l,i)=>l.labelY=Math.max(g.top+11,l.labelY,i?labels[i-1].labelY+12:g.top+11));
+  labels.forEach((l,i)=>l.labelY=Math.max(g.top+11,l.labelY,i?labels[i-1].labelY+16:g.top+11));
   const overflow=Math.max(0,(labels.at(-1)?.labelY??0)-(g.bottom-3));
   for(const {name,value,color,y,labelY:at} of labels){const labelY=at-overflow;
-    svg+=`<g data-profile-level="${name}" data-price="${value}"><line x1="${from}" x2="${g.historyEnd}" y1="${y}" y2="${y}" stroke="${color}" stroke-width="${name==="POC"?1.2:.8}" stroke-dasharray="${name==="POC"?"7 4":"2 5"}"/><path d="M ${from+2} ${y} L ${labelLeft+20} ${labelY-3}" stroke="${color}" stroke-width=".6" fill="none"/><text x="${labelLeft+23}" y="${labelY}" fill="${color}" font-size="9">${name} ${value}</text></g>`;
+    svg+=`<g data-profile-level="${name}" data-price="${value}" data-label-y="${labelY}"><line x1="${from}" x2="${g.historyEnd}" y1="${y}" y2="${y}" stroke="${color}" stroke-width="${name==="POC"?1.2:.8}" stroke-dasharray="${name==="POC"?"7 4":"2 5"}"/><path d="M ${from+2} ${y} L ${labelLeft+102} ${labelY-3}" stroke="${color}" stroke-width=".6" fill="none"/><rect x="${labelLeft+19}" y="${labelY-11}" width="86" height="14" rx="3" fill="#142034" fill-opacity=".88"/><text x="${labelLeft+23}" y="${labelY}" fill="${color}" font-size="9">${name} ${value}</text></g>`;
   }
   return svg+"</g>";
 }

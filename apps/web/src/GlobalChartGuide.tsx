@@ -4,7 +4,7 @@ import "./globalReport.css";
 
 const illustrationVersion="20261028";
 const captureVersion="20261027";
-const guideVersion="20261101";
+const guideVersion="20261105";
 type ExampleFrame="15m"|"1H"|"4H"|"1Dutc"|"1Wutc";
 export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
   const tr=(en:string,zh:string)=>lang==="zh"?zh:en,appearance=useGlobalChartAppearance();
@@ -42,7 +42,7 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
   ];
   const selected=frames.find(row=>row.id===frame)!;
   return <div className="global-chart-reading" data-no-localize data-global-guide-version={guideVersion}>
-    <p className="global-guide-updated">{tr("Updated 1 November 2026 · Execution policies, scenario state and chart controls","更新于2026年11月1日 · 入场规则、计划状态与图表控件")}</p>
+    <p className="global-guide-updated">{tr("Updated 5 November 2026 · Quote references, source windows, execution policies and chart controls","更新于2026年11月5日 · 报价参考、来源窗口、入场规则与图表控件")}</p>
     <h2>{tr("Use the Global chart","使用Global图表")}</h2>
     <p>{tr("Use this panel to inspect a saved market setup, compare its timeframes and export what you have selected. View and indicator controls change the presentation; they do not generate another analysis.","此面板用于检查已保存市场计划、比较周期并导出所选内容。视图及指标控件调整展示方式，不会生成另一份分析。")}</p>
     <ol className="global-guide-steps">
@@ -62,6 +62,9 @@ export function GlobalChartGuide({lang="en"}:{lang?:"en"|"zh"}){
     <div className="global-guide-controls"><table><thead><tr><th>{tr("Study","指标")}</th><th>{tr("What to read","阅读重点")}</th></tr></thead><tbody>{indicators.map(([name,meaning])=><tr key={name}><td><strong>{name}</strong></td><td>{meaning}</td></tr>)}</tbody></table></div>
 
     <h3>{tr("Read the primary, entry and context frames together","结合主周期、入场周期与背景周期")}</h3>
+    <p>{tr("In Terminal, Current quote is a separate market reading shared across an asset’s timeframes. Last completed close belongs to the selected candle timeframe and can differ. When a fresh quote is unavailable, the chart explicitly labels the saved Snapshot quote. PNG exports retain the saved report’s quote; a changing market price does not rewrite its Entry, SL or TP.","在终端中，当前报价是资产各周期共享的独立市场读数，最后完整收盘属于所选 K 线周期，两者可以不同。缺少新报价时，图表明确显示已保存的快照报价。PNG 保留报告保存的报价；行情变化不会改写入场、止损或目标。")}</p>
+    <p>{tr("An enabled study has a solid filled button and a checkmark. Automatic price scale includes the highs and lows of all visible candles. Manual price and time zoom remain in place until you choose a view-fitting control such as Reset view or Full history.","已启用指标使用实色按钮和勾号。自动价格比例包含所有可见 K 线的最高和最低价。手动价格与时间缩放保持不变，直到使用重置视图或全部历史等调整视图操作。")}</p>
+    <p>{tr("Profile POC, VAL and VAH refer to the execution sample printed beside them, including its exact time window and trade count. A few minutes of recent trades remain a few minutes when displayed on a weekly chart. Close prices are not spread apart to make the labels look different; labels move while the actual level prices stay fixed.","分布的 POC、VAL 和 VAH 对应旁边标明的成交样本、准确时间窗口和成交笔数。几分钟近期成交即使显示在周线图上，也仍是几分钟样本。不会为了让标签看起来不同而拉开价格；只移动标签，实际价位保持固定。")}</p>
     <p>{tr("The Primary chart describes the selected horizon. Entry study shows a lower timeframe for the stated reaction. Context shows a higher timeframe and its agreement with the setup. Their candles, indicator anchors and protection distances belong to their own timeframes. Panel availability depends on saved coverage; missing entry or context candles are shown as unavailable.","主图描述所选周期；入场研究用更小周期检查指定反应；背景图展示更高周期及其与计划的关系。各自K线、指标锚点与保护距离属于各自周期。面板是否可用取决于已保存数据覆盖；缺少入场或背景K线时会注明不可用。")}</p>
     <div className="global-guide-controls"><table><thead><tr><th>{tr("Primary chart","主图")}</th><th>{tr("Reading","阅读重点")}</th><th>{tr("Entry study","入场研究")}</th><th>{tr("Context","背景")}</th></tr></thead><tbody>{frames.map(row=><tr key={row.id}><td>{row.label}</td><td>{row.reading}</td><td>{row.entry}</td><td>{row.context}</td></tr>)}</tbody></table></div>
     <p>{tr("Candle coordinates and source times use UTC. The moving clock shows current local time; it does not refresh a saved report. A completed weekly close can be older than the quote captured with the report or the lower-timeframe candles.","K线坐标及来源时间使用UTC；走动时钟显示当前本地时间，不会刷新已保存报告。完整周线收盘可能早于报告捕获的报价或小周期K线。")}</p>
