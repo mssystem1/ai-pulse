@@ -2,6 +2,14 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { buildCdpDiscoveryContract } from "./cdpMiddleware.js";
 import { getNetwork } from "@pulse/config";
+import { getX402OutputSchema } from "./inputContracts.js";
+
+test("Terminal pass discovery describes owner-authenticated access, not a report or vault", () => {
+  const contract = buildCdpDiscoveryContract("/v1/terminal/pass/24h");
+  assert.deepEqual(contract.inputSchema.required, ["requestId"]);
+  assert.equal("vault" in contract.inputSchema.properties, false); assert.equal("instId" in contract.inputSchema.properties, false);
+  const schema = getX402OutputSchema("/base/v1/terminal/pass/24h"); assert.equal(schema?.output?.delivery, "wallet_terminal_pass"); assert.equal(schema?.output?.status, 201);
+});
 
 test("publishes the actual Risk Guard body contract to Bazaar", () => {
   const contract = buildCdpDiscoveryContract("/v1/preflight");

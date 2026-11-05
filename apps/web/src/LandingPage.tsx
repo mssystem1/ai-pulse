@@ -4,6 +4,7 @@ import { applyAppearance, readAppearance, type AppearanceId } from "./appearance
 import { applicationLink } from "./siteRouting";
 import { PublicActivityBreakdown, ResearchCount, usePublicActivity } from "./PublicActivity";
 import { WEB_NETWORKS } from "./networks";
+import { TerminalLandingSection } from "./TerminalProductInfo";
 import "./landing.css";
 
 function PulseMark() {
@@ -101,6 +102,8 @@ export default function LandingPage() {
         <div className="landing-research-services">{research.map((item, index) => <article key={item.route}><p className="landing-kicker">{item.code}</p><ResearchIllustration service={index}/><h3>{item.title}</h3><p>{item.text}</p><ul>{item.points.map(point => <li key={point}>{point}</li>)}</ul><ResearchCount service={(["global", "prediction", "risk"] as const)[index]} data={activity.data} loading={activity.loading}/><a className="landing-text-link" href={link(item.route)}>Open {item.label} <span aria-hidden>↗</span></a></article>)}</div>
       </div></section>
 
+      <TerminalLandingSection href={link("/trading-terminal")} guideHref={`${link("/docs")}#docs-trading-terminal`} />
+
       <section className="landing-width landing-section landing-control">
         <div className="landing-section-heading"><p className="landing-kicker">BUILT AROUND YOUR CONTROL</p><h2>Autonomy needs<br/><span>clear boundaries.</span></h2><p>See what is allowed, what happened, and what needs your attention.</p><a className="landing-text-link" href={link("/docs")}>Understand the safeguards <span aria-hidden>↗</span></a></div>
         <figure className="landing-control-account"><figcaption>ILLUSTRATED CONTROLS · NOT A LIVE ACCOUNT</figcaption><div className="landing-account-title"><PulseMark/><div><small>OWNER-AUTHORIZED</small><h3>Your Autopilot account</h3></div></div><dl><div><dt>Capital</dt><dd>Only what you approve</dd></div><div><dt>Risk policy</dt><dd>Your signed limits</dd></div><div><dt>AI Entry Pass</dt><dd>Prepaid. No auto-renewal.</dd></div></dl><div className="landing-account-controls"><span>Pause trading<small>Hold remaining pass time</small></span><span>Withdraw funds<small>Owner authorization</small></span></div><p>Follow decisions → confirmed fills → transaction records.<br/>Missing evidence stays visible.</p></figure>
@@ -111,6 +114,7 @@ export default function LandingPage() {
       <section className="landing-width landing-section landing-faq"><div><p className="landing-kicker">BEFORE YOU BEGIN</p><h2>A few things<br/><span>worth knowing.</span></h2></div><div>{[
         ["Is Spot trading autonomous?","No. You review and approve Spot orders in your wallet. Autopilot is the separate autonomous-trading workflow, activated under your approved strategy and limits."],
         ["Do I need to buy research before trading?","No. Spot supports direct pair selection. Global reports can help prepare a trade, but are optional. Autopilot is configured independently and uses its own AI Entry Pass."],
+        ["What is Trading Terminal?","A separate workspace for market tools, ordered market-event detection, setup monitoring and a private position journal. Choose a Terminal pass in the app. Global reports and Autopilot Entry Passes remain separate purchases."],
         ["What does PULSE cost?","Global and Prediction Quick reports cost $0.20; Pro reports cost $0.30. Risk Guard costs $0.20. Autopilot Entry Passes are $1.50 for 24 hours, $10.50 for 7 days or $45 for 30 days. Network gas and execution costs are separate. Review the quoted payment before signing."],
         ["What happens when an Entry Pass ends?","Expiry or exhausted AI confirmations blocks new AI entries. Authorized deterministic protection can continue on an unpaused account. Manually pausing the vault stops strategy trading and freezes remaining paid time."],
         ["Which networks can I use?","PULSE integrates X Layer, Base, Arbitrum, Robinhood and Arc mainnets. Arc uses USDC for gas and trading, with Circle Gateway USDC for research payments. Robinhood uses USDG for settlement and ETH for gas. Each feature checks verified contracts, live routes and market data before execution; selecting a network does not guarantee every market or feature is available."],

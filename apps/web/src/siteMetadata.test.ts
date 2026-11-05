@@ -9,4 +9,5 @@ test("canonical metadata separates public and app contexts without exposing toke
   assert.deepEqual(siteMetadata("https://www.ai-pulse.tech/overview?token=private#secret","app"),{title:"Portfolio · PULSE",canonical:"https://app.ai-pulse.tech/portfolio",robots:"noindex,follow"});
   assert.equal(siteMetadata("https://www.ai-pulse.tech/shared-report#share=secret","shared").robots,"noindex,nofollow");
   assert.equal(siteMetadata("https://app.ai-pulse.tech/docs#docs-auto","app").canonical,"https://app.ai-pulse.tech/docs");
+  assert.deepEqual(siteMetadata("https://app.ai-pulse.tech/trading-terminal?token=private#positions","app"),{title:"Trading Terminal · PULSE",canonical:"https://app.ai-pulse.tech/trading-terminal",robots:"noindex,follow"});
 });

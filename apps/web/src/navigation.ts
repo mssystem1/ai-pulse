@@ -1,7 +1,8 @@
-export type PulseTab = "overview" | "analyze" | "prediction" | "spot" | "autopilot" | "telegram" | "docs" | "safety";
+export type PulseTab = "overview" | "terminal" | "analyze" | "prediction" | "spot" | "autopilot" | "telegram" | "docs" | "safety";
 
 const PATH_BY_TAB: Record<PulseTab, string> = {
   overview: "/portfolio",
+  terminal: "/trading-terminal",
   analyze: "/global",
   prediction: "/prediction",
   safety: "/safety",
@@ -17,6 +18,7 @@ const TAB_BY_PATH = Object.fromEntries(
 
 const LEGACY_SERVICE: Record<string, PulseTab> = {
   overview: "overview",
+  terminal: "terminal",
   global: "analyze",
   prediction: "prediction",
   reports: "overview",

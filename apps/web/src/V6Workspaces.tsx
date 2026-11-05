@@ -1,5 +1,6 @@
 import { TelegramGuide } from './TelegramGuide';
 import { GlobalChartGuide } from "./GlobalChartGuide";
+import { TradingTerminalGuide } from "./TradingTerminalGuide";
 import { GlobalSpotReview } from "./GlobalSpotReview";
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
@@ -7492,6 +7493,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
   const sections = [
     ["docs-workflows", "Workflow maps"],
     ["docs-start", "Quick start"],
+    ["docs-trading-terminal", lang === "zh" ? "交易终端" : "Trading Terminal"],
     ["docs-global", "Global reports"],
     ["docs-global-chart", lang === "zh" ? "阅读图表与指标" : "Chart & indicator guide"],
     ["docs-catalog", "Assets & routes"],
@@ -7740,6 +7742,7 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
             </div>
           </section>
 
+          <section id="docs-trading-terminal" className="docs-section" hidden={article !== "docs-trading-terminal"}>{article==="docs-trading-terminal"&&<TradingTerminalGuide lang={lang}/>}</section>
           <section id="docs-global-chart" className="docs-section" hidden={article !== "docs-global-chart"}><GlobalChartGuide lang={lang}/></section>
           <section id="docs-global-flow" className="docs-deep-dive" hidden={article !== "docs-global-flow"}>
             <div className="docs-deep-head">

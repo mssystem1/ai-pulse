@@ -18,6 +18,21 @@ Copy-Item .env.local.example .env
 
 Do not copy either template over an existing populated `.env` without first preserving its credentials. Bulk-wallet, treasury-funding, and review automation variables are intentionally kept in `.env.wallets`, `.env.scripts`, and the script-specific examples; they are not application deployment settings.
 
+## Trading Terminal activation and pricing
+
+Trading Terminal has its own API flag and prepaid passes, independent of Global reports and Autopilot:
+
+```env
+FEATURE_TRADING_TERMINAL=1
+PRICE_TERMINAL_PASS_24H=1.50
+PRICE_TERMINAL_PASS_7D=10.50
+PRICE_TERMINAL_PASS_30D=45.00
+```
+
+`FEATURE_TRADING_TERMINAL` defaults to `0` in code; the local templates enable it for full feature tests, while the production template keeps it off until rollout. It is distinct from the older `FEATURE_TERMINAL_TRADING` execution flag. All three prices accept exact USDT/USDC amounts from `0.000001` through `100000`, with at most six decimal places; a positive value below one payment unit is rejected. The API catalog supplies prices to the main website, app guide and checkout; the browser checks the reviewed amount again before requesting a signature. No browser price environment variable is required.
+
+Terminal requires durable Redis/KV state for paid access. Its current settlement routes support enabled X Layer, Base and Arbitrum; Arc/Robinhood Terminal purchases remain unavailable. Background monitoring uses the existing worker or authenticated automation tick. See [Trading Terminal](TRADING_TERMINAL.md) for capacity, AI allowance, retention, monitoring interval and Telegram configuration.
+
 ## Local ports and Reown domains
 
 The normal development commands run two processes:

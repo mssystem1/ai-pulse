@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SavedResearchDialog } from "./SavedResearchDialog";
+import { TerminalPortfolioCard } from "./TradingTerminalWorkspace";
 import { ReportHistory } from "./ReportHistory";
 import { reportTierLabel } from "./reportLabels";
 import "./portfolio.css";
@@ -130,7 +131,7 @@ const COPY: Record<Lang, Copy> = {
   en: {
     eyebrow: "PORTFOLIO · ACTIVITY · RESEARCH",
     title: "Your PULSE portfolio",
-    lead: "Spot orders, autonomous strategies and saved research—separate views of your activity on the selected network.",
+    lead: "Spot orders, autonomous strategies, Terminal positions and saved research—separate views of your activity.",
     refresh: "Refresh portfolio",
     refreshing: "Refreshing…",
     openOrders: "Open Spot orders",
@@ -196,7 +197,7 @@ const COPY: Record<Lang, Copy> = {
   zh: {
     eyebrow: "资产 · 活动 · 研究",
     title: "你的 PULSE 资产总览",
-    lead: "先查看当前网络、钱包、报告、现货活动和 Autopilot 运行状态，再选择下一步。",
+    lead: "现货订单、Autopilot 策略、终端持仓与已保存研究，分别展示你的活动。",
     refresh: "刷新概览",
     refreshing: "正在刷新…",
     openOrders: "未结束的现货订单",
@@ -344,6 +345,7 @@ export function OverviewWorkspace({
   lang,
   onNavigate,
   onRefreshBalances,
+  onNeedWallet,
 }: {
   networkKey: WebNetworkKey;
   wallet: string | null;
@@ -351,6 +353,7 @@ export function OverviewWorkspace({
   lang: Lang;
   onNavigate: (tab: PulseTab) => void;
   onRefreshBalances: () => Promise<void>;
+  onNeedWallet?: () => void;
 }) {
   const copy = COPY[lang];
   const network = WEB_NETWORKS[networkKey];
@@ -494,6 +497,8 @@ export function OverviewWorkspace({
           </div>
         </section>
       </div>}
+
+      <TerminalPortfolioCard networkKey={networkKey} wallet={wallet} lang={lang} onNavigate={onNavigate} onNeedWallet={onNeedWallet} />
 
       {wallet && alerts.length > 0 && <aside className="card overview-attention has-alerts">
           <span className="eyebrow">{copy.statusEyebrow}</span>

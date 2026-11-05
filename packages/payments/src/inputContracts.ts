@@ -310,6 +310,9 @@ for (const path of ["/v1/autopilot/pass/24h", "/v1/autopilot/pass/7d", "/v1/auto
     fields: autopilotStartFields,
   };
 }
+for (const path of ["/v1/terminal/pass/24h", "/v1/terminal/pass/7d", "/v1/terminal/pass/30d"]) {
+  routeInputs[path] = { message: "Authenticate the Terminal owner, review the separate pass price, and retain one stable purchase ID across payment/recovery. This does not purchase a report or place a trade.", requiredArgs: ["requestId"], fields: [{ name: "requestId", carrier: "body", type: "string", required: true, pattern: "^[a-zA-Z0-9_-]{16,128}$", description: "Stable owner-generated purchase ID. Keep the same ID for recovery; the authenticated paying wallet is inferred from its session and verified authorization." }] };
+}
 
 const predictionFields: X402InputField[] = [
   { name: "primaryMarketId", carrier: "body", type: "string", required: true, description: "Explicit Polymarket market or pm:condition ID." },
@@ -376,12 +379,13 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
     "/v1/analysis/divergence", "/v1/preflight/event-risk",
   ].includes(path);
   const autopilotStart = path.startsWith("/v1/autopilot/pass/");
+  const terminalPass = path.startsWith("/v1/terminal/pass/");
   return {
     method: "POST",
     input: Object.fromEntries(
       definition.fields.map(({ name, ...field }) => [name, field]),
     ),
-    ...(asynchronous ? { output: {
+    ...(terminalPass ? { output: { status: 201, delivery: "wallet_terminal_pass", fields: { grant: { type: "object", description: "Durable owner-bound access grant with original accepted terms." }, access: { type: "object", description: "Wallet-wide wall-clock access and expiry." }, recovered: { type: "boolean", description: "Existing receipt recovered without a new charge." } }, recoveryPath: "/v1/terminal/pass/recover" } } : asynchronous ? { output: {
       status: 202,
       delivery: "durable_job",
       fields: {

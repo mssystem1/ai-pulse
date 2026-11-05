@@ -23,6 +23,11 @@ export function globalExecutionInstructions(report: GlobalReport): string | null
   const price = (value: number) => value.toLocaleString(zh ? "zh-CN" : "en-US", { maximumFractionDigits: report.snapshot.pricePrecision });
   const deadline = globalScenarioEntryDeadline(report) ?? policy.expiresAt;
   const setupExpiry = report.scenario?.expiresAt ?? policy.expiresAt;
+  if (report.scenario?.state === "entry_observed") {
+    return zh
+      ? "已观察到价格进入本计划的入场区域，但这不代表实际成交或持仓。本次已观察机会不能再次作为新入场使用；保留所示价格用于复核。若确有成交，请单独记录实际价格、数量和保护措施；没有成交时，应等待有独立依据的新机会。"
+      : "Price reached this setup's entry area; that observation does not establish an actual fill or position. This already-observed opportunity cannot be reused as a new entry. Its displayed prices remain for review. If you actually traded, record the fill price, quantity and protection separately; otherwise wait for a separate opportunity with its own evidence.";
+  }
   if (report.scenario && ["invalidated", "expired", "completed"].includes(report.scenario.state)) {
     return zh
       ? `本次已定价机会已${report.scenario.state === "expired" ? "到期" : report.scenario.state === "invalidated" ? "失效" : "结束"}，不能作为新入场。保留所示价格用于复核；新机会必须有独立依据。价格路径观察不代表实际成交或盈亏。`

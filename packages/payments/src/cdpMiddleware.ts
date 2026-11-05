@@ -8,6 +8,10 @@ import { createCdpAuthHeaders } from "./cdpAuth.js";
 import { canonicalPaymentResource, inlineSettlement } from "./inlineSettlement.js";
 
 export function buildCdpDiscoveryContract(path: string, networkKey: "base" | "arbitrum" = "base") {
+  if (path.startsWith("/v1/terminal/pass/")) return {
+    input: { requestId: "owner-generated-purchase-request-id" },
+    inputSchema: { properties: { requestId: { type: "string", minLength: 16, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$", description: "Stable owner-scoped purchase ID retained for receipt recovery. A Terminal wallet-ownership bearer session is also required." } }, required: ["requestId"] },
+  };
   const riskGuard = path === "/v1/preflight";
   const autopilotStart = path.startsWith("/v1/autopilot/pass/");
   const prediction = path.includes("prediction") || path.includes("event-risk");
@@ -95,10 +99,11 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
     if (!middleware) {
       const { input, inputSchema } = buildCdpDiscoveryContract(req.path, key);
       const autopilotStart = req.path.startsWith("/v1/autopilot/pass/");
+      const terminalPass = req.path.startsWith("/v1/terminal/pass/");
       const riskGuard = req.path === "/v1/preflight";
       const extensions = cfg.BAZAAR_DISCOVERABLE ? declareDiscoveryExtension({
         input, inputSchema, bodyType: "json",
-        output: { example: autopilotStart
+        output: { example: terminalPass ? { grant: { requestId: "owner-generated-purchase-request-id", duration: "24h", expiresAt: "ISO-8601 timestamp" }, access: { active: true, expiresAt: "ISO-8601 timestamp" }, recovered: false } : autopilotStart
           ? { aiPass: { vault: "owner-controlled-vault", status: "active", expiresAt: "ISO-8601 timestamp" }, behavior: { newEntries: "AI-assisted while runtime is active" } }
           : riskGuard ? { reportMarkdown: "Full token due-diligence report", history: { jobId: "opaque-job-id", recoveryToken: "opaque-recovery-token" } }
           : { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id", reportUrl: "/v1/jobs/opaque-job-id/report", delivery: { status: "processing", authHeader: "PULSE-RECOVERY-TOKEN", paymentRequired: false } } },
@@ -106,7 +111,7 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
       middleware = paymentMiddleware({
         [`${req.method.toUpperCase()} ${req.path}`]: {
           resource: canonicalPaymentResource(cfg, key, req.path),
-          accepts: [{ scheme: "exact", price: `$${route.priceUsd.toFixed(2)}`, network, payTo: cfg.PAY_TO_ADDRESS }],
+          accepts: [{ scheme: "exact", price: `$${req.path.startsWith("/v1/terminal/pass/") ? route.priceUsd.toFixed(6) : route.priceUsd.toFixed(2)}`, network, payTo: cfg.PAY_TO_ADDRESS }],
           description: route.description, mimeType: "application/json",
           ...(extensions ? { extensions } : {}),
         },

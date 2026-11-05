@@ -15,6 +15,7 @@ test("Launch app shares only the allowlisted theme, not the source URL's secrets
   assert.equal(link,"https://app.ai-pulse.tech/portfolio?pulseTheme=base");
   assert.equal(applicationLink("https://www.ai-pulse.tech/?token=secret#private","/portfolio","robinhood"),"https://app.ai-pulse.tech/portfolio?pulseTheme=robinhood");
   assert.equal(applicationLink("http://localhost:5178/landing","/spot","xlayer"),"http://localhost:5178/spot?pulseTheme=xlayer");
+  assert.equal(applicationLink("https://www.ai-pulse.tech/?token=secret#private","/trading-terminal","base"),"https://app.ai-pulse.tech/trading-terminal?pulseTheme=base");
   assert.throws(()=>applicationLink("https://www.ai-pulse.tech/","//evil.test","base"));
   assert.throws(()=>applicationLink("https://www.ai-pulse.tech/","/portfolio","base","javascript:alert(1)"));
 });

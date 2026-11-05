@@ -5,6 +5,7 @@ import {globalContextRelation,globalContextRequired} from "./globalContext.js";
 import {globalStructuralWindow} from "./globalViewport.js";
 import {globalDiscretionaryCard} from "./globalDiscretionaryPlan.js";
 import {globalSetupStrategyProfile} from "./globalSetupStrategies.js";
+import {globalScenarioEntryDeadline} from "./globalExecutionInstructions.js";
 
 export function globalArtifactReference(report:GlobalReport):string {
   return fnv1a(JSON.stringify([report.snapshot,report.tradePlan,report.levels,...(report.discretionaryPlan?[report.discretionaryPlan]:[]),...(report.horizonContext?[report.horizonContext,report.indicators.vwap,report.indicators.ema]:[]),...(report.orderFlow?[report.orderFlow]:[])])).toString(16).padStart(8,"0");
@@ -46,6 +47,18 @@ export function globalSetupMap(report:GlobalReport):GlobalReport {
 
 export type GlobalEligibility = "no_trade"|"invalidated"|"expired"|"waiting_confirmation"|"waiting_retest"|"technical_valid";
 export function globalEligibility(report:GlobalReport):GlobalEligibility {
+  const scenario=report.scenario,policy=report.discretionaryPlan?.executionPolicy;
+  if(scenario&&policy){
+    if(scenario.state==="invalidated")return "invalidated";
+    if(scenario.state==="expired")return "expired";
+    // Observed price paths do not create another entry opportunity or prove
+    // execution permission. Keep the legacy enum for existing API consumers.
+    if(scenario.state==="completed"||scenario.state==="entry_observed")return "no_trade";
+    const deadline=globalScenarioEntryDeadline(report),asOf=Date.parse(report.snapshot.observedAt);
+    if(deadline!==null&&Number.isFinite(asOf)&&asOf>deadline)return "expired";
+    if(policy.mode==="passive_limit")return "waiting_retest"; // bounded location/quote review, not candle confirmation
+    return scenario.state==="awaiting_event"?"waiting_confirmation":"waiting_retest";
+  }
   const p=globalTradePlan(report);
   if(p.side==="none"||p.blockers.some(b=>["reward","history","levels"].includes(b)))return "no_trade";
   if(p.blockers.includes("cancelled"))return "invalidated";

@@ -4,15 +4,18 @@
 
 <h1 align="center">PULSE</h1>
 
-<p align="center"><strong>Market intelligence. Wallet-approved Spot orders. Autonomous Autopilot trading.</strong></p>
+<p align="center"><strong>Market intelligence. Trading Terminal. Wallet-approved Spot orders. Autonomous Autopilot trading.</strong></p>
 
 PULSE combines live OKX Global Market evidence—including crypto, xStocks, and RWA instruments—with explicitly selected Polymarket data. Arc uses the same OKX research logic, with reviewed BTC → cirBTC and ETH → WETH execution mappings; its wider token index belongs to Token Risk Guard. A valid Global report can prefill a wallet-signed Market or Limit Spot ticket, including optional TP/SL. Guarded Autopilot starts separately through its own pair, strategy, capital/risk, owner-vault and duration workflow; it never requires or reuses a paid report as its live signal. Reports are private, recoverable across devices through wallet proof, and paid per request through network-aware x402 settlement on X Layer, Base, Arbitrum One, Arc Mainnet and Robinhood Chain. Execution availability depends on each network's release gates.
 
 PULSE is an independent intelligence product. Polymarket is a public read-only evidence source; PULSE does not place Polymarket orders or bypass Polymarket trading restrictions.
 
+**Trading Terminal** is a separate wallet-owned workspace for market tools, Tapeout-powered Market Radar, saved setup monitoring and a position journal. It is the tab immediately after Portfolio; the existing header and other navigation remain intact. Terminal uses its own time-limited pass, with no Global report bundle or required report purchase. See the [Terminal guide and operational boundaries](docs/TRADING_TERMINAL.md).
+
 ## Contents
 
 - [Product and experience](#the-product)
+- [Trading Terminal](#trading-terminal)
 - [Networks, services and payments](#networks-and-payments)
 - [System architecture](#system-architecture)
 - [End-to-end workflows](#end-to-end-workflows)
@@ -29,7 +32,21 @@ PULSE is an independent intelligence product. Polymarket is a public read-only e
 
 ### Public website and application
 
-The public landing introduces Global Market, Prediction Market, Risk Guard, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Both public and app interfaces support five independent appearances: Pulse, Clarity, Midnight, Horizon and Dawn (ink black/electric lime). Dawn preserves the existing `robinhood` preference ID. Appearance never changes the selected network or overwrites an existing saved choice.
+The public landing introduces Global Market, Prediction Market, Risk Guard, Trading Terminal, wallet-approved Spot and autonomous Autopilot. The canonical application home is `app.ai-pulse.tech/portfolio`; `/overview` remains compatible. Trading Terminal opens at `/trading-terminal`; Portfolio links its separate position/watch workspace without merging journal values into verified Spot or Autopilot P&L. Both public and app interfaces support five independent appearances: Pulse, Clarity, Midnight, Horizon and Dawn (ink black/electric lime). Dawn preserves the existing `robinhood` preference ID. Appearance never changes the selected network or overwrites an existing saved choice.
+
+### Trading Terminal
+
+Terminal has three views: **Market**, **My positions**, and **Alerts & activity**, with contextual AI questions. Its Market view keeps one asset/timeframe selection and the existing Pro chart renderer. **Market tools** provide source-labelled value, executed flow, footprint, derivative positioning and book evidence. **Market Radar** evaluates ordered reclaim/acceptance/failure sequences using a real registered X Layer Tapeout component. **Follow setup** monitors an eligible saved plan using its existing strategy admission policy; it cannot revive an expired, invalidated or already completed opportunity. Measurements, detections, setup eligibility and actual executions remain separate.
+
+Access is feature-gated by **`FEATURE_TRADING_TERMINAL=1`**. This is distinct from the older `FEATURE_TERMINAL_TRADING` execution flag. Standalone Terminal pass defaults are **24h 1.50**, **7d 10.50**, and **30d 45.00 USDT/USDC**, independently adjustable with `PRICE_TERMINAL_PASS_24H`, `PRICE_TERMINAL_PASS_7D` and `PRICE_TERMINAL_PASS_30D`. The browser/main page read the server catalog; checkout binds the reviewed price before signing. Terminal passes do not grant Autopilot access or include a Global report. Supported payment networks and configured capacity limits are disclosed by the catalog.
+
+Private state uses wallet-signature authentication and durable owner-scoped storage. Paid access can be recovered without a second charge. Manual position fills and recorded protection remain user-reported; chart touches never create verified fills. Telegram notifications require an existing linked owner chat and explicit event opt-in. Background monitoring uses the authenticated worker/tick path and stops when access expires; this does not close trades or cancel exchange protection. Journal/history remain readable within the configured retention period.
+
+Current source coverage is explicit. A bounded current trade sample is not a complete weekly/monthly profile, a book snapshot is not a historical heatmap, and unknown flow cannot confirm an entry. The independent native calculations do not redistribute third-party indicator scripts or publish confidential strategy recipes. Local implementation/tests do not establish production activation, exchange-import support, trading performance or hackathon acceptance. The [app guide](https://app.ai-pulse.tech/docs#docs-trading-terminal) explains trader workflows; the [repository guide](docs/TRADING_TERMINAL.md) covers setup, configuration and validation boundaries.
+
+The [4 November Terminal acceptance record](docs/TRADING_TERMINAL_ACCEPTANCE_2026-11-04.md) records the single approved 1.50 USDC Base payment, connected API/browser validation and current five-timeframe setup audit, including payoff limitations.
+
+Terminal and Portfolio show remaining paid access with a live server-anchored countdown for 24h, 7d and 30d passes. Refreshes preserve the recorded expiry and renewals extend the continuous access period. The [workflow follow-up and countdown validation](docs/TRADING_TERMINAL_WORKFLOW_ACCEPTANCE_2026-11-05.md) covers pinned setup/tool reviews, chart navigation, journal retries and monitoring races.
 
 Local previews: `/landing` for the public site and `/portfolio` for the application. Root cutover is gated by `VITE_PUBLIC_LANDING_ENABLED`; the owner configures domains and deploys manually. See [public/app rollout and report recovery](docs/PUBLIC_APP_ROLLOUT.md).
 

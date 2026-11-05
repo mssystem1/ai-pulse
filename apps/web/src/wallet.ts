@@ -1,3 +1,5 @@
+import { parseTerminalPlans, terminalUsdAtomic } from "./terminalPricing";
+
 const X_LAYER_ID = 196;
 const X_LAYER_HEX = "0xc4"; // 196
 const WALLET_DISCONNECTED_KEY = "pulse.wallet.disconnected";
@@ -110,6 +112,18 @@ async function publishedAmount(input: RequestInfo | URL): Promise<string> {
   const base = typeof window === "undefined" ? "http://localhost" : window.location.href;
   const requestUrl = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, base);
   const origin = requestUrl.origin;
+  const terminalPass = /^\/v1\/terminal\/pass\/(24h|7d|30d)$/.exec(canonicalPaidPath(input));
+  if (terminalPass) {
+    // Fetch fresh terms for each purchase. A previous report-price catalog is
+    // deliberately not an authority for this separately priced product.
+    const response = await fetch(`${origin}/v1/terminal/catalog`, { headers: { Accept: "application/json" }, cache: "no-store", signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) throw new Error("Could not verify the current Terminal pass price");
+    const body = await response.json() as { enabled?: boolean; available?: boolean; plans?: unknown };
+    if (!body.enabled || !body.available) throw new Error("Trading Terminal purchases are currently unavailable");
+    const plan = parseTerminalPlans(body.plans).find(item => item.duration === terminalPass[1]);
+    if (!plan) throw new Error("The selected Terminal pass has no valid published price");
+    return terminalUsdAtomic(plan.priceUsd);
+  }
   if (!publishedPrices.has(origin)) publishedPrices.set(origin, fetch(`${origin}/v1/meta`, { headers: { Accept: "application/json" } }).then(async (response) => {
     if (!response.ok) throw new Error(`Could not verify published PULSE prices (${response.status})`);
     const body = await response.json() as { routes?: Array<{ route?: string; priceUsd?: number }> };
@@ -271,7 +285,14 @@ export async function selectWalletNetwork(key: import("./networks").WebNetworkKe
 /**
  * Browser x402 pay: user signs EIP-3009 auth with their wallet; no server private key.
  */
-export async function createWalletPaidFetch(userAddress: string, networkKey: import("./networks").WebNetworkKey = "xlayer"): Promise<typeof fetch> {
+export async function createWalletPaidFetch(userAddress: string, networkKey: import("./networks").WebNetworkKey = "xlayer", options?: { approvedAmounts?: Readonly<Record<string, string>> }): Promise<typeof fetch> {
+  const reviewedAmount = async (input: RequestInfo | URL) => {
+    const path = canonicalPaidPath(input), amount = await publishedAmount(input);
+    const approved = options?.approvedAmounts?.[path];
+    if (path.startsWith("/v1/terminal/pass/") && (!approved || approved !== amount)) throw new Error("The Terminal price changed or has not been reviewed. Review the current pass price before paying.");
+    if (approved && approved !== amount) throw new Error("The service price changed. Review its current price before paying.");
+    return amount;
+  };
   const provider = getInjectedProvider();
   if (!provider) throw new Error("Wallet not connected");
 
@@ -330,7 +351,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
         sign: async (first, request) => {
           const body = await first.clone().json().catch(() => ({}));
           const required = http.getPaymentRequiredResponse(name => first.headers.get(name), body);
-          validatePaymentChallenge(required as PaymentRequiredLike, request, networkKey, selected, await publishedAmount(request));
+          validatePaymentChallenge(required as PaymentRequiredLike, request, networkKey, selected, await reviewedAmount(request));
           return http.encodePaymentSignatureHeader(await http.createPaymentPayload(required));
         },
       });
@@ -340,7 +361,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       if (first.status !== 402) return first;
       const body = await first.clone().json().catch(() => ({}));
       const required = http.getPaymentRequiredResponse((name) => first.headers.get(name), body);
-      validatePaymentChallenge(required as PaymentRequiredLike, input, networkKey, selected, await publishedAmount(input));
+      validatePaymentChallenge(required as PaymentRequiredLike, input, networkKey, selected, await reviewedAmount(input));
       const payload = await http.createPaymentPayload(required);
       const headers = new Headers(init?.headers);
       Object.entries(http.encodePaymentSignatureHeader(payload)).forEach(([name, value]) => headers.set(name, value));
@@ -362,7 +383,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       try { required = JSON.parse(atob(header.replace(/-/g, "+").replace(/_/g, "/"))) as PaymentRequiredLike; }
       catch { throw new Error("Malformed PAYMENT-REQUIRED header"); }
     }
-    validatePaymentChallenge(required, input, networkKey, selected, await publishedAmount(input));
+    validatePaymentChallenge(required, input, networkKey, selected, await reviewedAmount(input));
     return paidFetch(input, init);
   }) as typeof fetch;
 }

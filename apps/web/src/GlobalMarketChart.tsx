@@ -29,14 +29,14 @@ function ContextChart({ report }: { report: GlobalReport }) {
   return <div className="global-context"><strong>{globalFrameReference(report.context.timeframe??"—")} {globalLabel("context", report.lang)}</strong>{report.context.candles.length>=2 ? <><div ref={ref} style={{ height: 112 }} /><small>{report.context.sma55.length?`SMA55 ${globalPrice(report,report.context.sma55.at(-1)?.value)}`:`${report.context.candles.length} ${report.lang==="zh"?"根完整 K 线":"completed candles"}`} · {agreement}</small></> : <p>{globalLabel("unavailable", report.lang)}</p>}</div>;
 }
 
-export function GlobalMarketChart({ report, selectedPathId, access }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess }) {
+export function GlobalMarketChart({ report, selectedPathId, access, viewportIdentity }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess; viewportIdentity?:string }) {
   const appearance=useGlobalChartAppearance(),paint=(color:string)=>globalChartColor(color,appearance);
   const options={...chartOptions,layout:{...chartOptions.layout,fontSize:appearance==="light"?13:11,fontFamily:'Inter, "Segoe UI", sans-serif',background:{type:ColorType.Solid,color:appearance==="light"?"#f8fbff":"#0d1420"},textColor:globalChartColor("#8d9cb3",appearance,"text")},grid:{...chartOptions.grid,horzLines:{...chartOptions.grid.horzLines,color:appearance==="light"?"#cbd5e4":"#263142"}}};
   // Parsing a saved report can return a fresh object on each parent refresh.
   // Recreate series only when chart evidence changes, not narrative or identity.
   const evidenceKey=useMemo(()=>JSON.stringify({...report,narrative:undefined}),[report]);
   const chartReport=useMemo(()=>report,[evidenceKey]);
-  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;price:{from:number;to:number}|null;autoScale:boolean}|null>(null);
+  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;price:{from:number;to:number}|null;autoScale:boolean;anchor?:{ts:number;index:number}}|null>(null);
   const ref = useRef<HTMLDivElement>(null), reset = useRef<() => void>(() => {}),focus = useRef<() => void>(() => {}),history = useRef<() => void>(() => {}),fitFib=useRef<()=>void>(()=>{});
   const [chartView,setChartView]=useState<"setup"|"structure"|"history"|"fibonacci">("setup");
   const pro = report.tier === "pro", [layers, setLayers] = useState<GlobalChartLayers>(()=>globalDefaultChartLayers(report));
@@ -49,7 +49,7 @@ export function GlobalMarketChart({ report, selectedPathId, access }: { report: 
   useEffect(() => {
     const report=chartReport;
     if (!ref.current || report.candles.length < 2) return;
-    const viewportKey=JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.snapshot.observedAt,report.tier]);
+    const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.snapshot.observedAt,report.tier]);
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
     const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: pro ? 660 : 540, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
     const plan=globalTradePlan(report),qualified=report.decisionVersion==="decision-v5"||globalDecision(report).planningValid,values = [...(report.decisionVersion==="decision-v5"?globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop?[c.plan.referenceStop]:[]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]):[]),...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(qualified?plan.referenceEntry??[]:[]),...(qualified&&plan.referenceStop!==null?[plan.referenceStop]:[])];
@@ -95,14 +95,25 @@ export function GlobalMarketChart({ report, selectedPathId, access }: { report: 
     fitFib.current=()=>showWindow(globalStructuralWindow(report,true));
     focus.current=()=>showWindow(Math.max(180,globalSetupWindow(report)));
     chart.subscribeCrosshairMove(event => { const candle = event.seriesData.get(candles); if (candle && "open" in candle) setReadout(`O ${globalPrice(report, candle.open)}  H ${globalPrice(report, candle.high)}  L ${globalPrice(report, candle.low)}  C ${globalPrice(report, candle.close)}`); });
-    let frame = 0, prior = "", firstFrame=true;
+    let frame = 0, prior = "", firstFrame=true, hiddenSincePaint=false;
     let previousWidth = chart.chartElement().clientWidth, previousRange = chart.timeScale().getVisibleLogicalRange();
     const render = () => {
       const width = chart.chartElement().clientWidth, height = chart.panes()[0]?.getHeight() ?? 0;
+      // Terminal keeps this pane mounted while another tab is shown. A hidden
+      // zero-width ResizeObserver pass must not overwrite the user's viewport.
+      if(width<=0||height<=0){hiddenSincePaint=true;frame=requestAnimationFrame(render);return;}
+      if(hiddenSincePaint&&!firstFrame&&previousRange){
+        chart.timeScale().setVisibleLogicalRange(previousRange);
+        const saved=viewport.current;if(saved?.key===viewportKey&&!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
+        previousWidth=width;
+      }
+      hiddenSincePaint=false;
       if(firstFrame&&width>0){
         const saved=viewport.current;
         if(saved?.key===viewportKey&&saved.logical){
-          chart.timeScale().setVisibleLogicalRange(saved.logical);
+          const anchorIndex=viewportIdentity&&saved.anchor?data.findIndex(c=>c.ts===saved.anchor!.ts):-1;
+          const shift=anchorIndex>=0?anchorIndex-saved.anchor!.index:0;
+          chart.timeScale().setVisibleLogicalRange({from:saved.logical.from+shift,to:saved.logical.to+shift});
           if(!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
         }else resetView();
         firstFrame=false;previousWidth=width;previousRange=chart.timeScale().getVisibleLogicalRange();
@@ -112,7 +123,8 @@ export function GlobalMarketChart({ report, selectedPathId, access }: { report: 
       if(width > 0 && width !== previousWidth && previousRange) chart.timeScale().setVisibleLogicalRange(previousRange);
       previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange();
       const scale=chart.priceScale("right"),priceRange=scale.getVisibleRange();
-      viewport.current={key:viewportKey,logical:previousRange,price:priceRange,autoScale:scale.options().autoScale};
+      const anchorIndex=Math.max(0,Math.min(data.length-1,Math.floor(previousRange?.from??0)));
+      viewport.current={key:viewportKey,logical:previousRange,price:priceRange,autoScale:scale.options().autoScale,anchor:{ts:data[anchorIndex].ts,index:anchorIndex}};
       if(ref.current){
         ref.current.dataset.viewportFrom=String(previousRange?.from??"");ref.current.dataset.viewportTo=String(previousRange?.to??"");
         ref.current.dataset.priceFrom=String(priceRange?.from??"");ref.current.dataset.priceTo=String(priceRange?.to??"");ref.current.dataset.priceAutoscale=String(scale.options().autoScale);
@@ -129,7 +141,7 @@ export function GlobalMarketChart({ report, selectedPathId, access }: { report: 
       frame = requestAnimationFrame(render);
     }; frame = requestAnimationFrame(render);
     return () => { cancelAnimationFrame(frame); chart.remove(); reset.current = () => {};focus.current=()=>{};history.current=()=>{};updateLayers.current=()=>{}; };
-  }, [chartReport, pro,appearance]);
+  }, [chartReport, pro,appearance,viewportIdentity]);
   useEffect(()=>{updateLayers.current(layers);},[layers]);
   if (report.candles.length < 2) return <p>{globalLabel("chartUnavailable", report.lang)}</p>;
   const flowStudy=pro&&layers.footprint?globalOrderFlowStudy(report,660):null;

@@ -26,7 +26,7 @@ test("automation tick fails closed and runs each enabled worker only with the cr
   const previousKvToken = process.env.KV_REST_API_TOKEN;
   process.env.AUTOMATION_WORKER_ENABLED = "1";
   const calls: string[] = [];
-  const cfg = { ...loadConfig(), CRON_SECRET: "test-cron-secret", FEATURE_TELEGRAM: true };
+  const cfg = { ...loadConfig(), CRON_SECRET: "test-cron-secret", FEATURE_TELEGRAM: true, FEATURE_TRADING_TERMINAL: true };
   delete process.env.KV_REST_API_URL;
   delete process.env.KV_REST_API_TOKEN;
   const app = express();
@@ -34,6 +34,7 @@ test("automation tick fails closed and runs each enabled worker only with the cr
     trade: async () => { calls.push("spot"); },
     autopilot: async () => { calls.push("autopilot"); },
     telegram: async () => { calls.push("telegram"); },
+    terminal: async () => { calls.push("terminal"); return { skipped: true }; },
   }));
   const { server, origin } = await serve(app);
   try {
@@ -45,10 +46,10 @@ test("automation tick fails closed and runs each enabled worker only with the cr
       headers: { Authorization: "Bearer test-cron-secret" },
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(calls.sort(), ["autopilot", "spot", "telegram"]);
+    assert.deepEqual(calls.sort(), ["autopilot", "spot", "telegram", "terminal"]);
     const body = await response.json() as { ok?: boolean; results?: unknown[] };
     assert.equal(body.ok, true);
-    assert.equal(body.results?.length, 3);
+    assert.equal(body.results?.length, 4);
   } finally {
     if (previousQueue === undefined) delete process.env.QUEUE_PROVIDER; else process.env.QUEUE_PROVIDER = previousQueue;
     if (previousStorage === undefined) delete process.env.STORAGE_PROVIDER; else process.env.STORAGE_PROVIDER = previousStorage;

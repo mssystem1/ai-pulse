@@ -40,6 +40,7 @@ import { RouteAvailability } from "./RouteAvailability";
 import { beginLatestRequest, isLatestRequest, supersedeRequests } from "./latestRequest";
 import { hrefForTab, tabFromHref, type PulseTab } from "./navigation";
 import { OverviewWorkspace } from "./OverviewWorkspace";
+import { TradingTerminalWorkspace } from "./TradingTerminalWorkspace";
 import { buildTelegramReportBuyIntent } from "./reportTradeHandoff";
 import {
   clearWalletDisconnected,
@@ -823,6 +824,7 @@ export function App() {
               : { title: lang === "zh" ? "风险卫士" : "Risk Guard", lead: lang === "zh" ? `在 ${network.label} 上查看免费原始证据，或生成由多来源证据支持的 Grok 代币风险报告，再决定是否签名。` : `View free raw evidence or generate a multi-source Grok Token Risk report on ${network.label} before deciding whether to sign.` };
   const navigationTabs: Array<{ id: Tab; label: string; hint: string }> = [
     { id: "overview", label: lang === "zh" ? "资产总览" : "Portfolio", hint: lang === "zh" ? "钱包和活动摘要" : "Positions, activity and saved research" },
+    { id: "terminal", label: lang === "zh" ? "交易终端" : "Trading Terminal", hint: lang === "zh" ? "行情工具、形态雷达和持仓跟踪" : "Market tools, Radar and position tracking" },
     { id: "analyze", label: lang === "zh" ? "全球市场" : "Global Market", hint: lang === "zh" ? "研究和报告" : "Research and reports" },
     { id: "prediction", label: lang === "zh" ? "预测市场" : "Prediction Market", hint: lang === "zh" ? "证据和概率" : "Evidence and probabilities" },
     { id: "safety", label: lang === "zh" ? "风险卫士" : "Risk Guard", hint: lang === "zh" ? "签名前检查" : "Inspect before signing" },
@@ -977,7 +979,8 @@ export function App() {
         <p className="hint">{d.nfa}</p>
       </section>}
 
-      {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} />
+      {tab === "overview" ? <OverviewWorkspace networkKey={networkKey} wallet={wallet} health={health} lang={lang} onNavigate={navigateTo} onRefreshBalances={refreshBalances} onNeedWallet={() => setWalletOpen(true)} />
+        : tab === "terminal" ? <TradingTerminalWorkspace networkKey={networkKey} wallet={telegramWalletMatches ? wallet : null} lang={lang} onNavigate={navigateTo} onNeedWallet={() => setWalletOpen(true)} />
         : tab === "spot" ? <SpotWorkspace networkKey={networkKey} wallet={telegramWalletMatches ? wallet : null} lang={lang} initialPair={tradeIntent?.pair || spotPairDraft || instId} initialTrade={tradeIntent} onPairSelected={(pair) => { setTradeIntent(null); setSpotPairDraft(pair); }} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "autopilot" ? <AutopilotWorkspace networkKey={networkKey} wallet={telegramWalletMatches ? wallet : null} lang={lang} onAnalyzeCandidate={selectCandidateForAnalysis} />
         : tab === "telegram" ? <TelegramWorkspace />

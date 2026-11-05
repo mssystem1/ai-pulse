@@ -7,6 +7,7 @@ import {globalContextLine,globalContextRelation,globalContextRequired,globalPrim
 import {globalFrameReference} from "./globalContext.js";
 import {globalSetupLanguage} from "./globalSetupLanguage.js";
 import {globalRangeSummary} from "./globalRange.js";
+import {globalScenarioEntryDeadline} from "./globalExecutionInstructions.js";
 
 export type GlobalDecision = ReturnType<typeof globalDecision>;
 /** Human decisions are derived from evidence, never from a provider headline.
@@ -50,7 +51,13 @@ export function globalDecision(report:GlobalReport) {
   const language=globalSetupLanguage(report,p,qualified);
   const conditions=[language.entryInstruction,...(contextBlocks?[contextLine]:[]),...(p.blockers.includes("entry_price")&&!p.blockers.includes("reward")?[zh?"入场证据的最后收盘不在有依据入场区间；报价须回到同一区间。":"The entry-study close is outside the supported entry zone; a quote must be inside that same zone."]:[]),report.decisionVersion==="decision-v5"?(zh?"按实际入场确认、SL、TP1 与新报价费用复核订单。":"Before order review, verify the entry signal, SL, TP1 and current quote costs."):(zh?"复核实际保护、首目标和金额对应的新报价后，再复核订单。":"Review observed protection, the first objective and an amount-specific fresh quote before order review.")];
   const d=report.discretionaryPlan,nextSetup=d?{pathId:"priced-setup",trigger:d.entry,watchArea:[d.priceZones?.entry.lower??d.entry,d.priceZones?.entry.upper??d.entry] as [number,number],planningStop:d.stop,targets:d.targets.map((t,i)=>({id:`priced-setup-tp${i+1}`,price:globalTargetReference(report,i)!,source:t.basis,timeframe:t.timeframe,anchorTs:t.anchorTs,knownAt:t.knownAt}))}:{pathId:p.pathId,trigger,watchArea:p.referenceEntry,planningStop:p.referenceStop,targets};
-  return {...language,marketView,currentAction,reason:language.entryInstruction,side,nextSetup,nextCondition:language.entryInstruction,checklist:conditions,changeView,route,relationship,contextRelation:relation,contextLine,previousAttempts:history,rewardLine,qualified,risk:globalRiskMeasurement(report),hierarchy:globalHierarchyLines(report),snapshotAt:report.snapshot.observedAt,retestDeadline:timing?.retestDeadline??null,expiresAt:p.method?.startsWith("structure-")?p.signalExpiresAt??null:timing?.expiresAt??null};
+  const canonicalPolicy=d?.executionPolicy,entryDeadline=canonicalPolicy?globalScenarioEntryDeadline(report):null;
+  const relationshipText=canonicalPolicy?.mode==="passive_limit"&&relation!=="opposing"
+    ? zh?"按各周期独立评估；本计划使用限定区域内的被动限价规则，不额外要求收盘确认。":"Each horizon is assessed separately. This plan uses its saved bounded passive-limit policy; a later confirmation candle is not an extra requirement."
+    :relationship;
+  const expiresAt=report.scenario?.expiresAt??canonicalPolicy?.expiresAt??(p.method?.startsWith("structure-")?p.signalExpiresAt??null:timing?.expiresAt??null);
+  const retestDeadline=canonicalPolicy?(canonicalPolicy.mode==="confirmed_retest"?entryDeadline:null):timing?.retestDeadline??null;
+  return {...language,marketView,currentAction,reason:language.entryInstruction,side,nextSetup,nextCondition:language.entryInstruction,checklist:conditions,changeView,route,relationship:relationshipText,contextRelation:relation,contextLine,previousAttempts:history,rewardLine,qualified,risk:globalRiskMeasurement(report),hierarchy:globalHierarchyLines(report),snapshotAt:report.snapshot.observedAt,retestDeadline,entryDeadline,expiresAt,entryPolicyStatus:report.scenario?.state??null};
 }
 export function globalDecisionTitle(report:GlobalReport):string {return globalDecision(report).heading;}
 export function globalDecisionLines(report:GlobalReport):string[] {const d=globalDecision(report),zh=report.lang==="zh";return [globalDecisionTitle(report),`${zh?"市场观点":"Market view"}: ${d.marketView}`,d.route,d.nextCondition,...(d.rewardLine&&d.direction!=="BUY / SELL"?[d.rewardLine]:[]),...(d.contextRelation==="unavailable"&&!globalContextRequired(report)?[]:[d.contextLine,d.relationship]),d.changeView].filter(Boolean);}

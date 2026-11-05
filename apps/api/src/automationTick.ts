@@ -5,17 +5,20 @@ import { runTradeAutomationCycle } from "./tradeAutomation.js";
 import { runAutopilotCycle } from "./autopilotAutomation.js";
 import { runTelegramDeliveryCycle } from "./telegram.js";
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
+import { runTerminalCycle } from "./terminalRuntime.js";
 
 export type AutomationTickDependencies = {
   trade: typeof runTradeAutomationCycle;
   autopilot: typeof runAutopilotCycle;
   telegram: typeof runTelegramDeliveryCycle;
+  terminal: typeof runTerminalCycle;
 };
 
 const defaults: AutomationTickDependencies = {
   trade: runTradeAutomationCycle,
   autopilot: runAutopilotCycle,
   telegram: runTelegramDeliveryCycle,
+  terminal: runTerminalCycle,
 };
 
 let localTickRunning = false;
@@ -96,6 +99,7 @@ export function createAutomationTickRouter(
         ["autopilot", Promise.resolve().then(() => workers.autopilot(cfg))],
       ];
       if (cfg.FEATURE_TELEGRAM) tasks.push(["telegram", Promise.resolve().then(() => workers.telegram())]);
+      if (cfg.FEATURE_TRADING_TERMINAL) tasks.push(["terminal", Promise.resolve().then(() => workers.terminal(cfg))]);
       const settled = await Promise.allSettled(tasks.map(([, task]) => task));
       const results = settled.map((result, index) => ({
         worker: tasks[index]![0],

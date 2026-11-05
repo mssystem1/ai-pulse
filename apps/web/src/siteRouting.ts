@@ -17,7 +17,7 @@ export function applicationLink(href: string, path: string, theme: string, confi
   const preview = ["localhost", "127.0.0.1", "[::1]"].includes(current.hostname) || current.hostname.endsWith(".vercel.app");
   const origin = preview ? current.origin : configuredOrigin || "https://app.ai-pulse.tech";
   const url = new URL(path, origin);
-  if (!/^\/(portfolio|global|prediction|safety|spot|autopilot|docs|telegram)$/.test(path)) throw new Error("Unsupported application destination");
+  if (!/^\/(portfolio|trading-terminal|global|prediction|safety|spot|autopilot|docs|telegram)$/.test(path)) throw new Error("Unsupported application destination");
   if (!["https:", ...(preview ? ["http:"] : [])].includes(url.protocol) || url.username || url.password) throw new Error("Invalid application origin");
   if (isAppearance(theme)) url.searchParams.set("pulseTheme", theme);
   return url.href;

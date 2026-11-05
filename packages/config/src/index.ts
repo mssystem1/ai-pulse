@@ -119,6 +119,15 @@ const EnvSchema = z.object({
   PRICE_AUTOPILOT_PASS_24H: z.coerce.number().positive().default(1.50),
   PRICE_AUTOPILOT_PASS_7D: z.coerce.number().positive().default(10.50),
   PRICE_AUTOPILOT_PASS_30D: z.coerce.number().positive().default(45.00),
+  PRICE_TERMINAL_PASS_24H: z.coerce.number().min(0.000001).max(100000).refine(v => Number.isSafeInteger(Math.round(v * 1e6)) && Math.abs(v * 1e6 - Math.round(v * 1e6)) < 1e-6, "Use at most six decimal places").default(1.50),
+  PRICE_TERMINAL_PASS_7D: z.coerce.number().min(0.000001).max(100000).refine(v => Math.abs(v * 1e6 - Math.round(v * 1e6)) < 1e-6, "Use at most six decimal places").default(10.50),
+  PRICE_TERMINAL_PASS_30D: z.coerce.number().min(0.000001).max(100000).refine(v => Math.abs(v * 1e6 - Math.round(v * 1e6)) < 1e-6, "Use at most six decimal places").default(45.00),
+  TERMINAL_MAX_WATCHES: z.coerce.number().int().min(1).max(200).default(20),
+  TERMINAL_MAX_RADARS: z.coerce.number().int().min(1).max(200).default(20),
+  TERMINAL_MAX_POSITIONS: z.coerce.number().int().min(1).max(500).default(50),
+  TERMINAL_AI_QUESTIONS_PER_DAY: z.coerce.number().int().min(0).max(1000).default(20),
+  TERMINAL_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(180),
+  TERMINAL_MONITOR_INTERVAL_MS: z.coerce.number().int().min(15000).max(3600000).default(60000),
   PRODUCT_LOGO_URL: z.string().optional().default(""),
   PRODUCT_CATEGORY: z.string().optional().default("Trading"),
   PRODUCT_NAME: z.string().optional().default("PULSE"),
@@ -154,6 +163,7 @@ const EnvSchema = z.object({
   FEATURE_TERMINAL_TRADING: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
   FEATURE_COPILOT: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
   FEATURE_AUTOPILOT: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
+  FEATURE_TRADING_TERMINAL: z.string().optional().default("0").transform((v) => v === "1" || v === "true"),
   AUTOPILOT_KILL_SWITCH: z.string().optional().default("0").transform((v) => v === "1" || v === "true"),
   FEATURE_HYPERLIQUID: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
   FEATURE_HIP3_GLOBAL_MARKETS: z.string().optional().default("1").transform((v) => v === "1" || v === "true"),
@@ -466,6 +476,11 @@ export function loadConfig(): AppConfig {
   if (!parsed.FEATURE_FUSED_ANALYSIS) {
     delete routes["POST /v1/analysis/fused/standard"];
     delete routes["POST /v1/analysis/fused/premium"];
+  }
+  if (parsed.FEATURE_TRADING_TERMINAL) {
+    for (const [duration, priceUsd] of [["24h", parsed.PRICE_TERMINAL_PASS_24H], ["7d", parsed.PRICE_TERMINAL_PASS_7D], ["30d", parsed.PRICE_TERMINAL_PASS_30D]] as const) {
+      routes[`POST /v1/terminal/pass/${duration}`] = { name: `Trading Terminal · ${duration}`, priceUsd, description: `Standalone Trading Terminal access for ${duration}. Market tools, Market Radar, setup monitoring and a private position journal. Reports and Autopilot passes are separate.` };
+    }
   }
   if (!parsed.FEATURE_DIVERGENCE_ANALYSIS) delete routes["POST /v1/analysis/divergence"];
   if (!parsed.FEATURE_EVENT_RISK_ANALYSIS) delete routes["POST /v1/preflight/event-risk"];

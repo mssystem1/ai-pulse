@@ -62,7 +62,7 @@ export function createOkxPaymentMiddleware(cfg: AppConfig): RequestHandler {
           scheme: "exact",
           network,
           payTo: cfg.PAY_TO_ADDRESS,
-          price: priceLabel(info.priceUsd),
+          price: routeKey.includes("/v1/terminal/pass/") ? `$${info.priceUsd.toFixed(6)}` : priceLabel(info.priceUsd),
           // Explicit decimals keep OKX.AI validation warning-free for X Layer
           // USD₮0, which is not yet in the task validator's USDT/USDG aliases.
           extra: { decimals: 6, symbol: "USDT0" },

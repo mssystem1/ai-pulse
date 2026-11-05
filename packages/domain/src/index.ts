@@ -40,3 +40,4 @@ export * from "./globalPriceZones.js";
 export * from "./globalExecutionInstructions.js";
 
 export * from "./globalStrategyMixLines.js";
+export * from "./terminal.js";

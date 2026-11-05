@@ -145,6 +145,34 @@ describe("owner-scoped Global scenario storage", () => {
     const store = createGlobalScenarioStore({ QUEUE_PROVIDER: "memory", KV_REST_API_URL: "", KV_REST_API_TOKEN: "", REPORT_RETENTION_DAYS: 180, PERSISTENCE_NAMESPACE: "pulse:test" });
     assert.equal((await store.advance(scope, definition(), [], BORN)).snapshot.observationOnly, true);
   });
+  it("optionally replays late price observations in causal order without changing the original contract", async () => {
+    const d = definition(), store = globalScenarioStore(new MemoryGlobalScenarioStorage(), { replayLatePriceEvents: true });
+    const before = await store.advance(scope, d, [event("acceptance", 10)], BORN + 10 * MIN);
+    const after = await store.advance(scope, d, [event("entry_touch", 5), event("target_touch", 15, "tp1")], BORN + 15 * MIN);
+    assert.equal(before.snapshot.lastEventAt, BORN + 10 * MIN);
+    assert.equal(after.snapshot.entryObservedAt, BORN + 5 * MIN); assert.equal(after.snapshot.outcome?.kind, "target_observed");
+    assert.equal(after.snapshot.outcome?.at, BORN + 15 * MIN); assert.deepEqual(after.snapshot.definition, before.snapshot.definition);
+    assert.equal(after.snapshot.startedAt, BORN); assert.equal(after.snapshot.expiresAt, d.expiresAt);
+    const ordinary = globalScenarioStore(new MemoryGlobalScenarioStorage());
+    await ordinary.advance(scope, d, [event("acceptance", 10)], BORN + 10 * MIN);
+    const unchanged = await ordinary.advance(scope, d, [event("entry_touch", 5)], BORN + 15 * MIN);
+    assert.equal(unchanged.snapshot.entryObservedAt, undefined, "Existing paid Global stores do not opt in to Terminal replay");
+  });
+  it("never revives an absorbing terminal opportunity when a late price observation arrives", async () => {
+    const d = definition(), store = globalScenarioStore(new MemoryGlobalScenarioStorage(), { replayLatePriceEvents: true });
+    const ended = await store.advance(scope, d, [event("target_touch", 10, "tp1")], BORN + 10 * MIN);
+    const later = await store.advance(scope, d, [event("entry_touch", 5)], BORN + 15 * MIN);
+    assert.equal(later.snapshot.state, "invalidated"); assert.equal(later.snapshot.reason, "target_before_entry");
+    assert.equal(later.snapshot.entryObservedAt, undefined); assert.deepEqual(later.snapshot.events, ended.snapshot.events);
+    assert.deepEqual(later.snapshot.definition, ended.snapshot.definition);
+  });
+  it("fails closed instead of replaying a possibly pruned event prefix", async () => {
+    const d = createGlobalScenarioDefinition({ ...definition(), mode: "confirmed_retest", expiresAt: BORN + 600 * MIN }), store = globalScenarioStore(new MemoryGlobalScenarioStorage(), { replayLatePriceEvents: true });
+    const before = await store.advance(scope, d, Array.from({ length: 256 }, (_, i) => event("acceptance", i + 1)), BORN + 256 * MIN);
+    assert.equal(before.snapshot.events.length, 256); assert.equal(before.snapshot.state, "awaiting_event");
+    await assert.rejects(store.advance(scope, d, [event("target_touch", 100, "tp1")], BORN + 260 * MIN), /Data needed: complete retained scenario history/);
+    assert.deepEqual(await store.get(scope, d.scenarioId), before, "Incomplete replay cannot replace known progress or renew clocks");
+  });
   it("keeps a real prepared report schema-valid across a completed 4H source refresh", async () => {
     const store = globalScenarioStore(new MemoryGlobalScenarioStorage());
     const before = preparedDowntrend(520);

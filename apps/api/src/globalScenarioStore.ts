@@ -47,7 +47,15 @@ export interface GlobalScenarioStorage {
 export interface GlobalScenarioStore {
   get(scope: GlobalScenarioScope, scenarioId: string): Promise<GlobalScenarioRecord | null>;
   advance(scope: GlobalScenarioScope, definition: GlobalScenarioDefinition, events: readonly GlobalScenarioEvent[], asOf: number, boundPlan?: NonNullable<GlobalReport["discretionaryPlan"]>): Promise<GlobalScenarioRecord>;
-  applyToReport(scope: GlobalScenarioScope, report: GlobalReport): Promise<void>;
+  applyToReport(scope: GlobalScenarioScope, report: GlobalReport, observe?: GlobalScenarioReportObserver): Promise<void>;
+}
+/** Optional supplementary observations are derived only after the original
+ * priced contract has been restored. Merge them before the first advance so
+ * a later coarse confirmation cannot hide an earlier fine-bar risk touch. */
+export type GlobalScenarioReportObserver = (report: GlobalReport, definition: GlobalScenarioDefinition) => readonly GlobalScenarioEvent[];
+export class GlobalScenarioHistoryUnavailableError extends Error {
+  readonly code = "scenario_history_unavailable";
+  constructor() { super("Data needed: complete retained scenario history is required to reconcile delayed price observations; the original opportunity has not been restarted."); this.name = "GlobalScenarioHistoryUnavailableError"; }
 }
 
 /** Scoped opaque keys do not expose wallet addresses or permit archive scans. */
@@ -88,9 +96,17 @@ export class RedisGlobalScenarioStorage implements GlobalScenarioStorage {
   }
 }
 
-export function globalScenarioStore(storage: GlobalScenarioStorage, options: { namespace?: string; retentionSeconds?: number } = {}): GlobalScenarioStore {
+export function globalScenarioStore(storage: GlobalScenarioStorage, options: { namespace?: string; retentionSeconds?: number; replayLatePriceEvents?: boolean } = {}): GlobalScenarioStore {
   const namespace = options.namespace ?? "pulse", retention = options.retentionSeconds ?? 180 * 86_400;
   const key = (scope: GlobalScenarioScope, scenarioId: string) => globalScenarioStorageKey(namespace, scope, scenarioId);
+  const eventKey = (event: GlobalScenarioEvent) => [event.kind, event.at, event.candleTs ?? null, event.targetId ?? null].join(":");
+  const replayLatePrices = (previous: GlobalScenario | undefined, events: readonly GlobalScenarioEvent[], asOf: number) => {
+    if (!options.replayLatePriceEvents || !previous || ["invalidated", "expired", "completed"].includes(previous.state)) return false;
+    const retained = new Set(previous.events.map(eventKey));
+    const late = events.some(event => ["entry_touch", "stop_touch", "target_touch"].includes(event.kind) && event.at < (previous.lastEventAt ?? 0) && event.at <= asOf && !retained.has(eventKey(event)));
+    if (late && previous.events.length >= 256) throw new GlobalScenarioHistoryUnavailableError();
+    return late;
+  };
   async function read(scope: GlobalScenarioScope, scenarioId: string) {
     const record = await storage.read(key(scope, scenarioId));
     if (record && (record.version !== "scenario-record-v1" || !Number.isInteger(record.revision) || record.revision < 1 || !GlobalScenarioSchema.safeParse(record.snapshot).success)) {
@@ -114,12 +130,13 @@ export function globalScenarioStore(storage: GlobalScenarioStorage, options: { n
         const previous = await read(scope, definition.scenarioId);
         if (previous && asOf < previous.snapshot.updatedAt) return previous;
         if (previous && previous.snapshot.revisionId !== definition.revisionId) throw new Error("Scenario events must use the stored priced revision");
-        const snapshot = advanceGlobalScenario(previous?.snapshot.definition ?? definition, previous?.snapshot ?? null, events, asOf);
+        const replay = replayLatePrices(previous?.snapshot, events, asOf);
+        const snapshot = advanceGlobalScenario(previous?.snapshot.definition ?? definition, replay ? newGlobalScenario(previous!.snapshot.definition) : previous?.snapshot ?? null, replay ? [...previous!.snapshot.events, ...events] : events, asOf);
         const saved = await write(scope, snapshot, previous, boundPlan); if (saved) return saved;
       }
       throw new Error("Scenario history changed concurrently; retry the report");
     },
-    async applyToReport(scope, report) {
+    async applyToReport(scope, report, observe) {
       const candidate = globalScenarioDefinitionForReport(report);
       if (!candidate) return;
       const asOf = Date.parse(report.snapshot.observedAt), proposedPlan = structuredClone(report.discretionaryPlan!);
@@ -129,11 +146,14 @@ export function globalScenarioStore(storage: GlobalScenarioStorage, options: { n
         if (previous && previous.snapshot.startedAt > asOf) return;
         if (previous?.boundPlan) restoreGlobalScenarioBoundPlan(report, previous.boundPlan);
         else report.discretionaryPlan = structuredClone(proposedPlan);
+        const definition = previous?.snapshot.definition ?? globalScenarioDefinitionForReport(report);
+        const supplementary = definition ? observe?.(report, definition) ?? [] : [];
         if (previous && previous.snapshot.updatedAt > asOf) {
-          applyGlobalScenario(report, newGlobalScenario(previous.snapshot.definition), previous.snapshot.events.filter(e => e.at <= asOf));
+          applyGlobalScenario(report, newGlobalScenario(previous.snapshot.definition), [...previous.snapshot.events.filter(e => e.at <= asOf), ...supplementary]);
           return;
         }
-        const snapshot = applyGlobalScenario(report, previous?.snapshot);
+        const replay = replayLatePrices(previous?.snapshot, supplementary, asOf);
+        const snapshot = applyGlobalScenario(report, replay ? newGlobalScenario(previous!.snapshot.definition) : previous?.snapshot, replay ? [...previous!.snapshot.events, ...supplementary] : supplementary);
         if (!snapshot) return;
         const saved = await write(scope, snapshot, previous, proposedPlan);
         if (saved) return;
@@ -144,9 +164,9 @@ export function globalScenarioStore(storage: GlobalScenarioStorage, options: { n
 }
 
 type ScenarioPersistenceConfig = Pick<PersistenceConfig, "QUEUE_PROVIDER" | "REDIS_URL" | "KV_REST_API_URL" | "KV_REST_API_TOKEN" | "REPORT_RETENTION_DAYS" | "PERSISTENCE_NAMESPACE">;
-export function createGlobalScenarioStore(config: ScenarioPersistenceConfig): GlobalScenarioStore {
+export function createGlobalScenarioStore(config: ScenarioPersistenceConfig, options: { replayLatePriceEvents?: boolean } = {}): GlobalScenarioStore {
   const storage = config.QUEUE_PROVIDER === "memory" ? new MemoryGlobalScenarioStorage()
     : new RedisGlobalScenarioStorage(new StoreRedis(config.QUEUE_PROVIDER === "redis" ? config.REDIS_URL || "" : config.KV_REST_API_URL, config.KV_REST_API_TOKEN));
   if (config.QUEUE_PROVIDER === "redis" && !/^rediss?:\/\//.test(config.REDIS_URL || "")) throw new Error("QUEUE_PROVIDER=redis requires REDIS_URL");
-  return globalScenarioStore(storage, { namespace: config.PERSISTENCE_NAMESPACE || "pulse", retentionSeconds: config.REPORT_RETENTION_DAYS * 86_400 });
+  return globalScenarioStore(storage, { namespace: config.PERSISTENCE_NAMESPACE || "pulse", retentionSeconds: config.REPORT_RETENTION_DAYS * 86_400, ...options });
 }

@@ -5,6 +5,8 @@ import { hrefForTab, tabFromHref } from "./navigation.js";
 test("direct service URLs survive refresh and trailing slashes", () => {
   assert.equal(tabFromHref("https://pulse.test/overview"), "overview");
   assert.equal(tabFromHref("https://pulse.test/portfolio"), "overview");
+  assert.equal(tabFromHref("https://pulse.test/trading-terminal/"), "terminal");
+  assert.equal(hrefForTab("https://pulse.test/portfolio?pulseTheme=base", "terminal"), "/trading-terminal?pulseTheme=base");
   assert.equal(hrefForTab("https://pulse.test/overview#reports", "overview"), "/portfolio#reports");
   assert.equal(tabFromHref("https://pulse.test/autopilot"), "autopilot");
   assert.equal(tabFromHref("https://pulse.test/spot/"), "spot");

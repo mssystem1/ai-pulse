@@ -9,6 +9,8 @@ import { createCircleWalletRouter } from "./circleWallet.js";
 import { arcAutomationReadiness } from "./arcExecutionReadiness.js";
 import { createTradeAutomationRouter } from "./tradeAutomation.js";
 import { createGlobalAssessmentRouter, recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
+import { createTerminalRoutes } from "./terminalRoutes.js";
+import type { TerminalDependencies } from "./terminalRuntime.js";
 import { normalizeExecutionRpcUrls } from "./onchainDiscovery.js";
 import { autopilotPassTargetExists, createAutopilotAutomationRouter, grantAutopilotPass } from "./autopilotAutomation.js";
 import type { AppConfig } from "@pulse/config";
@@ -159,11 +161,13 @@ export function createApp(cfg: AppConfig, dependencies: {
   spotInstrumentExists?: (instId: string) => Promise<boolean>;
   passTargetExists?: typeof autopilotPassTargetExists;
   automationTick?: Partial<AutomationTickDependencies>;
+  terminal?: TerminalDependencies;
   startDurableWorker?: boolean;
   /** Explicit in-process test adapter. Never populated from HTTP or environment. */
   robinhoodPayment?: express.RequestHandler;
 } = {}) {
   const app = express();
+  const terminal = createTerminalRoutes(cfg, dependencies.terminal);
   const polymarket = dependencies.polymarket || new PolymarketClient({
     gammaUrl: cfg.POLYMARKET_GAMMA_URL,
     clobUrl: cfg.POLYMARKET_CLOB_URL,
@@ -199,6 +203,13 @@ export function createApp(cfg: AppConfig, dependencies: {
 
   app.use(cors({ exposedHeaders: ["PAYMENT-REQUIRED", "PAYMENT-RESPONSE"] }));
   app.use(express.json({ limit: "12mb" }));
+  app.use(terminal.publicRouter);
+  // A wallet-wide private journal is independent of the selected payment
+  // network. Only purchase requests need the later canonical payment router.
+  app.use((req, res, next) => {
+    if (req.path.startsWith("/v1/terminal/") && !/^\/v1\/terminal\/pass\/(24h|7d|30d)\/?$/.test(req.path)) return terminal.beforePayment(req, res, next);
+    return next();
+  });
   app.use(createAutomationTickRouter(cfg, dependencies.automationTick));
   app.use(createV6Router(cfg, publicActivity));
   app.use(createTradeAutomationRouter(cfg));
@@ -1286,6 +1297,7 @@ export function createApp(cfg: AppConfig, dependencies: {
   // Payment gate for paid routes, measured only until challenge rejection or
   // verified/settled continuation (never including downstream provider work).
   const paymentGate = createPaymentGate(cfg, { robinhood: dependencies.robinhoodPayment || createRobinhoodPaymentRuntime(cfg), circle: createCirclePaymentRuntime(cfg) });
+  app.use(terminal.beforePayment);
   app.use((req, res, next) => {
     const route = cfg.routes[`${req.method.toUpperCase()} ${req.path}`];
     if (!route || route.free || route.priceUsd <= 0) return paymentGate(req, res, next);
@@ -1301,6 +1313,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     return paymentGate(req, res, (error?: unknown) => { record(!error); return error ? next(error) : next(); });
   });
 
+  app.use(terminal.afterPayment);
   for (const [path, days] of [["/v1/autopilot/pass/24h", 1], ["/v1/autopilot/pass/7d", 7], ["/v1/autopilot/pass/30d", 30]] as const) {
     app.post(path, async (req, res, next) => {
       try {
