@@ -17,3 +17,4 @@ export * from "./globalStrategyMix.js";
 export * from "./globalScenarioLifecycle.js";
 export * from "./terminalMarket.js";
 export * from "./terminalRadar.js";
+export * from "./terminalSessionProfile.js";

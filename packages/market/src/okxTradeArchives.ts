@@ -50,7 +50,7 @@ function columns(line:string){
 }
 export type OkxTradeArchiveProof={date:string;start:number;end:number;filename:string;sha256:string;bytes:number;crcVerified:true;rows:number;firstId:string;lastId:string;firstTs:number;lastTs:number;capturedAt:string;url?:string};
 export function decodeOkxTradeArchive(bytes:Buffer,input:{instId:string;date:string;capturedAt:string;start?:number;end?:number;maxOutputBytes?:number;maxRows?:number}){
-  identity(input.instId);const window=dateWindow(input.date),knownAt=Date.parse(input.capturedAt),from=input.start??window.start,to=input.end??window.end;
+  if(!/^[A-Z0-9]{1,20}-[A-Z0-9]{1,12}(-SWAP)?$/.test(input.instId))throw Error("Trade archive requires an exact instrument");const window=dateWindow(input.date),knownAt=Date.parse(input.capturedAt),from=input.start??window.start,to=input.end??window.end;
   if(!Number.isSafeInteger(knownAt)||knownAt<window.end||!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||to<=from)throw Error("Unavailable trade archive window");
   const maxBytes=input.maxOutputBytes??128_000_000,maxRows=input.maxRows??1_500_000;
   if(!Number.isSafeInteger(maxBytes)||maxBytes<1||!Number.isSafeInteger(maxRows)||maxRows<1)throw Error("Invalid trade decoder bounds");

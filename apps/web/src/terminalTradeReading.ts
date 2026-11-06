@@ -22,12 +22,13 @@ export function terminalCoverageLabel(source: TerminalToolStatus): string {
   if (source.status === "unavailable") return "Source unavailable";
   if (source.status === "stale") return "Update needed";
   if (source.id === "liquidity") return "Order book now";
+  if (source.source === "okx-retained-executions") return source.status === "available" ? "Complete session" : "Developing session";
   if (source.status === "partial") return "Recent executions";
   return "Source ready";
 }
 
 export function terminalValueReading(market: TerminalMarket): { title: string; observation: string; next: string } {
-  const value = market.tools.value, price = market.report.currentMarket?.quote?.price, profile = value.orderFlow?.profile;
+  const value = market.tools.value, price = market.report.currentMarket?.quote?.price, profile = value.sessionProfile ?? value.orderFlow?.profile;
   if (["stale", "unavailable"].includes(value.status) || !(typeof price === "number" && Number.isFinite(price)) || !profile) return { title: "Check the source first", observation: "This view needs a fresh quote and an executed-volume profile from the stated window.", next: "Refresh evidence before using this measurement to judge an entry." };
   if (price > profile.vah) return { title: "Price is above recent traded value", observation: "The quote at this evidence capture is above the execution window's value-area high. That locates price; it does not establish a breakout.", next: "Watch the value-area high: a later hold above supports acceptance; a return inside calls that move into question. Use Radar to monitor that sequence." };
   if (price < profile.val) return { title: "Price is below recent traded value", observation: "The quote at this evidence capture is below the execution window's value-area low. Sellers moved price below the sampled value area.", next: "Watch the value-area low: a reclaim and later hold can support a recovery review; continued acceptance below keeps that recovery unproven." };

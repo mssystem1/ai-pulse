@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { AppConfig } from "@pulse/config";
 import { createTerminalMarketSnapshot, advanceTerminalRadar, newTerminalRadar, restoreGlobalScenarioBoundPlan, advanceGlobalScenario, newGlobalScenario } from "@pulse/analysis";
 import { fetchTerminalTapeoutComponent, buildMarketContext, getTicker } from "@pulse/market";
-import { terminalFrameProfile, type TerminalMarketSnapshot, type TerminalRadarDefinition, type TerminalRadarState, type TerminalTapeoutComponent } from "@pulse/domain";
+import { globalSetupAdmission, terminalFrameProfile, type TerminalMarketSnapshot, type TerminalRadarDefinition, type TerminalRadarState, type TerminalTapeoutComponent } from "@pulse/domain";
 import { GlobalReportSchema, GlobalScenarioSchema, type GlobalAssessment, type GlobalReport, type GlobalScenario } from "@pulse/schemas";
 import { recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
 import { TerminalAuth } from "./terminalAuth.js";
@@ -11,6 +11,9 @@ import { inspectTelegramConfiguration } from "./telegram.js";
 import { StoreRedis } from "./storeRedis.js";
 import { createGlobalScenarioStore, GlobalScenarioHistoryUnavailableError, reconcileGlobalScenarioAssessment, type GlobalScenarioStore } from "./globalScenarioStore.js";
 import { terminalPricePathEvents } from "./terminalPricePath.js";
+import { createTerminalLiveCandles } from "./terminalLiveCandle.js";
+import type { TerminalMarketHistory } from "./terminalMarketHistory.js";
+import { coalesceTerminalIncident, formatTerminalNotification, terminalDependencyIssue, terminalNotificationConsent, terminalRadarNotification, terminalRadarSourceIssue, type TerminalNotificationActivity, type TerminalNotificationIssue } from "./terminalNotifications.js";
 
 export type TerminalDependencies = {
   store?: TerminalStore;
@@ -18,6 +21,8 @@ export type TerminalDependencies = {
   assess?: (report: GlobalReport) => Promise<GlobalAssessment>;
   recheckMarket?: typeof buildMarketContext;
   quote?: typeof getTicker;
+  candles?: NonNullable<Parameters<typeof createTerminalLiveCandles>[0]>["load"];
+  history?: () => TerminalMarketHistory;
   tapeout?: () => Promise<TerminalTapeoutComponent>;
   now?: () => number;
   telegramRecipient?: (owner: string) => Promise<number | null>;
@@ -67,6 +72,7 @@ export function terminalImmutableSourceReport(original: GlobalReport): GlobalRep
   return report;
 }
 export class TerminalRuntime {
+  readonly liveCandle: ReturnType<typeof createTerminalLiveCandles>;
   readonly store: TerminalStore;
   readonly auth: TerminalAuth;
   readonly now: () => number;
@@ -79,6 +85,7 @@ export class TerminalRuntime {
   private redis: StoreRedis | null;
   constructor(readonly cfg: AppConfig, readonly deps: TerminalDependencies = {}) {
     this.store = deps.store ?? createTerminalStore(cfg); this.auth = new TerminalAuth(this.store, cfg.BASE_URL); this.now = deps.now ?? Date.now;
+    this.liveCandle = createTerminalLiveCandles({ now: this.now, load: deps.candles });
     this.scenarios = deps.scenarios ?? createGlobalScenarioStore({ ...cfg, PERSISTENCE_NAMESPACE: `${cfg.PERSISTENCE_NAMESPACE}:terminal`, REPORT_RETENTION_DAYS: cfg.TERMINAL_RETENTION_DAYS }, { replayLatePriceEvents: true });
     const url = cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.QUEUE_PROVIDER === "upstash_kv" ? cfg.KV_REST_API_URL : "";
     this.redis = url ? new StoreRedis(url, cfg.KV_REST_API_TOKEN) : null;
@@ -186,10 +193,11 @@ export class TerminalRuntime {
     const serverNow = this.now();
     return { ...value, watches, serverNow, access: terminalAccess(value, serverNow), telegram: { ...value.telegram, linked: Boolean(linked), configured, botUsername, botUrl, linkUrl: botUrl ? `${botUrl}?start=terminal_alerts` : null, linkState, linkedWallet: linked ? owner.toLowerCase() : null, nextStep: linkState === "unavailable" ? "Telegram delivery or wallet-link lookup is unavailable. Existing notification preferences are preserved." : linked ? "Choose alert types and enable Telegram notifications here. Also select Telegram on each setup, Radar or position you want to follow." : "Open the PULSE bot, link this exact wallet, sign the ownership message and confirm the address in Telegram. Return here and refresh the connection." }, limits: terminalLimits(this.cfg), execution: "journal-and-monitoring-only" };
   }
-  private publish(value: TerminalWorkspace, event: TerminalActivity, telegram: boolean, recipient: number | null) {
+  private publish(value: TerminalWorkspace, event: TerminalNotificationActivity, telegram: boolean, recipient: number | null) {
     if (value.activity.some(item => item.id === event.id)) return;
+    const coalesced = telegram && recipient && value.telegram.enabled && terminalNotificationConsent(event, value.telegram.events) ? coalesceTerminalIncident(value, event) : false;
     appendTerminalActivity(value, event);
-    if (!telegram || !recipient || !value.telegram.enabled || !value.telegram.events.includes(event.kind)) return;
+    if (coalesced || !telegram || !recipient || !value.telegram.enabled || !terminalNotificationConsent(event, value.telegram.events)) return;
     const id = `td_${hash(`${event.id}:${recipient}`)}`;
     if (!value.deliveries.some(item => item.id === id)) value.deliveries.push({ id, eventId: event.id, subjectId: event.subjectId, recipientId: recipient, state: "queued", createdAt: event.at });
     value.deliveries = value.deliveries.slice(-1000);
@@ -202,6 +210,8 @@ export class TerminalRuntime {
     if (!source || source.instId !== input.instId || source.timeframe !== terminalFrameProfile(input.timeframe).timeframe || this.now() - source.observedAt > 300_000) throw new Error("Refresh the market and review its setup before following.");
     const assessment = await this.assessOwner(owner, source.report), scenario = assessment.scenario;
     if (!scenario || scenario.revisionId !== input.setupVersionId || ["invalidated", "expired", "completed", "entry_observed"].includes(scenario.state)) throw new Error("This opportunity has ended or its entry was already observed. A new watch cannot revive it.");
+    const geometry = globalSetupAdmission(source.report);
+    if (!geometry.geometryEligible) throw new Error(`This setup's saved entry, protection and nearest objective do not meet its risk rules. ${geometry.reasons.join(" ")}`);
     if (assessment.blockers.some(b => ["history", "source_revised", "quote"].includes(b))) throw new Error("Current eligibility cannot be assessed from complete fresh sources. Refresh after data recovers.");
     const now = this.now(), id = `tw_${hash(`${scenario.scenarioId}:${scenario.revisionId}:${owner}`)}`;
     const report = structuredClone(source.report);
@@ -268,8 +278,23 @@ export class TerminalRuntime {
           catch (error) { return { watch, assessment: null, sourceReportUnavailable: false, error }; }
         }));
         const radars = await Promise.all(claimed.radars.filter(r => !r.paused && !["completed", "failed", "expired"].includes(r.state)).map(async radar => {
-          const [market, component] = await Promise.all([this.snapshot(radar.instId, radar.timeframe).catch(() => null), this.tapeout().catch(() => null)]);
-          return { radar, snapshot: advanceTerminalRadar(radar.definition as TerminalRadarDefinition, radar.snapshot as TerminalRadarState, market?.observations ?? [], component, Math.max(this.now(), market?.observedAt ?? now)) };
+          const [marketRead, componentRead] = await Promise.allSettled([this.snapshot(radar.instId, radar.timeframe), this.tapeout()]);
+          const market = marketRead.status === "fulfilled" ? marketRead.value : null, component = componentRead.status === "fulfilled" ? componentRead.value : null;
+          const asOf = Math.max(this.now(), market?.observedAt ?? now), definition = radar.definition as TerminalRadarDefinition, previous = radar.snapshot as TerminalRadarState;
+          let issue: TerminalNotificationIssue | undefined = componentRead.status === "rejected" ? terminalDependencyIssue(componentRead.reason, "component") : marketRead.status === "rejected" ? terminalDependencyIssue(marketRead.reason, "market") : undefined;
+          let snapshot: TerminalRadarState;
+          try {
+            snapshot = advanceTerminalRadar(definition, previous, issue ? [] : market?.observations ?? [], issue ? null : component, asOf);
+          } catch (error) {
+            issue = terminalDependencyIssue(error, "component"); snapshot = advanceTerminalRadar(definition, previous, [], null, asOf);
+          }
+          if (issue && asOf < definition.expiresAt) {
+            snapshot.status = "data_needed"; snapshot.next = "WAIT for source verification to recover; monitoring retries automatically and missing intervals must be verified.";
+            const priorIssue = (radar as TerminalRadar & { notificationIssue?: TerminalNotificationIssue }).notificationIssue;
+            snapshot.events = snapshot.events.filter(event => previous.events.some(old => old.id === event.id));
+            if (previous.status !== "data_needed" || priorIssue?.code !== issue.code) snapshot.events.push({ id: `${radar.id}:data_needed:${issue.code}:${asOf}`, kind: "data_needed", at: asOf, reason: issue.message });
+          } else if (snapshot.status === "data_needed") issue = terminalRadarSourceIssue(snapshot);
+          return { radar, snapshot, issue };
         }));
         const positions = await Promise.all(claimed.positions.filter(p => !p.paused && p.status === "open").map(async position => ({ position, market: await this.snapshot(position.instId, position.timeframe).catch(() => null) })));
         await this.store.mutate(owner, value => {
@@ -287,11 +312,17 @@ export class TerminalRuntime {
             current.scenario = scenario; current.state = state; current.reason = reason; current.nextEvent = bad ? "Monitoring retries automatically. Refresh conditions to retry now; incomplete intervals must be verified before progress resumes." : terminalScenarioNext(state); current.lastObservedAt = new Date(now).toISOString();
             if (sourceIssue) current.sourceIssue = sourceIssue; else delete current.sourceIssue;
           }
-          for (const { radar, snapshot } of radars) {
+          for (const { radar, snapshot, issue } of radars) {
             const current = value.radars.find(r => r.id === radar.id); if (!current || current.paused || current.lastObservedAt !== radar.lastObservedAt) continue;
             const before = current.snapshot as TerminalRadarState;
-            for (const event of snapshot.events.filter(e => !before.events.some(old => old.id === e.id))) this.publish(value, { id: `radar:${current.id}:${event.id}`, at: new Date(now).toISOString(), sourceAt: new Date(event.at).toISOString(), kind: event.kind === "data_needed" ? "source_interruption" : `radar_${event.kind}`, subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: event.reason }, current.telegram, recipient);
-            current.snapshot = snapshot; current.state = snapshot.status; current.reason = snapshot.events.at(-1)?.reason ?? snapshot.next; current.nextEvent = snapshot.next; current.lastObservedAt = new Date(now).toISOString();
+            for (const event of snapshot.events.filter(e => !before.events.some(old => old.id === e.id))) this.publish(value, { id: `radar:${current.id}:${event.id}`, at: new Date(now).toISOString(), sourceAt: new Date(event.at).toISOString(), kind: event.kind === "data_needed" ? "source_interruption" : `radar_${event.kind}`, subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: event.kind === "data_needed" ? issue?.message ?? event.reason : event.reason, notification: terminalRadarNotification(current, event, snapshot, event.kind === "data_needed" ? issue : undefined) }, current.telegram, recipient);
+            const retained = current as TerminalRadar & { notificationIssue?: TerminalNotificationIssue }, priorIssue = retained.notificationIssue;
+            if (before.status === "data_needed" && snapshot.status !== "data_needed" && snapshot.status !== "expired") {
+              const recovered = { code: priorIssue?.code ?? terminalRadarSourceIssue(before).code, message: "The source verification checks recovered. Monitoring can evaluate verified completed candles again; a missing interval still cannot count as confirmation." };
+              this.publish(value, { id: `radar-recovered:${current.id}:${now}`, at: new Date(now).toISOString(), kind: "source_recovered", subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: recovered.message, notification: { ...terminalRadarNotification(current, { id: "recovered", at: now, kind: "started", reason: recovered.message }, snapshot, recovered), status: "recovered", next: snapshot.next } }, current.telegram, recipient);
+            }
+            if (issue) retained.notificationIssue = issue; else delete retained.notificationIssue;
+            current.snapshot = snapshot; current.state = snapshot.status; current.reason = issue?.message ?? snapshot.events.at(-1)?.reason ?? snapshot.next; current.nextEvent = snapshot.next; current.lastObservedAt = new Date(now).toISOString();
           }
           for (const { position, market } of positions) {
             const current = value.positions.find(p => p.id === position.id); if (!current || current.paused || current.status !== "open") continue;
@@ -332,7 +363,7 @@ export class TerminalRuntime {
         if (item.state === "sending") { item.state = "uncertain"; item.error = "Delivery acknowledgement was interrupted; automatic resend is suppressed."; }
         const event = value.activity.find(e => e.id === item.eventId), subject = [...value.watches, ...value.radars, ...value.positions].find(s => s.id === item.subjectId);
         const active = terminalAccess(value, this.now()).active;
-        if (item.state === "queued" && (!recipient || item.recipientId !== recipient || !value.telegram.enabled || !value.telegram.events.includes(event?.kind ?? "") || (event?.kind === "pass_expired" ? active : !active || !subject || subject.paused || !subject.telegram))) item.state = "cancelled";
+        if (item.state === "queued" && (!recipient || item.recipientId !== recipient || !value.telegram.enabled || !event || !terminalNotificationConsent(event, value.telegram.events) || (event?.kind === "pass_expired" ? active : !active || !subject || subject.paused || !subject.telegram))) item.state = "cancelled";
       }
       const item = value.deliveries.find(d => d.state === "queued");
       if (item) { item.state = "sending"; item.attemptedAt = new Date(now).toISOString(); selectedId = item.id; }
@@ -342,7 +373,7 @@ export class TerminalRuntime {
     let messageId: number | undefined, failure: string | undefined;
     try {
       if (!event || !recipient) throw new Error("Notification event or recipient is unavailable");
-      const text = `PULSE Trading Terminal\n${event.instId ?? "Access"}${event.timeframe ? ` · ${event.timeframe}` : ""}\n${event.message}\nObserved: ${event.sourceAt ?? event.at}\n${new URL("/trading-terminal", process.env.TELEGRAM_MINI_APP_URL || "https://app.ai-pulse.tech").href}`;
+      const text = formatTerminalNotification(event);
       if (this.deps.telegramSend) messageId = await this.deps.telegramSend(recipient, text);
       else {
         const token = process.env.TELEGRAM_BOT_TOKEN; if (!token) throw new Error("Telegram bot delivery is not configured");

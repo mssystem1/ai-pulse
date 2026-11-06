@@ -44,17 +44,17 @@ test("display row consolidation conserves the profile and selected footprint vol
 
 test("zoomed-out captions separate without moving POC, VAL or VAH price lines",()=>{
   const {report}=example(),svg=globalOrderFlowAnnotations(report,{left:0,right:700,historyEnd:500,top:0,bottom:400,x:()=>0,y:p=>p*.01+100});
-  const labels=[...svg.matchAll(/<text x="23" y="([^"]+)"/g)].map(m=>Number(m[1])).sort((a,b)=>a-b);
-  assert.equal(labels.length,3);assert.ok(labels[1]-labels[0]>=12);assert.ok(labels[2]-labels[1]>=12);
-  assert.ok(svg.includes('data-price="102.5"><line x1="0" x2="500" y1="101.025"'));
+  const labels=[...svg.matchAll(/data-profile-level="(?:POC|VAL|VAH)" data-price="[^"]+" data-label-y="([^"]+)"/g)].map(m=>Number(m[1])).sort((a,b)=>a-b);
+  assert.equal(labels.length,3);assert.ok(labels[1]-labels[0]>=16-1e-9);assert.ok(labels[2]-labels[1]>=16-1e-9);
+  assert.match(svg,/data-profile-level="POC" data-price="102.5"[^>]*><line x1="0" x2="500" y1="101.025"/);
 });
 
 test("a short profile starts at its own source window and disappears when panning before it",()=>{
   const {report}=example(),before=structuredClone(report.orderFlow);
   const coordinates={left:0,right:700,historyEnd:500,top:0,bottom:400,x:(ts:number)=>ts/hour*3,y:(price:number)=>price};
   const svg=globalOrderFlowAnnotations(report,coordinates);
-  assert.match(svg,/data-profile-level="POC" data-price="102.5"><line x1="378" x2="500"/);
-  assert.doesNotMatch(svg,/data-profile-level="[^"]+" data-price="[^"]+"><line x1="0"/);
+  assert.match(svg,/data-profile-level="POC" data-price="102.5"[^>]*><line x1="378" x2="500"/);
+  assert.doesNotMatch(svg,/data-profile-level="[^"]+" data-price="[^"]+"[^>]*><line x1="0"/);
   assert.equal(globalOrderFlowAnnotations(report,{...coordinates,x:ts=>1000+ts/hour*3}),"");
   assert.deepEqual(report.orderFlow,before,"Rendering keeps the original profile prices and executed rows");
 });
@@ -68,7 +68,7 @@ test("a one-day profile after the last completed weekly candle remains compact r
   assert.equal(GlobalReportSchema.safeParse(report).success,true);assert.equal(flow.footprints.length,0);
   const svg=globalOrderFlowAnnotations(report,{left:0,right:700,historyEnd:500,top:0,bottom:400,x:ts=>(ts-origin)/week*10,y:price=>price});
   assert.match(svg,/data-profile-location="recent_context"/);
-  const starts=[...svg.matchAll(/data-profile-level="[^"]+" data-price="[^"]+"><line x1="([^"]+)"/g)].map(match=>Number(match[1]));
+  const starts=[...svg.matchAll(/data-profile-level="[^"]+" data-price="[^"]+"[^>]*><line x1="([^"]+)"/g)].map(match=>Number(match[1]));
   assert.equal(starts.length,3);assert.ok(starts.every(x=>x>350&&x<500),"One day of trades must not label the entire weekly history");
   assert.deepEqual(report.orderFlow,flow);
 });

@@ -6,7 +6,13 @@ import type { PolymarketClient } from "@pulse/market";
 import { createApp } from "./app.js";
 
 test("Bazaar can discover Prediction inputs without bypassing signed or supplied-input validation", async t => {
-  const cfg = { ...loadConfig(), NODE_ENV: "test" as const, X402_MOCK: true, BASE_URL: "https://pulse.example", QUEUE_PROVIDER: "memory" as const, STORAGE_PROVIDER: "memory" as const, FEATURE_TELEGRAM: false, FEATURE_POLYMARKET: true, FEATURE_BASE_PAYMENTS: true, FEATURE_ARBITRUM_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true };
+  const base = loadConfig();
+  // Discovery assertions exercise enabled services explicitly; .env and the
+  // operator's current feature/network/price choices must not decide this test.
+  const cfg = { ...base, NODE_ENV: "test" as const, X402_MOCK: true, BASE_URL: "https://pulse.example", QUEUE_PROVIDER: "memory" as const, STORAGE_PROVIDER: "memory" as const, FEATURE_TELEGRAM: false, FEATURE_POLYMARKET: true, FEATURE_PREDICTION_ANALYSIS: true, FEATURE_BASE_PAYMENTS: true, FEATURE_ARBITRUM_PAYMENTS: true, FEATURE_ARC_MAINNET: true, FEATURE_ARC_PAYMENTS: true, CIRCLE_GATEWAY_ENABLED: true,
+    enabledNetworks: ["xlayer", "base", "arbitrum", "arc"] as const,
+    routes: { ...base.routes, "POST /v1/analysis/prediction/standard": { name: "Prediction Quick fixture", priceUsd: .2, description: "Synthetic discovery test" }, "POST /v1/analysis/prediction/premium": { name: "Prediction Pro fixture", priceUsd: .3, description: "Synthetic discovery test" } },
+  };
   let marketReads = 0;
   const polymarket = { getMarket: async () => { marketReads++; return { id: `pm:0x${"a".repeat(64)}`, active: true, closed: false, archived: false, enableOrderBook: true, outcomes: [{ tokenId: "1" }, { tokenId: "2" }] }; }, getOrderBook: async () => ({ bids: [], asks: [] }) } as unknown as PolymarketClient;
   const server = createServer(createApp(cfg, { startDurableWorker: false, polymarket }));

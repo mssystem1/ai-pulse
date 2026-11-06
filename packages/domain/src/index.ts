@@ -11,7 +11,7 @@ export * from "./researchChart.js";
 export * from "./globalPresentation.js";
 export * from "./globalChart.js";
 export * from "./globalChartAppearance.js";
-export { parseCandleTimeframe } from "@pulse/schemas";
+export { parseCandleTimeframe, candleCloseTime } from "@pulse/schemas";
 export * from "./globalTradePlan.js";
 export * from "./globalConfirmation.js";
 export * from "./globalPolicy.js";
@@ -41,3 +41,5 @@ export * from "./globalExecutionInstructions.js";
 
 export * from "./globalStrategyMixLines.js";
 export * from "./terminal.js";
+export * from "./terminalHistory.js";
+export * from "./globalSetupAdmission.js";

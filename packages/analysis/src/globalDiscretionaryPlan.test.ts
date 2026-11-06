@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {GlobalReportSchema,candleCloseTime} from "@pulse/schemas";
-import {globalTargetReference,globalTradeCards,globalRiskMeasurement,globalSetupStrategyProfile,globalReportChartSvg,globalEntryStudySvg,globalArtifactReference,globalDecision,globalSections} from "@pulse/domain";
+import {globalTargetReference,globalTradeCards,globalRiskMeasurement,globalSetupStrategyProfile,globalReportChartSvg,globalEntryStudySvg,globalArtifactReference,globalDecision,globalSections,globalSetupAdmission} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
@@ -12,6 +12,17 @@ import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
 const make=(frame:string)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium"});
+
+test("a live quote beyond TP1 blocks the same future-entry setup instead of promoting a farther objective",()=>{
+ const report=make("1Dutc"),original=structuredClone(report.discretionaryPlan!),cutoff=Date.parse(report.snapshot.observedAt);
+ report.currentMarket={...(report.currentMarket??{source:report.snapshot.source,frames:[]}),quote:{price:original.targets[0].price+1,ts:cutoff}};
+ applyGlobalDiscretionaryPlan(report);
+ const plan=report.discretionaryPlan!;
+ assert.deepEqual(plan.targets,original.targets);assert.equal(plan.entry,original.entry);assert.equal(plan.stop,original.stop);
+ assert.deepEqual(plan.priceZones!.targets,original.priceZones!.targets);
+ const admission=globalSetupAdmission(report);assert.equal(admission.allowed,false);assert.ok(admission.blockers.includes("objective_already_reached"));
+ assert.equal(GlobalReportSchema.safeParse(report).success,true,"The schema accepts unchanged entry-relative sources while admission blocks the spent current opportunity");
+});
 
 test("all five horizons retain their own objective and protection frames with a complete priced setup",()=>{
   for(const [frame,entry] of [["15m","5m"],["1H","15m"],["4H","1H"],["1Dutc","4H"],["1Wutc","1D"]]){

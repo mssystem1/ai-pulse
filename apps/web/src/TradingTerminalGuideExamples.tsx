@@ -1,0 +1,59 @@
+import type {Lang} from "./i18n";
+import {useGlobalChartAppearance} from "./useGlobalChartAppearance";
+
+function ExampleFigure({name,alt,caption,lang}:{name:string;alt:string;caption:string;lang:Lang}){
+ const appearance=useGlobalChartAppearance(),src=`/terminal-guide/${name}-${appearance}.png`;
+ return <figure className="terminal-guide-figure">
+  <a href={src} target="_blank" rel="noopener noreferrer" aria-label={lang==="zh"?`打开完整图片：${alt}`:`Open full-size image: ${alt}`}><img src={src} alt={alt} loading="lazy"/></a>
+  <figcaption>{caption} <a href={src} target="_blank" rel="noopener noreferrer">{lang==="zh"?"打开完整图片 ↗":"Open full size ↗"}</a></figcaption>
+ </figure>;
+}
+
+export function TerminalSessionGuideExample({lang}:{lang:Lang}){
+ const tr=(en:string,zh:string)=>lang==="zh"?zh:en;
+ return <section className="terminal-guide-example" aria-labelledby="terminal-session-guide">
+  <h4 id="terminal-session-guide">{tr("Choose the session before reading its profile","先选择时段，再解读成交量分布")}</h4>
+  <p>{tr("Executed-volume session sets the history used by VWAP, value area, buy/sell flow and footprint. It does not change the primary chart timeframe or rewrite a saved setup.","Executed-volume session 决定 VWAP、价值区、主动买卖和 Footprint 使用的历史区间，不会改变主图周期或重写已保存计划。")}</p>
+  <ol>
+   <li>{tr("Choose Today, Previous day, This week, This month or Custom UTC range. Weeks start on Monday; current sessions end at the latest completed minute. Custom ranges use whole UTC minutes, up to 31 days.","选择今天、前一天、本周、本月或自定义 UTC 区间。每周从星期一开始，当前时段截止至最新已完成分钟。自定义区间以完整 UTC 分钟填写，最长 31 天。")}</li>
+   <li>{tr("Read the requested dates, execution count and missing intervals. Full requested Spot session retained means the requested Spot execution window is covered. Futures coverage is checked separately.","查看请求日期、成交笔数和缺失区间。Full requested Spot session retained 表示所请求现货成交区间已完整保留；期货覆盖情况单独检查。")}</li>
+   <li>{tr("If backfill is incomplete, let collection continue or choose an already covered range. Continue backfill requests more genuine history. A missing interval stays unknown; a current snapshot never substitutes for it.","回填未完成时，可继续收集或选择已有覆盖的区间。Continue backfill 会请求更多真实历史。缺失区间保持未知，不能用当前快照代替。")}</li>
+   <li>{tr("Compare the quote with the value-area edges, then inspect the flow and a later price response. Watch value-high breakout or Watch value-low reclaim opens the Radar review; it does not place an order.","将报价与价值区边界比较，再检查主动成交及之后的价格反应。Watch value-high breakout 或 Watch value-low reclaim 会打开 Radar 审阅，不会下单。")}</li>
+  </ol>
+  <div className="terminal-guide-example-reading"><strong>{tr("Real example · BTC / USDT · 01 Nov 2026 UTC","真实示例 · BTC / USDT · 2026 年 11 月 1 日 UTC")}</strong><p>{tr("The complete day contains 177,587 Spot executions in 94 price rows of 10 USDT. VWAP is 77,953.37; POC is 78,005; the 70% value area is 77,820–78,220. These levels describe where that day traded. They are neither today's price nor an automatic long or short signal.","完整一天包含 177,587 笔现货成交，按 10 USDT 分为 94 个价位行。VWAP 为 77,953.37，POC 为 78,005，70% 价值区为 77,820–78,220。这些价位描述当日成交集中区域，并非当前价格或自动多空信号。")}</p><p>{tr("The screenshot uses the session's closing execution, 78,342.5, as its historical price reference. The final full-day profile is only known after the day ends; it cannot be treated as a level known earlier that morning.","截图以该时段最后成交价 78,342.5 作为历史参考。全天最终分布只能在当天结束后确定，不能将其当作当天早晨已知的价位。")}</p></div>
+  <ExampleFigure name="session-profile" lang={lang} alt={tr("Actual PULSE Market tools showing the complete November 1 BTC session profile and value-area levels","PULSE 实际市场工具：11 月 1 日 BTC 完整时段成交量分布与价值区") } caption={tr("Actual Terminal component with genuine historical OKX executions. The historical banner and covered UTC range identify this example.","实际终端组件使用真实 OKX 历史成交。历史横幅和 UTC 覆盖区间标明本示例。")}/>
+  <details><summary>{tr("Read buy/sell flow from the same complete session","解读同一完整时段的主动买卖")}</summary><p>{tr("Taker buys total 2,132.8881 BTC and taker sells total 1,585.3953 BTC, for positive delta of 547.4928 BTC. Price and cumulative delta use aligned execution buckets. Positive delta describes aggressive buying in this window; it does not prove that a long entry has good location, protection or payoff.","主动买入合计 2,132.8881 BTC，主动卖出 1,585.3953 BTC，净 delta 为 +547.4928 BTC。价格与累计 delta 使用对齐成交分组。正 delta 描述该窗口内的主动买入，不证明做多具有合适位置、止损或回报。")}</p><ExampleFigure name="session-flow" lang={lang} alt={tr("Actual PULSE price and cumulative delta for the complete November 1 BTC session","PULSE 实际工具展示 11 月 1 日 BTC 完整时段价格与累计 delta")} caption={tr("Same historical session and source window as the profile. Spot quantities are BTC; Futures contracts remain separate.","与成交量分布使用相同历史时段。现货数量单位为 BTC，期货合约数量单独显示。")}/></details>
+ </section>;
+}
+
+export function TerminalLiquidityGuideExample({lang}:{lang:Lang}){
+ const tr=(en:string,zh:string)=>lang==="zh"?zh:en;
+ return <section className="terminal-guide-example" aria-labelledby="terminal-liquidity-guide">
+  <h4 id="terminal-liquidity-guide">{tr("Use Liquidity over time to inspect resting orders","使用 Liquidity over time 检查历史挂单")}</h4>
+  <p>{tr("Order book shows one current depth capture. Liquidity over time shows genuine retained captures across time and price: green for bids, red for offers, and stronger colour for larger displayed size. The gold line follows the midpoint of each observed book. Choose Last hour, Last 6 hours, Last 24 hours or Last 7 days independently of the execution-session selector.","Order book 显示当前深度快照；Liquidity over time 在时间和价格维度显示真实保留快照：绿色为买盘，红色为卖盘，颜色越强表示显示挂单量越大。金线连接已观察盘口的中间价。可独立选择最近 1 小时、6 小时、24 小时或 7 天，不受成交时段选择器影响。")}</p>
+  <ol>
+   <li>{tr("Read the source, returned sampling interval and levels per side. Wider windows may display fewer retained observations, so the stated interval matters.","查看来源、返回采样间隔和每侧深度档数。较宽窗口可能显示较少保留快照，因此应检查标明的间隔。")}</li>
+   <li>{tr("Hover or tap a price/time cell to inspect its actual source timestamp, price band and displayed bid/offer quantities. Keyboard users can focus the heatmap and use the arrow keys.","悬停或点击价格/时间单元格，查看实际来源时间、价格区间及买卖盘显示数量。键盘用户可聚焦热图后使用方向键。")}</li>
+   <li>{tr("Compare a visible band across several observations: did it persist, move or disappear as price approached? Use that context alongside executed flow and a later level reaction. A displayed order can still be cancelled before trading.","比较多个观察时点的挂单带：价格靠近时，它保持、移动还是消失？结合主动成交与后续价位反应判断。显示挂单仍可能在成交前撤销。")}</li>
+  </ol>
+  <div className="terminal-guide-example-reading"><strong>{tr("Historical example · 1,440 real observations","历史示例 · 1,440 个真实观察时点")}</strong><p>{tr("The November 1 example retains one genuine book observation per minute, with 50 levels on each side and no missing minute observations in the requested day. It does not establish what happened between those snapshots. Hatched columns in an incomplete range mean no retained observation, not an empty order book.","11 月 1 日示例每分钟保留一个真实盘口观察，每侧 50 档，请求的一天内没有缺失分钟观察。这不代表已知两次快照之间的变化。不完整区间中的斜线列表示未保留观察，而非空盘口。")}</p></div>
+  <ExampleFigure name="liquidity-history" lang={lang} alt={tr("Actual PULSE historical bid and offer heatmap from November 1 BTC order-book observations","PULSE 实际历史买卖盘热图：11 月 1 日 BTC 盘口观察")} caption={tr("Actual Terminal heatmap and source-time inspector. Resting depth is separate from executed volume, open interest and liquidation prices.","实际终端热图与来源时间检查器。挂单深度不同于已成交量、持仓量或清算价位。")}/>
+ </section>;
+}
+
+export function TerminalRadarGuideExample({lang}:{lang:Lang}){
+ const tr=(en:string,zh:string)=>lang==="zh"?zh:en;
+ return <section className="terminal-guide-example" aria-labelledby="terminal-radar-guide">
+  <h4 id="terminal-radar-guide">{tr("A real three-step Radar walkthrough","真实行情的三步 Radar 示例")}</h4>
+  <p>{tr("This historical replay applies Break & hold to a manually selected 78,000 boundary using genuine BTC 15-minute candles on November 1. In the planner, choose Intraday · 15-minute candles. This illustration was evaluated later from retained data; it is not a claim that PULSE published or traded this level at the time.","该历史回放在 11 月 1 日真实 BTC 15 分钟 K 线上，对手动选择的 78,000 边界应用 Break & hold。规划器中选择 Intraday · 15-minute candles。本示例在之后使用保留数据计算，不表示 PULSE 当时发布或交易过此价位。")}</p>
+  <ol className="terminal-guide-event-steps">
+   <li><strong>{tr("08:45 UTC · Completed break","08:45 UTC · 收盘突破")}</strong><span>{tr("The 08:30 candle closes at 78,145.6, above 78,000. Radar still waits for a separate later retest.","08:30 K 线以 78,145.6 收盘，高于 78,000。Radar 继续等待另一根后续 K 线回测。")}</span></li>
+   <li><strong>{tr("09:30 UTC · Later retest","09:30 UTC · 后续回测")}</strong><span>{tr("The 09:15 candle trades down to 77,953.6 and closes back above the boundary at 78,010.5. The retest stage is observed; confirmation still needs another candle.","09:15 K 线最低到 77,953.6，并以 78,010.5 收回边界上方。回测阶段完成，仍需另一根 K 线确认。")}</span></li>
+   <li><strong>{tr("09:45 UTC · Later hold","09:45 UTC · 后续保持")}</strong><span>{tr("The 09:30 candle closes at 78,056.5, above the boundary. The ordered sequence completes and asks for a trade-plan review. It does not open a position or prove a profitable trade.","09:30 K 线以 78,056.5 收于边界上方。有序事件完成并提示审阅交易计划，不会开仓，也不证明交易盈利。")}</span></li>
+  </ol>
+  <ExampleFigure name="radar-sequence" lang={lang} alt={tr("Actual PULSE Radar progress showing the historical break, retest and hold at 08:45, 09:30 and 09:45 UTC","PULSE 实际 Radar 进度：08:45、09:30 和 09:45 UTC 的历史突破、回测与保持")} caption={tr("Actual Radar progress component, replayed with the verified Tapeout component read on November 5 at X Layer block 75,134,025. Historical candle times and current circuit verification are separate facts.","实际 Radar 进度组件，使用 11 月 5 日在 X Layer 区块 75,134,025 读取并验证的 Tapeout 组件回放。历史 K 线时间与当前电路验证是两个独立事实。")}/>
+  <p>{tr("In normal monitoring, Radar only considers new complete eligible candles after you start it; the already forming candle is excluded. Repeated refreshes do not add stages. A source gap interrupts confirmation, and the card shows the next required event, source close and expiry.","正常监控中，Radar 仅考虑启动后新完成且符合条件的 K 线，启动时已形成中的 K 线不计入。重复刷新不会增加阶段。来源缺口会中断确认，卡片显示下一事件、来源收盘时间与到期时间。")}</p>
+  <div className="terminal-guide-example-reading"><strong>{tr("Read a Radar notification","如何阅读 Radar 通知")}</strong><p>{tr("For the 08:45 replay event, the alert identifies BTC-USDT, Breakout acceptance, the 78,000 boundary, primary 1H / completed 15m candles and Stage 1 of 3. It gives the actual 78,145.6 event close and asks for a later retest. The event price and candle-close time describe that observation; they are separate from the current quote and retrieval time.","对于 08:45 的回放事件，通知会标明 BTC-USDT、突破接受模式、78,000 边界、主周期 1H / 已完成 15m K 线，以及第 1/3 阶段。通知给出实际事件收盘价 78,145.6，并要求等待后续回测。事件价格和 K 线收盘时间仅描述该次观察，与当前报价及数据接收时间分别标注。")}</p><p>{tr("Failed means the selected price pattern did not complete; it does not mean a trade lost money. A source-check alert means monitoring is waiting for verified data or circuit checks, not that a new market signal occurred. The link opens the exact Radar after wallet sign-in. Multiple Radars affected by the same source outage share one incident notice; their individual activity stays available.","失败表示所选价格形态未完成，不代表交易亏损。来源检查通知表示监控正在等待已验证数据或电路检查，而非产生了新市场信号。钱包登录后，链接会打开对应 Radar。同一来源故障影响多个 Radar 时，只发送一条故障通知；每个 Radar 的活动记录仍可查看。")}</p></div>
+  <p><a href="/terminal-guide/examples-source.json" target="_blank" rel="noopener noreferrer">{tr("Inspect the historical example data and verification summary ↗","查看历史示例数据与验证摘要 ↗")}</a></p>
+ </section>;
+}

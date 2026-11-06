@@ -35,6 +35,7 @@ test("automation tick fails closed and runs each enabled worker only with the cr
     autopilot: async () => { calls.push("autopilot"); },
     telegram: async () => { calls.push("telegram"); },
     terminal: async () => { calls.push("terminal"); return { skipped: true }; },
+    marketHistory: async () => { calls.push("terminal_market_history"); return { disabled: true }; },
   }));
   const { server, origin } = await serve(app);
   try {
@@ -46,10 +47,10 @@ test("automation tick fails closed and runs each enabled worker only with the cr
       headers: { Authorization: "Bearer test-cron-secret" },
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(calls.sort(), ["autopilot", "spot", "telegram", "terminal"]);
+    assert.deepEqual(calls.sort(), ["autopilot", "spot", "telegram", "terminal", "terminal_market_history"]);
     const body = await response.json() as { ok?: boolean; results?: unknown[] };
     assert.equal(body.ok, true);
-    assert.equal(body.results?.length, 4);
+    assert.equal(body.results?.length, 5);
   } finally {
     if (previousQueue === undefined) delete process.env.QUEUE_PROVIDER; else process.env.QUEUE_PROVIDER = previousQueue;
     if (previousStorage === undefined) delete process.env.STORAGE_PROVIDER; else process.env.STORAGE_PROVIDER = previousStorage;

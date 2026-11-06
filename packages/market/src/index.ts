@@ -6,6 +6,7 @@ export * from "./resilience.js";
 export * from "./orderFlow.js";
 export * from "./orderBook.js";
 export * from "./okxTradeArchives.js";
+export * from "./terminalHistorySource.js";
 
 export type SpotInstrument = {
   instId: string;

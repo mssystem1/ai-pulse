@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { globalDecision, globalPriceBandText, globalPriceZonePayoff, globalSetupEvidenceLines, globalStrategyMixLines, globalTradeCards, type GlobalReport } from "@pulse/domain";
+import { globalDecision, globalSetupAdmission, globalPriceBandText, globalPriceZonePayoff, globalSetupEvidenceLines, globalStrategyMixLines, globalTradeCards, type GlobalReport } from "@pulse/domain";
+import type { GlobalLiveCandle } from "./globalLiveCandle";
 import { GlobalMarketChart } from "./GlobalMarketChart";
 import { createWalletPaidFetch, getInjectedProvider } from "./wallet";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
@@ -21,7 +22,7 @@ import { TerminalTelegramPanel } from "./TerminalTelegramPanel";
 import { TerminalRadarPlanner, type TerminalRadarDraft } from "./TerminalRadarPlanner";
 import { TerminalRadarProgress } from "./TerminalRadarProgress";
 import { TerminalPositionForm } from "./TerminalPositionForm";
-import { TerminalMarketTools } from "./TerminalMarketTools";
+import { TerminalRetainedMarketTools } from "./TerminalRetainedMarketTools";
 import "./tradingTerminal.css";
 import "./terminalExperience.css";
 
@@ -80,13 +81,13 @@ function PassCountdown({ time, lang = "en" }: { time: TerminalPassTime; lang?: L
 
 function SetupCard({ report, onFollow, onAsk, canFollow }: { report: GlobalReport; onFollow: () => void; onAsk: (question: string) => void; canFollow: boolean }) {
   const card = globalTradeCards(report)[0], decision = globalDecision(report), references = terminalSetupReferences(report);
-  const payoff = globalPriceZonePayoff(report);
+  const payoff = globalPriceZonePayoff(report), admission = globalSetupAdmission(report);
   const followRestriction = terminalFollowRestriction(report);
-  return <section className="terminal-panel terminal-setup" aria-labelledby="terminal-setup-heading"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">One plan · distinct entry conditions</span><h3 id="terminal-setup-heading">{card?.direction ?? "Conditional setup"} · {decision.marketView}</h3><p>{card?.state ?? decision.heading}</p></div><button type="button" onClick={() => onAsk("Why this side? Give supporting evidence, opposing evidence and what would change the view.")}>Why this side?</button></div>
-    {card ? <><div className="terminal-metrics"><ToolMetric label="Entry area" value={card.entry} /><ToolMetric label="Protection area" value={card.stop} note={references.hardStop === null ? "No fixed hard stop supplied" : `Fixed hard SL ${terminalPrice(references.hardStop, report.snapshot.pricePrecision)}`} /><ToolMetric label="First target" value={report.discretionaryPlan?.priceZones?.targets[0] ? globalPriceBandText(report, report.discretionaryPlan.priceZones.targets[0]) : card.targets[0] ? terminalPrice(card.targets[0].price, report.snapshot.pricePrecision) : "—"} note={payoff ? `Least-favorable fill: ${payoff.worstToTP1.toFixed(2)}R to TP1 / ${payoff.worstToObstacle.toFixed(2)}R to nearest obstacle` : undefined} /></div>
+  return <section className="terminal-panel terminal-setup" aria-labelledby="terminal-setup-heading"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">One plan · distinct entry conditions</span><h3 id="terminal-setup-heading">{card?.direction ? `${card.direction} plan` : "Conditional setup"} · {decision.marketView}</h3><p>{card?.state ?? decision.heading}</p><span className={`terminal-status ${admission.geometryEligible ? "waiting" : "negative"}`} data-setup-admission={admission.state}>{admission.geometryEligible ? "Conditional plan · entry review required" : "WAIT · this setup is not qualified"}</span></div><button type="button" onClick={() => onAsk("Why this side? Give supporting evidence, opposing evidence and what would change the view.")}>Why this side?</button></div>
+    {card ? <>{!admission.geometryEligible && <div className="terminal-admission-warning" role="status"><b>Do not treat these targets as an entry signal.</b>{admission.reasons.map(reason=><p key={reason}>{reason}</p>)}<p>The saved plan remains visible for review. A new plan must satisfy its own entry, protection and nearest-obstacle rules.</p></div>}<div className="terminal-metrics"><ToolMetric label="Entry area" value={card.entry} /><ToolMetric label="Protection area" value={card.stop} note={references.hardStop === null ? "No fixed hard stop supplied" : `Fixed hard SL ${terminalPrice(references.hardStop, report.snapshot.pricePrecision)}`} /><ToolMetric label="First target" value={report.discretionaryPlan?.priceZones?.targets[0] ? globalPriceBandText(report, report.discretionaryPlan.priceZones.targets[0]) : card.targets[0] ? terminalPrice(card.targets[0].price, report.snapshot.pricePrecision) : "—"} note={payoff ? `Least-favorable fill: ${payoff.worstToTP1.toFixed(2)}R to TP1 / ${payoff.worstToObstacle.toFixed(2)}R to nearest obstacle` : undefined} /></div>
       <div className="terminal-next"><b>What must happen</b><p>{card.condition}</p></div>
       {report.discretionaryPlan?.barriers.length ? <p><b>Nearest opposing area:</b> {report.discretionaryPlan.barriers.slice(0, 3).map(barrier => `${frameName(barrier.timeframe)} ${terminalPrice(barrier.price, report.snapshot.pricePrecision)}`).join(" · ")}</p> : null}
-      <div className="terminal-evidence"><div><h4>Selected setup evidence</h4>{references.lines.map((line, i) => <p key={i}>{line}</p>)}</div><div><h4>Primary trend &amp; opposing conditions</h4><p>{decision.marketView}. The selected setup response is assessed separately from the primary trend.</p><p>{decision.contextLine}</p><p>{decision.relationship}</p><p>{decision.changeView}</p>{payoff && payoff.worstToObstacle < 1 && <p className="terminal-warning">The nearest obstacle offers less than the full stop risk at the least-favorable fill. Distant targets do not remove that obstacle.</p>}</div></div>
+      <p className="terminal-hint">This is a {frameName(report.snapshot.timeframe)} scenario. A higher-timeframe recovery plan and a shorter-timeframe pullback plan can point in opposite directions; each requires its own entry conditions and invalidation. Targets are conditional objectives.</p><div className="terminal-evidence"><div><h4>Selected setup evidence</h4>{references.lines.map((line, i) => <p key={i}>{line}</p>)}</div><div><h4>Primary trend &amp; opposing conditions</h4><p>{decision.marketView}. The selected setup response is assessed separately from the primary trend.</p><p>{decision.contextLine}</p><p>{decision.relationship}</p><p>{decision.changeView}</p>{payoff && payoff.worstToObstacle < 1 && <p className="terminal-warning">The nearest obstacle offers less than the full stop risk at the least-favorable fill. Distant targets do not remove that obstacle.</p>}</div></div>
       {globalSetupEvidenceLines(report).length > 0 && <details><summary>Full direction, source and risk notes</summary>{globalSetupEvidenceLines(report).map((line, i) => <p key={i}>{line}</p>)}</details>}
       {globalStrategyMixLines(report).length > 0 && <details><summary>Strategy mix and selection</summary>{globalStrategyMixLines(report).map((line, i) => <p key={i}>{line}</p>)}</details>}
       <div className="terminal-actions"><button type="button" className="terminal-primary" disabled={!canFollow || Boolean(followRestriction)} onClick={onFollow}>Follow this setup</button><button type="button" onClick={() => onAsk("Explain the Entry, fixed hard SL, target zones and nearest obstacle for this exact setup.")}>Explain Entry / SL / TP</button></div><p className="terminal-hint">{followRestriction ?? "Save this plan's conditions and receive state changes. Following does not place an order or record a fill."}</p>
@@ -108,6 +109,7 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   const [view, setView] = useState<View>("market");
   const [instId, setInstId] = useState("BTC-USDT"), [marketInput, setMarketInput] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<TerminalTimeframe>("1H");
+  const [currentCandle,setCurrentCandle] = useState<GlobalLiveCandle>();
   const [liveQuote, setLiveQuote] = useState<TerminalLiveQuote | null>(null), [quoteError, setQuoteError] = useState("");
   const quoteClock = useRef<number | null>(null);
   const [market, setMarket] = useState<TerminalMarket | null>(null), [marketError, setMarketError] = useState("");
@@ -121,6 +123,16 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   const [activityFilter, setActivityFilter] = useState("all");
   const [recoveryTransactions, setRecoveryTransactions] = useState<Record<string, string>>({});
   const [replay, setReplay] = useState<{ radarId: string; events: TerminalEvent[] } | null>(null);
+  const deepLinkOpened=useRef("");
+  useEffect(()=>{
+    const subject=new URLSearchParams(window.location.search).get("subject");
+    if(!workspace||!subject||!/^[-a-zA-Z0-9_]{1,160}$/.test(subject))return;
+    const identity=workspace.owner+":"+subject;if(deepLinkOpened.current===identity)return;
+    const position=workspace.positions.some(item=>item.id===subject),found=position||workspace.radars.some(item=>item.id===subject)||workspace.watches.some(item=>item.id===subject);
+    if(!found)return;deepLinkOpened.current=identity;setView(position?"positions":"activity");
+    const timer=window.setTimeout(()=>{const element=document.getElementById("terminal-subject-"+subject);if(!element)return;element.scrollIntoView({block:"center"});element.setAttribute("tabindex","-1");element.focus({preventScroll:true});},100);
+    return()=>window.clearTimeout(timer);
+  },[workspace?.owner,workspace?.revision]);
   const alive = useRef(true), abort = useRef(new AbortController()), marketGeneration = useRef(0), pendingMutation = useRef(false), currentView = useRef(view), journalRequests = useRef(new Map<string, string>());
   const radarRequests = useRef(new Map<string, { requestId: string; expiresAt: string }>());
   currentView.current = view;
@@ -197,6 +209,16 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
     const foreground = () => { void refresh(); }; document.addEventListener("visibilitychange", foreground);
     return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", foreground); };
   }, [token, active, instId]);
+  useEffect(()=>{
+    setCurrentCandle(undefined);if(!token||!active)return;
+    let cancelled=false,pending=false;
+    const refresh=async()=>{if(pending||document.visibilityState!=="visible")return;pending=true;
+      try{const value=await terminalRequest<GlobalLiveCandle>("live-candle?instId="+encodeURIComponent(instId)+"&timeframe="+encodeURIComponent(timeframe),{token,signal:abort.current.signal});
+        if(!cancelled&&value.instId===instId&&value.timeframe===timeframe)setCurrentCandle(previous=>!previous||value.observedAt>=previous.observedAt?value:previous);
+      }catch{/* Saved candles remain readable; never manufacture a forming OHLC. */}finally{pending=false;}};
+    void refresh();const timer=window.setInterval(()=>void refresh(),5000);document.addEventListener("visibilitychange",refresh);
+    return()=>{cancelled=true;window.clearInterval(timer);document.removeEventListener("visibilitychange",refresh);};
+  },[token,active,instId,timeframe]);
   const refreshMarket = useCallback(async (manual = false) => {
     if (!token || !active) return;
     const generation = ++marketGeneration.current;
@@ -395,8 +417,8 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
       {active && quoteError && <p className="terminal-hint" role="status">Current ticker: {quoteError}</p>}
       {marketError && <div className="terminal-notice terminal-error" role="alert"><p>{marketError}</p><button type="button" disabled={marketBusy} onClick={() => void refreshMarket(true)}>Retry market</button>{selectedMarket && <small>The displayed assessment is retained from {terminalUtc(selectedMarket.observedAt)}. New entry monitoring requires fresh evidence.</small>}</div>}
       {selectedMarket ? <><div className="terminal-market-clock"><strong>{instId} · {frameName(timeframe)}</strong><span>Assessment {terminalUtc(selectedMarket.observedAt)}</span><span><b>{currentQuote ? "Current quote" : "Saved quote at assessment"}</b> {terminalPrice(currentQuote?.price ?? selectedMarket.report.currentMarket?.quote?.price, terminalPricePrecision(currentQuote?.price ?? selectedMarket.report.currentMarket?.quote?.price))} · {terminalUtc(currentQuote?.ts ?? selectedMarket.report.currentMarket?.quote?.ts)}</span><span>Completed primary close {terminalPrice(selectedMarket.report.snapshot.price)}</span></div><SetupCard report={selectedMarket.report} onFollow={() => { if (wallet) setReviewFollow(terminalFollowReview(selectedMarket, wallet)); }} onAsk={ask} canFollow={active && Boolean(selectedMarket.setupVersionId) && !busy && !marketBusy && !marketError} />
-        <section className="global-chart-panel terminal-chart"><GlobalMarketChart report={selectedMarket.report} selectedPathId={selectedCard?.key ?? null} viewportIdentity={`terminal:${instId}:${timeframe}`} currentQuote={currentQuote} /></section>
-        <TerminalMarketTools market={selectedMarket} onAsk={ask} onRadar={(price, outside) => { setRadarBoundary(String(price)); setRadarSide(outside); setRadarDetector(outside === "below" ? "sweep_reclaim" : "breakout_acceptance"); setRadarOpen(true); window.setTimeout(() => document.querySelector(".terminal-radar")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); }} />
+        <section className="global-chart-panel terminal-chart"><GlobalMarketChart report={selectedMarket.report} selectedPathId={selectedCard?.key ?? null} viewportIdentity={`terminal:${instId}:${timeframe}`} currentQuote={currentQuote} currentCandle={currentCandle} /></section>
+        <TerminalRetainedMarketTools key={instId+timeframe} token={token} active={active} market={selectedMarket} onAsk={ask} onRadar={(price, outside) => { setRadarBoundary(String(price)); setRadarSide(outside); setRadarDetector(outside === "below" ? "sweep_reclaim" : "breakout_acceptance"); setRadarOpen(true); window.setTimeout(() => document.querySelector(".terminal-radar")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); }} />
       </> : <section className="terminal-panel terminal-empty"><strong>{marketBusy ? `Loading ${instId} · ${frameName(timeframe)} evidence…` : active ? "Select a market to inspect" : "Market evidence opens with an active pass"}</strong><p>{active ? "Each timeframe uses its own structure, execution policy, value window and risk references." : "Your report purchases stay in Global Market. Terminal has its own market selection and ongoing workspace."}</p></section>}
       <section className="terminal-panel terminal-radar"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">A market event · independent of a setup</span><h3>Market Radar</h3><p>Detect an ordered sequence around your level. See each stage, its timestamp, and the next required event.</p></div><button type="button" className="terminal-primary" disabled={!active || Boolean(busy)} onClick={() => { setRadarOpen(previous => !previous); if (!radarBoundary && selectedMarket) setRadarBoundary(String(selectedMarket.report.snapshot.price ?? "")); }}>Create Radar</button></div><div className="terminal-feature-grid"><div><h4>Sweep &amp; reclaim</h4><p>Move beyond a boundary → return inside → later hold. A wick alone does not finish the sequence.</p></div><div><h4>Breakout acceptance</h4><p>Completed break → later hold or retest. See acceptance separately from initial penetration.</p></div><div><h4>Breakout failure</h4><p>Break outside → return inside → later failed hold. Review its relevance to an existing position.</p></div></div>
         {radarOpen && <TerminalRadarPlanner key={timeframe + radarBoundary + radarDetector + radarSide} market={selectedMarket} initialFrame={timeframe} initialBoundary={radarBoundary} initialSide={radarSide} initialDetector={radarDetector} active={active} busy={Boolean(busy)} telegramLinked={Boolean(workspace?.telegram.linked)} telegramEnabled={Boolean(workspace?.telegram.enabled)} accessEndsAt={workspace?.access.expiresAt} serverNow={passTime.now} onCancel={() => setRadarOpen(false)} onCreate={draft => void createRadar(draft)} />}

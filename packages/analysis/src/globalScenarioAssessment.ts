@@ -1,6 +1,6 @@
 import { candleCloseTime, GlobalAssessmentSchema, type GlobalAssessment, type GlobalCandle, type GlobalReport, type GlobalScenario } from "@pulse/schemas";
 import type { SpotMarketContext } from "@pulse/market";
-import { globalArtifactReference, globalContextRelation, globalFrameReference } from "@pulse/domain";
+import { globalArtifactReference, globalContextRelation, globalFrameReference,globalSetupAdmission } from "@pulse/domain";
 import { completedGlobalCandles, globalFrameEvidence, globalSma, globalWilderIndicators } from "./globalReport.js";
 import { advanceGlobalScenario, applyGlobalScenario } from "./globalScenarioLifecycle.js";
 import { globalEntryOpposition } from "./globalRouteObstacles.js";
@@ -58,6 +58,13 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   const opposing = globalEntryOpposition(report, definition.side, { lower: definition.entryZone[0], upper: definition.entryZone[1] });
   if (opposing.length) blockers.push("opposing_zone_overlap");
   const quote = market.ticker.last, quoteAt = Number(market.ticker.ts);
+  // The geometry gate must see this recheck's quote, never the old quote saved
+  // with the purchased report. It does not rewrite the saved report itself.
+  if(Number.isFinite(quote)&&quote>0&&Number.isFinite(quoteAt)&&quoteAt<=asOf+5000&&asOf-quoteAt<=60000)report.currentMarket={...(report.currentMarket??{source:market.source,frames:[]}),quote:{price:quote,ts:quoteAt}};
+  const admission=globalSetupAdmission(report);
+  if(admission.blockers.includes("reward"))blockers.push("reward");
+  if(admission.blockers.includes("geometry"))blockers.push("levels");
+  if(admission.blockers.includes("objective_already_reached"))blockers.push("objective_already_reached");
   // Match report capture's bounded exchange-clock tolerance. A genuine quote
   // a few milliseconds ahead is not a future completed candle or a stale tick.
   const freshQuote = Number.isFinite(quote) && quote > 0 && Number.isFinite(quoteAt) && quoteAt <= asOf + 5_000 && asOf - quoteAt <= 60_000;
@@ -75,7 +82,7 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   else if (assessed.state === "expired") { state = "expired"; blockers.push(assessed.reason ?? "expired"); }
   else if (assessed.state === "completed") { state = "no_trade"; blockers.push("scenario_completed"); }
   else if (assessed.state === "entry_observed") { state = "no_trade"; blockers.push("entry_already_observed", "observation_only"); }
-  else if (integrity || blockers.includes("context") || blockers.includes("quote") || blockers.includes("opposing_zone_overlap")) state = "no_trade";
+  else if (integrity || blockers.includes("context") || blockers.includes("quote") || blockers.includes("opposing_zone_overlap") || blockers.includes("reward") || blockers.includes("levels") || blockers.includes("objective_already_reached")) state = "no_trade";
   else if (definition.mode === "passive_limit") state = "waiting_retest";
   else if (assessed.state === "confirmed_awaiting_fill") state = inEntry ? "technical_valid" : "waiting_retest";
   else state = "waiting_confirmation";
@@ -83,7 +90,7 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   const targets = definition.targets.map(t => definition.side === "long" ? t.lower : t.upper), distance = Math.abs(worst - definition.hardStop);
   const rewardRisk = sign * (targets[0] - worst) / distance;
   const firstObstacle = plan.barriers.filter(b => sign * (b.price - worst) > 0 && sign * (targets[0] - b.price) > 0).sort((a, b) => sign * (a.price - b.price))[0]?.price ?? targets[0];
-  const firstObstacleRewardRisk = opposing.length ? 0 : sign * (firstObstacle - worst) / distance;
+  const firstObstacleRewardRisk = admission.firstObstacleRewardRisk??(opposing.length ? 0 : sign * (firstObstacle - worst) / distance);
   const agreement: GlobalAssessment["context"] = relation === "aligned" ? "supports" : relation === "opposing" ? "conflicts" : relation === "mixed" ? "neutral" : "unknown";
   const retestDeadline = assessed.confirmationAt === undefined ? null : assessed.confirmationAt + definition.fillWindowMs;
   const entryDeadline = Math.min(definition.expiresAt, retestDeadline ?? definition.expiresAt);
@@ -98,6 +105,8 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   if (integrity) lines.push(zh ? "历史数据不完整、过期或被修订；不推进情景记录，避免跳过未知价格路径。" : "History is incomplete, stale or revised. The scenario cursor is not advanced across an unknown price path.");
   if (blockers.includes("context")) lines.push(zh ? "高周期背景缺失或与此方向相反；原价格计划保留，入场授权受阻。" : "Higher-timeframe context is unavailable or opposing; the saved prices remain intact and entry authorization is blocked.");
   if (opposing.length) lines.push(zh ? "原入场区域与主周期反向区域重叠；价格回测本身不证明已突破该区域，不能授权入场。" : "The saved Entry overlaps primary-timeframe opposition. A price retest alone does not prove acceptance through that zone and cannot authorize entry.");
+  if(blockers.includes("reward"))lines.push(zh?`最近障碍仅提供 ${firstObstacleRewardRisk.toFixed(2)}R；本计划的最低要求为 ${admission.minimumRewardRisk.toFixed(2)}R。已观察的价格确认不能弥补不足的收益空间；需要新的有依据结构。`:`The nearest opposing level offers only ${firstObstacleRewardRisk.toFixed(2)}R; this saved policy requires ${admission.minimumRewardRisk.toFixed(2)}R. An observed price confirmation cannot repair insufficient reward; a new supported structure is required.`);
+  if(blockers.includes("objective_already_reached"))lines.push(zh?"当前报价已到达或越过原首目标区域；不能通过改用更远的目标来重新授权本次入场。":"The current quote has reached or passed the saved first target area. A farther target cannot make this a fresh entry opportunity.");
   if (blockers.includes("quote")) lines.push(zh ? "需要更新的同市场报价，不能用旧收盘替代当前报价。" : "A fresh quote from the same market is required; an old close does not replace the current quote.");
   if (next !== null && next > asOf) lines.push(zh ? `下一根 ${globalFrameReference(timeframe)} 收盘：${new Date(next).toISOString()}。` : `Next ${globalFrameReference(timeframe)} close: ${new Date(next).toISOString()}.`);
   const atr = globalWilderIndicators(primaryBars).atr.at(-1)?.value;

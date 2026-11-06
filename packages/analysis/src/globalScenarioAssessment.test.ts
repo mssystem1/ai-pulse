@@ -28,7 +28,7 @@ function fixture(mode: "passive_limit" | "confirmed_retest" = "passive_limit", s
       stopBasis: { price: side === "long" ? 96 : 107, timeframe: "15m", anchorTs: BORN - 90 * MIN, knownAt: BORN - 60 * MIN },
       reference: { timeframe: "5m", candleTs: BORN - 5 * MIN, completedAt: BORN, price: 103 },
       targets: [{ price: side === "long" ? 110 : 90, timeframe: "15m", anchorTs: BORN - 90 * MIN, knownAt: BORN - 60 * MIN, basis: "confirmed_swing" }],
-      barriers: [{ price: side === "long" ? 106 : 97, timeframe: "15m", anchorTs: BORN - 90 * MIN, knownAt: BORN - 60 * MIN, basis: "confirmed_swing" }],
+      barriers: [{ price: side === "long" ? 107 : 97, timeframe: "15m", anchorTs: BORN - 90 * MIN, knownAt: BORN - 60 * MIN, basis: "confirmed_swing" }],
       priceZones: { version: "price-zones-v1", entry: { lower: side === "long" ? 99 : 103, upper: side === "long" ? 101 : 105, sourceLower: side === "long" ? 99 : 103, sourceUpper: side === "long" ? 101 : 105, sourcePrice: side === "long" ? 101 : 103 }, stop: { lower: side === "long" ? 95 : 107, upper: side === "long" ? 96 : 108 }, targets: [{ lower: side === "long" ? 110 : 89, upper: side === "long" ? 111 : 90 }], payoffFloor: 1, payoffLimited: false },
       executionPolicy: { version: "execution-policy-v1", id: mode === "passive_limit" ? "structural-zone-passive-v1" : "accepted-breakout-retest-v1", configurationKey: "BTC-USDT:15m:level_retest:v1", family: "level_retest", mode, sourceBoundary: side === "long" ? 101 : 103, eventTimeframe: "5m", eventKnownAt: BORN - 60 * MIN, eventAfter: BORN - 60 * MIN, expiresAt: BORN + 90 * MIN, confirmationBars: 2, fillWindowBars: 3, stopManagement: "structural_fixed", targetAllocations: [1], entryRegion: mode === "passive_limit" ? "source_zone" : "defended_retest" },
     },
@@ -43,7 +43,7 @@ test("v8 dispatch keeps passive limit prices and never borrows canonical confirm
   const a = assessGlobalEntryReport(report, market, context, entry);
   assert.equal(a.state, "waiting_retest"); assert.equal(a.confirmationTs, null); assert.equal(a.permittedEntry, null);
   assert.equal(a.strategyId, "structural-zone-passive-v1"); assert.equal(a.side, "long");
-  assert.deepEqual(a.targets, [110]); assert.equal(a.grossRewardRisk, 1.5); assert.equal(a.firstObstacleRewardRisk, 5 / 6);
+  assert.deepEqual(a.targets, [110]); assert.equal(a.grossRewardRisk, 1.5); assert.equal(a.firstObstacleRewardRisk, 1);
   assert.equal(a.scenario?.definition.hardStop, 95); assert.deepEqual(a.scenario?.definition.entryZone, [99, 101]);
   assert.match(a.lines.join("\n"), /does not borrow later confirmation/); assert.deepEqual(report, before);
   assert.deepEqual(assessGlobalReport(report, market, context, entry), a);
@@ -161,13 +161,25 @@ test("confirmed price events inside genuine primary opposition do not authorize 
   assert.ok(a.blockers.includes("opposing_zone_overlap")); assert.match(a.lines.join("\n"), /does not prove acceptance/);
 });
 
-test("payoff uses the closest retained barrier and does not ban a setup merely below one R", () => {
+test("observed confirmation cannot authorize a setup below its saved nearest-obstacle floor", () => {
   const { report, market, entry, context } = fixture("confirmed_retest"), initial = report.scenario!;
   report.scenario = advanceGlobalScenario(initial.definition, initial, [event("confirmation", 10)], BORN + 11 * MIN);
   report.discretionaryPlan!.barriers.unshift({ ...report.discretionaryPlan!.barriers[0], price: 109 });
+  report.discretionaryPlan!.barriers.push({...report.discretionaryPlan!.barriers[0],price:106});
+  const before=structuredClone(report.discretionaryPlan);
   const a = assessGlobalEntryReport(report, market, context, entry);
-  assert.equal(a.state, "technical_valid"); assert.equal(a.firstObstacleRewardRisk, 5 / 6);
-  assert.equal(a.blockers.includes("reward"), false); assert.equal(a.grossRewardRisk, 1.5);
+  assert.equal(a.state, "no_trade"); assert.equal(a.firstObstacleRewardRisk, 5 / 6);
+  assert.equal(a.blockers.includes("reward"), true); assert.equal(a.grossRewardRisk, 1.5);
+  assert.equal(a.permittedEntry,null);assert.equal(a.observedStop,null);assert.deepEqual(report.discretionaryPlan,before);
+  assert.match(a.lines.join(" "),/saved policy requires 1\.00R/);
+});
+
+test("a new quote beyond the saved first target blocks re-entry instead of borrowing TP2",()=>{
+ const {report,market,entry,context}=fixture("confirmed_retest"),initial=report.scenario!;
+ report.scenario=advanceGlobalScenario(initial.definition,initial,[event("confirmation",10)],BORN+11*MIN);
+ market.ticker.last=110.5;const before=structuredClone(report);
+ const a=assessGlobalEntryReport(report,market,context,entry);
+ assert.equal(a.state,"no_trade");assert.ok(a.blockers.includes("objective_already_reached"));assert.equal(a.permittedEntry,null);assert.deepEqual(a.targets,[110]);assert.deepEqual(report,before);
 });
 
 test("short rechecks use the facing target boundary and their own protection", () => {

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Router, type Request, type RequestHandler } from "express";
+import {createTerminalHistoryRoutes} from "./terminalHistoryRoutes.js";
 import { z } from "zod";
 import { getNetwork, usdToAtomic, type AppConfig, type NetworkKey } from "@pulse/config";
 import { type SettlementRequest, validateSignedPayment } from "@pulse/payments";
@@ -21,7 +22,7 @@ const inspectionSchema = z.object({ tool: z.enum(["value", "flow", "footprint", 
 const requestIdSchema = z.string().min(16).max(128).regex(/^[a-zA-Z\d_-]+$/);
 const iso = z.string().datetime();
 const positive = z.number().finite().positive().max(1e15);
-const allowedEvents = ["conditions_satisfied", "watch_location_test", "watch_invalidation", "watch_invalidated", "watch_expired", "watch_target_touch", "watch_stop_touch", "watch_entry_observed", "radar_first_stage", "radar_second_stage", "radar_completed", "radar_failed", "radar_expired", "source_interruption", "protection_touched", "target_touched", "pass_expired"] as const;
+const allowedEvents = ["conditions_satisfied", "watch_location_test", "watch_invalidation", "watch_invalidated", "watch_expired", "watch_target_touch", "watch_stop_touch", "watch_entry_observed", "radar_first_stage", "radar_second_stage", "radar_completed", "radar_failed", "radar_expired", "source_interruption", "source_recovered", "protection_touched", "target_touched", "pass_expired"] as const;
 function paymentHash(network: string, header: string) {
   let identity = header;
   try {
@@ -77,6 +78,14 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
     try { return res.json(await runtime!.quote(parsed.data.instId)); }
     catch { return res.status(503).json({ error: "A fresh matching OKX Spot quote is unavailable. The last report close is not substituted; retry the live quote.", code: "terminal_quote_unavailable" }); }
   }));
+  beforePayment.get("/v1/terminal/live-candle", active, asyncRoute(async (req, res) => {
+    const parsed=marketSchema.pick({instId:true,timeframe:true}).strict().safeParse(req.query);
+    if(!parsed.success)return res.status(400).json({error:"Choose the exact market and primary timeframe",code:"terminal_live_candle_input"});
+    try{return res.json(await runtime!.liveCandle(parsed.data.instId,parsed.data.timeframe));}
+    catch{return res.status(503).json({error:"The current forming exchange candle is unavailable. Completed candles remain unchanged.",code:"terminal_live_candle_unavailable"});}
+  }));
+  beforePayment.use("/v1/terminal/history",active);
+  if(runtime)beforePayment.use(createTerminalHistoryRoutes(runtime,dependencies.history));
   beforePayment.get("/v1/terminal/market", active, asyncRoute(async (req, res) => {
     const input = marketSchema.parse(req.query);
     let snapshot: TerminalMarketSnapshot;

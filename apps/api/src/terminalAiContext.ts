@@ -7,7 +7,7 @@ function pick(value: unknown, keys: readonly string[]) {
   const source = object(value);
   return Object.fromEntries(keys.filter(key => source[key] !== undefined).map(key => { const current = source[key]; return [key, typeof current === "string" ? current.slice(0, 600) : current]; }));
 }
-const proofKeys = ["id", "source", "status", "knownAt", "windowStart", "windowEnd", "units", "reason"];
+const proofKeys = ["coverage", "id", "source", "status", "knownAt", "windowStart", "windowEnd", "units", "reason"];
 const candleKeys = ["ts", "open", "high", "low", "close", "volume", "confirmed"];
 const tail = (value: unknown, limit: number) => Array.isArray(value) ? value.slice(-limit) : [];
 const priceRows = (value: unknown, limit = 8) => (Array.isArray(value) ? value.slice().sort((a, b) => Number(object(b).buy ?? 0) + Number(object(b).sell ?? 0) - Number(object(a).buy ?? 0) - Number(object(a).sell ?? 0)).slice(0, limit) : []).map(row => pick(row, ["low", "high", "buy", "sell", "trades"]));
@@ -31,7 +31,7 @@ export function terminalSelectedInspection(evidence: TerminalInspectionEvidence,
   }
   if (selection.tool === "footprint") {
     const orderFlow = tools.value.orderFlow;
-    const bar = selection.footprintStart === undefined ? orderFlow?.profile : orderFlow?.footprints.find(item => item.start === selection.footprintStart);
+    const bar = selection.footprintStart === undefined ? tools.value.sessionProfile ?? orderFlow?.profile : (tools.value.sessionFootprints ?? orderFlow?.footprints)?.find(item => item.start === selection.footprintStart);
     if (selection.footprintStart !== undefined && !bar) throw new TerminalInspectionUnavailableError("The selected completed footprint is not retained in that evidence snapshot. Refresh and select a candle again; a newer bucket was not substituted.");
     return { ...base, windowKind: selection.footprintStart === undefined ? "captured-profile-sample" : "completed-footprint", values: bar ? {
       ...pick(bar, ["start", "end", "knownAt", "open", "high", "low", "close", "buy", "sell", "volume", "delta", "trades"]),
@@ -39,7 +39,7 @@ export function terminalSelectedInspection(evidence: TerminalInspectionEvidence,
       rowCoverage: "Totals cover the selected window. Only its highest-volume price rows are included here; omitted cells are unknown to this explanation.",
     } : null };
   }
-  if (selection.tool === "value") return { ...base, values: { ...pick(tools.value, ["tradeVwap", "sigma", "bands"]), profile: tools.value.orderFlow ? pick(tools.value.orderFlow.profile, ["start", "end", "knownAt", "poc", "val", "vah", "buy", "sell", "volume", "delta"]) : null } };
+  if (selection.tool === "value") return { ...base, values: { ...pick(tools.value, ["tradeVwap", "sigma", "bands"]), profile: tools.value.sessionProfile || tools.value.orderFlow ? pick(tools.value.sessionProfile ?? tools.value.orderFlow!.profile, ["start", "end", "knownAt", "poc", "val", "vah", "buy", "sell", "volume", "delta"]) : null } };
   if (selection.tool === "derivatives") return { ...base, values: pick(tools.derivatives, ["instrumentId", "markPrice", "markPriceAt", "openInterest", "openInterestAt", "openInterestUsd", "fundingRate", "fundingTime", "fundingObservedAt", "fundingKind"]) };
   return { ...base, values: { ...pick(tools.liquidity, ["note"]), bids: tools.liquidity.bids?.slice(0, 12), asks: tools.liquidity.asks?.slice(0, 12) } };
 }

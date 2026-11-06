@@ -30,6 +30,69 @@
   overflow-wrap: anywhere;
 }
 
+/* Actual component captures remain contained and open at their original size. */
+.docs-product .terminal-guide-example {
+  min-width: 0;
+  margin: 32px 0;
+}
+
+.docs-product .terminal-guide-example-reading {
+  padding: 16px 18px;
+  border: 1px solid var(--line2);
+  border-left: 3px solid var(--mint);
+  border-radius: 8px;
+  background: var(--card);
+}
+
+.docs-product .terminal-guide-example-reading strong,
+.docs-product .terminal-guide-event-steps strong {
+  color: var(--text);
+}
+
+.docs-product .terminal-guide-example-reading p:last-child {
+  margin-bottom: 0;
+}
+
+.docs-product .terminal-guide-figure {
+  min-width: 0;
+  margin: 20px 0 26px;
+}
+
+.docs-product .terminal-guide-figure > a {
+  display: block;
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.docs-product .terminal-guide-figure img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.docs-product .terminal-guide-figure figcaption {
+  margin-top: 10px;
+  color: var(--muted);
+  font: 14px/1.6 "Segoe UI", system-ui, sans-serif;
+}
+
+.docs-product .terminal-guide-figure figcaption a {
+  display: inline-block;
+  min-height: 30px;
+  padding: 4px 2px;
+  font-weight: 600;
+}
+
+.docs-product .terminal-guide-event-steps li {
+  margin: 14px 0;
+}
+
+.docs-product .terminal-guide-event-steps :is(strong, span) {
+  display: block;
+}
+
 /* Use the topic picker whenever the sidebar cannot fit beside the article.
    This also prevents its search and all topic links becoming one wide row. */
 @media (max-width: 1050px) {

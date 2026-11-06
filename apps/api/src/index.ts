@@ -4,6 +4,7 @@ import { startTradeAutomation } from "./tradeAutomation.js";
 import { startAutopilotAutomation } from "./autopilotAutomation.js";
 import { startTelegramDeliveryWorker } from "./telegram.js";
 import { startTerminalMonitorWorker } from "./terminalRuntime.js";
+import {startTerminalMarketHistoryWorker} from "./terminalMarketHistoryWorker.js";
 
 const cfg = loadConfig();
 const app = createApp(cfg);
@@ -13,6 +14,7 @@ if (process.env.NODE_ENV !== "test") {
   startAutopilotAutomation(cfg);
   startTelegramDeliveryWorker();
   const stopTerminalMonitor = startTerminalMonitorWorker(cfg);
+  const stopMarketHistory = startTerminalMarketHistoryWorker(cfg);
   const server = app.listen(cfg.PORT, cfg.HOST, () => {
     console.log(`
 ╔══════════════════════════════════════════════════════════╗
@@ -29,6 +31,7 @@ if (process.env.NODE_ENV !== "test") {
     if (shuttingDown) return;
     shuttingDown = true;
     stopTerminalMonitor();
+    stopMarketHistory();
     const deadline = setTimeout(() => process.exit(1), 10_000);
     deadline.unref();
     const releasing = app.locals.stopReportWorker?.();

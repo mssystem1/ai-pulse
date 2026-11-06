@@ -11,6 +11,7 @@ import { advanceGlobalScenario, createGlobalScenarioDefinition } from "@pulse/an
 function pricedReport(firstTarget = 110, nearestObstacle = 105): GlobalReport {
   const report = globalDesignFixture("pro"), born = Date.parse("2026-11-04T05:30:00Z"), minute = 60_000;
   report.decisionVersion = "decision-v5"; report.snapshot.instId = "BTC-USDT"; report.snapshot.observedAt = new Date(born).toISOString(); report.snapshot.price = 100;
+  report.currentMarket = { source: "synthetic-ai-context", quote: { price: 100, ts: born }, frames: [] };
   report.discretionaryPlan = { version: "discretionary-plan-v8", family: "level_retest", side: "long", objectiveTimeframe: "1H", entry: 100, stop: 95,
     entryBasis: { kind: "structure_zone", timeframe: "1H", knownAt: born - 120 * minute, price: 100 },
     stopBasis: { price: 96, timeframe: "1H", anchorTs: born - 180 * minute, knownAt: born - 120 * minute },
@@ -57,7 +58,7 @@ test("confirmed scenario does not become qualified when the canonical decision s
   const context = terminalAiContext({ snapshot: marketSnapshot(report), report, selected: {}, exposure: [] });
   assert.equal(context.scenario!.state, "confirmed_awaiting_fill");
   for (const eligibility of [context.selectedSetupEligibility, context.currentEligibility]) {
-    assert.equal(eligibility.qualified, false); assert.equal(eligibility.currentAction, "WAIT"); assert.equal(eligibility.globalEligibility, "waiting_retest");
+    assert.equal(eligibility.qualified, false); assert.equal(eligibility.currentAction, "WAIT"); assert.equal(eligibility.globalEligibility, "no_trade");
     assert.ok(eligibility.blockers.includes("reward")); assert.ok(eligibility.blockers.includes("nearest_obstacle_reward_below_required_floor"));
     assert.ok(Math.abs(eligibility.payoff!.worstToTP1 - .33) < 1e-9); assert.ok(Math.abs(eligibility.payoff!.worstToObstacle - .11) < 1e-9);
     assert.equal(eligibility.payoff!.leastFavorableEntry, 100); assert.equal(eligibility.payoff!.hardStop, 95); assert.equal(eligibility.payoff!.requiredNearestObstacleR, 1);
@@ -67,7 +68,7 @@ test("confirmed scenario does not become qualified when the canonical decision s
 });
 
 test("selected historical setup and current market keep separate deterministic eligibility and deadlines", () => {
-  const saved = pricedReport(101.65, 100.55), current = structuredClone(saved);
+  const saved = pricedReport(110, 105), current = structuredClone(saved);
   current.snapshot.observedAt = new Date(Date.parse(saved.snapshot.observedAt) + 120 * 60_000).toISOString(); current.scenario!.state = "expired";
   const context = terminalAiContext({ snapshot: marketSnapshot(current), report: saved, selected: {}, exposure: [] });
   assert.equal(context.selectedSetupMatchesCurrentSnapshot, false); assert.equal(context.selectedSetupEligibility.globalEligibility, "waiting_retest");

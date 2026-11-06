@@ -1,4 +1,4 @@
-import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
+import type {GlobalReport} from "@pulse/schemas";
 import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles.js";
 import {deriveGlobalExecutionPolicy,type GlobalExecutionSettings} from "./globalExecutionPolicy.js";
 
@@ -12,8 +12,6 @@ export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<Globa
   const original=report.discretionaryPlan;if(!original)return;
   const tf=report.snapshot.timeframe,tick=10**-report.snapshot.pricePrecision;
   const sources=[{timeframe:tf,candles:report.candles,pivots:report.indicators.pivots},...(report.entryStudy?[report.entryStudy]:[])];
-  const latest=[...sources,...(report.currentMarket?.frames??[])].flatMap(s=>{const c=s.candles.at(-1);return c?[{price:c.close,end:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.end-a.end)[0]?.price??original.reference.price;
-  const current=report.currentMarket?.quote?.price??latest;
   const sourceBand=(p:Plan):Band=>{
     const price=p.entryBasis.price;
     if(p.entryBasis.kind==="structure_zone"){
@@ -41,9 +39,9 @@ export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<Globa
       const c=report.candles.find(c=>c.ts===t.anchorTs);
       if(c)result=p.side==="long"?band(Math.max(c.open,c.close),c.high):band(c.low,Math.min(c.open,c.close));
     }
-    // A partially traversed source wick cannot create reward behind today's
-    // quote. Its remaining exact reference stays a point, with no fake width.
-    if(p.side==="long"?result.lower<=current:result.upper>=current)return band(t.price,t.price);
+    // Keep the actual facing edge even when today's quote has crossed it.
+    // That blocks a fresh opportunity; it cannot promote the far wick edge
+    // into a larger apparent reward for an unchanged future entry.
     // A candle body may straddle a future entry while its actual swing high/
     // low remains ahead. Keep that exact objective as a point; do not shift
     // Entry, invent a partial wick interval or skip to a farther objective.

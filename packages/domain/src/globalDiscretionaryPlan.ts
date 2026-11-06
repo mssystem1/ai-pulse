@@ -5,6 +5,7 @@ import {globalFrameReference} from "./globalContext.js";
 import {globalSetupFamilyName} from "./globalSetupStrategies.js";
 import {globalSetupEvidenceLines,globalCurrentMarketPrice} from "./globalMarketNow.js";
 import {globalPriceBandText,globalTargetReference,globalPriceZonePayoff} from "./globalPriceZones.js";
+import {globalSetupAdmission} from "./globalSetupAdmission.js";
 
 /** Saved source intervals are conditional plans, separate from signals/fills. */
 export function globalDiscretionaryCard(report:GlobalReport){
@@ -30,6 +31,13 @@ export function globalDiscretionaryCard(report:GlobalReport){
   const firstBarrier=d.barriers[0];if(firstBarrier){p.entryObstacle=firstBarrier;p.firstObstacleRewardRisk=sign*(firstBarrier.price-d.entry)/risk;}
   const direction=d.side==="long"?"LONG / BUY":"SHORT / SELL",state=globalScenarioStateName(report)?`${trigger} · ${globalScenarioStateName(report)}`:trigger,payoff=globalPriceZonePayoff(report);
   if(payoff)p.firstObstacleRewardRisk=payoff.worstToObstacle;
+  const admission=globalSetupAdmission(report);
+  if(admission.firstObstacleRewardRisk!==null)p.firstObstacleRewardRisk=admission.firstObstacleRewardRisk;
+  if(!admission.geometryEligible){
+    if(admission.blockers.includes("reward")||admission.blockers.includes("opposing_zone_overlap"))p.blockers.push("reward");
+    if(admission.blockers.includes("geometry"))p.blockers.push("levels");
+    if(p.blockers.some(b=>["reward","levels"].includes(b)))p.state="avoid";
+  }
   const lines=[`${direction} · ${state}`,`Entry: ${entryText} · SL: ${stopText}${zones?` · ${zh?"硬止损":"Hard SL"}: ${price(d.stop)}`:""}`,targets.map((t,i)=>`TP${i+1} ${targetText(i)} (${t.movePercent>=0?"+":""}${t.movePercent.toFixed(2)}%)`).join(" → "),...(zones?[zh?"涨跌幅与收益风险比采用目标首次触及边界和最不利入场；硬止损为固定外侧止损。":"Percentages and R use the first target-zone boundary and least favorable entry; Hard SL is the fixed outer stop."]:[]),...targets.map((t,i)=>`TP${i+1} ${zh?"依据":"basis"}: ${t.source}`),...globalSetupEvidenceLines(report),...globalStrategyMixLines(report).slice(0,4),entryCondition,location,...d.barriers.map(b=>`${globalFrameReference(b.timeframe)} ${zh?"途中障碍":"intermediate barrier"}: ${price(b.price)}`),`R:R → TP1: ${rr.toFixed(2)} · Entry–SL: ${(risk/d.entry*100).toFixed(2)}%`,...(payoff?[zh?`从最不利到最有利入场：TP1 ${payoff.worstToTP1.toFixed(2)}–${payoff.bestToTP1.toFixed(2)}R；最近障碍 ${payoff.worstToObstacle.toFixed(2)}–${payoff.bestToObstacle.toFixed(2)}R。`:`Least to most favorable fill: TP1 ${payoff.worstToTP1.toFixed(2)}–${payoff.bestToTP1.toFixed(2)}R; nearest obstacle ${payoff.worstToObstacle.toFixed(2)}–${payoff.bestToObstacle.toFixed(2)}R.`]:[])];
-  return {key,pathId:key,side:d.side,direction,state,confirmed:false,selected:true,entry:entryText,stop:stopText,targets,condition:entryCondition,location,riskPercent:risk/d.entry*100,rr,plan:p,lines};
+  return {key,pathId:key,side:d.side,direction,state,confirmed:false,selected:true,entry:entryText,stop:stopText,targets,condition:entryCondition,location,riskPercent:risk/d.entry*100,rr,plan:p,lines,admission};
 }

@@ -1,5 +1,6 @@
 import { API_BASE } from "./api";
 import type { GlobalReport, TerminalMarketSnapshot, TerminalRadarState, TerminalSourceStatus } from "@pulse/domain";
+import { globalSetupAdmission } from "@pulse/domain";
 import { terminalUsdAtomic } from "./terminalPricing";
 
 export type TerminalDuration = "24h" | "7d" | "30d";
@@ -77,13 +78,14 @@ export function setTerminalSession(session: TerminalSession, wallet: string) {
   currentSession = session;
 }
 /** Credentials stay in memory; never place them in a URL, report or local storage. */
-export async function terminalRequest<T>(path: string, options: { token?: string; method?: string; body?: unknown; signal?: AbortSignal; fetcher?: typeof fetch; networkRoute?: string } = {}): Promise<T> {
+export async function terminalRequest<T>(path: string, options: { token?: string; method?: string; body?: unknown; signal?: AbortSignal; fetcher?: typeof fetch; networkRoute?: string; timeoutMs?: number } = {}): Promise<T> {
   const { token, body, method = "GET", signal, fetcher = fetch, networkRoute } = options;
+  if(options.timeoutMs!==undefined&&(!Number.isSafeInteger(options.timeoutMs)||options.timeoutMs<1000||options.timeoutMs>240000))throw new Error("Unsupported Terminal request timeout.");
   if (networkRoute && !["xlayer", "base", "arbitrum", "arc", "robinhood"].includes(networkRoute)) throw new Error("Unsupported Terminal payment network.");
   if (!/^[a-z\d/_?=&%.\-]+$/i.test(path) || path.includes("..")) throw new Error("Invalid Terminal request path.");
   const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
   signal?.addEventListener("abort", cancel, { once: true }); if (signal?.aborted) cancel();
-  const deadline = setTimeout(() => controller.abort(new DOMException("Terminal request timed out. Retry this request.", "TimeoutError")), networkRoute ? 180_000 : 90_000);
+  const deadline = setTimeout(() => controller.abort(new DOMException("Terminal request timed out. Retry this request.", "TimeoutError")), options.timeoutMs??(networkRoute ? 180_000 : 90_000));
   let response: Response, data: { error?: string; code?: string; doNotPayAgain?: boolean; transactionHash?: string };
   try { response = await fetcher(`${API_BASE}${networkRoute ? `/${networkRoute}` : ""}/v1/terminal/${path.replace(/^\//, "")}`, {
     method, headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -117,11 +119,12 @@ export function terminalUtc(value: number | string | null | undefined): string {
 }
 export function terminalLabel(value: string): string { return value === "conditions_satisfied" ? "Price policy confirmed" : value.replaceAll("_", " ").replace(/\b\w/g, c => c.toUpperCase()); }
 /** Keep ended priced scenarios readable without offering a new watch on their old opportunity. */
-export function terminalFollowRestriction(report: Pick<GlobalReport, "scenario">): string | null {
+export function terminalFollowRestriction(report: Pick<GlobalReport, "scenario"> & Partial<GlobalReport>): string | null {
   const state = report.scenario?.state;
   if (state === "entry_observed") return "This setup's entry was already observed; review a separate new setup.";
-  return state === "invalidated" || state === "expired" || state === "completed"
-    ? "This opportunity ended; review a separate new setup." : null;
+  if(state === "invalidated" || state === "expired" || state === "completed")return "This opportunity ended; review a separate new setup.";
+  if(report.discretionaryPlan&&report.snapshot){const admission=globalSetupAdmission(report as GlobalReport);if(!admission.geometryEligible)return "WAIT: "+admission.reasons.join(" ");}
+  return null;
 }
 /** Use the priced scenario's immutable protection, independently of current entry eligibility. */
 export function terminalSetupReferences(report: Pick<GlobalReport, "scenario" | "discretionaryPlan" | "snapshot" | "setupSelection">) {

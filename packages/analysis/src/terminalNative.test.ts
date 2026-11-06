@@ -130,6 +130,8 @@ test("snapshot reuses Pro schema with primary profile and execution observations
     const snapshot=await createTerminalMarketSnapshot({instId:"BTC-USDT",timeframe,now,loadMarket,loadParticipation});
     assert.equal(snapshot.report.snapshot.timeframe,timeframe);assert.equal(snapshot.report.orderFlow?.profile.timeframe,timeframe);assert.equal(snapshot.report.orderFlow?.source,snapshot.report.snapshot.source);assert.equal(snapshot.tools.value.orderFlow?.profile.timeframe,terminalFrameProfile(timeframe).execution);assert.equal(snapshot.observations.at(-1)?.timeframe,terminalFrameProfile(timeframe).execution);
     assert.equal(snapshot.tools.perpetualFlow?.status,"unavailable");
+    assert.ok(snapshot.observations.every(c=>c.knownAt===now&&c.at<=c.knownAt),"Retrieval time is retained separately from historical candle close time in Radar alerts");
+    assert.ok(snapshot.observations.some(c=>c.at<c.knownAt),"A fetched historical candle must not claim it was received at its original close");
   }
   const loadInvalidParticipation=async()=>{const p=await loadParticipation();return {...p,capture:{...p.capture,trades:[...p.capture.trades,p.capture.trades[0]]}};};
   const degraded=await createTerminalMarketSnapshot({instId:"BTC-USDT",timeframe:"1Wutc",now,loadMarket,loadParticipation:loadInvalidParticipation});

@@ -6,12 +6,14 @@ import { runAutopilotCycle } from "./autopilotAutomation.js";
 import { runTelegramDeliveryCycle } from "./telegram.js";
 import { kvConfigured, runKvCommand } from "./resilientKv.js";
 import { runTerminalCycle } from "./terminalRuntime.js";
+import { runTerminalMarketHistoryCycle } from "./terminalMarketHistoryWorker.js";
 
 export type AutomationTickDependencies = {
   trade: typeof runTradeAutomationCycle;
   autopilot: typeof runAutopilotCycle;
   telegram: typeof runTelegramDeliveryCycle;
   terminal: typeof runTerminalCycle;
+  marketHistory: typeof runTerminalMarketHistoryCycle;
 };
 
 const defaults: AutomationTickDependencies = {
@@ -19,6 +21,7 @@ const defaults: AutomationTickDependencies = {
   autopilot: runAutopilotCycle,
   telegram: runTelegramDeliveryCycle,
   terminal: runTerminalCycle,
+  marketHistory: runTerminalMarketHistoryCycle,
 };
 
 let localTickRunning = false;
@@ -100,6 +103,7 @@ export function createAutomationTickRouter(
       ];
       if (cfg.FEATURE_TELEGRAM) tasks.push(["telegram", Promise.resolve().then(() => workers.telegram())]);
       if (cfg.FEATURE_TRADING_TERMINAL) tasks.push(["terminal", Promise.resolve().then(() => workers.terminal(cfg))]);
+      if (cfg.FEATURE_TRADING_TERMINAL && cfg.TERMINAL_HISTORY_ENABLED) tasks.push(["terminal_market_history", Promise.resolve().then(() => workers.marketHistory(cfg))]);
       const settled = await Promise.allSettled(tasks.map(([, task]) => task));
       const results = settled.map((result, index) => ({
         worker: tasks[index]![0],

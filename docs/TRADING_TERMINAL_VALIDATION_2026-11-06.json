@@ -1,0 +1,562 @@
+{
+  "recordedAt": "2026-11-06T06:23:51.799Z",
+  "scope": "Local implementation validation. Public exchange data and original approved test-owner captures; synthetic authentication/pass/AI/Telegram transport for hermetic workflow checks. No new payment, order, real bot message, deployment or push.",
+  "unitTests": [
+    {
+      "name": "api",
+      "tests": 502,
+      "passed": 501,
+      "failed": 0,
+      "skipped": 1
+    },
+    {
+      "name": "web",
+      "tests": 272,
+      "passed": 272,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "analysis",
+      "tests": 390,
+      "passed": 390,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "market",
+      "tests": 54,
+      "passed": 54,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "domain",
+      "tests": 78,
+      "passed": 78,
+      "failed": 0,
+      "skipped": 0
+    },
+    {
+      "name": "config",
+      "tests": 13,
+      "passed": 13,
+      "failed": 0,
+      "skipped": 0
+    }
+  ],
+  "totalPassed": 1308,
+  "totalSkipped": 1,
+  "skipReason": "Optional Redis integration test requires an explicitly configured isolated test instance.",
+  "builds": [
+    {
+      "name": "schemas",
+      "code": 0
+    },
+    {
+      "name": "domain",
+      "code": 0
+    },
+    {
+      "name": "config",
+      "code": 0
+    },
+    {
+      "name": "market",
+      "code": 0
+    },
+    {
+      "name": "analysis",
+      "code": 0
+    },
+    {
+      "name": "api",
+      "code": 0
+    },
+    {
+      "name": "web",
+      "code": 0
+    }
+  ],
+  "productionFrontendBuild": "passed; Vite reports the existing large application chunk warning",
+  "browser": {
+    "docs": {
+      "at": "2026-11-05T18:35:53.175Z",
+      "scope": "Public real application docs; stubbed catalog only; external network blocked; no wallet/payments/Telegram",
+      "checks": 346,
+      "screenshots": 14,
+      "errors": [],
+      "artifact": ".tmp/docs-layout-20261105/validation.json"
+    },
+    "historicalComponents": {
+      "at": "2026-11-06T06:05:09.843Z",
+      "scope": "Actual application components, genuine historical public OKX data, actual AppearancePicker; external browser network blocked; no payments, wallet signing or bot sends",
+      "checks": 27,
+      "screenshots": 8,
+      "errors": [],
+      "artifact": ".tmp/docs-illustrations-20261105/validation.json"
+    },
+    "liveCandles": {
+      "at": "2026-11-05T18:35:33.724Z",
+      "scope": "Actual chart, selector and AppearancePicker; captured public BTC candles/ticker from18:06UTC, controlled same-period quote update; no payment/orders/TG",
+      "checks": 34,
+      "screenshots": 6,
+      "errors": [],
+      "artifact": ".tmp/terminal-live-chart-20261105/validation.json"
+    },
+    "historyRaces": {
+      "at": "2026-11-06T06:03:41.637Z",
+      "scope": "Actual retained-history components with controlled asynchronous transport, historical fixture records and fake in-memory owner tokens; no wallet, payment, trade or bot send",
+      "checks": 10,
+      "errors": [],
+      "artifact": ".tmp/terminal-history-web-audit/validation.json"
+    },
+    "workflow": {
+      "at": "2026-11-06T05:54:56.895Z",
+      "scope": "Actual local Vite UI, SYNTHETIC localhost API/source/pass/owner/login/AI fixtures; no production API proof, live market fetch, real wallet signature, payment, exchange order or Telegram send.",
+      "checks": 26,
+      "screenshots": 22,
+      "errors": [],
+      "artifact": ".tmp/terminal-usability-regressions/validation.json"
+    },
+    "capturedSetups": {
+      "at": "2026-11-06T06:18:54.472Z",
+      "scope": "Actual local Vite UI with five retained public BTC snapshots from 06 Nov 2026; synthetic localhost owner/pass only. No new market fetch, production API proof, real wallet signature, payment, exchange order or Telegram send. Original capture source clocks retained.",
+      "checks": 9,
+      "screenshots": 3,
+      "errors": [],
+      "artifact": ".tmp/terminal-fresh-setup-workflow-20261106/validation.json"
+    }
+  },
+  "verifiedHistoricalSession": {
+    "source": "Official public OKX executions and order-book archives; no payment, wallet signing or bot send",
+    "knownAt": 1793901967401,
+    "start": 1793491200000,
+    "end": 1793577600000,
+    "complete": true,
+    "trades": 177587,
+    "buy": 2132.8881197699993,
+    "sell": 1585.3952754300008,
+    "vwap": 77953.366065726,
+    "poc": 78005,
+    "val": 77820,
+    "vah": 78220,
+    "proofHashes": [
+      "456f303cf352a1d8088fe19259b76defd32b4f4c76fde6888c90628a3cf13a43",
+      "280ad84688aa18a16b157efa81050bc1dd02de34dee6b840a95f92dac672cac3"
+    ],
+    "liquidity": {
+      "frames": 1440,
+      "gaps": 0,
+      "status": "available",
+      "depthLevels": 50,
+      "sampleMs": 60000
+    },
+    "liquidityCaptureSha256": "c7f5f9cf4cf9504e50c07447a2d97d72d991f62796099c01d6d579aad8fef1ea"
+  },
+  "freshSetupAudit": {
+    "createdAt": "2026-11-06T05:56:41.857Z",
+    "frames": [
+      {
+        "timeframe": "15m",
+        "source": "okx-public-spot",
+        "observedAt": "2026-11-06T05:56:43.645Z",
+        "completedAt": 1793943900000,
+        "completedClose": 75628.5,
+        "quote": {
+          "price": 75725.8,
+          "ts": 1793944608069
+        },
+        "primaryBias": "mixed",
+        "contextBias": "down",
+        "setup": {
+          "side": "short",
+          "family": "level_retest",
+          "entry": {
+            "lower": 75668.9,
+            "upper": 76069.6,
+            "sourceLower": 75668.9,
+            "sourceUpper": 76069.6,
+            "sourcePrice": 75668.9
+          },
+          "stop": 76121.1503884,
+          "stopBasis": {
+            "timeframe": "15m",
+            "anchorTs": 1793901600000,
+            "knownAt": 1793943900000,
+            "price": 76069.6
+          },
+          "targets": [
+            {
+              "price": 75405.3,
+              "timeframe": "15m",
+              "anchorTs": 1793919600000,
+              "knownAt": 1793943900000,
+              "basis": "structure_zone"
+            }
+          ],
+          "targetZones": [
+            {
+              "lower": 75200,
+              "upper": 75405.3
+            }
+          ],
+          "source": {
+            "kind": "structure_zone",
+            "timeframe": "15m",
+            "knownAt": 1793943900000,
+            "price": 75668.9
+          },
+          "scenario": "awaiting_location"
+        },
+        "admission": {
+          "geometryEligible": false,
+          "allowed": false,
+          "minimumRewardRisk": 1,
+          "minimumPolicy": "saved-price-zones",
+          "firstObstacleRewardRisk": 0.09176332638833326,
+          "targetRewardRisk": 0.5828629599027433,
+          "nearestObstacle": {
+            "price": 75627.4,
+            "timeframe": "5m"
+          },
+          "reasons": [
+            "The nearest opposing level offers 0.09R at the least favorable entry; this saved policy requires 1.00R. A farther target does not remove that obstacle."
+          ],
+          "blockers": [
+            "reward"
+          ],
+          "state": "blocked"
+        }
+      },
+      {
+        "timeframe": "1H",
+        "source": "okx-public-spot",
+        "observedAt": "2026-11-06T05:56:43.734Z",
+        "completedAt": 1793941200000,
+        "completedClose": 75773,
+        "quote": {
+          "price": 75725.8,
+          "ts": 1793944608270
+        },
+        "primaryBias": "down",
+        "contextBias": "range",
+        "setup": {
+          "side": "short",
+          "family": "ema_pullback",
+          "entry": {
+            "lower": 76402.6604868,
+            "upper": 76402.6604868,
+            "sourceLower": 76402.6604868,
+            "sourceUpper": 77277.2364636,
+            "sourcePrice": 76402.6604868
+          },
+          "stop": 76700.7865127,
+          "stopBasis": {
+            "timeframe": "1H",
+            "anchorTs": 1793923200000,
+            "knownAt": 1793937600000,
+            "price": 76427.1
+          },
+          "targets": [
+            {
+              "price": 75200,
+              "timeframe": "1H",
+              "anchorTs": 1793919600000,
+              "knownAt": 1793934000000,
+              "basis": "confirmed_swing"
+            }
+          ],
+          "targetZones": [
+            {
+              "lower": 75200,
+              "upper": 75709.4
+            }
+          ],
+          "source": {
+            "kind": "ema_ribbon",
+            "timeframe": "1H",
+            "knownAt": 1793941200000,
+            "price": 76402.6604868
+          },
+          "scenario": "awaiting_event"
+        },
+        "admission": {
+          "geometryEligible": true,
+          "allowed": true,
+          "minimumRewardRisk": 1,
+          "minimumPolicy": "saved-price-zones",
+          "firstObstacleRewardRisk": 2.2412014676777186,
+          "targetRewardRisk": 2.3253940500738133,
+          "nearestObstacle": {
+            "price": 75734.5,
+            "timeframe": "1H"
+          },
+          "reasons": [
+            "The saved geometry clears its 1.00R nearest-obstacle floor. Entry location, fresh evidence, context and execution review are still required."
+          ],
+          "blockers": [],
+          "state": "waiting"
+        }
+      },
+      {
+        "timeframe": "4H",
+        "source": "okx-public-spot",
+        "observedAt": "2026-11-06T05:56:43.779Z",
+        "completedAt": 1793937600000,
+        "completedClose": 75912.1,
+        "quote": {
+          "price": 75725.8,
+          "ts": 1793944607868
+        },
+        "primaryBias": "range",
+        "contextBias": "range",
+        "setup": {
+          "side": "short",
+          "family": "level_retest",
+          "entry": {
+            "lower": 76191.1,
+            "upper": 76261,
+            "sourceLower": 76191.1,
+            "sourceUpper": 76261,
+            "sourcePrice": 76261
+          },
+          "stop": 77121.9603337,
+          "stopBasis": {
+            "timeframe": "4H",
+            "anchorTs": 1793376000000,
+            "knownAt": 1793937600000,
+            "price": 76887.7
+          },
+          "targets": [
+            {
+              "price": 70261,
+              "timeframe": "4H",
+              "anchorTs": 1793649600000,
+              "knownAt": 1793937600000,
+              "basis": "measured_projection"
+            }
+          ],
+          "targetZones": [
+            {
+              "lower": 70261,
+              "upper": 70261
+            }
+          ],
+          "source": {
+            "kind": "reclaimed_level",
+            "timeframe": "4H",
+            "knownAt": 1788393600000,
+            "price": 76261
+          },
+          "scenario": "confirmed_awaiting_fill"
+        },
+        "admission": {
+          "geometryEligible": false,
+          "allowed": false,
+          "minimumRewardRisk": 1,
+          "minimumPolicy": "saved-price-zones",
+          "firstObstacleRewardRisk": 0.4905139723647978,
+          "targetRewardRisk": 6.370558273150358,
+          "nearestObstacle": {
+            "price": 75734.5,
+            "timeframe": "4H"
+          },
+          "reasons": [
+            "The nearest opposing level offers 0.49R at the least favorable entry; this saved policy requires 1.00R. A farther target does not remove that obstacle."
+          ],
+          "blockers": [
+            "reward"
+          ],
+          "state": "blocked"
+        }
+      },
+      {
+        "timeframe": "1Dutc",
+        "source": "okx-public-spot",
+        "observedAt": "2026-11-06T05:56:43.838Z",
+        "completedAt": 1793923200000,
+        "completedClose": 76087.4,
+        "quote": {
+          "price": 75725.8,
+          "ts": 1793944607868
+        },
+        "primaryBias": "range",
+        "contextBias": "mixed",
+        "setup": {
+          "side": "long",
+          "family": "range_rotation",
+          "entry": {
+            "lower": 74955.5,
+            "upper": 76265.2,
+            "sourceLower": 74955.5,
+            "sourceUpper": 76265.2,
+            "sourcePrice": 76265.2
+          },
+          "stop": 74464.0879256,
+          "stopBasis": {
+            "timeframe": "1Dutc",
+            "anchorTs": 1788393600000,
+            "knownAt": 1793923200000,
+            "price": 74955.5
+          },
+          "targets": [
+            {
+              "price": 81751.75,
+              "timeframe": "1Dutc",
+              "anchorTs": 1788393600000,
+              "knownAt": 1793923200000,
+              "basis": "range_midpoint"
+            },
+            {
+              "price": 84495.025,
+              "timeframe": "1Dutc",
+              "anchorTs": 1788393600000,
+              "knownAt": 1793923200000,
+              "basis": "range_quartile"
+            },
+            {
+              "price": 87238.3,
+              "timeframe": "1Dutc",
+              "anchorTs": 1788393600000,
+              "knownAt": 1793923200000,
+              "basis": "range_boundary"
+            }
+          ],
+          "targetZones": [
+            {
+              "lower": 81751.75,
+              "upper": 81751.75
+            },
+            {
+              "lower": 84495.025,
+              "upper": 84495.025
+            },
+            {
+              "lower": 87238.3,
+              "upper": 87238.3
+            }
+          ],
+          "source": {
+            "kind": "range_edge",
+            "timeframe": "1Dutc",
+            "knownAt": 1793923200000,
+            "price": 76265.2
+          },
+          "scenario": "awaiting_location"
+        },
+        "admission": {
+          "geometryEligible": false,
+          "allowed": false,
+          "minimumRewardRisk": 1,
+          "minimumPolicy": "saved-price-zones",
+          "firstObstacleRewardRisk": 0,
+          "targetRewardRisk": 3.0462013319341863,
+          "nearestObstacle": {
+            "price": 77507.1,
+            "timeframe": "4H"
+          },
+          "reasons": [
+            "The nearest opposing level offers 0.00R at the least favorable entry; this saved policy requires 1.00R. A farther target does not remove that obstacle.",
+            "The entry area overlaps primary-timeframe opposition. A price retest alone does not remove that opposing zone."
+          ],
+          "blockers": [
+            "reward",
+            "opposing_zone_overlap"
+          ],
+          "state": "blocked"
+        }
+      },
+      {
+        "timeframe": "1Wutc",
+        "source": "okx-public-spot",
+        "observedAt": "2026-11-06T05:56:44.613Z",
+        "completedAt": 1793577600000,
+        "completedClose": 78342.5,
+        "quote": {
+          "price": 75725.8,
+          "ts": 1793944607868
+        },
+        "primaryBias": "mixed",
+        "contextBias": "mixed",
+        "setup": {
+          "side": "long",
+          "family": "ema_pullback",
+          "entry": {
+            "lower": 76577.2764419,
+            "upper": 78675.2841677,
+            "sourceLower": 76577.2764419,
+            "sourceUpper": 78675.2841677,
+            "sourcePrice": 78675.2841677
+          },
+          "stop": 73739.3535554,
+          "stopBasis": {
+            "timeframe": "1Wutc",
+            "anchorTs": 1789344000000,
+            "knownAt": 1791763200000,
+            "price": 74955.5
+          },
+          "targets": [
+            {
+              "price": 87399,
+              "timeframe": "1Wutc",
+              "anchorTs": 1789948800000,
+              "knownAt": 1792368000000,
+              "basis": "confirmed_swing"
+            },
+            {
+              "price": 97925.4,
+              "timeframe": "1Wutc",
+              "anchorTs": 1768176000000,
+              "knownAt": 1770595200000,
+              "basis": "confirmed_swing"
+            }
+          ],
+          "targetZones": [
+            {
+              "lower": 84479,
+              "upper": 87399
+            },
+            {
+              "lower": 93674.1,
+              "upper": 97925.4
+            }
+          ],
+          "source": {
+            "kind": "ema_ribbon",
+            "timeframe": "1Wutc",
+            "knownAt": 1793577600000,
+            "price": 78675.2841677
+          },
+          "scenario": "awaiting_location"
+        },
+        "admission": {
+          "geometryEligible": false,
+          "allowed": false,
+          "minimumRewardRisk": 1,
+          "minimumPolicy": "saved-price-zones",
+          "firstObstacleRewardRisk": 0.16465300996630142,
+          "targetRewardRisk": 1.175809849886776,
+          "nearestObstacle": {
+            "price": 79488,
+            "timeframe": "1Dutc"
+          },
+          "reasons": [
+            "The nearest opposing level offers 0.16R at the least favorable entry; this saved policy requires 1.00R. A farther target does not remove that obstacle."
+          ],
+          "blockers": [
+            "reward"
+          ],
+          "state": "blocked"
+        }
+      }
+    ]
+  },
+  "savedContractsUnchanged": true,
+  "limits": [
+    "Historical exchange archive publication delay and genuine source gaps remain explicit. Current incomplete sessions stay developing.",
+    "The book heatmap contains retained sampled observations; no state between samples, liquidation map or publisher sequence verification is invented.",
+    "Geometry-passing candidates remain conditional. No entry, profitability or award guarantee is established.",
+    "The Trading Rules Tapeout extension is a design proposal; current X Layer support must be verified before implementation claims."
+  ]
+}

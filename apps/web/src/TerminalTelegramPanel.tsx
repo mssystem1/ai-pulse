@@ -5,7 +5,7 @@ const groups = [
   { title: "Setup changes", events: ["conditions_satisfied", "watch_location_test", "watch_invalidation", "watch_invalidated", "watch_expired", "watch_target_touch", "watch_stop_touch", "watch_entry_observed"] },
   { title: "Radar stages", events: ["radar_first_stage", "radar_second_stage", "radar_completed", "radar_failed", "radar_expired"] },
   { title: "Position stop / targets", events: ["protection_touched", "target_touched"] },
-  { title: "Data and pass status", events: ["source_interruption", "pass_expired"] },
+  { title: "Data and pass status", events: ["source_interruption", "source_recovered", "pass_expired"] },
 ];
 const defaults = groups.flatMap(group => group.events);
 export function TerminalTelegramPanel({ workspace, active, busy, onSave, onSync, onIncludeAll }: { workspace: TerminalWorkspace | null; active: boolean; busy: boolean; onSave: (enabled: boolean, events: string[]) => void; onSync: () => void; onIncludeAll: () => void }) {

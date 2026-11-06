@@ -27,7 +27,7 @@ export type TerminalFlowTool = TerminalToolBase & {
   buy?:number;sell?:number;delta?:number;marketType:"spot"|"perpetual";
 };
 export type TerminalMarketTools = {
-  value:TerminalToolBase & {tradeVwap?:number;sigma?:number;bands?:{lower:number;upper:number;deviations:number}[];orderFlow?:GlobalOrderFlow};
+  value:TerminalToolBase & {tradeVwap?:number;sigma?:number;bands?:{lower:number;upper:number;deviations:number}[];orderFlow?:GlobalOrderFlow;sessionProfile?:GlobalOrderFlow["profile"];sessionFootprints?:GlobalOrderFlow["footprints"]};
   flow:TerminalFlowTool;
   perpetualFlow?:TerminalFlowTool;
   derivatives:TerminalToolBase & {instrumentId?:string;openInterest?:number;openInterestUsd?:number;openInterestAt?:number;fundingRate?:number;fundingTime?:number;fundingObservedAt?:number;markPrice?:number;markPriceAt?:number;fundingKind?:"current-estimate"};

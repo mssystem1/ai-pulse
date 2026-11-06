@@ -1,0 +1,182 @@
+{
+  "purpose": "Historical educational examples rendered with actual PULSE components; not current conditions or claimed trades.",
+  "session": {
+    "instrument": "BTC-USDT",
+    "source": "okx-retained-executions",
+    "start": 1793491200000,
+    "end": 1793577600000,
+    "knownAt": 1793901967401,
+    "complete": true,
+    "trades": 177587,
+    "quantityUnit": "base",
+    "rows": 94,
+    "rowSize": 10,
+    "vwap": 77953.366065726,
+    "poc": 78005,
+    "val": 77820,
+    "vah": 78220,
+    "priceReference": 78342.5,
+    "priceReferenceMeaning": "Final execution of the complete historical session. Final profile was not known earlier that morning."
+  },
+  "liquidity": {
+    "source": "okx-public-orderbook-archive-and-retained-snapshots",
+    "start": 1793491200000,
+    "end": 1793577600000,
+    "samples": 1440,
+    "sampleIntervalMs": 60000,
+    "depthLevels": 50,
+    "gaps": 0,
+    "meaning": "Real book observations; intervening changes are not inferred."
+  },
+  "radar": {
+    "boundary": 78000,
+    "boundaryOrigin": "Manually selected for an illustrative historical replay, not a previously published setup.",
+    "detector": "breakout_acceptance",
+    "timeframe": "15m",
+    "observations": [
+      {
+        "id": "docs-1793520900000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793520900000,
+        "at": 1793521800000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 77866.1,
+        "high": 77957.4,
+        "low": 77851.7,
+        "close": 77956,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-1793521800000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793521800000,
+        "at": 1793522700000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 77957.4,
+        "high": 78170.3,
+        "low": 77957.3,
+        "close": 78145.6,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-1793522700000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793522700000,
+        "at": 1793523600000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 78139.6,
+        "high": 78251.1,
+        "low": 78139.6,
+        "close": 78233.6,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-1793523600000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793523600000,
+        "at": 1793524500000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 78234.9,
+        "high": 78250.9,
+        "low": 78152.1,
+        "close": 78177.6,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-1793524500000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793524500000,
+        "at": 1793525400000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 78177.6,
+        "high": 78204.2,
+        "low": 77953.6,
+        "close": 78010.5,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-1793525400000",
+        "instId": "BTC-USDT",
+        "timeframe": "15m",
+        "start": 1793525400000,
+        "at": 1793526300000,
+        "knownAt": 1793901967401,
+        "complete": true,
+        "open": 78010.4,
+        "high": 78080,
+        "low": 77939.3,
+        "close": 78056.5,
+        "source": "okx-retained-executions"
+      }
+    ],
+    "events": [
+      {
+        "id": "docs-btc-20261101-78000:start",
+        "at": 1793520900000,
+        "kind": "started",
+        "reason": "Monitoring starts here; earlier touches are historical."
+      },
+      {
+        "id": "docs-btc-20261101-78000:first_stage:docs-1793521800000",
+        "at": 1793522700000,
+        "kind": "first_stage",
+        "reason": "New completed close beyond the boundary.",
+        "observationId": "docs-1793521800000",
+        "price": 78145.6,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-btc-20261101-78000:second_stage:docs-1793524500000",
+        "at": 1793525400000,
+        "kind": "second_stage",
+        "reason": "A later retest closed outside.",
+        "observationId": "docs-1793524500000",
+        "price": 78010.5,
+        "source": "okx-retained-executions"
+      },
+      {
+        "id": "docs-btc-20261101-78000:completed:docs-1793525400000",
+        "at": 1793526300000,
+        "kind": "completed",
+        "reason": "The ordered price sequence completed. This is an observed event, not a trade or fill.",
+        "observationId": "docs-1793525400000",
+        "price": 78056.5,
+        "source": "okx-retained-executions"
+      }
+    ],
+    "tapeout": {
+      "version": "tapeout-xlayer-nand-v1",
+      "chainId": 196,
+      "factory": "0x1f09daefa827f02cbb40967cc91b259763760761",
+      "processor": "0x839bdd6fa7a66416a609a735e11de5411b98574e",
+      "circuitId": "2",
+      "blockNumber": "75134025",
+      "blockHash": "0x1f34f1dea33a289ecbb7cb4f303c2358bd65b202f5cff581833b3471f191b8a1",
+      "observedAt": 1793903061425,
+      "netlist": "0x000000020000030000000400000400000005000005",
+      "codeHash": "sha256:2ea683e275cbe6e51928a9bdefe80b6ff6a6a6e8535436bbe7eea02ee18306ae",
+      "truthTable": [
+        1,
+        1,
+        1,
+        0
+      ],
+      "verified": true,
+      "endpoints": [
+        "https://rpc.xlayer.tech",
+        "https://tapeout.net/rpc-xlayer"
+      ]
+    },
+    "verificationMeaning": "Circuit verified November 5, 2026 and used to replay retained November 1 candle observations later. No historical on-chain price verification is claimed."
+  }
+}

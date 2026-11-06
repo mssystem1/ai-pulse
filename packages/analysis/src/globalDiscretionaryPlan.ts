@@ -67,9 +67,10 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   if(family==="vwap_reversion"){const outer=band(3,side==="long"?"lower":"upper");if(outer!==undefined&&outer>tick){stop=round(side==="long"?Math.max(tick,Math.min(outer,primaryLast.low)-primaryAtr*.2):Math.max(outer,primaryLast.high)+primaryAtr*.2);stopBasis={price:outer,timeframe:primaryTimeframe,anchorTs:vwap?.anchorTs??report.candles[0].ts,knownAt:primaryClosed};}}
   if(!(stop>0)||sign*(entry-stop)<=0)return;
   const targetSources=[...sources,...(!study&&lower?[{bars:lower.candles,timeframe:lower.timeframe}]:[]),...(report.currentMarket?.frames.map(f=>({bars:f.candles,timeframe:f.timeframe}))??[])];
-  const latest=targetSources.flatMap(s=>{const c=s.bars.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,s.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]?.price??reference.price;
-  const currentPrice=report.currentMarket?.quote?.price??latest;
-  const forward=(price:number)=>sign*(price-entry)>tick&&sign*(price-currentPrice)>tick;
+  // A future return to Entry has its own route. A live quote crossing a real
+  // first objective must not promote an archive target; admission/lifecycle
+  // marks that opportunity unavailable. Completed consumed levels stay spent.
+  const forward=(price:number)=>sign*(price-entry)>tick;
   const unplayed=(price:number,knownAt:number)=>!targetSources.some(source=>candleLevelTouchedAfter(source.bars,source.timeframe,price,side,knownAt,cutoff));
   const horizonStart=report.candles.at(-Math.min(report.strategy.lookbackBars,report.candles.length))!.ts;
   const candidates:NonNullable<GlobalReport["discretionaryPlan"]>["targets"]=known.filter(a=>a.timeframe===primaryTimeframe&&a.anchorTs>=horizonStart&&a.kind===(side==="long"?"high":"low")&&forward(a.price)&&unplayed(a.price,a.knownAt)).map(a=>({price:a.price,timeframe:a.timeframe,anchorTs:a.anchorTs,knownAt:a.knownAt,basis:a.basis}));
@@ -101,7 +102,7 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     if(!targets.length&&forward(boundary))targets.push({price:boundary,timeframe:report.snapshot.timeframe,anchorTs:report.range.startTs,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,basis:"range_boundary"});
   }
   if(!targets.length){
-    const measured=Math.max(primaryAtr,Math.max(...report.candles.slice(-20).map(c=>c.high))-Math.min(...report.candles.slice(-20).map(c=>c.low))),price=round((sign*(currentPrice-entry)>0?currentPrice:entry)+sign*measured);
+    const measured=Math.max(primaryAtr,Math.max(...report.candles.slice(-20).map(c=>c.high))-Math.min(...report.candles.slice(-20).map(c=>c.low))),price=round(entry+sign*measured);
     if(price>0)targets.push({price,anchorTs:report.candles.at(-Math.min(20,report.candles.length))!.ts,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"measured_projection"});
   }
   if(!targets.length)return;
