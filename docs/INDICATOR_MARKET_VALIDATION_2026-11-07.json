@@ -1,0 +1,353 @@
+{
+  "date": "2026-11-07",
+  "scope": "Local implementation and real-wallet Base acceptance; not deployed",
+  "automatedSuites": {
+    "domain": {
+      "tests": 85,
+      "pass": 85,
+      "fail": 0,
+      "skipped": 0
+    },
+    "web": {
+      "tests": 292,
+      "pass": 292,
+      "fail": 0,
+      "skipped": 0
+    },
+    "api": {
+      "tests": 509,
+      "pass": 508,
+      "fail": 0,
+      "skipped": 1
+    },
+    "analysis": {
+      "tests": 392,
+      "pass": 392,
+      "fail": 0,
+      "skipped": 0
+    },
+    "config": {
+      "tests": 14,
+      "pass": 14,
+      "fail": 0,
+      "skipped": 0
+    }
+  },
+  "passed": 1291,
+  "skipped": 1,
+  "funded": {
+    "at": "2026-11-07T13:15:10.552Z",
+    "checks": [
+      {
+        "check": "real_test_wallet_authenticated_model_4_7",
+        "ok": true
+      },
+      {
+        "check": "paid_terminal_access_active",
+        "ok": true,
+        "newPurchase": false,
+        "expiresAt": "2026-11-08T12:59:38.907Z"
+      },
+      {
+        "check": "base_exact_transfer_verified",
+        "ok": true,
+        "transaction": "0x90309f954c88830bf8208c3610e339bd5ed380ebc35d81d53cb73e864a3a841f",
+        "block": "54330055"
+      },
+      {
+        "check": "real_wallet_publish_load_unpublish",
+        "ok": true
+      },
+      {
+        "check": "indicator_evaluates_fresh_btc_executions",
+        "ok": true,
+        "status": "partial",
+        "points": 14,
+        "source": "okx-public-history-trades"
+      },
+      {
+        "check": "live_session_day",
+        "ok": true,
+        "timeframe": "15m",
+        "start": 1794009600000,
+        "end": 1794057180000,
+        "trades": 0,
+        "complete": false
+      },
+      {
+        "check": "live_session_week",
+        "ok": true,
+        "timeframe": "1H",
+        "start": 1793577600000,
+        "end": 1794057180000,
+        "trades": 0,
+        "complete": false
+      },
+      {
+        "check": "live_session_month",
+        "ok": true,
+        "timeframe": "1Dutc",
+        "start": 1793491200000,
+        "end": 1794057180000,
+        "trades": 0,
+        "complete": false
+      },
+      {
+        "check": "live_ask_pulse_grok_4_7_with_exact_source",
+        "ok": true,
+        "model": "grok-4.7",
+        "sources": 7
+      },
+      {
+        "check": "browser_existing_header_and_terminal_second_tab",
+        "ok": true,
+        "tabs": [
+          "Portfolio",
+          "Trading Terminal",
+          "Global Market",
+          "Prediction Market",
+          "Risk Guard",
+          "Spot Trading",
+          "Autopilot",
+          "Telegram",
+          "Docs"
+        ]
+      },
+      {
+        "check": "browser_real_owner_signin_paid_access_current_chart",
+        "ok": true,
+        "walletSignatures": 1
+      },
+      {
+        "check": "browser_paid_access_countdown_matches_original_grant_and_ticks",
+        "ok": true,
+        "timerStart": 85477,
+        "timerLater": 85475,
+        "expiry": "2026-11-08T12:59:38.907Z"
+      },
+      {
+        "check": "browser_live_indicator_catalog_install_two_numeric_panes",
+        "ok": true
+      },
+      {
+        "check": "browser_indicator_ask_button_prefills_context_and_exposes_model",
+        "ok": true
+      },
+      {
+        "check": "browser_live_indicator_layout",
+        "ok": true,
+        "theme": "base",
+        "width": 1440
+      },
+      {
+        "check": "browser_live_indicator_layout",
+        "ok": true,
+        "theme": "base",
+        "width": 390
+      },
+      {
+        "check": "browser_live_indicator_layout",
+        "ok": true,
+        "theme": "xlayer",
+        "width": 1440
+      },
+      {
+        "check": "browser_live_indicator_layout",
+        "ok": true,
+        "theme": "xlayer",
+        "width": 390
+      }
+    ],
+    "scope": "Actual local API, durable wallet access, Base USDC settlement if needed, public BTC feed and xAI; no orders or Telegram sends"
+  },
+  "browser": {
+    "at": "2026-11-07T13:15:10.549Z",
+    "scope": "Actual PULSE app, real Base-paid pass and restricted TEST_WALLET_ADDRESS sign-in; live market source, Indicator catalog/install, AI context, desktop/mobile in two themes; no payment signing, orders, journal mutations or Telegram sends",
+    "checks": [
+      {
+        "name": "existing_header_and_terminal_second_tab",
+        "tabs": [
+          "Portfolio",
+          "Trading Terminal",
+          "Global Market",
+          "Prediction Market",
+          "Risk Guard",
+          "Spot Trading",
+          "Autopilot",
+          "Telegram",
+          "Docs"
+        ]
+      },
+      {
+        "name": "real_owner_signin_paid_access_current_chart",
+        "walletSignatures": 1
+      },
+      {
+        "name": "paid_access_countdown_matches_original_grant_and_ticks",
+        "timerStart": 85477,
+        "timerLater": 85475,
+        "expiry": "2026-11-08T12:59:38.907Z"
+      },
+      {
+        "name": "live_indicator_catalog_install_two_numeric_panes"
+      },
+      {
+        "name": "indicator_ask_button_prefills_context_and_exposes_model"
+      },
+      {
+        "name": "live_indicator_layout",
+        "theme": "base",
+        "width": 1440
+      },
+      {
+        "name": "live_indicator_layout",
+        "theme": "base",
+        "width": 390
+      },
+      {
+        "name": "live_indicator_layout",
+        "theme": "xlayer",
+        "width": 1440
+      },
+      {
+        "name": "live_indicator_layout",
+        "theme": "xlayer",
+        "width": 390
+      }
+    ],
+    "screenshots": [
+      "indicator-base-1440.png",
+      "indicator-base-390.png",
+      "indicator-xlayer-1440.png",
+      "indicator-xlayer-390.png"
+    ],
+    "errors": [],
+    "walletCalls": [
+      "eth_accounts",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "personal_sign",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId",
+      "eth_accounts",
+      "eth_chainId"
+    ]
+  },
+  "desktopExports": {
+    "physicalDevices": false,
+    "simulatedBridges": true,
+    "modelCalls": 0,
+    "walletPayments": 0,
+    "telegramSends": 0,
+    "exportRequests": 80,
+    "sourceArtifact": ".tmp/desktop-export-regression-20261107/download-validation.json",
+    "exportChecks": 50,
+    "pageCases": 20
+  },
+  "independentHost": {
+    "executedBuy": 120,
+    "executedSell": 80,
+    "priorCvd": 20,
+    "delta": 40,
+    "cvd": 60,
+    "buyerSharePercent": 60,
+    "arbitraryAppBundleRequired": false
+  },
+  "limitations": [
+    "Portable numeric kernels are locally evaluated and not yet registered on X Layer.",
+    "Two reviewed formulas only; no arbitrary creator scripts or paid indicator sales.",
+    "Session endpoint checks returned incomplete queued history in the test environment; macro session completeness is not established.",
+    "Mobile browser viewports were emulated; physical iOS and Android devices were not tested."
+  ],
+  "reproducibleE2E": {
+    "script": "scripts/audit-terminal-indicator-market.ts",
+    "browserScript": "scripts/audit-terminal-indicator-browser.mjs",
+    "passed": true,
+    "newPaymentSigningEnabled": false,
+    "checks": 17,
+    "sourceArtifact": ".tmp/indicator-market-e2e/funded-validation.json"
+  }
+}

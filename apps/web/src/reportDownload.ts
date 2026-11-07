@@ -13,6 +13,14 @@ export function requestTelegramDownload(app:TelegramDownloads|undefined,url:stri
 export function canShareReport(file:File,nav:Partial<Pick<Navigator,"share"|"canShare">>=navigator){
   try{return Boolean(nav.share&&nav.canShare?.({files:[file]}));}catch{return false;}
 }
+type ReportSaveNavigator=Partial<Pick<Navigator,"userAgent"|"platform"|"maxTouchPoints"|"share"|"canShare">>&{userAgentData?:{mobile?:boolean}};
+/** Mobile browsers may need their native sheet to save a prepared local file.
+ * Desktop Web Share support (including touchscreen PCs) must never turn Save
+ * into Share. The separate Share button remains available on either platform. */
+export function shouldShareReportOnSave(file:File,nav:ReportSaveNavigator=navigator){
+  const mobile=Boolean(nav.userAgentData?.mobile)||/Android|iPhone|iPad|iPod/i.test(nav.userAgent??"")||(nav.platform==="MacIntel"&&(nav.maxTouchPoints??0)>1);
+  return mobile&&canShareReport(file,nav);
+}
 /** Invoke directly from the final Save/Share click, after preparation. */
 export function shareReport(file:File,nav:Partial<Pick<Navigator,"share"|"canShare">>=navigator){
   if(typeof nav.share!=="function"||!canShareReport(file,nav))throw new Error("File sharing is unavailable in this browser");

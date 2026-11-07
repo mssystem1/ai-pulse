@@ -1,15 +1,17 @@
-import {useCallback,useEffect,useRef,useState} from "react";
-import type {TerminalSessionHistory,TerminalLiquidityHistory as BookHistory,TerminalSessionPreset,TerminalMarketTools as Tools} from "@pulse/domain";
+import { TerminalIndicatorMarket } from "./TerminalIndicatorMarket";
+import {useCallback,useEffect,useMemo,useRef,useState} from "react";
+import type {TerminalSessionHistory,TerminalLiquidityHistory as BookHistory,TerminalMarketTools as Tools} from "@pulse/domain";
 import type {TerminalMarket,TerminalAskContext} from "./terminalClient";
 import {terminalRequest,terminalUtc} from "./terminalClient";
 import {TerminalMarketTools} from "./TerminalMarketTools";
 import {TerminalLiquidityHistory} from "./TerminalLiquidityHistory";
-import {terminalCustomHistoryRange,terminalSessionEvidenceMatches} from "./terminalHistorySelection";
+import {TERMINAL_HISTORY_PREFERENCE_PREFIX,terminalCustomHistoryRange,terminalHistoryDefaults,terminalHistoryPreferences,terminalHistorySelection,terminalSessionEvidenceMatches} from "./terminalHistorySelection";
+import type {TerminalHistorySessionSelection,TerminalLiquidityWindowSelection} from "./terminalHistorySelection";
 import {terminalRetainedToolSource} from "./terminalRetainedToolSource";
 import "./terminalHistory.css";
 
 type Response={session:TerminalSessionHistory;perpetualSession:TerminalSessionHistory;tools:Pick<Tools,"value"|"flow"|"perpetualFlow">;evidenceSnapshotId?:string;setupVersionId?:string;observedAt:number};
-type Props={market:TerminalMarket;token:string;active:boolean;onAsk:(question:string,context?:TerminalAskContext)=>void;onRadar:(price:number,side:"above"|"below")=>void};
+type Props={market:TerminalMarket;token:string;active:boolean;onAsk:(question:string,context?:TerminalAskContext)=>void;onRadar:(price:number,side:"above"|"below")=>void;onToolsChange?:(market:TerminalMarket,scope:"assessment"|"session")=>void};
 
 /** One request per selection at a time. A late success, error or finally from an
  * old owner/asset/window can never change the current selection's state. */
@@ -42,10 +44,15 @@ function useRetainedRead<T>(key:string,active:boolean,read:(signal:AbortSignal)=
  return{value:state.key===key?state.value:null,busy:state.key===key?state.busy:false,error:state.key===key?state.error:"",refresh};
 }
 
-export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar}:Props){
- const [preset,setPreset]=useState<TerminalSessionPreset>(market.timeframe==="15m"?"day":["1Dutc","1Wutc"].includes(market.timeframe)?"month":"week");
- const [custom,setCustom]=useState({start:"",end:""}),[applied,setApplied]=useState<{start:number;end:number}|null>(null),[rangeError,setRangeError]=useState("");
- const [hours,setHours]=useState(1);
+export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,onToolsChange}:Props){
+ const preferenceKey=TERMINAL_HISTORY_PREFERENCE_PREFIX+market.instId;
+ const [preferences]=useState(()=>{try{return terminalHistoryPreferences(sessionStorage.getItem(preferenceKey));}catch{return terminalHistoryPreferences(null);}});
+ const [sessionSelection,setSessionSelection]=useState<TerminalHistorySessionSelection>(preferences.sessionSelection);
+ const [liquiditySelection,setLiquiditySelection]=useState<TerminalLiquidityWindowSelection>(preferences.liquiditySelection);
+ const defaults=terminalHistoryDefaults(market.timeframe);
+ const {preset,hours}=terminalHistorySelection(market.timeframe,sessionSelection,liquiditySelection);
+ const [custom,setCustom]=useState(preferences.custom),[applied,setApplied]=useState<{start:number;end:number}|null>(preferences.applied),[rangeError,setRangeError]=useState("");
+ useEffect(()=>{try{sessionStorage.setItem(preferenceKey,JSON.stringify({sessionSelection,liquiditySelection,custom,applied}));}catch{/* Browsers may disable storage; in-view controls still work. */}},[preferenceKey,sessionSelection,liquiditySelection,custom,applied]);
  const accessKey=JSON.stringify([token,active,market.instId]);
  const sessionKey=JSON.stringify([accessKey,market.timeframe,market.evidenceSnapshotId,market.setupVersionId,preset,preset==="custom"?applied:null]);
  const bookKey=JSON.stringify([accessKey,hours]);
@@ -71,11 +78,11 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar}:
   const current=()=>!closed&&!controller.signal.aborted&&currentAccess.current===accessKey;
   const collect=async()=>{
    if(pending||!current())return;pending=true;
-   setCollection({key:accessKey,busy:true,message:"Collecting genuine source history. Coverage continues to refresh while this batch runs.",error:false});
+   setCollection({key:accessKey,busy:true,message:"Updating market history: saving new executions and order-book snapshots, then requesting available missing history. Coverage refreshes while collection runs.",error:false});
    try{
     await terminalRequest("history/collect",{token,method:"POST",body:{instId:market.instId},signal:controller.signal,timeoutMs:210_000});
     if(current()){
-     setCollection({key:accessKey,busy:false,message:"Collection batch finished. Checking the retained source coverage.",error:false});
+     setCollection({key:accessKey,busy:false,message:"History update checked. The session and liquidity views below show what was saved and which intervals still need data. Collection continues automatically while this view is active.",error:false});
      await Promise.all([refreshReaders.current.session(),refreshReaders.current.book()]);
     }
    }catch(error){
@@ -96,21 +103,26 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar}:
  // Empty/backfilling history must not remove the independently captured tools.
  // Keep the whole assessment source and its evidence ID together until retained
  // executions exist; never attach fallback measurements to a different snapshot.
- const {market:displayed,scope:executionScope}=terminalRetainedToolSource(market,record);
+ const {market:displayed,scope:executionScope}=useMemo(()=>terminalRetainedToolSource(market,record),[market,record]);
+ // Publish the exact measurements displayed below to sibling indicators. A
+ // parent's callback identity alone must not republish or trigger a render loop.
+ const publishTools=useRef(onToolsChange);publishTools.current=onToolsChange;
+ useEffect(()=>{publishTools.current?.(displayed,executionScope);},[displayed,executionScope]);
  const retainedHasExecutions=executionScope==="session";
  const collecting=collection.key===accessKey&&collection.busy;
  return <div className="terminal-retained-tools">
-  <div className="terminal-session-control"><label>Executed-volume session<select disabled={!active} value={preset} onChange={event=>{setRangeError("");setPreset(event.target.value as TerminalSessionPreset);}}><option value="day">Today · UTC</option><option value="previous-day">Previous day · UTC</option><option value="week">This week · UTC</option><option value="month">This month · UTC</option><option value="custom">Custom UTC range…</option></select></label>
+  <div className="terminal-session-control" data-session-selection={sessionSelection} data-session-preset={preset}><label>Market-tools execution window<select aria-label="Market-tools execution window" disabled={!active} value={sessionSelection} onChange={event=>{setRangeError("");setSessionSelection(event.target.value as TerminalHistorySessionSelection);}}><option value="timeframe">Follow chart timeframe · {defaults.label}</option><option value="day">Today · UTC</option><option value="previous-day">Previous day · UTC</option><option value="week">This week · UTC</option><option value="month">This month · UTC</option><option value="custom">Custom UTC range…</option></select></label>
    {preset==="custom"&&<><label>From · UTC<input disabled={!active} type="datetime-local" value={custom.start} onChange={event=>setCustom(value=>({...value,start:event.target.value}))}/></label><label>Until · UTC<input disabled={!active} type="datetime-local" value={custom.end} onChange={event=>setCustom(value=>({...value,end:event.target.value}))}/></label><button type="button" disabled={!active||!custom.start||!custom.end} onClick={()=>{try{const next=terminalCustomHistoryRange(custom);setRangeError("");setApplied(next);}catch(error){setRangeError(error instanceof Error?error.message:"Choose a valid UTC range.");}}}>Apply range</button></>}
-   <p>The session controls executed volume, VWAP and flow. The primary chart and saved setup keep their own timeframe and prices. Current sessions end at the latest completed UTC minute.</p>
+   <p>{sessionSelection==="timeframe"?`Following ${market.timeframe.replace("utc", "")} chart: ${defaults.label.toLowerCase()}. `:"Manual window: kept when you change the chart timeframe. Choose Follow chart timeframe to restore automatic windows. "}This is the time range of real trades used for VWAP, POC, value area, buy/sell flow and footprint. A shorter range shows recent participation; a longer range shows broader value. Current sessions end at the latest completed UTC minute. {market.timeframe==="1Wutc"&&sessionSelection==="timeframe"?"Weekly charts use the available monthly execution window, not a full-cycle profile. ":""}Chart candles, saved entry/SL/TP and current order-book/OI/funding timestamps stay independent.</p>
   </div>
   {rangeError&&<p className="terminal-warning" role="alert">{rangeError}</p>}
   {!active&&<p className="terminal-history-coverage" role="status">History refresh and collection are paused. An active Terminal pass is required.</p>}
   {collection.key===accessKey&&collection.message&&active&&<p className={collection.error?"terminal-warning":"terminal-hint"} role={collection.error?"alert":"status"}>{collection.message}</p>}
   {readSession.error&&<div className="terminal-warning terminal-session-error" role="alert"><p>{readSession.error} {retainedHasExecutions?"The last matching retained measurements remain below with their original source times.":"The assessment's independently captured tools remain available below; the requested UTC session has not replaced them."}</p><button type="button" disabled={!active||readSession.busy} onClick={()=>void readSession.refresh()}>{readSession.busy?"Retrying session…":"Retry session history"}</button></div>}
-  {result&&<div className="terminal-session-progress" data-session-market={result.session.instId} data-session-start={result.session.requestedStart} data-session-end={result.session.requestedEnd}><b>{result.session.complete?"Full requested Spot session retained":"Session backfill in progress"}</b><p>{result.session.totals?.trades.toLocaleString()??0} executions · {terminalUtc(result.session.requestedStart)} → {terminalUtc(result.session.requestedEnd)} · {result.session.gaps.length} missing interval(s). Futures: {result.perpetualSession.complete?"complete":"collecting separately"}.</p><p>{result.session.backfill.message}</p>{!result.session.complete&&<button type="button" disabled={!active||collecting} onClick={()=>void collectRef.current()}>{collecting?"Backfilling…":"Continue backfill"}</button>}</div>}
+  {result&&<div className="terminal-session-progress" data-session-market={result.session.instId} data-session-start={result.session.requestedStart} data-session-end={result.session.requestedEnd}><b>{result.session.complete?"Full requested Spot session retained":result.session.backfill.state==="failed"?"Session history update needs a retry":"Session history is still filling"}</b><p>{result.session.totals?.trades.toLocaleString()??0} executions · {terminalUtc(result.session.requestedStart)} → {terminalUtc(result.session.requestedEnd)} · {result.session.gaps.length} missing interval(s). Futures: {result.perpetualSession.complete?"complete":"collecting separately"}.</p><p>{result.session.backfill.message} Missing intervals are excluded from profile and flow calculations until genuine exchange records are retained.</p>{!result.session.complete&&<button type="button" disabled={!active||collecting} onClick={()=>void collectRef.current()}>{collecting?"Updating history…":"Update missing session history"}</button>}</div>}
   {!result&&active&&<p role="status">{preset==="custom"&&!applied?"Choose and apply a valid UTC range to open its retained executions.":readSession.busy?"Opening retained session history… The assessment tools remain usable below.":"The selected UTC session is not available yet. The assessment tools and saved setup keep their own captured data."}</p>}
   <TerminalMarketTools market={displayed} executionScope={executionScope} onAsk={(question,context)=>onAsk(question,{...context,instId:displayed.instId,timeframe:displayed.timeframe,setupVersionId:displayed.setupVersionId,evidenceSnapshotId:displayed.evidenceSnapshotId})} onRadar={onRadar}/>
-  <section className="terminal-panel"><TerminalLiquidityHistory history={readBook.value} selectedHours={hours} onWindowChange={setHours} busy={readBook.busy} collecting={collecting} disabled={!active} error={readBook.error} onCollect={()=>void collectRef.current()}/></section>
+  <TerminalIndicatorMarket market={displayed} token={token} active={active} onAsk={(question,context)=>onAsk(question,{...context,instId:displayed.instId,timeframe:displayed.timeframe,setupVersionId:displayed.setupVersionId,evidenceSnapshotId:displayed.evidenceSnapshotId})}/>
+  <section className="terminal-panel"><TerminalLiquidityHistory history={readBook.value} selectedHours={hours} onWindowChange={value=>setLiquiditySelection(value as TerminalLiquidityWindowSelection)} followsTimeframe={liquiditySelection==="timeframe"} onFollowTimeframe={()=>setLiquiditySelection("timeframe")} timeframe={market.timeframe} busy={readBook.busy} collecting={collecting} disabled={!active} error={readBook.error} onCollect={()=>void collectRef.current()}/></section>
  </div>;
 }

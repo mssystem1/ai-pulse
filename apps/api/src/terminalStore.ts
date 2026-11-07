@@ -3,6 +3,7 @@ import type { AppConfig } from "@pulse/config";
 import type { GlobalReport, GlobalScenario } from "@pulse/schemas";
 import { StoreRedis } from "./storeRedis.js";
 
+export type TerminalIndicatorPublication = { id: string; manifestId: string; version: string; title: string; description: string; author: string; kernel: "executed-cvd-v1" | "buy-participation-v1"; publisher: string; createdAt: string; sha256: string; packageRef: string };
 export type TerminalDuration = "24h" | "7d" | "30d";
 export const terminalDurationMs = { "24h": 86_400_000, "7d": 604_800_000, "30d": 2_592_000_000 } as const;
 export type TerminalPassGrant = { id: string; requestId: string; duration: TerminalDuration; priceUsd: string; amountAtomic: string; network: string; asset: string; paymentId: string; purchasedAt: string; startsAt: string; expiresAt: string; simulated: boolean };
@@ -16,7 +17,7 @@ export type TerminalRadar = { id: string; instId: string; timeframe: string; det
 export type TerminalPositionEvent = { id: string; requestId: string; kind: "open" | "add" | "close" | "protection"; quantity?: number; price?: number; executedAt: string; recordedAt: string; hardStop?: number | null; targets?: number[]; provenance: "user_reported" };
 export type TerminalPositionMark = { price: number; at: string; source: string; kind: "spot-reference" | "perpetual-mark-reference"; venueMatches: boolean };
 export type TerminalPosition = { id: string; instId: string; timeframe: string; side: "long" | "short"; venue: string; instrumentType: "spot" | "perpetual"; createdAt: string; paused: boolean; telegram: boolean; setupVersionId?: string; quantity: number; quantityUnit?: "base"; pnlCurrency?: string; averageEntry: number; realizedPnl: number; hardStop: number | null; targets: number[]; protectionStatus: "user_reported"; status: "open" | "closed"; events: TerminalPositionEvent[]; lastMark?: TerminalPositionMark; lastMarkObservation?: TerminalPositionMark; lastRiskState?: string };
-export type TerminalWorkspace = { version: "terminal-workspace-v1"; revision: number; owner: string; grants: TerminalPassGrant[]; pendingPurchases?: TerminalPurchase[]; watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalActivity[]; deliveries: TerminalDelivery[]; answers?: Array<{ id: string; at: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[] }>; telegram: { enabled: boolean; events: string[] }; aiUsage: { day: string; count: number }; lastMonitorAt?: number; monitoringLease?: { token: string; until: number } };
+export type TerminalWorkspace = { version: "terminal-workspace-v1"; revision: number; owner: string; grants: TerminalPassGrant[]; pendingPurchases?: TerminalPurchase[]; watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalActivity[]; deliveries: TerminalDelivery[]; answers?: Array<{ id: string; at: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; model?: string }>; indicatorPublications?: TerminalIndicatorPublication[]; telegram: { enabled: boolean; events: string[] }; aiUsage: { day: string; count: number }; lastMonitorAt?: number; monitoringLease?: { token: string; until: number } };
 
 export interface TerminalStorage {
   read<T>(key: string): Promise<T | null>;

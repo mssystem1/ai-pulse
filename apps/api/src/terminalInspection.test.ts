@@ -43,7 +43,7 @@ test("tool questions retain the displayed owner-scoped evidence and reject subst
   let now = BORN, generation = 0, snapshotReads = 0;
   const prompts: Array<{ context: Record<string, any>; question: string }> = [];
   const aiApp = express(); aiApp.use(express.json());
-  aiApp.post("/v1/chat/completions", (req, res) => { prompts.push(JSON.parse(req.body.messages[1].content)); res.json({ choices: [{ message: { content: "Fixture evidence explanation; no trade authorization." } }] }); });
+  aiApp.post("/v1/chat/completions", (req, res) => { assert.equal(req.body.model, cfg.GROK_COPILOT_MODEL); assert.equal(req.body.reasoning_effort, cfg.GROK_REASONING_COPILOT); prompts.push(JSON.parse(req.body.messages[1].content)); res.json({ model: req.body.model, choices: [{ message: { content: "Fixture evidence explanation; no trade authorization." } }] }); });
   const ai = await listen(aiApp), storage = new MemoryTerminalStorage(), state = new TerminalStore(storage, `terminal-inspection-${Math.random()}`, 180);
   for (const owner of [OWNER, OTHER]) await state.mutate(owner, value => { grantTerminalPass(value, { requestId: "fixture_pass_request", duration: "24h", priceUsd: "1.5", amountAtomic: "1500000", network: "base", asset: `0x${"33".repeat(20)}`, paymentId: "fixture-pass", purchasedAt: new Date(BORN).toISOString(), simulated: true }); });
   const cfg = { ...loadConfig(), NODE_ENV: "test" as const, FEATURE_TRADING_TERMINAL: true, FEATURE_TELEGRAM: false, X402_MOCK: true, QUEUE_PROVIDER: "memory" as const, STORAGE_PROVIDER: "memory" as const, XAI_API_KEY: "local-ai-fixture", XAI_BASE_URL: `${ai.origin}/v1`, PERSISTENCE_NAMESPACE: `inspection-${Math.random()}` };

@@ -6,6 +6,7 @@ import {spawnSync} from 'node:child_process';
 
 function installFileBridges(){
   window.__exportDownloads=[];window.__exportBrowserLinks=[];window.__exportShares=[];
+  Object.defineProperty(navigator,'userAgentData',{configurable:true,value:{mobile:innerWidth<600}});
   Object.defineProperty(navigator,'canShare',{configurable:true,value:data=>Boolean(data.files?.length)});
   Object.defineProperty(navigator,'share',{configurable:true,value:async data=>{const file=data.files[0],record={name:file.name,type:file.type,size:file.size,active:navigator.userActivation?.isActive};window.__exportShares.push(record);record.bytes=[...new Uint8Array(await file.arrayBuffer()).slice(0,8)];}});
   if(innerWidth<600)window.Telegram={WebApp:{initData:'fixture-only-no-real-telegram-session',ready(){},expand(){},isVersionAtLeast(){return true;},downloadFile(params,callback){window.__exportDownloads.push({...params,active:navigator.userActivation?.isActive});callback?.(true);},openLink(url){window.__exportBrowserLinks.push(url);}}};
@@ -26,6 +27,7 @@ async function checkExports({width,theme,frame,lang,card},{call,evaluate,wait}){
     if(format==='png'){await wait('document.querySelector(".report-download-preview img")?.complete');assert.ok(await evaluate('document.querySelector(".report-download-preview img").naturalWidth')>2600);}
     else assert.ok((await evaluate('document.querySelector(".report-download-dialog textarea").value')).includes(card.entry));
     const nativeBefore=await evaluate('window.__exportDownloads.length+window.__exportBrowserLinks.length');
+    const sharesBefore=await evaluate('window.__exportShares.length');
     await evaluate('document.querySelector(".report-download-dialog [data-save-report]").click()',true);
     let bytes,bridge='browser-file';
     if(width<600){
@@ -35,25 +37,36 @@ async function checkExports({width,theme,frame,lang,card},{call,evaluate,wait}){
       const response=await fetch(origin+new URL(native.url).pathname);assert.equal(response.status,200);assert.match(response.headers.get('content-disposition'),/attachment/);bytes=Buffer.from(await response.arrayBuffer());
     }else{
       let file;for(let attempt=0;attempt<100;attempt++){file=fs.readdirSync(folder).find(f=>!before.has(f)&&f.endsWith('.'+format));if(file)break;await pause(100);}assert.ok(file,'Browser did not save the report file');bytes=fs.readFileSync(path.join(folder,file));
+      assert.equal(await evaluate('window.__exportShares.length'),sharesBefore,'Desktop Save unexpectedly opened the share sheet');
     }
     if(format==='png'){assert.equal(bytes.subarray(1,4).toString(),'PNG');const w=bytes.readUInt32BE(16),h=bytes.readUInt32BE(20);assert.ok(w>2600&&w*h<=16_000_000);}
     else{assert.ok(bytes.toString('utf8').includes(card.entry));assert.ok(!bytes.toString('utf8').includes('deployment_fixture_'));}
     downloadCases.push({frame,lang,theme,width,format,bridge,bytes:bytes.length,name});
-    if(width<600&&frame==='15m'&&lang==='en'){
+    if(frame==='15m'&&lang==='en'){
       const count=await evaluate('window.__exportShares.length');
       await evaluate('Array.from(document.querySelectorAll(".report-download-actions button")).find(b=>b.textContent.includes("Share")).click()',true);
       await wait(`window.__exportShares.length>${count}&&window.__exportShares.at(-1).bytes`);const shared=await evaluate('window.__exportShares.at(-1)');assert.equal(shared.active,true);assert.equal(shared.name,name);
       downloadCases.push({frame,lang,theme,width,format,bridge:'web-share-simulated',active:true,bytes:shared.size});
     }
     await evaluate('document.querySelector(".report-download-heading button").click()',true);await wait('!document.querySelector(".report-download-dialog")');
-    if(width<600&&frame==='15m'&&lang==='en'){
+    if(frame==='15m'&&lang==='en'){
       await evaluate(`window.__originalExportFetch=window.fetch;window.fetch=(url,options)=>String(url).endsWith('/v1/global/export')?Promise.resolve(new Response('{"error":"Audit offline fixture"}',{status:503,headers:{'Content-Type':'application/json'}})):window.__originalExportFetch(url,options)`);
       await evaluate(`document.querySelector('[data-global-export="${format}"]').click()`,true);await wait('Boolean(document.querySelector(".report-download-dialog [data-save-report]"))');
       assert.ok(!(await evaluate('document.querySelector(".report-download-dialog [role=alert]")')));
       assert.ok((await evaluate('document.querySelector(".report-download-dialog").textContent')).includes('Secure download is unavailable'));
-      const count=await evaluate('window.__exportShares.length');await evaluate('document.querySelector("[data-save-report]").click()',true);await wait(`window.__exportShares.length>${count}&&window.__exportShares.at(-1).bytes`);
-      const shared=await evaluate('window.__exportShares.at(-1)');assert.equal(shared.active,true);assert.ok(shared.size>0);assert.equal(shared.type,format==='png'?'image/png':'text/plain');
-      downloadCases.push({frame,lang,theme,width,format,bridge:'offline-local-file-share-simulated',active:true,bytes:shared.size});
+      const count=await evaluate('window.__exportShares.length'),offlineFolder=path.join(folder,'offline');fs.mkdirSync(offlineFolder,{recursive:true});
+      await call('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:offlineFolder});
+      await evaluate('document.querySelector("[data-save-report]").click()',true);
+      if(width<600){
+        await wait(`window.__exportShares.length>${count}&&window.__exportShares.at(-1).bytes`);
+        const shared=await evaluate('window.__exportShares.at(-1)');assert.equal(shared.active,true);assert.ok(shared.size>0);assert.equal(shared.type,format==='png'?'image/png':'text/plain');
+        downloadCases.push({frame,lang,theme,width,format,bridge:'offline-local-file-share-simulated',active:true,bytes:shared.size});
+      }else{
+        let saved;for(let attempt=0;attempt<100;attempt++){saved=fs.readdirSync(offlineFolder).find(f=>f.endsWith('.'+format));if(saved)break;await pause(100);}assert.ok(saved,'Desktop local report did not download');
+        const localBytes=fs.readFileSync(path.join(offlineFolder,saved));assert.ok(localBytes.length>0);assert.equal(await evaluate('window.__exportShares.length'),count,'Desktop local Save unexpectedly opened the share sheet');
+        assert.equal(saved,name);if(format==='png')assert.equal(localBytes.subarray(1,4).toString(),'PNG');else assert.ok(localBytes.toString('utf8').includes(card.entry));
+        downloadCases.push({frame,lang,theme,width,format,bridge:'offline-local-file-browser-download',bytes:localBytes.length});
+      }
       await evaluate('document.querySelector(".report-download-heading button").click()',true);await wait('!document.querySelector(".report-download-dialog")');
       if(format==='png'){
         await evaluate('window.__originalExportContext=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=()=>null');

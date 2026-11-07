@@ -4,7 +4,7 @@ import {globalArtifactTag,presentResearch,researchText,type GlobalReport,type Gl
 import {API_BASE} from "./api";
 import type {ReportExportAccess} from "./reportDownload";
 import {createGlobalChartFile} from "./globalChartDownload";
-import {canShareReport,shareReport,saveReportLink,releaseReportPreview,telegramDownloads,requestTelegramDownload} from "./reportDownload";
+import {canShareReport,shouldShareReportOnSave,shareReport,saveReportLink,releaseReportPreview,telegramDownloads,requestTelegramDownload} from "./reportDownload";
 
 type Prepared={file:File;preview:string;url?:string;expiresAt?:number;text?:string;note?:string};
 export function GlobalExportButton({report,access,format,options,appearance="dark"}:{report:GlobalReport;access?:ReportExportAccess;format:"png"|"txt";options?:GlobalChartOptions;appearance?:GlobalChartAppearance}){
@@ -53,7 +53,7 @@ export function GlobalExportButton({report,access,format,options,appearance="dar
     try{
       if(prepared.url&&requestTelegramDownload(app,prepared.url,prepared.file.name,accepted=>setStatus(accepted?tr("Download requested.","已请求下载。"):tr("Download canceled. You can try again.","下载已取消，可重试。"))))return;
       if(prepared.url&&app?.openLink){app.openLink(prepared.url,{try_instant_view:false});setStatus(tr("Opened in your browser. Save the file there.","已在浏览器中打开，请保存文件。"));return;}
-      if(canShareReport(prepared.file)&&(!prepared.url||window.matchMedia("(pointer:coarse)").matches)){void share();return;}
+      if(shouldShareReportOnSave(prepared.file)){void share();return;}
       saveReportLink(prepared.preview,prepared.file.name);setStatus(tr("Download requested. You can also save or share the preview.","已请求下载。也可保存或分享预览。"));
     }catch{setError(tr("Use Share, or open the file in your browser.","请使用分享，或在浏览器打开文件。"));}
   };

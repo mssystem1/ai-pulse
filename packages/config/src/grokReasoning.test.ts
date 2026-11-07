@@ -32,7 +32,7 @@ test("report configuration accepts Quick low and Pro medium with their configure
 test("production report template and omitted effort variables both retain Quick low and Pro medium",()=>{
   const values=Object.fromEntries(Object.entries(parse(readFileSync(new URL("../../../.env.production.example",import.meta.url),"utf8"))).filter(([key])=>/^GROK_(?:MODEL|REASONING_|MAX_(?:INPUT|OUTPUT)_(?:STANDARD|PREMIUM)$)/.test(key)));
   const previous=Object.fromEntries(Object.keys(values).map(key=>[key,process.env[key]]));
-  try{Object.assign(process.env,values);let config=loadConfig();assert.equal(config.GROK_REASONING_STANDARD,"low");assert.equal(config.GROK_REASONING_PREMIUM,"medium");assert.equal(config.GROK_MODEL,"grok-4.5");assert.equal(config.GROK_MAX_OUTPUT_PREMIUM,8192);
+  try{Object.assign(process.env,values);let config=loadConfig();assert.equal(config.GROK_REASONING_STANDARD,"low");assert.equal(config.GROK_REASONING_PREMIUM,"medium");assert.equal(config.GROK_MODEL,"grok-4.7");assert.equal(config.GROK_MAX_OUTPUT_PREMIUM,8192);
     delete process.env.GROK_REASONING_STANDARD;delete process.env.GROK_REASONING_PREMIUM;config=loadConfig();assert.equal(config.GROK_REASONING_STANDARD,"low");assert.equal(config.GROK_REASONING_PREMIUM,"medium");
   }finally{for(const [key,value]of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value;}}
 });

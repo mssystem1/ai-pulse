@@ -65,8 +65,10 @@ const EnvSchema = z.object({
   OKX_FACILITATOR_URL: z.string().url().default("https://web3.okx.com"),
   XAI_API_KEY: z.string().optional().default(""),
   XAI_BASE_URL: z.string().optional().default("https://api.x.ai/v1"),
-  GROK_MODEL: z.string().optional().default("grok-4.5"),
-  GROK_COPILOT_MODEL: z.string().optional().default("grok-4.5"),
+  GROK_MODEL: z.string().trim().min(1).optional().default("grok-4.7"),
+  // An empty override inherits the report model, including operator upgrades.
+  GROK_COPILOT_MODEL: z.string().trim().optional().default(""),
+  GROK_REASONING_COPILOT: z.enum(["low", "medium", "high", "xhigh"]).default("low"),
   GROK_AUTOPILOT_MODEL: z.string().optional().default("grok-4.3"),
   GROK_REASONING_STANDARD: z.enum(["none", "low", "medium"]).default("low"),
   GROK_REASONING_PREMIUM: z.enum(["none", "low", "medium"]).default("medium"),
@@ -94,7 +96,7 @@ const EnvSchema = z.object({
   GROK_MAX_INPUT_STRATEGY: z.coerce.number().int().min(4000).max(160000).default(64000),
   GROK_MAX_OUTPUT_STRATEGY: z.coerce.number().int().min(256).max(16384).default(3200),
   XAI_INPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(2),
-  XAI_CACHED_INPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(0.30),
+  XAI_CACHED_INPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(0.50),
   XAI_OUTPUT_COST_PER_MILLION_USD: z.coerce.number().min(0).default(6),
   ARC_AI_MODE: z.enum(["fixture", "live"]).default("live"),
   ARC_LIVE_WALLET_HOURLY_LIMIT: z.coerce.number().int().positive().default(10),
@@ -271,6 +273,7 @@ export function loadConfig(): AppConfig {
   }
 
   const parsed = EnvSchema.parse(process.env);
+  parsed.GROK_COPILOT_MODEL ||= parsed.GROK_MODEL;
   if (parsed.ENABLED_NETWORKS.split(",").map(v => v.trim()).includes("arc")) {
     if (!parsed.FEATURE_ARC_MAINNET) throw new Error("Arc is mainnet-only; enable FEATURE_ARC_MAINNET or remove arc from ENABLED_NETWORKS");
     if (!parsed.X402_MOCK && parsed.ARC_AI_MODE !== "live") throw new Error("Arc mainnet requires ARC_AI_MODE=live for real payments");

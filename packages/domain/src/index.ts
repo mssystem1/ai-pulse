@@ -43,3 +43,4 @@ export * from "./globalStrategyMixLines.js";
 export * from "./terminal.js";
 export * from "./terminalHistory.js";
 export * from "./globalSetupAdmission.js";
+export * from "./indicatorMarket.js";

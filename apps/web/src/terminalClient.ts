@@ -15,7 +15,7 @@ export const terminalFrameRoles: Record<TerminalTimeframe, { entry: string; cont
 };
 export type TerminalPlan = { duration: TerminalDuration; priceUsd: string; durationMs: number };
 export type TerminalCatalog = {
-  enabled: boolean; available: boolean; reason?: string; plans: TerminalPlan[];
+  enabled: boolean; available: boolean; reason?: string; aiModel?: string; plans: TerminalPlan[];
   limits?: Record<string, number | string>; features?: Record<string, boolean | string>;
   paymentNetworks?: Array<{ key: string; network: string; asset: string }>;
 };
@@ -29,7 +29,7 @@ export type TerminalWorkspace = {
   watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalEvent[];
   telegram: { linked: boolean; enabled: boolean; events: string[]; configured?: boolean; botUsername?: string | null; botUrl?: string | null; linkUrl?: string | null; linkState?: "linked" | "not_linked" | "unavailable"; linkedWallet?: string | null; nextStep?: string }; limits?: Record<string, number | string>;
   deliveries?: Array<{ id: string; eventId: string; subjectId: string; state: string; createdAt: string; attemptedAt?: string; error?: string }>;
-  answers?: Array<{ id: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; at: string }>;
+  answers?: Array<{ id: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; at: string; model?: string }>;
   pendingPurchases?: Array<{ requestId: string; duration: TerminalDuration; priceUsd: string; amountAtomic: string; network: string; asset: string; createdAt: string; state: "authorizing" | "settled" | "granted"; paymentId: string; settlementTx?: string; settledAt?: string }>;
 };
 export type TerminalToolStatus = TerminalSourceStatus;
@@ -48,7 +48,9 @@ export function terminalFollowReviewMatches(review: TerminalFollowReview, owner:
 }
 /** Bind a question to the chart/tool evidence visible when it was opened. */
 export function terminalAskBinding(market: TerminalMarket | null, context: TerminalAskContext = {}): TerminalAskContext {
-  return { ...context, ...(context.inspection ? { inspection: { ...context.inspection } } : {}), ...(!context.positionId && market ? { instId: market.instId, timeframe: market.timeframe, ...(market.setupVersionId ? { setupVersionId: market.setupVersionId } : {}), ...(market.evidenceSnapshotId ? { evidenceSnapshotId: market.evidenceSnapshotId } : {}) } : {}) };
+  // Retained-session tools carry a different evidence ID from the assessment.
+  // Explicit source bindings win over a newer parent chart capture.
+  return { ...(!context.positionId && market ? { instId: market.instId, timeframe: market.timeframe, ...(market.setupVersionId ? { setupVersionId: market.setupVersionId } : {}), ...(market.evidenceSnapshotId ? { evidenceSnapshotId: market.evidenceSnapshotId } : {}) } : {}), ...context, ...(context.inspection ? { inspection: { ...context.inspection } } : {}) };
 }
 /** Match the exact catalog precision instead of rounding a micro-USDC price
  * to zero. Validation is shared with checkout's atomic amount conversion. */

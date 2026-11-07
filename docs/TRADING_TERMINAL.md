@@ -21,6 +21,7 @@ To record a position, enter its market, direction, entry price and size. Choose 
 | Function | Input | Result |
 | --- | --- | --- |
 | Market tools | Market/frame and the stated captured source window | VWAP/value, executed flow/footprint, OI/funding and book evidence with provenance and coverage |
+| Indicator Market | Supported portable calculation package and actual Market-tools evidence | Locally evaluated indicator values, supported-kernel import/export and source coverage; no imported arbitrary code |
 | Market Radar | Boundary, detector, observation frame and expiry | Ordered Developing/Completed/Failed/Expired/Data needed events, with history and optional alerts |
 | Follow setup | A currently eligible immutable setup version | Its saved policy's next requirement and lifecycle; old plans cannot be revived by resetting the watch |
 | My positions | Actual user-recorded fills, protection and closes | A separate private journal with explicit provenance; observed prices do not prove executions |
@@ -49,11 +50,29 @@ Measurements come from explicitly identified exchange sources. Profiles and foot
 
 ### Retained sessions and liquidity history
 
-Choose **Today**, **Previous day**, **This week**, **This month** or **Custom UTC range** (up to 31 days) above Market tools. Current sessions stop at the last completed UTC minute. The choice affects session VWAP, volume profile, buy/sell flow and complete execution footprints; it does not change the primary chart, setup prices or selected strategy. Complete profiles require verified coverage across the entire requested range. Developing profiles expose missing intervals, source knowledge time and resumable backfill status. VWAP and deviation bands use exact execution moments before price-bin rounding. The native session value area expands around POC to cover at least 70% of retained volume; the histogram never expands levels merely to make them look farther apart.
+The **Market-tools execution window** (previously **Executed-volume session**) is the UTC interval of actual trades used to calculate session VWAP, POC, volume profile/value area, buy/sell flow and complete execution footprints. It changes the participation context, not chart candles, setup prices or selected strategy. A daily window describes recent session trading; a month supplies a broader value view. Missing periods cannot be inferred from candles.
+
+**Follow chart timeframe** chooses these defaults:
+
+| Primary chart | Executed-trade session | Order-book history |
+| --- | --- | --- |
+| 15m | Today, UTC | Last hour |
+| 1H | This week, UTC | Last 6 hours |
+| 4H | This week, UTC | Last 24 hours |
+| 1D UTC | This month, UTC | Last 7 days |
+| 1W UTC | This month, UTC | Last 7 days |
+
+Weekly charts use the largest supported calendar session, one month, not full-cycle execution coverage. Manual **Today**, **Previous day**, **This week**, **This month** and **Custom UTC range** selections are available; custom ranges support up to 31 days. Manual session and book windows survive chart remounts through browser-session window preferences keyed by market, without storing wallet tokens or report data. Choose Follow chart timeframe separately in each control to restore automatic selection. Weeks start Monday; current sessions stop at the last completed UTC minute.
+
+Complete profiles require verified coverage across the entire requested range. Developing profiles expose missing intervals, source knowledge time and resumable backfill status. VWAP and deviation bands use exact execution moments before price-bin rounding. The native session value area expands around POC to cover at least 70% of retained volume; the histogram never expands levels merely to make them look farther apart.
 
 The collector first uses official daily execution archives when published, otherwise it pages the public historical tape with execution-ID continuity. UTC sessions crossing the execution archives' UTC+8 day boundary use both source files. Immutable compressed chunks, content hashes, durable cursors and fenced leases allow restart and prevent duplicate quantities. Only fully covered execution candles become footprints. Price/CVD lines break across missing display buckets; observed cumulative delta cannot establish unknown flow.
 
 **Liquidity over time** shows actual resting bids/offers, with 1h, 6h, 24h and 7d choices. The collector replays every update in the exchange's dated 400-level book archive before sampling; forward collection retains real book snapshots. The default display stores 50 levels per side at one-minute cadence. Each cell exposes its actual source timestamp, price band and quantities. Color is size in one observation, never a sum of the same resting order across repeated polls. Hatched columns and explicit source gaps remain unknown. Sampled observations do not establish what happened between samples, consumed liquidity or liquidation prices. The archive does not provide publisher sequence/checksum IDs; archive integrity and chronological replay are verified without claiming such continuity.
+
+Its automatic display span shows up to the latest captured hour for a one-hour history window and the full captured period for broader windows. Explicit 15-minute/hour/full display choices remain available. The book-history window is independent of the executed-trade session; current book, OI and funding retain their own timestamps.
+
+**Update missing market history** requests a bounded collection turn. Collection saves new executions and book snapshots; backfill requests available older exchange records for missing periods. Saved cursors resume progress across batches. While the view is active the browser refreshes measurements and requests further turns automatically; configured workers run independently of the page. The button is an immediate retry, not a report purchase or order. A finished batch is not a claim that all requested history is complete. Retry cannot manufacture an unpublished archive; coverage, missing intervals and source messages remain visible.
 
 Official execution archives typically appear after two days and book archives after three; actual availability varies by instrument. Newly started services need time to collect recent book history. Backfill cannot manufacture unpublished observations. The illustrated app guide uses the verified **1 November 2026 BTC Spot session: 177,587 executions, VWAP 77,953.3661, POC 78,005, VAL 77,820, VAH 78,220**, plus 1,440 retained one-minute order-book observations. This is explicitly a historical example, not a current trade recommendation.
 
@@ -64,6 +83,12 @@ Create Radar from a value-area edge or a saved chart level, then review its orde
 Radar uses a registered Tapeout component from X Layer, retaining processor/circuit identity, pinned block/code/netlist provenance and verified evaluation semantics. Source-derived price comparisons feed the causal event layer; the chain component does not prove exchange-feed truth or predict outcomes. Dependency failure blocks supported Radar evaluation instead of silently substituting an unrelated local-only demonstration. Private position and strategy data are not published on-chain.
 
 Replay re-evaluates at most 512 retained source observations using the original detector and Tapeout definition. If the required prefix has been dropped, replay is unavailable; workspace retention does not imply unlimited raw observation history. Repeated polling cannot supply a later event. Past-history inspection is distinct from newly triggered monitoring and cannot invent a trade. Protocol use and local checks do not establish organizer acceptance or trading win rate.
+
+### Portable indicators
+
+[PULSE Indicator Market](PULSE_INDICATOR_MARKET.md) is the approved extension for reusable tools across compatible Tapeout applications. Initial portable packages use supported CVD/net-participation kernels with the exact displayed Market-tools source and coverage. The circuit runtime performs the supported calculation locally; imported packages do not execute arbitrary JavaScript or amend a saved setup. Import/export portability is distinct from X Layer circuit registration and from confirmed support in a third-party application. The detailed document records implementation and deployment status; no local package alone establishes an on-chain deployment, profitable indicator or full MMT parity.
+
+Ask PULSE buttons retain the selected tool/indicator or setup context. The copilot uses explicit `GROK_COPILOT_MODEL` when set, otherwise `GROK_MODEL`. Model naming does not replace data freshness, source coverage, geometric qualification or live strategy validation.
 
 ## Access and configuration
 

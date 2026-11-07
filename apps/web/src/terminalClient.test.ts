@@ -159,3 +159,10 @@ test("published pass displays preserve six-decimal prices and event confirmation
   assert.throws(() => terminalPassPrice("0")); assert.throws(() => terminalPassPrice("1.0000001"));
   assert.equal(terminalLabel("conditions_satisfied"), "Price policy confirmed");
 });
+
+
+test("Ask PULSE preserves the retained-session evidence instead of replacing it with the parent assessment", () => {
+  const assessment = { instId:"BTC-USDT", timeframe:"1H", setupVersionId:"setup-parent", evidenceSnapshotId:"assessment-parent" } as TerminalMarket;
+  const selected = { instId:"BTC-USDT", timeframe:"1H", setupVersionId:"setup-retained", evidenceSnapshotId:"retained-session", inspection:{tool:"flow" as const,stream:"spot" as const} };
+  assert.deepEqual(terminalAskBinding(assessment,selected), selected);
+});

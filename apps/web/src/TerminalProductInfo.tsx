@@ -33,9 +33,9 @@ export function TerminalPassPrices({ lang="en" }: {lang?:Lang}) {
 
 export function TerminalLandingSection({ href, guideHref }: {href:string;guideHref:string}) {
   return <section id="trading-terminal" className="landing-width landing-section landing-terminal" aria-labelledby="landing-terminal-title">
-    <div className="landing-section-heading"><p className="landing-kicker">PULSE TRADING TERMINAL</p><h2 id="landing-terminal-title">Read the move.<br/><span>Follow your plan.</span></h2><p>Explore value, executed buy/sell flow and liquidity. Detect developing market events, follow setup conditions, and track your positions with Telegram alerts.</p></div>
+    <div className="landing-section-heading"><p className="landing-kicker">PULSE TRADING TERMINAL</p><h2 id="landing-terminal-title">Read the move.<br/><span>Follow your plan.</span></h2><p>Explore value, executed buy/sell flow, liquidity and portable indicators. Detect developing market events, follow setup conditions, and track your positions with Telegram alerts.</p></div>
     <div className="landing-terminal-services">
-      <article><span>01 / MARKET TOOLS</span><h3>Read the session. Watch liquidity change.</h3><p>Choose a UTC session for volume profiles, VWAP, buy/sell flow and footprints. Inspect real bids and offers over time in the liquidity heatmap, with coverage and missing intervals visible.</p></article>
+      <article><span>01 / MARKET TOOLS</span><h3>Read the session. Watch liquidity change.</h3><p>Choose a UTC session for volume profiles, VWAP, buy/sell flow and footprints. Inspect real bids and offers over time in the liquidity heatmap, with coverage and missing intervals visible. Add, create and share portable CVD and buyer-participation packages through PULSE Indicator Market.</p></article>
       <article><span>02 / MARKET RADAR</span><h3>Follow the response at your level.</h3><p>Start from a value-area edge or your own price. Follow the three candle stages and get Telegram updates naming the market, boundary, observed price and next required step.</p></article>
       <article><span>03 / POSITIONS & ALERTS</span><h3>Keep your trade in view.</h3><p>Add your entry and size in coins, position value or futures margin. Link your wallet to the PULSE bot and choose the changes you want to receive.</p></article>
     </div>
