@@ -1,0 +1,724 @@
+{
+  "version": 1,
+  "validatedAt": "2026-11-07T05:54:17.907Z",
+  "clientDate": "2026-11-07",
+  "scope": "Post-deployment retained Market tools, public-data collection and liquidity visualization follow-up",
+  "tests": {
+    "suites": [
+      {
+        "name": "analysis",
+        "tests": 392,
+        "passed": 392,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "name": "domain",
+        "tests": 78,
+        "passed": 78,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "name": "market",
+        "tests": 57,
+        "passed": 57,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "name": "web",
+        "tests": 283,
+        "passed": 283,
+        "failed": 0,
+        "skipped": 0
+      },
+      {
+        "name": "api",
+        "tests": 508,
+        "passed": 507,
+        "failed": 0,
+        "skipped": 1
+      }
+    ],
+    "passed": 1317,
+    "skipped": 1,
+    "failed": 0
+  },
+  "browsers": [
+    {
+      "path": ".tmp/terminal-history-web-audit/validation.json",
+      "pass": true,
+      "at": "2026-11-06T19:08:56.619Z",
+      "scope": "Actual retained-history components with controlled asynchronous transport, historical fixture records and fake in-memory owner tokens; no wallet, payment, trade or bot send",
+      "checks": [
+        "single_flight_reads_and_collector",
+        "collector_deadline_exceeds_server_180s_batch",
+        "all_market_tools_present_while_retained_session_is_loading",
+        "session_failure_keeps_all_five_tools_usable_with_original_ask_binding_and_radar_level",
+        "source_failure_tools_discoverable_without_overflow_in_all_five_themes_desktop_and_mobile",
+        "empty_collecting_session_keeps_assessment_sample_without_fabricated_zero_source_clock",
+        "preset_late_error_and_finally_do_not_replace_current_loading_or_data",
+        "unobserved_spot_clocks_show_no_epoch_and_do_not_hide_futures_or_current_book",
+        "book_window_out_of_order_response_rejected",
+        "asset_change_clears_previous_measurements_and_old_collection_cannot_refresh_new_asset",
+        "late_previous_owner_responses_rejected",
+        "ask_uses_exact_retained_evidence_and_original_setup_version",
+        "long_collection_timeout_is_unconfirmed_not_false_failure_or_permanent_spinner",
+        "actual_heatmap_intra_minute_gap_inspection_remains_unknown",
+        "pass_expiry_aborts_readers_clears_old_data_and_stops_collecting"
+      ],
+      "requests": [
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "week",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "BTC-USDT",
+          "session": null,
+          "hours": "1",
+          "done": true
+        },
+        {
+          "type": "collect",
+          "path": "/v1/terminal/history/collect",
+          "instId": null,
+          "session": null,
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "week",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "week",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "BTC-USDT",
+          "session": null,
+          "hours": "1",
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "previous-day",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "month",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "previous-day",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "BTC-USDT",
+          "session": "month",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "BTC-USDT",
+          "session": null,
+          "hours": "6",
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "BTC-USDT",
+          "session": null,
+          "hours": "24",
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "ETH-USDT",
+          "session": "month",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "ETH-USDT",
+          "session": null,
+          "hours": "24",
+          "done": true
+        },
+        {
+          "type": "collect",
+          "path": "/v1/terminal/history/collect",
+          "instId": null,
+          "session": null,
+          "hours": null,
+          "done": false
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "ETH-USDT",
+          "session": null,
+          "hours": "24",
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "ETH-USDT",
+          "session": "month",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "collect",
+          "path": "/v1/terminal/history/collect",
+          "instId": null,
+          "session": null,
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "session",
+          "path": "/v1/terminal/history/session",
+          "instId": "ETH-USDT",
+          "session": "month",
+          "hours": null,
+          "done": true
+        },
+        {
+          "type": "book",
+          "path": "/v1/terminal/history/liquidity",
+          "instId": "ETH-USDT",
+          "session": null,
+          "hours": "24",
+          "done": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "path": ".tmp/terminal-liquidity-fit-web-audit/validation.json",
+      "pass": true,
+      "at": "2026-11-07T05:42:49.806Z",
+      "scope": "Actual heatmap component, genuine Nov1 archive plus explicitly controlled sparse transport fixtures; localhost-only browser, no wallet/payment/order/bot actions",
+      "checks": [
+        {
+          "name": "real_day_archive_latest_hour_has_visible_bid_offer_bands",
+          "bids": 26735,
+          "offers": 26551,
+          "hatch": 767304,
+          "width": 1557,
+          "height": 540
+        },
+        {
+          "name": "fifteen_minute_display_span_selects_actual_latest_observations"
+        },
+        {
+          "name": "full_captured_period_remains_available_without_changing_source_interval"
+        },
+        {
+          "name": "history_interval_selector_visible_and_labeled"
+        },
+        {
+          "name": "five_real_snapshots_auto_fit_without_stretching_seven_days",
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "width": 1557,
+          "height": 540
+        },
+        {
+          "name": "full_seven_day_interval_remains_available_with_true_unknown_time"
+        },
+        {
+          "name": "missing_source_intervals_expose_exact_clocks_and_reason"
+        },
+        {
+          "name": "single_snapshot_keeps_one_actual_tile_and_unknown_context"
+        },
+        {
+          "name": "source_accepted_clock_lead_does_not_blank_real_frames"
+        },
+        {
+          "name": "calibrated_exchange_clock_keeps_local_retrieval_separate_and_disclosed"
+        },
+        {
+          "name": "older_disconnected_real_capture_period_is_selectable"
+        },
+        {
+          "name": "pointer_inspection_of_explicit_intra_minute_gap_remains_unknown"
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "base",
+          "width": 1557,
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "height": 540
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "base",
+          "width": 351,
+          "bids": 7423,
+          "offers": 5308,
+          "hatch": 81636,
+          "height": 405
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "xlayer",
+          "width": 1557,
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "height": 540
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "xlayer",
+          "width": 351,
+          "bids": 7423,
+          "offers": 5308,
+          "hatch": 81636,
+          "height": 405
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "arbitrum",
+          "width": 1557,
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "height": 540
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "arbitrum",
+          "width": 351,
+          "bids": 7423,
+          "offers": 5308,
+          "hatch": 81636,
+          "height": 405
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "arc-testnet",
+          "width": 1557,
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "height": 540
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "arc-testnet",
+          "width": 351,
+          "bids": 7423,
+          "offers": 5308,
+          "hatch": 81636,
+          "height": 405
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "robinhood",
+          "width": 1557,
+          "bids": 44620,
+          "offers": 33185,
+          "hatch": 483602,
+          "height": 540
+        },
+        {
+          "name": "sparse_observations_and_interval_controls_visible_without_overflow",
+          "theme": "robinhood",
+          "width": 351,
+          "bids": 7423,
+          "offers": 5308,
+          "hatch": 81636,
+          "height": 405
+        },
+        {
+          "name": "history_interval_change_calls_parent_with_selected_hour_count"
+        }
+      ],
+      "errors": []
+    },
+    {
+      "path": ".tmp/docs-illustrations-20261105/validation.json",
+      "pass": true,
+      "at": "2026-11-07T05:51:52.932Z",
+      "scope": "Actual application components, genuine historical public OKX data, actual AppearancePicker; external browser network blocked; no payments, wallet signing or bot sends",
+      "checks": [
+        {
+          "check": "genuine_radar_replay",
+          "stage": 3,
+          "events": [
+            {
+              "kind": "first_stage",
+              "at": 1793522700000,
+              "price": 78145.6
+            },
+            {
+              "kind": "second_stage",
+              "at": 1793525400000,
+              "price": 78010.5
+            },
+            {
+              "kind": "completed",
+              "at": 1793526300000,
+              "price": 78056.5
+            }
+          ],
+          "tapeoutBlock": "75134025"
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "xlayer",
+          "view": "value",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "xlayer",
+          "view": "flow",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "xlayer",
+          "view": "liquidity",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "xlayer",
+          "view": "radar",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "base",
+          "view": "value",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "base",
+          "view": "flow",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "base",
+          "view": "liquidity",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "base",
+          "view": "radar",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arbitrum",
+          "view": "value",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arbitrum",
+          "view": "flow",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arbitrum",
+          "view": "liquidity",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arbitrum",
+          "view": "radar",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arc-testnet",
+          "view": "value",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arc-testnet",
+          "view": "flow",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arc-testnet",
+          "view": "liquidity",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "arc-testnet",
+          "view": "radar",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "robinhood",
+          "view": "value",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "robinhood",
+          "view": "flow",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "robinhood",
+          "view": "liquidity",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_historical_example",
+          "theme": "robinhood",
+          "view": "radar",
+          "width": 1152
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "base",
+          "view": "value",
+          "width": 390
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "base",
+          "view": "liquidity",
+          "width": 390
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "base",
+          "view": "radar",
+          "width": 390
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "arc-testnet",
+          "view": "value",
+          "width": 390
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "arc-testnet",
+          "view": "liquidity",
+          "width": 390
+        },
+        {
+          "check": "actual_component_mobile_no_overflow",
+          "theme": "arc-testnet",
+          "view": "radar",
+          "width": 390
+        }
+      ],
+      "screenshots": [
+        {
+          "name": "session-profile-light.png",
+          "x": 56.5,
+          "y": 58,
+          "width": 1152,
+          "height": 1670.03125
+        },
+        {
+          "name": "session-flow-light.png",
+          "x": 56.5,
+          "y": 58,
+          "width": 1152,
+          "height": 1546.1875
+        },
+        {
+          "name": "liquidity-history-light.png",
+          "x": 64,
+          "y": 58,
+          "width": 1152,
+          "height": 1133.0625
+        },
+        {
+          "name": "radar-sequence-light.png",
+          "x": 64,
+          "y": 58,
+          "width": 1152,
+          "height": 781.40625
+        },
+        {
+          "name": "session-profile-dark.png",
+          "x": 56.5,
+          "y": 58,
+          "width": 1152,
+          "height": 1645.28125
+        },
+        {
+          "name": "session-flow-dark.png",
+          "x": 56.5,
+          "y": 58,
+          "width": 1152,
+          "height": 1521.4375
+        },
+        {
+          "name": "liquidity-history-dark.png",
+          "x": 64,
+          "y": 58,
+          "width": 1152,
+          "height": 1108.3125
+        },
+        {
+          "name": "radar-sequence-dark.png",
+          "x": 64,
+          "y": 58,
+          "width": 1152,
+          "height": 781.40625
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "liveSource": {
+    "pass": true,
+    "at": "2026-11-07T05:48:33.117Z",
+    "scope": "Fresh public BTC book samples through real history storage and UI model, local memory storage only",
+    "sourceSamples": 9,
+    "failures": 0,
+    "retainedMinuteSamples": 3,
+    "visibleFrames": 3,
+    "sourceStart": 1794030347208,
+    "sourceEnd": 1794030441758,
+    "sourceClocks": [
+      {
+        "ts": 1794030347208,
+        "knownAt": 1794030337711,
+        "exchangeClockOffsetMs": 10112.5,
+        "exchangeClockUncertaintyMs": 823.5
+      },
+      {
+        "ts": 1794030410408,
+        "knownAt": 1794030400910,
+        "exchangeClockOffsetMs": 10063,
+        "exchangeClockUncertaintyMs": 972
+      },
+      {
+        "ts": 1794030441758,
+        "knownAt": 1794030432265,
+        "exchangeClockOffsetMs": 9582.5,
+        "exchangeClockUncertaintyMs": 847.5
+      }
+    ],
+    "hasExplicitGaps": true,
+    "notFullHour": true,
+    "captureSha256": "6c95ba2df4fcdb25dd0b4b3b751ddd91acb8cc00bbc17eb9401ac45aad1e69be"
+  },
+  "builds": {
+    "domain": "passed",
+    "market": "passed",
+    "analysis": "passed",
+    "api": "passed",
+    "web": "passed",
+    "webWarning": "Existing bundle-size and dependency annotation warnings"
+  },
+  "historicalGuide": {
+    "sessionDate": "2026-11-01",
+    "spotExecutions": 177587,
+    "bookMinuteObservations": 1440,
+    "imagesRefreshed": 8,
+    "images": [
+      {
+        "name": "liquidity-history-dark.png",
+        "sha256": "4aec6b02f03e4f5aec593a2bd67f187d042db1284eab6cfb81d474173d796267"
+      },
+      {
+        "name": "liquidity-history-light.png",
+        "sha256": "301a60e2c4536a7beafda8b23eb4337b523d1a4327c801af8d06af7cebfa2c8e"
+      },
+      {
+        "name": "radar-sequence-dark.png",
+        "sha256": "98897b866b2e43db78ba5862ab41adb87106bd4abfa7de4228520e26888875e4"
+      },
+      {
+        "name": "radar-sequence-light.png",
+        "sha256": "a334b5fc11fbc92d20e1c84ff5e8f1e3eccda233a4706bd660b2a3c77beb56a1"
+      },
+      {
+        "name": "session-flow-dark.png",
+        "sha256": "8a57bf96657a70d107b4da240bcdb931cc78c06cae3f179eaad7db47c9969249"
+      },
+      {
+        "name": "session-flow-light.png",
+        "sha256": "f861e9580f7c64a24d7e6f2dd78848e395896fcc945ba2573da02e07a033bb41"
+      },
+      {
+        "name": "session-profile-dark.png",
+        "sha256": "47779dd2f30bb335aacd4e87f4c1cf25d2b8c15c52ec9dcb87132c92df8b9e75"
+      },
+      {
+        "name": "session-profile-light.png",
+        "sha256": "c674897b5a1fc82e4f4f6296ac40dc48e7b174b3f099816e5233971c3678ad08"
+      }
+    ]
+  },
+  "notPerformed": [
+    "Deployment or push",
+    "Wallet purchase or exchange order",
+    "Telegram message",
+    "Writes to production storage",
+    "Trading Rules or Execution Lab implementation"
+  ],
+  "limits": [
+    "Unrecorded recent depth stays missing until an exact exchange archive becomes available.",
+    "Busy execution backfills can lag the newest tail; incomplete session coverage remains explicit.",
+    "Current 50-level captures describe only supplied near-price depth; hidden/deeper orders remain unknown.",
+    "Optional real Redis integration skipped without an isolated configured test instance."
+  ]
+}

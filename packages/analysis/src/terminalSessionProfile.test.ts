@@ -34,6 +34,25 @@ test("explicit source gaps preserve measured flow but exclude affected footprint
  const {value,flow}=terminalToolsFromSession(history,"15m");assert.equal(value.status,"partial");assert.equal(value.orderFlow,undefined);assert.equal(value.sessionFootprints!.length,0);assert.equal(flow.sell,3);assert.equal(value.coverage!.completeRequestedWindow,false);
 });
 
+test("an empty uncollected session remains unavailable rather than throwing on its zero source clock",()=>{
+ const history=session([{price:100.1,size:1,side:"buy"}]);
+ Object.assign(history,{knownAt:0,complete:false,status:"collecting",intervals:[],totals:null,rows:[],bars:[],proofHashes:[],gaps:[{start:history.requestedStart,end:history.requestedEnd,reason:"Collection queued"}],backfill:{state:"queued",pages:0,message:"Collection queued"}});
+ const {value,flow}=terminalToolsFromSession(history,"15m");
+ assert.equal(value.status,"unavailable");assert.equal(value.knownAt,0);assert.equal(value.reason,"Collection queued");
+ assert.equal(value.sessionProfile,undefined);assert.equal(flow.status,"unavailable");assert.deepEqual(flow.points,[]);
+});
+
+test("an incomplete session keeps measured executions when the requested end advances beyond collection",()=>{
+ const history=session([{price:100.1,size:1,side:"buy"},{price:100.9,size:3,side:"sell"}]);
+ const capturedEnd=history.requestedEnd;history.requestedEnd+=minute;history.complete=false;history.status="partial";
+ history.gaps=[{start:capturedEnd,end:history.requestedEnd,reason:"Current tail still collecting"}];
+ const {value,flow}=terminalToolsFromSession(history,"15m");
+ assert.equal(value.status,"partial");assert.equal(value.knownAt,capturedEnd+1);near(value.tradeVwap,100.7);
+ assert.equal(value.orderFlow,undefined);assert.equal(value.coverage!.completeRequestedWindow,false);assert.equal(flow.sell,3);
+ const impossible=structuredClone(history);impossible.intervals[0].end=impossible.requestedEnd;
+ assert.throws(()=>terminalToolsFromSession(impossible,"15m"),/actual source observation/);
+});
+
 test("a session clipped inside an execution bar never becomes a complete footprint",()=>{
  const history=session([{price:100.1,size:1,side:"buy",at:start+minute+1},{price:100.9,size:1,side:"sell",at:start+minute+2}]);history.requestedStart=start+minute;history.intervals=[{start:history.requestedStart,end:history.requestedEnd}];
  const {value,flow}=terminalToolsFromSession(history,"15m");assert.equal(value.status,"available");assert.equal(value.sessionFootprints!.length,0);assert.equal(flow.displayPoints![0].ts,history.requestedStart);

@@ -126,3 +126,39 @@ test("retained decimal price rows do not fall one tick below their exact grid du
  const history=new TerminalMarketHistory({storage,now:()=>end,namespace:"decimal-grid"}),result=await history.readSession({instId:"BTC-USDT",marketType:"spot",start:day,end:day+minute});
  assert.deepEqual(result.rows,[{low:80612.34,high:80612.35,buy:1,sell:0,trades:1}]);assert.equal(result.totals?.notional,80612.34);
 });
+
+test("live depth continues under its own fenced lease while a dated archive is blocked",async()=>{
+ const now=day+4*fullDay+3*minute,storage=new MemoryTerminalHistoryStorage(()=>now);let started!:()=>void,finish!:()=>void;
+ const entered=new Promise<void>(resolve=>{started=resolve;}),held=new Promise<void>(resolve=>{finish=resolve;});
+ const history=new TerminalMarketHistory({storage,now:()=>now,namespace:"independent-live",markets:["BTC-USDT","ETH-USDT"],fetchTrades:async()=>emptyBatch(now),fetchBook:async()=>frame(now-1000,now),bookArchive:async()=>{started();await held;return{frames:[frame(day+1000,now)],gaps:[]};}});
+ await history.ensure({instId:"BTC-USDT",start:day,end:day+fullDay});
+ const backfill=history.collect({captureBooks:false,maxJobs:1});await entered;
+ const live=await history.collectLiveBooks();assert.equal(live.books,2);assert.equal(live.alreadyRunning,false);
+ const retained=await history.readLiquidity({instId:"ETH-USDT",start:now-minute,end:now});assert.equal(retained.frames.length,1);assert.equal(retained.frames[0].ts,now-1000);
+ finish();await backfill;
+});
+
+test("startup primes a bounded default history instead of all assets and selected sessions take priority",async()=>{
+ const now=day+15*fullDay+3*minute,storage=new MemoryTerminalHistoryStorage(()=>now),ns="auto-prime:terminal-public-history:v1";
+ const calls:string[]=[],history=new TerminalMarketHistory({storage,now:()=>now,namespace:"auto-prime",markets:["BTC-USDT","ETH-USDT","SOL-USDT"],fetchTrades:async input=>{calls.push(input.instId);return emptyBatch(now);},tradeArchive:async input=>{calls.push(input.instId);return emptyBatch(now);},fetchBook:async()=>frame(now-1000,now),bookArchive:async()=>{throw Error("The exact public archive is not yet available");}});
+ await history.ensureBackground();const queue=await storage.get<{markets:string[];days:string[]}>(`${ns}:queue:`);assert.deepEqual(queue?.markets,["BTC-USDT"]);assert.equal(queue?.days.length,16);
+ assert.equal(await storage.get(`${ns}:day:ETH-USDT:spot:${Math.floor(now/fullDay)*fullDay}`),null);
+ await history.ensure({instId:"ETH-USDT",start:now-2*minute,end:now});
+ await history.collect({captureBooks:false,maxJobs:1});assert.equal(calls[0],"ETH-USDT");
+});
+
+test("missing live versus unpublished or failed dated history has an honest count and retry reason",async()=>{
+ const now=day+4*fullDay+3*minute,history=new TerminalMarketHistory({storage:new MemoryTerminalHistoryStorage(()=>now),now:()=>now,namespace:"history-diagnostics",fetchTrades:async()=>emptyBatch(now),tradeArchive:async()=>emptyBatch(now),fetchBook:async()=>frame(now-1000,now),bookArchive:async()=>{throw Error("Public history HTTP 429");}});
+ await history.ensure({instId:"BTC-USDT",start:day,end:day+fullDay});await history.collect({captureBooks:false,maxJobs:1});
+ const failed=await history.readLiquidity({instId:"BTC-USDT",start:day,end:day+fullDay});assert.equal(failed.backfill.state,"failed");assert.match(failed.backfill.message!,/0 of 1440 expected 60s/);assert.match(failed.gaps[0].reason,/429.*Next retry after/);
+ const current=await history.readLiquidity({instId:"BTC-USDT",start:now-minute,end:now});assert.equal(current.status,"collecting");assert.match(current.gaps[0].reason,/live.*not yet published/);
+});
+
+test("retained books require explicit bounded clock proof for a measured exchange lead",async()=>{
+ const history=new TerminalMarketHistory({storage:new MemoryTerminalHistoryStorage(()=>end),now:()=>end}),led={...frame(end+9000,end),exchangeClockOffsetMs:9500,exchangeClockUncertaintyMs:500,exchangeClockVerifiedAt:end};
+ await history.appendBook("BTC-USDT",led);
+ await assert.rejects(history.appendBook("BTC-USDT",frame(end+9000,end)),/Invalid real book/);
+ for(const changed of [{exchangeClockOffsetMs:30001},{exchangeClockUncertaintyMs:1501},{exchangeClockVerifiedAt:end-5001},{exchangeClockVerifiedAt:end+1},{exchangeClockVerifiedAt:-1}])await assert.rejects(history.appendBook("BTC-USDT",{...led,...changed}),/clock calibration/);
+ await assert.rejects(history.appendBook("BTC-USDT",{...led,knownAt:-1,exchangeClockVerifiedAt:0}),/clock calibration|Invalid real book/);
+ await assert.rejects(history.appendBook("BTC-USDT",{...led,ts:end+20000}),/Invalid real book/);
+});

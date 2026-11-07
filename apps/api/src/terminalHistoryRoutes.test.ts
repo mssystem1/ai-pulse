@@ -6,13 +6,13 @@ import {loadConfig} from "@pulse/config";
 import type {TerminalSessionHistory,TerminalLiquidityHistory} from "@pulse/domain";
 import {createTerminalRoutes} from "./terminalRoutes.js";
 import {TerminalStore,MemoryTerminalStorage,grantTerminalPass} from "./terminalStore.js";
-import type {TerminalMarketHistory} from "./terminalMarketHistory.js";
+import {TerminalMarketHistory,MemoryTerminalHistoryStorage} from "./terminalMarketHistory.js";
 import type {TerminalInspectionEvidence} from "./terminalAiContext.js";
 
 test("retained history requires owner authentication and an active pass, pins evidence and rejects malformed windows",async()=>{
  const now=Date.UTC(2026,10,5,12),account=privateKeyToAccount(`0x${"11".repeat(32)}`),other=privateKeyToAccount(`0x${"22".repeat(32)}`),owner=account.address.toLowerCase();
  const storage=new MemoryTerminalStorage(),store=new TerminalStore(storage,"history-route-test",180);let reads=0,ensures=0,collections=0;
- const history={ensure:async()=>{ensures++;},readSession:async(input:any):Promise<TerminalSessionHistory>=>{reads++;return{version:"terminal-session-history-v1",instId:input.instId,marketType:input.marketType,quantityUnit:input.marketType==="spot"?"base":"contracts",source:"okx-retained-executions",requestedStart:input.start,requestedEnd:input.end,knownAt:now,status:"collecting",priceStep:1,complete:false,intervals:[],gaps:[{start:input.start,end:input.end,reason:"Fixture not yet captured"}],totals:null,rows:[],bars:[],barMs:input.barMs,backfill:{state:"queued",pages:0}};},readLiquidity:async(input:any):Promise<TerminalLiquidityHistory>=>({version:"terminal-liquidity-history-v1",source:"fixture-retained-book",instrumentId:input.instId,marketType:"spot",quantityUnit:"base",requestedStart:input.start,requestedEnd:input.end,observedAt:now,status:"collecting",sampleIntervalMs:60000,priceStep:1,depthLevels:50,frames:[],gaps:[{start:input.start,end:input.end,reason:"No retained observations"}],backfill:{state:"queued",pages:0}}),collect:async()=>{collections++;return{books:0,trades:0};}} as unknown as TerminalMarketHistory;
+ let history={ensure:async()=>{ensures++;},readSession:async(input:any):Promise<TerminalSessionHistory>=>{reads++;return{version:"terminal-session-history-v1",instId:input.instId,marketType:input.marketType,quantityUnit:input.marketType==="spot"?"base":"contracts",source:"okx-retained-executions",requestedStart:input.start,requestedEnd:input.end,knownAt:now,status:"collecting",priceStep:1,complete:false,intervals:[],gaps:[{start:input.start,end:input.end,reason:"Fixture not yet captured"}],totals:null,rows:[],bars:[],barMs:input.barMs,backfill:{state:"queued",pages:0}};},readLiquidity:async(input:any):Promise<TerminalLiquidityHistory>=>({version:"terminal-liquidity-history-v1",source:"fixture-retained-book",instrumentId:input.instId,marketType:"spot",quantityUnit:"base",requestedStart:input.start,requestedEnd:input.end,observedAt:now,status:"collecting",sampleIntervalMs:60000,priceStep:1,depthLevels:50,frames:[],gaps:[{start:input.start,end:input.end,reason:"No retained observations"}],backfill:{state:"queued",pages:0}}),collect:async()=>{collections++;return{books:0,trades:0};}} as unknown as TerminalMarketHistory;
  const cfg={...loadConfig(),NODE_ENV:"test" as const,FEATURE_TRADING_TERMINAL:true,TERMINAL_HISTORY_ENABLED:true,QUEUE_PROVIDER:"memory" as const,STORAGE_PROVIDER:"memory" as const,X402_MOCK:true,PERSISTENCE_NAMESPACE:"history-route-test"};
  const routes=createTerminalRoutes(cfg,{store,now:()=>now,history:()=>history,telegramRecipient:async()=>null});
  const app=express();app.use(express.json());app.use(routes.publicRouter);app.use(routes.beforePayment);app.use((e:Error,_req:express.Request,res:express.Response,_next:express.NextFunction)=>res.status(500).json({error:e.message}));
@@ -37,6 +37,26 @@ test("retained history requires owner authentication and an active pass, pins ev
   for(const query of [`instId=BTC-USDT&start=${now}&end=${now-60000}`,`instId=BTC-USDT&start=${now-1}&end=${now}`,`instId=BTC-USDT&hours=2`])assert.equal((await get("history/liquidity?"+query,token)).status,400);
   const book=await get("history/liquidity?instId=BTC-USDT&hours=1",token);assert.equal(book.status,200);assert.equal((await book.json() as any).frames.length,0);
   assert.equal((await fetch(base+"/history/collect",{method:"POST",headers:{authorization:`Bearer ${token}`,"content-type":"application/json"},body:JSON.stringify({instId:"BTC-USDT"})})).status,200);assert.equal(collections,1);
+  // Exercise real storage/aggregation: the previous fixture populated knownAt
+  // with the request clock and concealed the production empty-session failure.
+  let collectionClock=now-60000;
+  const realHistory=(namespace:string)=>new TerminalMarketHistory({storage:new MemoryTerminalHistoryStorage(()=>collectionClock),namespace,now:()=>collectionClock,
+   fetchBook:async()=>{throw Error("No book in this execution fixture");},
+   fetchTrades:async(input)=>({trades:[{id:"1",ts:input.start+1,price:80600,size:1,side:"buy" as const}],reachedStart:true,pages:1,knownAt:collectionClock,pageHashes:["a".repeat(64)]})});
+  history=realHistory("history-route-real-empty");
+  collectionClock=now;
+  const emptyResponse=await get("history/session?instId=BTC-USDT&timeframe=1H&session=day",token);
+  assert.equal(emptyResponse.status,200);const empty=await emptyResponse.json() as any;
+  assert.equal(empty.session.knownAt,0);assert.equal(empty.tools.value.status,"unavailable");assert.equal(empty.tools.perpetualFlow.status,"unavailable");
+  collectionClock=now-60000;
+  history=realHistory("history-route-real-partial");
+  await history.collect({instId:"BTC-USDT",maxJobs:2,maxWorkMs:1000});
+  collectionClock=now;
+  const partialResponse=await get("history/session?instId=BTC-USDT&timeframe=1H&session=day",token);
+  assert.equal(partialResponse.status,200);const partial=await partialResponse.json() as any;
+  assert.equal(partial.session.knownAt,now-60000);assert.equal(partial.session.complete,false);
+  assert.equal(partial.tools.value.status,"partial");assert.equal(partial.tools.value.tradeVwap,80600);
+  assert.equal(partial.tools.value.coverage.completeRequestedWindow,false);assert.ok(partial.session.gaps.length>0);
   cfg.TERMINAL_HISTORY_ENABLED=false;assert.equal((await get("history/session?instId=BTC-USDT&timeframe=1H",token)).status,503);
  }finally{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));}
 });

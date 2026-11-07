@@ -36,6 +36,29 @@ test("only explicit fully injected fixtures can request zero cadence",async()=>{
  await client.archiveFile(input);await client.archiveFile(input);assert.equal(waits,0);
  for(const spacingMs of [NaN,-1,1.5])assert.throws(()=>new OkxTradeHistoryClient({spacingMs}),/cadence/);
 });
+
+test("public exchange errors retain a bounded diagnostic code without returning source text",async()=>{
+ const client=new OkxTradeHistoryClient({now:()=>now,fetchImpl:async()=>Response.json({code:"50011",msg:"arbitrary upstream text",data:[]})});
+ await assert.rejects(client.book("BTC-USDT"),/^Error: Public history exchange error 50011$/);
+});
+
+test("live-book reads disable caching and distinguish stale snapshots from a future exchange clock",async()=>{
+ let seen:RequestInit|undefined;const rows={ts:String(now),bids:[["100","2","0","1"]],asks:[["102","3","0","1"]]};
+ const client=new OkxTradeHistoryClient({now:()=>now,fetchImpl:async(_url,init)=>{seen=init;return Response.json({code:"0",data:[rows]});}});
+ await client.book("BTC-USDT");assert.equal((seen as RequestInit&{cache?:string})?.cache,"no-store");assert.equal(new Headers(seen?.headers).get("Cache-Control"),"no-cache");
+ rows.ts=String(now-15001);await assert.rejects(client.book("BTC-USDT"),/Stale order-book/);
+ rows.ts=String(now+9000);await assert.rejects(client.book("BTC-USDT"),/clock is ahead/);
+});
+
+test("bounded HTTPS clock calibration accepts a measured exchange lead without changing local knownAt",async()=>{
+ const rows={ts:String(now+9000),bids:[["100","2","0","1"]],asks:[["102","3","0","1"]]},response=(date:number)=>Response.json({code:"0",data:[rows]},{headers:{Date:new Date(date).toUTCString()}});
+ const client=new OkxTradeHistoryClient({now:()=>now,fetchImpl:async()=>response(now+9000)}),frame=await client.book("BTC-USDT");
+ assert.equal(frame.knownAt,now);assert.equal(frame.ts,now+9000);assert.equal(frame.exchangeClockOffsetMs,9500);assert.equal(frame.exchangeClockUncertaintyMs,500);assert.equal(frame.exchangeClockVerifiedAt,now);
+ rows.ts=String(now-6000);await assert.rejects(client.book("BTC-USDT"),/Stale order-book/);
+ rows.ts=String(now+20000);await assert.rejects(client.book("BTC-USDT"),/clock is ahead/);
+ rows.ts=String(now+9000);await assert.rejects(new OkxTradeHistoryClient({now:()=>now,fetchImpl:async()=>response(now+31000)}).book("BTC-USDT"),/clock is ahead/);
+ let slow=now;await assert.rejects(new OkxTradeHistoryClient({now:()=>slow,fetchImpl:async()=>{slow+=2500;rows.ts=String(slow+9000);return response(slow+9000);}}).book("BTC-USDT"),/clock is ahead/);
+});
 test("official archive identity binds source path, UTC versus UTC+8 date and exact file metadata",async()=>{
  for(const module of ["1","4"]as const){const file=await clientFor([catalogue(module)]).archiveFile({instId:"BTC-USDT",date:"2026-11-01",module});assert.match(file.url,/static\.okx\.com\/cdn\//);}
  const base=(catalogue("4")[0].details[0].groupDetails[0]).url;

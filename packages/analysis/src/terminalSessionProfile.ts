@@ -35,10 +35,14 @@ function profile(rows:TerminalHistoryRow[],totals:NonNullable<TerminalSessionHis
  * stays explicit; only fully covered sessions enter the complete flow schema. */
 export function terminalToolsFromSession(history:TerminalSessionHistory,timeframe:string):Pick<TerminalMarketTools,"value"|"flow">{
  const {requestedStart:start,requestedEnd:end,knownAt,totals}=history,frame=terminalFrameProfile(timeframe);
- if(history.version!=="terminal-session-history-v1"||!history.source||!history.instId||![start,end,knownAt,history.barMs].every(Number.isSafeInteger)||start<0||end<=start||end>knownAt||history.barMs<1||!Number.isFinite(history.priceStep)||history.priceStep<=0||history.quantityUnit!==(history.marketType==="spot"?"base":"contracts")||!["spot","perpetual"].includes(history.marketType))throw Error("Invalid retained session identity, units or clock");
+ // The requested session can extend beyond the last collector observation.
+ // Missing time remains a gap; it is not a reason to discard the usable prefix
+ // (or turn an empty, still-queued session into a service error).
+ if(history.version!=="terminal-session-history-v1"||!history.source||!history.instId||![start,end,knownAt,history.barMs].every(Number.isSafeInteger)||start<0||knownAt<0||end<=start||history.barMs<1||!Number.isFinite(history.priceStep)||history.priceStep<=0||history.quantityUnit!==(history.marketType==="spot"?"base":"contracts")||!["spot","perpetual"].includes(history.marketType))throw Error("Invalid retained session identity, units or clock");
  const intervals=history.intervals.slice().sort((a,b)=>a.start-b.start);
  if([...intervals,...history.gaps].some(p=>![p.start,p.end].every(Number.isSafeInteger)||p.start<start||p.end>end||p.end<=p.start))throw Error("Invalid retained session coverage interval");
  const covered=terminalCovered(intervals,start,end)&&!history.gaps.length&&history.complete;
+ if(history.complete&&end>knownAt||intervals.some(interval=>interval.end>knownAt)||totals&&totals.lastTradeAt>knownAt)throw Error("Retained coverage extends beyond its actual source observation");
  const meta={source:history.source,knownAt,windowStart:start,windowEnd:end,status:covered?"available" as const:totals?"partial" as const:"unavailable" as const,units:history.quantityUnit,reason:covered?undefined:history.backfill.message??"Session collection is incomplete. Gaps remain unknown.",coverage:totals?{requestedStart:start,requestedEnd:end,capturedStart:intervals[0]?.start??start,capturedEnd:intervals.at(-1)?.end??start,firstTradeAt:totals.firstTradeAt,lastTradeAt:totals.lastTradeAt,tradeCount:totals.trades,completeRequestedWindow:covered,completeCapturedInterval:covered,horizon:"selected-session"}:undefined};
  const value:TerminalMarketTools["value"]={...meta,id:"value",label:"Session VWAP & value"},flow:TerminalMarketTools["flow"]={...meta,id:"flow",label:"Session executed flow",marketType:history.marketType,points:[]};
  if(!totals){if(history.rows.length||history.bars.length)throw Error("Retained execution rows require their exact totals");return{value,flow};}

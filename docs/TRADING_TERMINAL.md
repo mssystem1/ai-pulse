@@ -106,7 +106,7 @@ Market-history configuration is also environment-driven:
 | `TERMINAL_HISTORY_POLL_MS` | `15000` | Long-lived collector interval |
 | `TERMINAL_HISTORY_MARKETS` | Eight listed Spot pairs | Exact markets collected in the background |
 
-Production history uses the existing durable Redis/KV configuration. Run the long-lived collector with `AUTOMATION_WORKER_ENABLED=1`, or call the existing authenticated cron endpoint; both paths share the fenced collector lease. Configure serverless request duration to accommodate the bounded archive download. The UI continues reading retained progress while a collection is running. A missing archive, rate limit or source outage leaves a visible gap and a resumable checkpoint.
+Production history uses the existing durable Redis/KV configuration. On a long-lived API host, `FEATURE_TRADING_TERMINAL=1` and `TERMINAL_HISTORY_ENABLED=1` start public-data collection automatically; the trading automation switch is independent. Live books and execution/archive backfill have separate timers, source clients and fenced leases, so a slow historical download cannot stop current book sampling. Serverless hosts must call the authenticated automation tick on a regular schedule; browser collection alone is insufficient for continuous history. Configure serverless request duration to accommodate bounded archive downloads. Explicitly selected sessions receive a bounded priority turn while existing backlog resumes. A missing archive, rate limit or source outage leaves a visible gap, source/retry reason and resumable checkpoint.
 
 ## Monitoring, Telegram and expiry
 
@@ -126,7 +126,7 @@ After access expiry, journal/history can be read within retention, while monitor
 
 ## Validation and release
 
-The [6 November validation record](TRADING_TERMINAL_VALIDATION_2026-11-06.md) documents the current seven-issue follow-up, real session/heatmap examples, fresh five-frame admission audit, automated checks and browser validation. Its [JSON companion](TRADING_TERMINAL_VALIDATION_2026-11-06.json) retains the exact source clocks and geometry results. [Trading Rules](TRADING_TERMINAL_TAPEOUT_NEXT.md) is the proposed next X Layer/Tapeout function and remains separate from implemented capabilities.
+The [6 November validation record](TRADING_TERMINAL_VALIDATION_2026-11-06.md) documents the earlier seven-issue follow-up, real session/heatmap examples, fresh five-frame admission audit and its original test boundaries. Its [JSON companion](TRADING_TERMINAL_VALIDATION_2026-11-06.json) retains the source clocks and geometry results. The later [Market tools deployment follow-up](TERMINAL_MARKET_TOOLS_FIX_2026-11-07.md) records the empty-session, continuous-collection and heatmap defects found after that validation. Trading Rules was rejected and is not an approved feature.
 
 Run the new feature paths with `FEATURE_TRADING_TERMINAL=1`, `NODE_ENV=test` and `PULSE_SKIP_DOTENV=1` to avoid inheriting production credentials/workers. Verify owner isolation, exact/env-configured prices, receipt recovery, expiry, scenario eligibility, causal Radar replay, missing sources, manual-fill accounting, notification consent/deduplication, chart-view preservation and mobile/Clarity readability.
 

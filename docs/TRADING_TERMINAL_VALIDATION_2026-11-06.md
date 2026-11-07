@@ -1,5 +1,7 @@
 # Terminal fixes and validation — 6 November 2026
 
+Historical validation record. Deployment later exposed additional session/collector/heatmap defects; see the [7 November follow-up](TERMINAL_MARKET_TOOLS_FIX_2026-11-07.md). The Trading Rules design mentioned below was subsequently rejected and is not an approved feature.
+
 The seven current user issues are addressed by the implementation and design work below. Changes are local until separately deployed. The [machine-readable validation record](TRADING_TERMINAL_VALIDATION_2026-11-06.json) preserves source dates, exact setup prices, admission outcomes, archive hashes and test scope.
 
 | Issue | Result |

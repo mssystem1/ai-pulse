@@ -20,7 +20,13 @@ export type TerminalLiquidityModel = {
 export type TerminalLiquidityCell = {
   column: number; row: number; start: number; end: number; low: number; high: number;
   sourceAt: number | null; knownAt: number | null; bid: number | null; ask: number | null;
+  clockOffsetMs: number | null; clockUncertaintyMs: number | null;
   observations: number; gaps: TerminalHistoryGap[];
+};
+export type TerminalLiquidityPeriod = { start: number; end: number; frames: number };
+export type TerminalLiquidityViewport = {
+  start: number; end: number; requestedStart: number; requestedEnd: number;
+  periods: TerminalLiquidityPeriod[]; period: TerminalLiquidityPeriod; totalFrames: number;
 };
 
 const finitePositive = (value: number) => Number.isFinite(value) && value > 0;
@@ -29,19 +35,58 @@ function latestSample(samples: TerminalLiquiditySample[], start: number, end: nu
   for (let index = samples.length - 1; index >= 0; index--) if (samples[index].start >= start && samples[index].start < end) return samples[index];
 }
 
+function realFrames(history: TerminalLiquidityHistory, start: number, end: number) {
+  const unique = new Map<number, TerminalBookHistoryFrame>();
+  for (const raw of history.frames) {
+    if (!Number.isSafeInteger(raw.ts) || raw.ts < start || raw.ts >= end || !Number.isSafeInteger(raw.knownAt) || raw.knownAt < 0 || raw.knownAt > history.observedAt + 5_000 || !Array.isArray(raw.bids) || !Array.isArray(raw.asks)) continue;
+    // Match the source adapter's bounded official-HTTPS clock calibration.
+    // Local knownAt is never rewritten to make an exchange frame look fresh.
+    const hasCalibration = raw.exchangeClockOffsetMs !== undefined || raw.exchangeClockUncertaintyMs !== undefined || raw.exchangeClockVerifiedAt !== undefined;
+    const offset = raw.exchangeClockOffsetMs, uncertainty = raw.exchangeClockUncertaintyMs, verifiedAt = raw.exchangeClockVerifiedAt;
+    if (hasCalibration && (typeof offset !== "number" || !Number.isFinite(offset) || Math.abs(offset) > 30_000 || typeof uncertainty !== "number" || !Number.isFinite(uncertainty) || uncertainty < 500 || uncertainty > 1_500 || !Number.isSafeInteger(verifiedAt) || verifiedAt! < 0 || verifiedAt! > raw.knownAt || raw.knownAt - verifiedAt! > 5_000)) continue;
+    const sourceNow = raw.knownAt + (offset ?? 0), tolerance = uncertainty ?? 0;
+    if (raw.ts > sourceNow + tolerance + 5_000 || raw.ts > history.observedAt + (offset ?? 0) + tolerance + 5_000 || hasCalibration && sourceNow + tolerance - raw.ts > 15_000) continue;
+    const bids = raw.bids.filter(validLevel).sort((a, b) => b.price - a.price), asks = raw.asks.filter(validLevel).sort((a, b) => a.price - b.price);
+    if (!bids.length || !asks.length || bids[0].price >= asks[0].price || unique.has(raw.ts)) continue;
+    unique.set(raw.ts, { ...raw, bids, asks });
+  }
+  return [...unique.values()].sort((a, b) => a.ts - b.ts);
+}
+
+/** Fitting changes only the viewport. Unknown time is never compressed out of
+ * a period, and the complete requested window remains independently available. */
+export function terminalLiquidityViewport(history: TerminalLiquidityHistory, mode: "available" | "requested" = "available", selectedPeriod?: number, maximumSpanMs: number | null = 3_600_000): TerminalLiquidityViewport | null {
+  const start = history.requestedStart, end = history.requestedEnd, cadence = history.sampleIntervalMs;
+  if (![start, end, history.observedAt, cadence].every(Number.isFinite) || end <= start || cadence <= 0) return null;
+  const frames = realFrames(history, start, end).filter(f => !history.gaps.some(g => g.start <= f.ts && g.end > f.ts));
+  if (!frames.length) return null;
+  const periods: TerminalLiquidityPeriod[] = [];
+  let previousFrameAt: number | null = null;
+  for (const f of frames) {
+    const previous = periods.at(-1);
+    const interrupted = previousFrameAt !== null && history.gaps.some(g => g.start < f.ts && g.end > previousFrameAt!);
+    const frameEnd = Math.min(end, f.ts + cadence, ...history.gaps.filter(g => g.start > f.ts).map(g => g.start));
+    if (previous && previousFrameAt !== null && f.ts - previousFrameAt <= cadence * 1.5 && !interrupted) { previous.end = frameEnd; previous.frames++; }
+    else periods.push({ start: f.ts, end: frameEnd, frames: 1 });
+    previousFrameAt = f.ts;
+  }
+  const period = periods.find(value => value.start === selectedPeriod) ?? periods[periods.length - 1];
+  if (mode === "requested") return { start, end, requestedStart: start, requestedEnd: end, periods, period, totalFrames: frames.length };
+  // Keep some unknown context and at least six cadence slots. One snapshot is
+  // a narrow observed tile, never a solid band stretched across a whole chart.
+  const limit = maximumSpanMs === null ? Infinity : finitePositive(maximumSpanMs) ? Math.max(cadence, maximumSpanMs) : 3_600_000;
+  const span = Math.min(limit, Math.max(period.end - period.start + cadence * 2, cadence * 6));
+  let viewEnd = Math.min(end, period.end + cadence), viewStart = Math.max(start, viewEnd - span);
+  if (viewEnd - viewStart < span) viewEnd = Math.min(end, viewStart + span);
+  return { start: viewStart, end: viewEnd, requestedStart: start, requestedEnd: end, periods, period, totalFrames: frames.length };
+}
+
 /** Price bins sum levels inside one real order-book snapshot. Time columns
  * select their latest observation; repeated snapshots never become volume. */
 export function terminalLiquidityModel(history: TerminalLiquidityHistory, maximumColumns = 320, maximumRows = 80): TerminalLiquidityModel | null {
   const start = history.requestedStart, end = history.requestedEnd;
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !Number.isFinite(history.observedAt) || !finitePositive(history.priceStep) || !finitePositive(history.sampleIntervalMs)) return null;
-  const unique = new Map<number, TerminalBookHistoryFrame>();
-  for (const raw of history.frames) {
-    if (!Number.isFinite(raw.ts) || raw.ts < start || raw.ts >= end || !Number.isFinite(raw.knownAt) || raw.knownAt < raw.ts || raw.knownAt > history.observedAt + 5_000) continue;
-    const bids = raw.bids.filter(validLevel).sort((a, b) => b.price - a.price), asks = raw.asks.filter(validLevel).sort((a, b) => a.price - b.price);
-    if (!bids.length || !asks.length || bids[0].price >= asks[0].price || unique.has(raw.ts)) continue;
-    unique.set(raw.ts, { ...raw, bids, asks });
-  }
-  const frames = [...unique.values()].sort((a, b) => a.ts - b.ts);
+  const frames = realFrames(history, start, end).filter(frame => !history.gaps.some(gap => gap.start <= frame.ts && gap.end > frame.ts));
   if (!frames.length) return null;
   const allPrices = frames.flatMap(frame => [...frame.bids, ...frame.asks].map(level => level.price));
   const min = allPrices.reduce((v,p)=>Math.min(v,p),Infinity), max = allPrices.reduce((v,p)=>Math.max(v,p),-Infinity), rowLimit = Number.isFinite(maximumRows) ? Math.min(800, Math.max(2, Math.floor(maximumRows))) : 80;
@@ -94,7 +139,7 @@ export function terminalLiquidityCell(model: TerminalLiquidityModel, columnIndex
   if (!Number.isInteger(columnIndex) || !Number.isInteger(rowIndex) || columnIndex < 0 || columnIndex >= model.columns.length || rowIndex < 0 || rowIndex >= model.rowCount) return null;
   const column = model.columns[columnIndex], low = model.low + rowIndex * model.priceStep;
   const sample = at === undefined ? latestSample(model.samples, column.start, column.end) : Number.isFinite(at) && at >= column.start && at < column.end ? model.samples.find(item => item.start <= at && item.end > at) : undefined;
-  return { column: columnIndex, row: rowIndex, start: column.start, end: column.end, low, high: low + model.priceStep, sourceAt: sample?.frame.ts ?? null, knownAt: sample?.frame.knownAt ?? null, bid: sample && low + model.priceStep > sample.lowestBid ? sample.bids[rowIndex] : null, ask: sample && low <= sample.highestAsk ? sample.asks[rowIndex] : null, observations: column.observations, gaps: model.gaps.filter(gap => gap.start < column.end && gap.end > column.start) };
+  return { column: columnIndex, row: rowIndex, start: column.start, end: column.end, low, high: low + model.priceStep, sourceAt: sample?.frame.ts ?? null, knownAt: sample?.frame.knownAt ?? null, clockOffsetMs: sample?.frame.exchangeClockOffsetMs ?? null, clockUncertaintyMs: sample?.frame.exchangeClockUncertaintyMs ?? null, bid: sample && low + model.priceStep > sample.lowestBid ? sample.bids[rowIndex] : null, ask: sample && low <= sample.highestAsk ? sample.asks[rowIndex] : null, observations: column.observations, gaps: model.gaps.filter(gap => gap.start < column.end && gap.end > column.start) };
 }
 
 export function terminalLiquidityIntensity(size: number, maximum: number, logarithmic = true): number {

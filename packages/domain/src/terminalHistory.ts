@@ -35,6 +35,11 @@ export type TerminalBookHistoryFrame = {
   ts: number; knownAt: number; bids: { price: number; size: number }[];
   asks: { price: number; size: number }[];
   sequence?: number; sequenceVerified?: boolean;
+  /** Bounded calibration from an official HTTPS Date response (RTT <=2s).
+   * knownAt stays local; this never advances requested completed-bar cutoffs. */
+  exchangeClockOffsetMs?: number;
+  exchangeClockUncertaintyMs?: number;
+  exchangeClockVerifiedAt?: number;
 };
 export type TerminalLiquidityHistory = {
   version: "terminal-liquidity-history-v1";

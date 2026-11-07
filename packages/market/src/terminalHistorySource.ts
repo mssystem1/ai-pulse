@@ -7,7 +7,8 @@ import {decodeOkxTradeArchive,okxTradeArchiveDates} from "./okxTradeArchives.js"
 const DAY=86400000;
 const valid=(id:string)=>/^[A-Z0-9]{2,20}-(USDT|USDC|USD)(-SWAP)?$/.test(id);
 export type OkxHistoryBatch={trades:MarketTradePrint[];knownAt:number;nextAfterId?:string;reachedStart:boolean;pages:number;pageHashes:string[];oldestAt?:number};
-export type OkxHistoryBookFrame={ts:number;knownAt:number;bids:{price:number;size:number}[];asks:{price:number;size:number}[];sequenceVerified?:boolean};
+type ExchangeClock={exchangeClockOffsetMs:number;exchangeClockUncertaintyMs:number;exchangeClockVerifiedAt:number};
+export type OkxHistoryBookFrame={ts:number;knownAt:number;bids:{price:number;size:number}[];asks:{price:number;size:number}[];sequenceVerified?:boolean}&Partial<ExchangeClock>;
 export class OkxTradeHistoryClient{
  private tail:Promise<unknown>=Promise.resolve();private last=0;
  constructor(readonly options:{fetchImpl?:typeof fetch;now?:()=>number;wait?:(ms:number)=>Promise<void>;spacingMs?:number}={}){if(options.spacingMs!==undefined&&(!Number.isSafeInteger(options.spacingMs)||options.spacingMs<0))throw Error("Invalid public history request cadence");}
@@ -17,10 +18,15 @@ export class OkxTradeHistoryClient{
    // 20/2s. The serialized queue must respect the slower endpoint separately.
    // Zero cadence is only for a fully injected, network-free clock fixture.
    const fixture=this.options.spacingMs===0&&this.options.fetchImpl&&this.options.now&&this.options.wait,minimum=path.startsWith("/api/v5/public/market-data-history?")?450:150,spacing=fixture?0:Math.max(minimum,this.options.spacingMs??minimum),delay=this.last+spacing-clock();if(delay>0)await wait(delay);this.last=clock();
-   const response=await(this.options.fetchImpl??fetch)("https://www.okx.com"+path,{signal:AbortSignal.timeout(12000),redirect:"error"});
+   const requestStarted=clock(),response=await(this.options.fetchImpl??fetch)("https://www.okx.com"+path,{signal:AbortSignal.timeout(12000),redirect:"error",cache:"no-store",headers:{"Cache-Control":"no-cache","Pragma":"no-cache"}} as RequestInit&{cache:"no-store"});
    if(!response.ok){await response.body?.cancel();throw Error(`Public history HTTP ${response.status}`);}const reader=response.body?.getReader();if(!reader)throw Error("Public history response is empty");const chunks:Uint8Array[]=[];let bytes=0;
    try{while(true){const part=await reader.read();if(part.done)break;bytes+=part.value.byteLength;if(bytes>1000000)throw Error("History response exceeds bound");chunks.push(part.value);}}catch(error){await reader.cancel().catch(()=>{});throw error;}finally{reader.releaseLock();}
-   const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(body.code!=="0"||!Array.isArray(body.data))throw Error("Public history unavailable");return body.data as Record<string,unknown>[];
+   const body=JSON.parse(Buffer.concat(chunks).toString("utf8"));if(body.code!=="0")throw Error(typeof body.code==="string"&&/^\d{1,8}$/.test(body.code)?`Public history exchange error ${body.code}`:"Public history unavailable");if(!Array.isArray(body.data))throw Error("Public history response has invalid data");
+   const completed=clock(),httpDate=Date.parse(response.headers.get("date")??""),roundTrip=completed-requestStarted,offset=httpDate+500-(requestStarted+completed)/2;
+   // HTTP Date has one-second precision. Retain local knownAt and record the
+   // bounded calibration separately; it does not advance completed-bar cutoffs.
+   const exchangeClock:ExchangeClock|undefined=Number.isSafeInteger(requestStarted)&&requestStarted>=0&&Number.isSafeInteger(completed)&&completed>=0&&roundTrip>=0&&roundTrip<=2000&&Number.isFinite(httpDate)&&Math.abs(offset)<=30000?{exchangeClockOffsetMs:offset,exchangeClockUncertaintyMs:500+roundTrip/2,exchangeClockVerifiedAt:completed}:undefined;
+   return{data:body.data as Record<string,unknown>[],exchangeClock};
   });this.tail=task.catch(()=>{});return task;
  }
  async fetchBatch(input:{instId:string;start:number;end:number;afterId?:string;afterAt?:number;maxPages?:number}):Promise<OkxHistoryBatch>{
@@ -30,7 +36,7 @@ export class OkxTradeHistoryClient{
   const maximum=input.maxPages??20;if(!Number.isInteger(maximum)||maximum<1||maximum>200)throw Error("Invalid history page bound");
   const kept=new Map<string,MarketTradePrint>(),hashes:string[]=[];let cursor=input.afterId,reachedStart=false,pages=0,oldestAt:number|undefined,priorTs=input.afterAt??Infinity;
   for(;pages<maximum;){
-   const rows=await this.get(`/api/v5/market/history-trades?instId=${input.instId}&limit=100&type=${cursor?1:2}&after=${cursor??input.end}`);pages++;
+   const {data:rows}=await this.get(`/api/v5/market/history-trades?instId=${input.instId}&limit=100&type=${cursor?1:2}&after=${cursor??input.end}`);pages++;
    if(!rows.length)throw Error("Executed history ended before the requested start was verified");
    if(rows.length>100)throw Error("History page exceeds requested limit");hashes.push(createHash("sha256").update(JSON.stringify(rows)).digest("hex"));
    let previous=cursor?BigInt(cursor):null,next=cursor;
@@ -50,7 +56,7 @@ export class OkxTradeHistoryClient{
   if(!valid(input.instId)||!/^\d{4}-\d{2}-\d{2}$/.test(input.date))throw Error("Invalid archive identity");
   const at=Date.parse(input.date+"T00:00:00Z"),swap=input.instId.endsWith("-SWAP");if(!Number.isSafeInteger(at)||new Date(at).toISOString().slice(0,10)!==input.date)throw Error("Invalid archive date");
   const params=new URLSearchParams({module:input.module,instType:swap?"SWAP":"SPOT",dateAggrType:"daily",begin:String(at),end:String(at),[swap?"instFamilyList":"instIdList"]:swap?input.instId.slice(0,-5):input.instId});
-  const data=await this.get("/api/v5/public/market-data-history?"+params),name=`${input.instId}-${input.module==="4"?"L2orderbook-400lv":"trades"}-${input.date}.${input.module==="4"?"tar.gz":"zip"}`;
+  const {data}=await this.get("/api/v5/public/market-data-history?"+params),name=`${input.instId}-${input.module==="4"?"L2orderbook-400lv":"trades"}-${input.date}.${input.module==="4"?"tar.gz":"zip"}`;
   const groups=data.flatMap(item=>Array.isArray(item.details)?item.details:[]).filter((item:any)=>swap?item.instType==="SWAP"&&item.instFamily===input.instId.slice(0,-5):item.instId===input.instId&&item.instType==="SPOT").flatMap((item:any)=>Array.isArray(item.groupDetails)?item.groupDetails:[]);
   const matches=groups.filter((group:any)=>group.filename===name);if(matches.length!==1)throw Error("The exact public archive is not yet available");
   const selected=matches[0],url=new URL(selected.url),size=Number(selected.sizeMB)*1048576;
@@ -60,10 +66,14 @@ export class OkxTradeHistoryClient{
  }
  async book(instId:string,depth=50):Promise<OkxHistoryBookFrame>{
   if(!valid(instId)||!Number.isInteger(depth)||depth<1||depth>400)throw Error("Invalid book identity/depth");
-  const [raw]=await this.get(`/api/v5/market/books?instId=${instId}&sz=${depth}`),ts=Number(raw?.ts),knownAt=(this.options.now??Date.now)();
+  const {data:[raw],exchangeClock}=await this.get(`/api/v5/market/books?instId=${instId}&sz=${depth}`),ts=Number(raw?.ts),knownAt=(this.options.now??Date.now)();
   const levels=(v:unknown,bid:boolean)=>{if(!Array.isArray(v)||!v.length||v.length>depth)throw Error("Invalid book levels");let prior=bid?Infinity:-Infinity;return v.map(row=>{if(!Array.isArray(row)||row.length!==4||row.some(value=>typeof value!=="string"||!value.trim()))throw Error("Invalid book level format");const price=Number(row[0]),size=Number(row[1]),orders=Number(row[3]);if(!Number.isFinite(price)||price<=0||!Number.isFinite(size)||size<=0||!Number.isSafeInteger(orders)||orders<0||(bid?price>=prior:price<=prior))throw Error("Invalid or unordered book level");prior=price;return{price,size};});};
-  const bids=levels(raw?.bids,true),asks=levels(raw?.asks,false);if(!Number.isSafeInteger(knownAt)||!Number.isSafeInteger(ts)||ts<0||ts>knownAt+5000||knownAt-ts>15000||bids[0].price>=asks[0].price)throw Error("Stale/crossed book");
-  return{ts,knownAt,bids,asks,sequenceVerified:false};
+  const bids=levels(raw?.bids,true),asks=levels(raw?.asks,false);if(!Number.isSafeInteger(knownAt)||knownAt<0||!Number.isSafeInteger(ts)||ts<0)throw Error("Invalid order-book source clock");
+  const calibrated=exchangeClock&&knownAt>=exchangeClock.exchangeClockVerifiedAt&&knownAt-exchangeClock.exchangeClockVerifiedAt<=5000?exchangeClock:undefined,sourceNow=knownAt+(calibrated?.exchangeClockOffsetMs??0),uncertainty=calibrated?.exchangeClockUncertaintyMs??0;
+  if(ts>sourceNow+uncertainty+5000)throw Error("Exchange order-book clock is ahead of collection clock");
+  if(sourceNow+uncertainty-ts>15000)throw Error("Stale order-book snapshot");
+  if(bids[0].price>=asks[0].price)throw Error("Crossed order-book snapshot");
+  return{ts,knownAt,bids,asks,sequenceVerified:false,...calibrated};
  }
 }
 

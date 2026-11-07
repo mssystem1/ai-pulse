@@ -1,6 +1,6 @@
 # Trading Rules: a useful next Tapeout function for PULSE
 
-Status: design proposal for review; no new feature implementation or on-chain write is authorized by this document. Research reviewed against the official sources below on 6 November 2026 (client date, Europe/Samara).
+Status: REJECTED by the user on 6 November 2026. Retained as an earlier design record only; this is not an approved roadmap or an implemented feature. No implementation, publication or on-chain write is authorized by this document.
 
 ## Product decision
 

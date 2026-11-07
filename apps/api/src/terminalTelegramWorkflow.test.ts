@@ -10,6 +10,7 @@ import { TelegramCommerce } from "./telegramCommerce.js";
 import { TelegramWalletLink } from "./telegramWalletLink.js";
 import { MemoryJobStore, MemoryReportStore } from "./jobs.js";
 import { grantTerminalPass, MemoryTerminalStorage, TerminalStore } from "./terminalStore.js";
+import { kvConfigured } from "./resilientKv.js";
 
 const signer = privateKeyToAccount(`0x${"11".repeat(32)}`), OWNER = signer.address.toLowerCase(), NOW = Date.parse("2026-11-05T10:00:00Z");
 const cfg = (): AppConfig => ({ ...loadConfig(), NODE_ENV: "test", FEATURE_TRADING_TERMINAL: true, FEATURE_TELEGRAM: true, QUEUE_PROVIDER: "memory", STORAGE_PROVIDER: "memory" });
@@ -72,7 +73,14 @@ test("bot Terminal deep link explains opt-in and uses the existing ownership-con
   assert.ok(calls.every(call => call.method === "sendMessage"), "All bot calls use a test capture; no payment or external request occurs");
 });
 
-test("verified wallet to app opt-in to selected position to worker to one Telegram acknowledgement", async () => {
+test("verified wallet to app opt-in to selected position to worker to one Telegram acknowledgement", async (t) => {
+  // Wallet links select persistence from process.env, independently of cfg().
+  const keys = ["QUEUE_PROVIDER", "STORAGE_PROVIDER", "REDIS_URL", "KV_REST_API_URL", "KV_REST_API_TOKEN"] as const;
+  const previous = keys.map(key => process.env[key]);
+  t.after(() => keys.forEach((key, index) => { if (previous[index] === undefined) delete process.env[key]; else process.env[key] = previous[index]; }));
+  process.env.QUEUE_PROVIDER = "memory"; process.env.STORAGE_PROVIDER = "memory";
+  for (const key of keys) if (key !== "QUEUE_PROVIDER" && key !== "STORAGE_PROVIDER") process.env[key] = "";
+  assert.equal(kvConfigured(), false, "The workflow must use memory without an external Redis/KV connection");
   let now = NOW, price = 105; const state = store(), config = { ...cfg(), TERMINAL_MONITOR_INTERVAL_MS: 15_000 };
   const links = new TelegramWalletLink(config, new MemoryJobStore()), attempt = await links.start(123);
   const challenge = await links.challenge(attempt.token, signer.address);
