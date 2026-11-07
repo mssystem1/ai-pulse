@@ -306,3 +306,5 @@ export async function buildMarketContext(opts: {
 }
 export * from "./terminalParticipation.js";
 export * from "./terminalTapeout.js";
+export * from "./indicatorTapeout.js";
+export * from "./indicatorDeployments.js";

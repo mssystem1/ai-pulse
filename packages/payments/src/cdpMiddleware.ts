@@ -6,8 +6,13 @@ import { ExactEvmScheme } from "@x402/evm/exact/server";
 import { bazaarResourceServerExtension, declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { createCdpAuthHeaders } from "./cdpAuth.js";
 import { canonicalPaymentResource, inlineSettlement } from "./inlineSettlement.js";
+import { isIndicatorPurchasePath } from "./inputContracts.js";
 
 export function buildCdpDiscoveryContract(path: string, networkKey: "base" | "arbitrum" = "base") {
+  if (isIndicatorPurchasePath(path)) return {
+    input: { requestId: "owner-generated-indicator-quote-id" },
+    inputSchema: { properties: { requestId: { type: "string", minLength: 16, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$", description: "Use the original requestId from this exact creator-service quote. Requires Terminal wallet authentication and reviewed network, token, creator recipient, amount and immutable indicator version." } }, required: ["requestId"] },
+  };
   if (path.startsWith("/v1/terminal/pass/")) return {
     input: { requestId: "owner-generated-purchase-request-id" },
     inputSchema: { properties: { requestId: { type: "string", minLength: 16, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$", description: "Stable owner-scoped purchase ID retained for receipt recovery. A Terminal wallet-ownership bearer session is also required." } }, required: ["requestId"] },
@@ -78,6 +83,26 @@ export function buildCdpDiscoveryContract(path: string, networkKey: "base" | "ar
   };
 }
 
+export function buildCdpDiscoveryOutput(path: string, networkKey: "base" | "arbitrum" = "base") {
+  if (isIndicatorPurchasePath(path)) {
+    const network = getNetwork(networkKey);
+    return {
+      entitled: true,
+      purchase: {
+        id: path.split("/").at(-1)!, listingId: "pmi_11111111111111111111111111111111", version: "1.0.0",
+        sha256: "0".repeat(64), state: "granted", network: networkKey, asset: network.paymentAsset.address,
+        assetSymbol: network.paymentAsset.symbol, amountAtomic: "1000", payee: "0x1111111111111111111111111111111111111111",
+        settlementTx: `0x${"0".repeat(64)}`, grantedAt: "ISO-8601 timestamp", platformFeeAtomic: "0", creatorReceivesAtomic: "1000",
+      },
+      recovered: false,
+    };
+  }
+  if (path.startsWith("/v1/terminal/pass/")) return { grant: { requestId: "owner-generated-purchase-request-id", duration: "24h", expiresAt: "ISO-8601 timestamp" }, access: { active: true, expiresAt: "ISO-8601 timestamp" }, recovered: false };
+  if (path.startsWith("/v1/autopilot/pass/")) return { aiPass: { vault: "owner-controlled-vault", status: "active", expiresAt: "ISO-8601 timestamp" }, behavior: { newEntries: "AI-assisted while runtime is active" } };
+  if (path === "/v1/preflight") return { reportMarkdown: "Full token due-diligence report", history: { jobId: "opaque-job-id", recoveryToken: "opaque-recovery-token" } };
+  return { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id", reportUrl: "/v1/jobs/opaque-job-id/report", delivery: { status: "processing", authHeader: "PULSE-RECOVERY-TOKEN", paymentRequired: false } };
+}
+
 export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
   const facilitator = new HTTPFacilitatorClient({
     url: cfg.CDP_FACILITATOR_URL,
@@ -98,20 +123,14 @@ export function createCdpPaymentMiddleware(cfg: AppConfig): RequestHandler {
     let middleware = cache.get(cacheKey);
     if (!middleware) {
       const { input, inputSchema } = buildCdpDiscoveryContract(req.path, key);
-      const autopilotStart = req.path.startsWith("/v1/autopilot/pass/");
-      const terminalPass = req.path.startsWith("/v1/terminal/pass/");
-      const riskGuard = req.path === "/v1/preflight";
       const extensions = cfg.BAZAAR_DISCOVERABLE ? declareDiscoveryExtension({
         input, inputSchema, bodyType: "json",
-        output: { example: terminalPass ? { grant: { requestId: "owner-generated-purchase-request-id", duration: "24h", expiresAt: "ISO-8601 timestamp" }, access: { active: true, expiresAt: "ISO-8601 timestamp" }, recovered: false } : autopilotStart
-          ? { aiPass: { vault: "owner-controlled-vault", status: "active", expiresAt: "ISO-8601 timestamp" }, behavior: { newEntries: "AI-assisted while runtime is active" } }
-          : riskGuard ? { reportMarkdown: "Full token due-diligence report", history: { jobId: "opaque-job-id", recoveryToken: "opaque-recovery-token" } }
-          : { job: { id: "opaque-job-id", stage: "payment_settled" }, recoveryToken: "opaque-recovery-token", pollUrl: "/v1/jobs/opaque-job-id", reportUrl: "/v1/jobs/opaque-job-id/report", delivery: { status: "processing", authHeader: "PULSE-RECOVERY-TOKEN", paymentRequired: false } } },
+        output: { example: buildCdpDiscoveryOutput(req.path, key) },
       }) : undefined;
       middleware = paymentMiddleware({
         [`${req.method.toUpperCase()} ${req.path}`]: {
           resource: canonicalPaymentResource(cfg, key, req.path),
-          accepts: [{ scheme: "exact", price: `$${req.path.startsWith("/v1/terminal/pass/") ? route.priceUsd.toFixed(6) : route.priceUsd.toFixed(2)}`, network, payTo: cfg.PAY_TO_ADDRESS }],
+          accepts: [{ scheme: "exact", price: `$${req.path.startsWith("/v1/terminal/pass/") || req.path.startsWith("/v1/terminal/indicators/purchases/") ? route.priceUsd.toFixed(6) : route.priceUsd.toFixed(2)}`, network, payTo: cfg.PAY_TO_ADDRESS }],
           description: route.description, mimeType: "application/json",
           ...(extensions ? { extensions } : {}),
         },

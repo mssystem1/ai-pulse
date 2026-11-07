@@ -86,14 +86,23 @@ function canonicalPaidPath(input: RequestInfo | URL): string {
   const pathname = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, base).pathname;
   return pathname.replace(/^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/, "");
 }
+function paidNetworkRoute(input: RequestInfo | URL): string | undefined {
+  const base = typeof window === "undefined" ? "http://localhost" : window.location.href;
+  return /^\/(xlayer|base|arbitrum|arc|robinhood)(?=\/)/.exec(new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, base).pathname)?.[1];
+}
 
-export function validatePaymentChallenge(required: PaymentRequiredLike, input: RequestInfo | URL, selected: import("./networks").WebNetworkKey, network: { caip2: string; label: string; payment: { address: string } }, approvedAmount?: string) {
+export function validatePaymentChallenge(required: PaymentRequiredLike, input: RequestInfo | URL, selected: import("./networks").WebNetworkKey, network: { caip2: string; label: string; payment: { address: string } }, approvedAmount?: string, approvedPayee?: string) {
   if (Number(required.x402Version) !== 2 || !Array.isArray(required.accepts)) throw new Error("Unsupported or malformed x402 challenge");
   const expectedPath = canonicalPaidPath(input);
+  const requestedNetwork = paidNetworkRoute(input);
+  if (requestedNetwork && requestedNetwork !== selected) throw new Error("Payment route does not match the selected network");
   const expectedAmount = approvedAmount || EXPECTED_ROUTE_AMOUNTS[expectedPath];
   if (!expectedAmount) throw new Error(`PULSE has no approved browser price for ${expectedPath}`);
   const browserEnv = (import.meta as ImportMeta & { env?: Record<string, unknown> }).env || {};
-  const expectedPayee = String(browserEnv.VITE_PAY_TO_ADDRESS || "");
+  if (approvedPayee && !/^\/v1\/terminal\/indicators\/purchases\/iqu_[a-f0-9]{32}$/.test(expectedPath)) throw new Error("Creator recipients are restricted to reviewed indicator purchases");
+  if (approvedPayee && !/^0x[\da-f]{40}$/i.test(approvedPayee)) throw new Error("Invalid indicator creator recipient");
+  if (approvedPayee && required.accepts.length !== 1) throw new Error("An indicator quote must contain exactly one reviewed creator payment");
+  const expectedPayee = approvedPayee || String(browserEnv.VITE_PAY_TO_ADDRESS || "");
   if (browserEnv.PROD === true && !expectedPayee) throw new Error("Production payment recipient is not configured in the web deployment");
   const acceptable = required.accepts.some((entry) =>
     entry.scheme === "exact" && entry.network === network.caip2
@@ -105,6 +114,7 @@ export function validatePaymentChallenge(required: PaymentRequiredLike, input: R
   if (!acceptable) throw new Error(`Payment challenge does not match approved ${network.label} asset, price, network, or recipient`);
   const resource = typeof required.resource === "string" ? required.resource : (required.resource as { url?: unknown } | null)?.url;
   if (resource && canonicalPaidPath(String(resource)) !== expectedPath) throw new Error("Payment challenge resource does not match the requested service");
+  if (resource && paidNetworkRoute(String(resource)) && paidNetworkRoute(String(resource)) !== selected) throw new Error("Payment challenge resource does not match the selected network");
 }
 
 const publishedPrices = new Map<string, Promise<Record<string, string>>>();
@@ -285,9 +295,15 @@ export async function selectWalletNetwork(key: import("./networks").WebNetworkKe
 /**
  * Browser x402 pay: user signs EIP-3009 auth with their wallet; no server private key.
  */
-export async function createWalletPaidFetch(userAddress: string, networkKey: import("./networks").WebNetworkKey = "xlayer", options?: { approvedAmounts?: Readonly<Record<string, string>> }): Promise<typeof fetch> {
+export async function createWalletPaidFetch(userAddress: string, networkKey: import("./networks").WebNetworkKey = "xlayer", options?: { approvedAmounts?: Readonly<Record<string, string>>; expectedPayTo?: string; onPaymentAuthorization?: () => void }): Promise<typeof fetch> {
   const reviewedAmount = async (input: RequestInfo | URL) => {
-    const path = canonicalPaidPath(input), amount = await publishedAmount(input);
+    const path = canonicalPaidPath(input);
+    if (/^\/v1\/terminal\/indicators\/purchases\/iqu_[a-f0-9]{32}$/.test(path)) {
+      const pinned = options?.approvedAmounts?.[path];
+      if (!["xlayer","base","arbitrum"].includes(networkKey) || !pinned || !/^[1-9]\d*$/.test(pinned) || !/^0x[\da-f]{40}$/i.test(options?.expectedPayTo || "")) throw new Error("Review the exact indicator quote, selected stablecoin network and creator recipient before paying");
+      return pinned;
+    }
+    const amount = await publishedAmount(input);
     const approved = options?.approvedAmounts?.[path];
     if (path.startsWith("/v1/terminal/pass/") && (!approved || approved !== amount)) throw new Error("The Terminal price changed or has not been reviewed. Review the current pass price before paying.");
     if (approved && approved !== amount) throw new Error("The service price changed. Review its current price before paying.");
@@ -351,7 +367,7 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
         sign: async (first, request) => {
           const body = await first.clone().json().catch(() => ({}));
           const required = http.getPaymentRequiredResponse(name => first.headers.get(name), body);
-          validatePaymentChallenge(required as PaymentRequiredLike, request, networkKey, selected, await reviewedAmount(request));
+          validatePaymentChallenge(required as PaymentRequiredLike, request, networkKey, selected, await reviewedAmount(request), options?.expectedPayTo);
           return http.encodePaymentSignatureHeader(await http.createPaymentPayload(required));
         },
       });
@@ -361,18 +377,20 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       if (first.status !== 402) return first;
       const body = await first.clone().json().catch(() => ({}));
       const required = http.getPaymentRequiredResponse((name) => first.headers.get(name), body);
-      validatePaymentChallenge(required as PaymentRequiredLike, input, networkKey, selected, await reviewedAmount(input));
+      validatePaymentChallenge(required as PaymentRequiredLike, input, networkKey, selected, await reviewedAmount(input), options?.expectedPayTo);
       const payload = await http.createPaymentPayload(required);
+      options?.onPaymentAuthorization?.();
       const headers = new Headers(init?.headers);
       Object.entries(http.encodePaymentSignatureHeader(payload)).forEach(([name, value]) => headers.set(name, value));
       return fetch(input, { ...init, headers });
     }) as typeof fetch;
   }
 
-  const [{ wrapFetchWithPaymentFromConfig }, { ExactEvmScheme }] = await Promise.all([
-    import("@okxweb3/x402-fetch"), import("@okxweb3/x402-evm"),
+  const [{ x402Client, x402HTTPClient }, { ExactEvmScheme }] = await Promise.all([
+    import("@okxweb3/x402-core/client"), import("@okxweb3/x402-evm"),
   ]);
-  const paidFetch = wrapFetchWithPaymentFromConfig(fetch, { schemes: [{ network: selected.caip2, client: new ExactEvmScheme(signer) }] }) as typeof fetch;
+  const core = new x402Client().register(selected.caip2, new ExactEvmScheme(signer));
+  const http = new x402HTTPClient(core);
   return (async (input: RequestInfo | URL, init?: RequestInit) => {
     const first = await fetch(input, init);
     if (first.status !== 402) return first;
@@ -383,7 +401,13 @@ export async function createWalletPaidFetch(userAddress: string, networkKey: imp
       try { required = JSON.parse(atob(header.replace(/-/g, "+").replace(/_/g, "/"))) as PaymentRequiredLike; }
       catch { throw new Error("Malformed PAYMENT-REQUIRED header"); }
     }
-    validatePaymentChallenge(required, input, networkKey, selected, await reviewedAmount(input));
-    return paidFetch(input, init);
+    validatePaymentChallenge(required, input, networkKey, selected, await reviewedAmount(input), options?.expectedPayTo);
+    // Sign the exact challenge that passed validation. Re-fetching through an
+    // automatic wrapper here could replace it with different payment terms.
+    const payload = await core.createPaymentPayload(required as Parameters<typeof core.createPaymentPayload>[0]);
+    options?.onPaymentAuthorization?.();
+    const headers = new Headers(init?.headers);
+    Object.entries(http.encodePaymentSignatureHeader(payload)).forEach(([name, value]) => headers.set(name, value));
+    return fetch(input, { ...init, headers });
   }) as typeof fetch;
 }

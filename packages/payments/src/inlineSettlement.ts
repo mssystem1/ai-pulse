@@ -23,7 +23,7 @@ export type PulseSettlement = Readonly<{
   settledAt: string;
 }>;
 
-export type SettlementRequest = Request & { pulseNetworkKey?: NetworkKey; pulseSettlement?: PulseSettlement };
+export type SettlementRequest = Request & { pulseNetworkKey?: NetworkKey; pulseSettlement?: PulseSettlement; pulsePaymentFailure?: { phase: "verification"; definitiveNoSettlement: true } };
 
 export function canonicalPaymentResource(cfg: Pick<AppConfig, "BASE_URL">, network: NetworkKey, path: string) {
   const prefix = network === "arc" ? "arc" : network;
@@ -77,14 +77,17 @@ export function inlineSettlement(
   return async (req: SettlementRequest, res: Response, next: NextFunction) => {
     const signature = req.header("PAYMENT-SIGNATURE") || req.header("X-PAYMENT");
     if (!signature) return fallback(req, res, next);
+    let settlementStarted = false;
     try {
       const payload = decodePayment(signature);
       const requirements = validateSignedPayment(cfg, req, payload);
       const verifiedAt = new Date().toISOString();
       const verification = await facilitator.verify(payload as never, requirements as never);
       if (!verification.isValid) {
+        req.pulsePaymentFailure = { phase: "verification", definitiveNoSettlement: true };
         return res.status(402).json({ error: verification.invalidMessage || verification.invalidReason || "Payment verification failed" });
       }
+      settlementStarted = true;
       const settlement = await facilitator.settle(payload as never, requirements as never);
       if (!settlement.success) {
         return res.status(402).json({ error: settlement.errorMessage || settlement.errorReason || "Payment settlement failed" });
@@ -94,6 +97,7 @@ export function inlineSettlement(
       res.setHeader("PAYMENT-RESPONSE", Buffer.from(JSON.stringify(settlement), "utf8").toString("base64"));
       return next();
     } catch (error) {
+      if (!settlementStarted) req.pulsePaymentFailure = { phase: "verification", definitiveNoSettlement: true };
       return res.status(402).json({ error: error instanceof Error ? error.message : "Payment processing failed" });
     }
   };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { assertPaymentBalance, networkKeyForChainId, readPreferredNetwork, savePreferredNetwork, WEB_NETWORKS, switchWalletNetwork } from "./networks.js";
-import { findOkxProvider, validatePaymentChallenge, walletProviderName, type InjectedProvider } from "./wallet.js";
+import { createWalletPaidFetch, findOkxProvider, validatePaymentChallenge, walletProviderName, type InjectedProvider } from "./wallet.js";
 
 test("persists the selected network across application starts", () => {
   const values = new Map<string, string>();
@@ -107,4 +107,54 @@ test("fails closed on unavailable or insufficient fresh payment balance before s
   assert.doesNotThrow(() => assertPaymentBalance(0.03, 0.03, "USDC", "Base"));
   assert.throws(() => assertPaymentBalance(undefined, 0.03, "USDC", "Base"), /Unable to verify/);
   assert.throws(() => assertPaymentBalance(0.029, 0.03, "USDC", "Base"), /Insufficient USDC/);
+});
+
+test("indicator payments pin the reviewed creator, six-decimal amount, route and native stablecoin on every supported checkout network", () => {
+  const creator = "0x" + "4".repeat(40), id = "iqu_" + "5".repeat(32);
+  for (const selected of ["xlayer", "base", "arbitrum"] as const) {
+    const network = WEB_NETWORKS[selected], resource = `https://api.ai-pulse.tech/${selected}/v1/terminal/indicators/purchases/${id}`;
+    const requirement = { scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "1000", payTo: creator };
+    const challenge = { x402Version: 2, resource: { url: resource }, accepts: [requirement] };
+    assert.doesNotThrow(() => validatePaymentChallenge(challenge, resource, selected, network, "1000", creator));
+    for (const changed of [
+      { ...challenge, accepts: [{ ...requirement, network: "eip155:1" }] },
+      { ...challenge, accepts: [{ ...requirement, asset: "0x" + "9".repeat(40) }] },
+      { ...challenge, accepts: [{ ...requirement, amount: "1001" }] },
+      { ...challenge, accepts: [{ ...requirement, payTo: "0x" + "8".repeat(40) }] },
+      { ...challenge, accepts: [requirement, requirement] },
+      { ...challenge, resource: { url: resource.replace(`/${selected}/`, selected === "base" ? "/xlayer/" : "/base/") } },
+    ]) assert.throws(() => validatePaymentChallenge(changed, resource, selected, network, "1000", creator));
+    assert.throws(() => validatePaymentChallenge(challenge, resource.replace(`/${selected}/`, selected === "base" ? "/xlayer/" : "/base/"), selected, network, "1000", creator), /route/);
+  }
+});
+
+test("X Layer checkout signs the validated USDT0 challenge once and records recovery before submitting it", async () => {
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window"), originalFetch = globalThis.fetch;
+  const calls: string[] = [], network = WEB_NETWORKS.xlayer, owner = "0x" + "6".repeat(40), creator = "0x" + "4".repeat(40);
+  const path = "/v1/terminal/indicators/purchases/iqu_" + "5".repeat(32), resource = "https://api.ai-pulse.tech/xlayer" + path;
+  let rejectSignature = false;
+  const provider = { request: async ({ method }: { method: string }) => {
+    if (method === "wallet_switchEthereumChain") return null;
+    if (method === "eth_chainId") return network.chainHex;
+    if (method === "eth_signTypedData_v4") { calls.push("signed"); if (rejectSignature) throw Object.assign(new Error("User rejected"), { code: 4001 }); return "0x" + "11".repeat(64) + "1b"; }
+    throw new Error("Unexpected wallet request " + method);
+  } };
+  Object.defineProperty(globalThis, "window", { configurable: true, value: { __pulseDirectProvider: provider, location: { href: "https://app.ai-pulse.tech/trading-terminal" }, setTimeout, clearTimeout } });
+  globalThis.fetch = async (_input, init) => {
+    const signed = new Headers(init?.headers).has("PAYMENT-SIGNATURE"); calls.push(signed ? "submit-signed" : "request-quote");
+    if (signed) return Response.json({ granted: true });
+    const challenge = { x402Version: 2, resource: { url: resource }, accepts: [{ scheme: "exact", network: network.caip2, asset: network.payment.address, amount: "1000", payTo: creator, maxTimeoutSeconds: 300, extra: { name: "USDT0", version: "1" } }] };
+    return Response.json(challenge, { status: 402, headers: { "PAYMENT-REQUIRED": Buffer.from(JSON.stringify(challenge)).toString("base64") } });
+  };
+  try {
+    const paid = await createWalletPaidFetch(owner, "xlayer", { expectedPayTo: creator, approvedAmounts: { [path]: "1000" }, onPaymentAuthorization: () => calls.push("recovery-saved") });
+    assert.equal((await paid(resource, { method: "POST" })).status, 200);
+    assert.deepEqual(calls, ["request-quote", "signed", "recovery-saved", "submit-signed"]);
+    calls.length = 0; rejectSignature = true;
+    await assert.rejects(() => paid(resource, { method: "POST" }), /rejected/i);
+    assert.deepEqual(calls, ["request-quote", "signed"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalWindow) Object.defineProperty(globalThis, "window", originalWindow); else Reflect.deleteProperty(globalThis, "window");
+  }
 });

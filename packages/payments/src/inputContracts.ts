@@ -313,6 +313,15 @@ for (const path of ["/v1/autopilot/pass/24h", "/v1/autopilot/pass/7d", "/v1/auto
 for (const path of ["/v1/terminal/pass/24h", "/v1/terminal/pass/7d", "/v1/terminal/pass/30d"]) {
   routeInputs[path] = { message: "Authenticate the Terminal owner, review the separate pass price, and retain one stable purchase ID across payment/recovery. This does not purchase a report or place a trade.", requiredArgs: ["requestId"], fields: [{ name: "requestId", carrier: "body", type: "string", required: true, pattern: "^[a-zA-Z0-9_-]{16,128}$", description: "Stable owner-generated purchase ID. Keep the same ID for recovery; the authenticated paying wallet is inferred from its session and verified authorization." }] };
 }
+const indicatorPurchaseInput: RouteInputDefinition = {
+  message: "Authenticate the Terminal wallet and obtain a creator-service quote before payment. Submit the same requestId to its exact network and quote resource; preserve it for receipt recovery. This installs one indicator version, not a report or Terminal pass.",
+  requiredArgs: ["requestId"],
+  fields: [{ name: "requestId", carrier: "body", type: "string", required: true, pattern: "^[a-zA-Z0-9_-]{16,128}$", description: "Original owner-generated request ID from the reviewed indicator quote; must match that quote and the authenticated paying wallet." }],
+};
+
+export function isIndicatorPurchasePath(path: string): boolean {
+  return /^\/v1\/terminal\/indicators\/purchases\/iqu_[a-f0-9]{32}$/.test(path);
+}
 
 const predictionFields: X402InputField[] = [
   { name: "primaryMarketId", carrier: "body", type: "string", required: true, description: "Explicit Polymarket market or pm:condition ID." },
@@ -345,7 +354,7 @@ routeInputs["/v1/preflight/event-risk"] = {
 export function getX402InputDefinition(path: string): RouteInputDefinition | undefined {
   const alias = /^\/(xlayer|base|arbitrum|arc)(?=\/v1\/)/.exec(path)?.[1];
   path = path.replace(/^\/(?:xlayer|base|arbitrum|arc)(?=\/v1\/)/, "");
-  let definition = routeInputs[path];
+  let definition = isIndicatorPurchasePath(path) ? indicatorPurchaseInput : routeInputs[path];
   if (!definition) return undefined;
   if (alias) {
     const chainId = { xlayer: "196", base: "8453", arbitrum: "42161", arc: "5042" }[alias];
@@ -380,12 +389,21 @@ export function getX402OutputSchema(path: string): X402InputContract | undefined
   ].includes(path);
   const autopilotStart = path.startsWith("/v1/autopilot/pass/");
   const terminalPass = path.startsWith("/v1/terminal/pass/");
+  const indicatorPurchase = isIndicatorPurchasePath(path);
   return {
     method: "POST",
     input: Object.fromEntries(
       definition.fields.map(({ name, ...field }) => [name, field]),
     ),
-    ...(terminalPass ? { output: { status: 201, delivery: "wallet_terminal_pass", fields: { grant: { type: "object", description: "Durable owner-bound access grant with original accepted terms." }, access: { type: "object", description: "Wallet-wide wall-clock access and expiry." }, recovered: { type: "boolean", description: "Existing receipt recovered without a new charge." } }, recoveryPath: "/v1/terminal/pass/recover" } } : asynchronous ? { output: {
+    ...(indicatorPurchase ? { output: {
+      status: 201, replayStatus: 200, delivery: "wallet_indicator_version_service",
+      fields: {
+        entitled: { type: "boolean", description: "This wallet owns the managed installation of the exact quoted indicator version." },
+        purchase: { type: "object", description: "Durable receipt with quote ID, listing ID, version, SHA-256, state granted, accepted network/token/amount, creator recipient and settlement transaction." },
+        recovered: { type: "boolean", description: "Existing entitlement restored without another charge." },
+      },
+      recoveryPath: "/v1/terminal/indicators/purchases/{quoteId}/recover",
+    } } : terminalPass ? { output: { status: 201, delivery: "wallet_terminal_pass", fields: { grant: { type: "object", description: "Durable owner-bound access grant with original accepted terms." }, access: { type: "object", description: "Wallet-wide wall-clock access and expiry." }, recovered: { type: "boolean", description: "Existing receipt recovered without a new charge." } }, recoveryPath: "/v1/terminal/pass/recover" } } : asynchronous ? { output: {
       status: 202,
       delivery: "durable_job",
       fields: {

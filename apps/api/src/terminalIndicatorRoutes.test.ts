@@ -28,7 +28,9 @@ test("Indicator catalog publishes immutable portable versions without exposing w
   const request = (path = "", method = "GET", body?: unknown, user: string | null = owner) => fetch(base + path, { method, headers: { "content-type": "application/json", ...(user ? { "x-test-owner": user } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
   try {
     assert.equal((await request("", "GET", undefined, null)).status, 401);
-    const initial = await (await request()).json(); assert.equal(initial.items.length, 2); assert.equal(initial.items[0].publisher, null);
+    const initial = await (await request()).json(); assert.equal(initial.items.length, 3); assert.equal(initial.items[0].publisher, null);
+    assert.deepEqual(initial.items.map((item: any) => item.registration?.circuitId), ["1", "2", "3"]);
+    assert(initial.items.every((item: any) => item.publication.registered === true && item.registration.blockHash && item.registration.vectorCount === 6));
     const seed = await (await request("/pulse.executed-cvd")).json(); assert.equal(parseIndicatorPackage(seed.manifest).kernel, "executed-cvd-v1");
     const manifest = createIndicatorPackage({ id: "alice.flow", title: "Alice Flow", description: "A reusable executed-volume calculation.", author: "Alice", kernel: "executed-cvd-v1" });
     const published = await request("", "POST", { manifest }); assert.equal(published.status, 201); const item = (await published.json()).item;

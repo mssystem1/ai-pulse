@@ -1,8 +1,42 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildCdpDiscoveryContract } from "./cdpMiddleware.js";
+import { buildCdpDiscoveryContract, buildCdpDiscoveryOutput } from "./cdpMiddleware.js";
 import { getNetwork } from "@pulse/config";
-import { getX402OutputSchema } from "./inputContracts.js";
+import { buildX402InputRequired, getX402OutputSchema, isIndicatorPurchasePath } from "./inputContracts.js";
+
+test("creator service discovery describes the exact quoted indicator entitlement, not a report or pass", () => {
+  const quoteId = "iqu_" + "a".repeat(32), path = `/v1/terminal/indicators/purchases/${quoteId}`;
+  assert.equal(isIndicatorPurchasePath(path), true);
+  for (const network of ["base", "arbitrum"] as const) {
+    const contract = buildCdpDiscoveryContract(path, network);
+    assert.deepEqual(contract.inputSchema.required, ["requestId"]);
+    assert.deepEqual(Object.keys(contract.inputSchema.properties), ["requestId"]);
+    assert.match((contract.inputSchema.properties.requestId as { description: string }).description, /quote/i);
+    const example = buildCdpDiscoveryOutput(path, network);
+    assert.ok("purchase" in example && example.purchase);
+    assert.equal(example.entitled, true);
+    assert.equal(example.purchase.id, quoteId);
+    assert.equal(example.purchase.state, "granted");
+    assert.equal(example.purchase.network, network);
+    assert.equal(example.purchase.asset, getNetwork(network).paymentAsset.address);
+    for (const foreignField of ["reportMarkdown", "job", "recoveryToken", "access", "grant"]) assert.equal(foreignField in example, false);
+  }
+  for (const prefix of ["", "/xlayer", "/base", "/arbitrum"]) {
+    const schema = getX402OutputSchema(prefix + path);
+    assert.deepEqual(Object.keys(schema!.input), ["requestId"]);
+    assert.equal(schema?.output?.delivery, "wallet_indicator_version_service");
+    assert.equal(schema?.output?.status, 201);
+    assert.equal(schema?.output?.replayStatus, 200);
+    assert.equal(schema?.output?.recoveryPath, "/v1/terminal/indicators/purchases/{quoteId}/recover");
+    const required = buildX402InputRequired(prefix + path);
+    assert.deepEqual(required.requiredArgs, ["requestId"]);
+    assert.match(required.message, /indicator version/);
+  }
+  for (const unpaid of [path + "/recover", "/v1/terminal/indicators/purchases", "/v1/terminal/indicators/purchases/iqu_invalid"]) {
+    assert.equal(isIndicatorPurchasePath(unpaid), false);
+    assert.equal(getX402OutputSchema(unpaid), undefined);
+  }
+});
 
 test("Terminal pass discovery describes owner-authenticated access, not a report or vault", () => {
   const contract = buildCdpDiscoveryContract("/v1/terminal/pass/24h");

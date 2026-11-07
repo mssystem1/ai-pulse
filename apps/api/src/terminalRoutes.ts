@@ -87,7 +87,6 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   }));
   beforePayment.use("/v1/terminal/history",active);
   if(runtime)beforePayment.use(createTerminalHistoryRoutes(runtime,dependencies.history));
-  if(runtime)beforePayment.use("/v1/terminal/indicators", active);
   if(runtime)beforePayment.use(createTerminalIndicatorRoutes(runtime));
   beforePayment.get("/v1/terminal/market", active, asyncRoute(async (req, res) => {
     const input = marketSchema.parse(req.query);

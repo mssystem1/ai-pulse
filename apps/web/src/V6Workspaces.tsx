@@ -1,6 +1,7 @@
 import { TelegramGuide } from './TelegramGuide';
 import { GlobalChartGuide } from "./GlobalChartGuide";
 import { TradingTerminalGuide } from "./TradingTerminalGuide";
+import { IndicatorMarketGuide, CreateIndicatorGuide } from "./IndicatorMarketGuide";
 import { GlobalSpotReview } from "./GlobalSpotReview";
 import { TradingWorkspaceNav, SPOT_WORKSPACE_PAGES, AUTOPILOT_WORKSPACE_PAGES } from "./TradingWorkspaceNav";
 import "./tradingWorkspace.css";
@@ -7495,6 +7496,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
     ["docs-workflows", "Workflow maps"],
     ["docs-start", "Quick start"],
     ["docs-trading-terminal", lang === "zh" ? "交易终端" : "Trading Terminal"],
+    ["docs-indicator-market", lang === "zh" ? "指标市场与安装" : "Indicator Market & installation"],
+    ["docs-create-indicator", lang === "zh" ? "创建指标与发布" : "Create indicator & publish"],
     ["docs-global", "Global reports"],
     ["docs-global-chart", lang === "zh" ? "阅读图表与指标" : "Chart & indicator guide"],
     ["docs-catalog", "Assets & routes"],
@@ -7744,6 +7747,8 @@ export function DocsWorkspace({ lang = "en" }: { lang?: Lang } = {}) {
           </section>
 
           <section id="docs-trading-terminal" className="docs-section" hidden={article !== "docs-trading-terminal"}>{article==="docs-trading-terminal"&&<TradingTerminalGuide lang={lang}/>}</section>
+          <section id="docs-indicator-market" className="docs-section" hidden={article !== "docs-indicator-market"}>{article==="docs-indicator-market"&&<IndicatorMarketGuide lang={lang}/>}</section>
+          <section id="docs-create-indicator" className="docs-section" hidden={article !== "docs-create-indicator"}>{article==="docs-create-indicator"&&<CreateIndicatorGuide lang={lang}/>}</section>
           <section id="docs-global-chart" className="docs-section" hidden={article !== "docs-global-chart"}><GlobalChartGuide lang={lang}/></section>
           <section id="docs-global-flow" className="docs-deep-dive" hidden={article !== "docs-global-flow"}>
             <div className="docs-deep-head">

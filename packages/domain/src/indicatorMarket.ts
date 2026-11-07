@@ -1,9 +1,13 @@
 /** Portable financial calculations using TAP-02's combinational NAND format.
  * No scripts, remote dependencies, wallet calls or mutable circuit state occur.
- * These packages are locally evaluated, not registered X Layer deployments.
+ * Package import never certifies a deployment; chain registration is verified
+ * independently against factory membership, byte identity and golden vectors.
  */
-export type IndicatorKernel = "executed-cvd-v1" | "buy-participation-v1";
-export type IndicatorManifest = {
+import { createFormulaIndicatorPackage, parseFormulaIndicatorPackage, interpretIndicatorFormula, type IndicatorFormulaManifest } from "./indicatorFormula.js";
+export { createFormulaIndicatorPackage, compileIndicatorFormula, parseIndicatorFormula, interpretIndicatorFormula } from "./indicatorFormula.js";
+export type { IndicatorFormulaManifest, IndicatorFormulaOutput } from "./indicatorFormula.js";
+export type IndicatorKernel = "executed-cvd-v1" | "buy-participation-v1" | "formula-v1";
+export type IndicatorBuiltinManifest = {
   format: "pulse-indicator-v1";
   id: string;
   version: string;
@@ -11,11 +15,12 @@ export type IndicatorManifest = {
   description: string;
   author: string;
   license: "MIT";
-  kernel: IndicatorKernel;
+  kernel: Exclude<IndicatorKernel, "formula-v1">;
   prerequisites: { source: "executed-aggressor-volume"; units: readonly ["base", "contracts"]; missing: "show-partial" };
   runtime: { format: "tap-02-nand"; bitOrder: "least-significant-first"; inputBits: number; outputBits: number; maxPoints: 1024; netlist: string };
   publication: { chainId: 196; registered: false };
 };
+export type IndicatorManifest = IndicatorBuiltinManifest | IndicatorFormulaManifest;
 export type IndicatorInput = {
   instId: string; timeframe: string; source: string;
   status: "available" | "partial" | "stale" | "unavailable";
@@ -23,11 +28,11 @@ export type IndicatorInput = {
   points: readonly { ts: number; end?: number; buy: number; sell: number }[];
   now?: number; maxAgeMs?: number;
 };
-export type IndicatorPoint = { ts: number; delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number };
+export type IndicatorPoint = { ts: number; delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number };
 export type IndicatorResult = {
   id: string; status: IndicatorInput["status"]; reason?: string;
   points: IndicatorPoint[];
-  summary: { delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; label: string };
+  summary: { delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; label: string };
   precision: { quantityQuantum: number; maxCvdError: number; note: string };
   provenance: { execution: "local-tap02"; chainId: 196; registered: false; source: string; knownAt: number; windowStart: number; windowEnd: number; gateCount: number; units: "base" | "contracts" };
 };
@@ -65,8 +70,8 @@ class NandBuilder {
   }
 }
 const pad = (bits: number[], size: number) => [...bits, ...Array(Math.max(0, size - bits.length)).fill(0)].slice(0, size);
-const CACHE = new Map<IndicatorKernel, Readonly<IndicatorManifest>>();
-function canonical(kernel: IndicatorKernel): Readonly<IndicatorManifest> {
+const CACHE = new Map<IndicatorBuiltinManifest["kernel"], Readonly<IndicatorBuiltinManifest>>();
+function canonical(kernel: IndicatorBuiltinManifest["kernel"]): Readonly<IndicatorBuiltinManifest> {
   const cached = CACHE.get(kernel); if (cached) return cached;
   const cvd = kernel === "executed-cvd-v1", b = new NandBuilder(cvd ? 64 : 32);
   const buy = Array.from({ length: 16 }, (_, i) => i + 2), sell = Array.from({ length: 16 }, (_, i) => i + 18);
@@ -91,7 +96,7 @@ function canonical(kernel: IndicatorKernel): Readonly<IndicatorManifest> {
     }
     outputs = quotient.slice(0, 14);
   }
-  const result: IndicatorManifest = {
+  const result: IndicatorBuiltinManifest = {
     format: "pulse-indicator-v1", id: cvd ? "pulse.executed-cvd" : "pulse.buy-participation", version: "1.0.0",
     title: cvd ? "Cumulative executed delta" : "Buyer participation",
     description: cvd ? "Executed buy volume minus sell volume, accumulated from the selected source-window start. A gap is not reconstructed." : "Buyer share of executed volume for each source bar, from 0 to 100%. It measures aggressor flow, not future direction.",
@@ -104,13 +109,13 @@ function canonical(kernel: IndicatorKernel): Readonly<IndicatorManifest> {
   CACHE.set(kernel, result); return result;
 }
 export function indicatorMarketCatalog(): IndicatorManifest[] {
-  return [canonical("executed-cvd-v1"), canonical("buy-participation-v1")].map(manifest => JSON.parse(JSON.stringify(manifest)) as IndicatorManifest);
+  return [canonical("executed-cvd-v1"), canonical("buy-participation-v1"), createFormulaIndicatorPackage({id:"pulse.weighted-flow",title:"Weighted executed flow",description:"A creator-formula example: twice the buy quantity minus the sell quantity. Open the creator to build your own calculation.",author:"PULSE",expression:"buy*2-sell",output:{label:"Weighted flow",unit:"volume",accumulation:"bar"}})].map(manifest => JSON.parse(JSON.stringify(manifest)) as IndicatorManifest);
 }
 
-export function createIndicatorPackage(input: { id: string; title: string; description: string; author: string; kernel: IndicatorKernel; version?: string }): IndicatorManifest {
+export function createIndicatorPackage(input: { id: string; title: string; description: string; author: string; kernel: IndicatorBuiltinManifest["kernel"]; version?: string }): IndicatorBuiltinManifest {
   if (input.kernel !== "executed-cvd-v1" && input.kernel !== "buy-participation-v1") fail("unsupported kernel version");
-  const base = JSON.parse(JSON.stringify(canonical(input.kernel))) as IndicatorManifest;
-  return parseIndicatorPackage({ ...base, id: input.id, title: input.title, description: input.description, author: input.author, version: input.version ?? "1.0.0" });
+  const base = JSON.parse(JSON.stringify(canonical(input.kernel))) as IndicatorBuiltinManifest;
+  return parseIndicatorPackage({ ...base, id: input.id, title: input.title, description: input.description, author: input.author, version: input.version ?? "1.0.0" }) as IndicatorBuiltinManifest;
 }
 
 /** Strict import: this release supports reviewed numeric kernels, not arbitrary
@@ -123,9 +128,10 @@ export function parseIndicatorPackage(input: string | unknown): IndicatorManifes
     try { input = JSON.parse(input); } catch { fail("invalid JSON"); }
   }
   const m = object(input);
+  if (m.format === "pulse-indicator-v2") return parseFormulaIndicatorPackage(m);
   exactKeys(m, ["format", "id", "version", "title", "description", "author", "license", "kernel", "prerequisites", "runtime", "publication"]);
   if (m.kernel !== "executed-cvd-v1" && m.kernel !== "buy-participation-v1") fail("unsupported kernel version");
-  const expected = canonical(m.kernel as IndicatorKernel);
+  const expected = canonical(m.kernel as IndicatorBuiltinManifest["kernel"]);
   for (const key of ["format", "license", "kernel"] as const) if (m[key] !== expected[key]) fail(`unreviewed ${key}`);
   if (typeof m.id !== "string" || !/^[a-z0-9][a-z0-9._-]{2,95}$/.test(m.id) || typeof m.version !== "string" || !/^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(m.version)) fail("invalid package identity or version");
   for (const [key, min, max] of [["title", 3, 80], ["description", 10, 600], ["author", 2, 80]] as const) if (typeof m[key] !== "string" || m[key].length < min || m[key].length > max || /[\x00-\x1f\x7f]/.test(m[key] as string)) fail(`invalid ${key}`);
@@ -140,9 +146,10 @@ export function parseIndicatorPackage(input: string | unknown): IndicatorManifes
 export function exportIndicatorPackage(manifest: IndicatorManifest): string { return JSON.stringify(parseIndicatorPackage(manifest), null, 2); }
 
 type Compiled = { inputBits: number; outputBits: number; gates: Uint32Array };
-const COMPILED = new Map<IndicatorKernel, Compiled>();
+const COMPILED = new Map<string, Compiled>();
 function compile(manifest: IndicatorManifest): Compiled {
-  const existing = COMPILED.get(manifest.kernel); if (existing) return existing;
+  const key = manifest.runtime.netlist;
+  const existing = COMPILED.get(key); if (existing) return existing;
   const raw = manifest.runtime.netlist;
   if (!/^0x(?:[a-f0-9]{14})+$/.test(raw)) fail("invalid TAP-02 NAND bytes");
   const count = (raw.length - 2) / 14;
@@ -156,7 +163,8 @@ function compile(manifest: IndicatorManifest): Compiled {
     gates[i * 2] = a; gates[i * 2 + 1] = b;
   }
   const result = { inputBits: manifest.runtime.inputBits, outputBits: manifest.runtime.outputBits, gates };
-  COMPILED.set(manifest.kernel, result); return result;
+  if (COMPILED.size >= 16) COMPILED.delete(COMPILED.keys().next().value!);
+  COMPILED.set(key, result); return result;
 }
 function run(circuit: Compiled, buy: number, sell: number, previousCvd: number) {
   const signal = new Uint8Array(circuit.inputBits + 2 + circuit.gates.length / 2); signal[1] = 1;
@@ -168,7 +176,7 @@ function run(circuit: Compiled, buy: number, sell: number, previousCvd: number) 
     let n = 0; for (let i = 0; i < width; i++) n += signal[begin + offset + i] * 2 ** i;
     return signed && signal[begin + offset + width - 1] ? n - 2 ** width : n;
   }
-  return circuit.outputBits === 64 ? { deltaQ: word(0, 32, true), cvdQ: word(32, 32, true) } : { participationBps: word(0, 14) };
+  return circuit.outputBits === 64 ? { deltaQ: word(0, 32, true), cvdQ: word(32, 32, true) } : circuit.outputBits === 32 ? { valueQ: word(0, 32, true) } : { participationBps: word(0, 14) };
 }
 /** Useful independently of PULSE UI: integer ABI is exactly buy uint16, sell
  * uint16, and (for CVD) prior signed int32; outputs are final TAP-02 signals. */
@@ -177,6 +185,12 @@ export function evaluateIndicatorCircuit(manifest: IndicatorManifest, input: { b
   if (![input.buy, input.sell].every(n => Number.isSafeInteger(n) && n >= 0 && n <= 65535) || !Number.isSafeInteger(prior) || prior < -2147483648 || prior > 2147483647) fail("integer input outside circuit ABI");
   if (m.kernel === "buy-participation-v1" && input.buy + input.sell === 0) fail("participation requires nonzero executed volume");
   if (m.kernel === "executed-cvd-v1" && (prior + input.buy - input.sell < -2147483648 || prior + input.buy - input.sell > 2147483647)) fail("cumulative delta would overflow");
+  if (m.kernel === "formula-v1") {
+    const value = interpretIndicatorFormula(m.formula.expression, input.buy, input.sell);
+    if (value === undefined) fail("formula division by zero is unknown");
+    const expected = value! + (m.formula.output.accumulation === "cumulative" ? prior : 0);
+    if (expected < -2147483648 || expected > 2147483647) fail("formula accumulation would overflow");
+  }
   return run(compile(m), input.buy, input.sell, prior);
 }
 
@@ -201,14 +215,24 @@ export function evaluateIndicator(manifest: IndicatorManifest, input: IndicatorI
   let previous = 0;
   const points: IndicatorPoint[] = status === "unavailable" ? [] : input.points.map(point => {
     const buy = Math.min(65535, Math.round(point.buy / quantum)), sell = Math.min(65535, Math.round(point.sell / quantum));
+    if (m.kernel === "formula-v1") {
+      const reference = interpretIndicatorFormula(m.formula.expression, buy, sell);
+      if (reference === undefined) return { ts: point.ts };
+      const expected = reference + (m.formula.output.accumulation === "cumulative" ? previous : 0);
+      if (expected < -2147483648 || expected > 2147483647) fail("formula accumulation would overflow");
+      const output = run(circuit, buy, sell, previous).valueQ!;
+      if (output !== expected) fail("compiled formula disagrees with integer arithmetic");
+      if (m.formula.output.accumulation === "cumulative") previous = output;
+      return { ts: point.ts, value: output * (m.formula.output.unit === "volume" ? quantum : 1) };
+    }
     if (m.kernel === "buy-participation-v1" && buy + sell === 0) return { ts: point.ts };
     const output = run(circuit, buy, sell, previous);
     if (output.cvdQ !== undefined && output.deltaQ !== undefined) { previous = output.cvdQ; return { ts: point.ts, delta: output.deltaQ * quantum, cvd: output.cvdQ * quantum }; }
     return { ts: point.ts, participationBps: output.participationBps, netParticipationBps: 2 * output.participationBps! - 10000 };
   });
-  const last = points.at(-1), summary = { ...last, label: m.kernel === "executed-cvd-v1" ? "Cumulative executed buy minus sell volume" : "Buyer share of the last source bar's executed volume" };
+  const last = points.at(-1), summary = { ...last, label: m.kernel === "formula-v1" ? m.formula.output.label : m.kernel === "executed-cvd-v1" ? "Cumulative executed buy minus sell volume" : "Buyer share of the last source bar's executed volume" };
   return { id: m.id, status, reason, points, summary,
-    precision: { quantityQuantum: quantum, maxCvdError: input.points.length * quantum, note: "Shared 16-bit volume quantization; CVD absolute error is bounded by point count × quantity quantum. Buyer share is integer basis points after quantization; very small bars may be unresolved." },
+    precision: { quantityQuantum: quantum, maxCvdError: input.points.length * quantum, note: m.kernel === "formula-v1" ? "Shared 16-bit volume inputs; arithmetic uses signed int32 and division truncates toward zero. A zero divisor is unknown. Volume outputs return to source units; ratio/bps/scalar outputs retain integer ABI units. Formula-dependent error can be larger than input quantization; no universal formula error bound is claimed." : "Shared 16-bit volume quantization; CVD absolute error is bounded by point count × quantity quantum. Buyer share is integer basis points after quantization; very small bars may be unresolved." },
     provenance: { execution: "local-tap02", chainId: 196, registered: false, source: input.source, knownAt: input.knownAt, windowStart: input.windowStart, windowEnd: input.windowEnd, gateCount: circuit.gates.length / 2, units: input.units },
   };
 }

@@ -135,16 +135,16 @@ function normalizePath(path: string): string {
 /**
  * Official OKX x402 middleware when paymentMode=okx, else mock gate.
  */
-export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler; circle?: RequestHandler } = {}): RequestHandler {
+export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: RequestHandler; circle?: RequestHandler; cdp?: RequestHandler } = {}): RequestHandler {
   const mock = createX402Middleware(cfg);
   const circle = cfg.CIRCLE_GATEWAY_ENABLED && cfg.FEATURE_ARC_PAYMENTS && cfg.PAY_TO_ADDRESS
     ? adapters.circle || createCircleGatewayPaymentMiddleware(cfg) : null;
   const cdp = (cfg.FEATURE_BASE_PAYMENTS || cfg.FEATURE_ARBITRUM_PAYMENTS) && cfg.CDP_API_KEY_ID && cfg.CDP_API_KEY_SECRET
-    ? createCdpPaymentMiddleware(cfg) : null;
+    ? adapters.cdp || createCdpPaymentMiddleware(cfg) : null;
   const xlayer = cfg.paymentMode === "okx" ? (() => {
     try { return createOkxPaymentMiddleware(cfg); }
-    catch (err) { console.error("[payments] Failed to init OKX middleware, falling back to mock:", err); return mock; }
-  })() : mock;
+    catch (err) { console.error("[payments] Failed to initialize OKX middleware:", err); return null; }
+  })() : null;
   return (req, res, next) => {
     // MCP must validate arguments and forward to the canonical paid REST
     // route before a signed header reaches any settlement adapter. Recovery
@@ -163,11 +163,15 @@ export function createPaymentGate(cfg: AppConfig, adapters: { robinhood?: Reques
       if (!circle) return res.status(503).json({ error: "Circle Gateway payment adapter is disabled" });
       return circle(req, res, next);
     }
-    if (cfg.paymentMode === "mock") return mock(req, res, next);
     if (networkKey === "base" || networkKey === "arbitrum") {
-      if (!cdp) return res.status(503).json({ error: "CDP payment adapter is not initialized" });
+      const enabled = networkKey === "base" ? cfg.FEATURE_BASE_PAYMENTS : cfg.FEATURE_ARBITRUM_PAYMENTS;
+      if (!enabled || !cdp) return res.status(503).json({ error: "CDP payment adapter is disabled or not initialized" });
       return cdp(req, res, next);
     }
+    // paymentMode describes OKX credential readiness. It must never turn a
+    // live request on another chain into an unsigned simulated payment.
+    // X402_MOCK above is the only general mock opt-in.
+    if (!xlayer) return res.status(503).json({ error: "X Layer payment adapter is unavailable; no payment requested", code: "xlayer_payments_unavailable" });
     return xlayer(req, res, next);
   };
 }

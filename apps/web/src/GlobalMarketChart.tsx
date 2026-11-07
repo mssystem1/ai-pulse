@@ -7,6 +7,7 @@ import {globalOrderFlowLines,globalOrderFlowStudy,globalOrderFlowCoverageLabel} 
 import {GlobalExportButton} from "./GlobalExportButton";
 import type {ReportExportAccess} from "./reportDownload";
 import {globalLiveCandle,type GlobalLiveCandle} from "./globalLiveCandle";
+import { terminalIndicatorSeries, type TerminalChartIndicator } from "./terminalIndicatorChart";
 import {GlobalChartClock} from "./GlobalChartClock";
 import {globalVisibleCandleExtrema,resolveGlobalChartQuote,type GlobalChartCurrentQuote,type GlobalChartQuote} from "./globalChartQuote";
 import {globalDecision,globalContextLine,globalChannelLines,globalEntryStudySvg,globalDefaultChartLayers,globalStructureChartLayers,globalSetupStudySeries,globalSetupStudyReadings,globalStructuralScaleValues,globalStructuralWindow,globalChannelAvailability,globalFibonacciDescription,globalFrameReference,globalVwapContextLine} from "@pulse/domain";
@@ -31,7 +32,7 @@ function ContextChart({ report }: { report: GlobalReport }) {
   return <div className="global-context"><strong>{globalFrameReference(report.context.timeframe??"—")} {globalLabel("context", report.lang)}</strong>{report.context.candles.length>=2 ? <><div ref={ref} style={{ height: 112 }} /><small>{report.context.sma55.length?`SMA55 ${globalPrice(report,report.context.sma55.at(-1)?.value)}`:`${report.context.candles.length} ${report.lang==="zh"?"根完整 K 线":"completed candles"}`} · {agreement}</small></> : <p>{globalLabel("unavailable", report.lang)}</p>}</div>;
 }
 
-export function GlobalMarketChart({ report, selectedPathId, access, viewportIdentity, currentQuote, currentCandle }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess; viewportIdentity?:string; currentQuote?:GlobalChartCurrentQuote;currentCandle?:GlobalLiveCandle }) {
+export function GlobalMarketChart({ report, selectedPathId, access, viewportIdentity, currentQuote, currentCandle, terminalIndicators = [] }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess; viewportIdentity?:string; currentQuote?:GlobalChartCurrentQuote;currentCandle?:GlobalLiveCandle; terminalIndicators?: TerminalChartIndicator[] }) {
   const appearance=useGlobalChartAppearance(),paint=(color:string)=>globalChartColor(color,appearance);
   const options={...chartOptions,layout:{...chartOptions.layout,fontSize:appearance==="light"?13:11,fontFamily:'Inter, "Segoe UI", sans-serif',background:{type:ColorType.Solid,color:appearance==="light"?"#f8fbff":"#0d1420"},textColor:globalChartColor("#8d9cb3",appearance,"text")},grid:{...chartOptions.grid,horzLines:{...chartOptions.grid.horzLines,color:appearance==="light"?"#cbd5e4":"#263142"}}};
   // Parsing a saved report can return a fresh object on each parent refresh.
@@ -43,6 +44,12 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
   const [chartView,setChartView]=useState<"setup"|"structure"|"history"|"fibonacci">("setup");
   const pro = report.tier === "pro", [layers, setLayers] = useState<GlobalChartLayers>(()=>globalDefaultChartLayers(report));
   const layerState=useRef(layers);layerState.current=layers;
+  const indicatorState=useRef(terminalIndicators);indicatorState.current=terminalIndicators;
+  const indicatorIdentity=terminalIndicators.map(item=>item.id).join("|");
+  const focusTerminalIndicators=useRef<()=>void>(()=>{});
+  const updateTerminalIndicators=useRef<(studies:TerminalChartIndicator[])=>void>(()=>{});
+  const [indicatorReadings,setIndicatorReadings]=useState<Record<string,string>>({});
+  const chartHeight=(pro?660:540)+terminalIndicators.length*150;
   const updateLayers=useRef<(value:GlobalChartLayers)=>void>(()=>{});
   const [quoteClock,setQuoteClock]=useState(()=>performance.now());
   useEffect(()=>{const timer=window.setInterval(()=>setQuoteClock(performance.now()),1000);return()=>window.clearInterval(timer);},[]);
@@ -68,7 +75,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     if (!ref.current || report.candles.length < 2) return;
     const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.snapshot.observedAt,report.tier]);
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
-    const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: pro ? 660 : 540, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
+    const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
     const plan=globalTradePlan(report),qualified=report.decisionVersion==="decision-v5"||globalDecision(report).planningValid,values = [...(report.decisionVersion==="decision-v5"?globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop?[c.plan.referenceStop]:[]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]):[]),...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(qualified?plan.referenceEntry??[]:[]),...(qualified&&plan.referenceStop!==null?[plan.referenceStop]:[])];
     const candles = chart.addSeries(CandlestickSeries, { upColor: paint("#35d0aa"), downColor: paint("#ef6b85"), wickUpColor: paint("#35d0aa"), wickDownColor: paint("#ef6b85"), borderVisible: false, priceLineVisible:false,lastValueVisible:false, priceFormat: { type: "price", precision: report.snapshot.pricePrecision, minMove: 10 ** -report.snapshot.pricePrecision }, autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
       let info=base();
@@ -127,6 +134,14 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       for (const value of [30, 50, 70]) addLine([{ ts: data[0].ts, value }, { ts: last.ts, value }], value===30?"#355e55":value===70?"#7a4659":"#465265", 1);
       chart.panes()[1]?.setHeight(170);
     }
+    const indicatorSeries = indicatorState.current.map((item, index) => {
+      const series=chart.addSeries(LineSeries,{color:paint(palette[index%palette.length]),lineWidth:2,priceLineVisible:false,lastValueVisible:true,title:item.title,priceFormat:{type:"custom",formatter:(value:number)=>value.toLocaleString(undefined,{maximumFractionDigits:4})+" "+item.units,minMove:.0001}},(pro?2:1)+index);
+      series.setData(terminalIndicatorSeries(item).map(point=>({...point,time:point.time as UTCTimestamp})));
+      chart.panes()[(pro?2:1)+index]?.setHeight(150);
+      return {id:item.id,series};
+    });
+    focusTerminalIndicators.current=()=>{const points=indicatorState.current.flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
+    updateTerminalIndicators.current=studies=>{for(const entry of indicatorSeries){const item=studies.find(study=>study.id===entry.id);entry.series.setData(item?terminalIndicatorSeries(item).map(point=>({...point,time:point.time as UTCTimestamp})):[]);}};
     // fitContent excludes trailing whitespace in Quick. An explicit logical
     // range reserves the same future scenario space in both tiers.
     const showWindow=(count:number,full=false)=>{
@@ -142,7 +157,9 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     history.current=()=>showWindow(data.length,true);
     fitFib.current=()=>showWindow(globalStructuralWindow(report,true));
     focus.current=()=>showWindow(Math.max(180,globalSetupWindow(report)));
-    chart.subscribeCrosshairMove(event=>{const c=event.seriesData.get(candles);if(c&&"open" in c&&typeof event.time==="number"){
+    chart.subscribeCrosshairMove(event=>{
+      const readings:Record<string,string>={};for(const entry of indicatorSeries){const value=event.seriesData.get(entry.series);const item=indicatorState.current.find(study=>study.id===entry.id);if(value&&"value" in value&&item)readings[entry.id]=Number(value.value).toLocaleString(undefined,{maximumFractionDigits:5})+" "+item.units;}setIndicatorReadings(readings);
+      const c=event.seriesData.get(candles);if(c&&"open" in c&&typeof event.time==="number"){
       const ts=event.time*1000,original=formingState.current?.ts===ts?formingState.current:data.find(item=>item.ts===ts);
       if(original)setCandleDetail({ts,open:c.open,high:c.high,low:c.low,close:c.close,volume:original.volume,live:formingState.current?.ts===ts});
     }});
@@ -192,8 +209,9 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       }
       frame = requestAnimationFrame(render);
     }; frame = requestAnimationFrame(render);
-    return () => { cancelAnimationFrame(frame); chart.remove(); reset.current = () => {};focus.current=()=>{};history.current=()=>{};updateLayers.current=()=>{};updateQuote.current=()=>{};updateForming.current=()=>{}; };
-  }, [chartReport, pro,appearance,viewportIdentity]);
+    return () => { cancelAnimationFrame(frame); chart.remove(); reset.current = () => {};focus.current=()=>{};history.current=()=>{};updateLayers.current=()=>{};updateQuote.current=()=>{};updateForming.current=()=>{};updateTerminalIndicators.current=()=>{}; };
+  }, [chartReport, pro,appearance,viewportIdentity,indicatorIdentity]);
+  useEffect(()=>{updateTerminalIndicators.current(terminalIndicators);},[terminalIndicators]);
   useEffect(()=>{updateLayers.current(layers);},[layers]);
   useEffect(()=>{updateQuote.current(quote);},[quote?.price,quote?.ts,quote?.kind]);
   useEffect(()=>{updateForming.current(forming);},[forming?.ts,forming?.open,forming?.high,forming?.low,forming?.close,forming?.volume]);
@@ -229,7 +247,8 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     {pro&&layers.volumeProfile&&report.orderFlow&&<p className="global-chart-profile-coverage">{globalOrderFlowCoverageLabel(report)} · {report.lang==="zh"?"仅该成交窗口，不是主要周期的完整分布。":"These levels describe this execution window, not the full primary timeframe."}</p>}
     <div className={`global-mobile-overview ${inspect?"is-inspecting":""}`} dangerouslySetInnerHTML={{__html:overview}} />
     <div className="global-mobile-inspect"><button aria-pressed={inspect} onClick={()=>setInspect(!inspect)}>{inspect?(report.lang==="zh"?"显示完整走势":"Saved report map"):(report.lang==="zh"?"检查 K 线":"Inspect candles")}</button><small>{report.lang==="zh"?"原图可下载；详细视图支持滑动和缩放。":"Download the original PNG for full detail. Swipe and zoom in the detailed view."}</small></div>
-    <div className={`global-chart-scroll ${inspect?"is-inspecting":""}`}><div className="global-chart-stage"><div ref={ref} style={{ height: pro ? 660 : 540 }} /><svg className="global-chart-overlay" style={{zIndex:5,width:overlay.width,height:overlay.height}} width={overlay.width} height={overlay.height} aria-label="Candles, saved setup indicators, range references, Entry, SL and TP" dangerouslySetInnerHTML={{ __html: overlay.svg }} />{pro&&<span className="global-rsi-label">RSI14 · {report.indicators.rsi.points.at(-1)?.value.toFixed(2)??"—"}</span>}</div></div>
+    <div className={`global-chart-scroll ${inspect?"is-inspecting":""}`}><div className="global-chart-stage"><div ref={ref} style={{ height: chartHeight }} /><svg className="global-chart-overlay" style={{zIndex:5,width:overlay.width,height:overlay.height}} width={overlay.width} height={overlay.height} aria-label="Candles, saved setup indicators, range references, Entry, SL and TP" dangerouslySetInnerHTML={{ __html: overlay.svg }} />{pro&&<span className="global-rsi-label">RSI14 · {report.indicators.rsi.points.at(-1)?.value.toFixed(2)??"—"}</span>}</div></div>
+    {terminalIndicators.length>0&&<section className="terminal-chart-indicator-key" aria-label="Applied chart indicators"><strong>Applied indicators / shared chart time axis</strong><button type="button" onClick={()=>{setInspect(true);focusTerminalIndicators.current();}}>Inspect execution window on chart</button>{terminalIndicators.map(item=><div key={item.id} data-chart-indicator={item.id}><b>{item.title}</b><span>{indicatorReadings[item.id]??"Hover the indicator pane for its value"}</span><small>{item.units} ? {item.status} coverage ? {new Date(item.windowStart).toISOString().slice(0,16).replace("T"," ")} ? {new Date(item.windowEnd).toISOString().slice(0,16).replace("T"," ")} UTC</small></div>)}<p>Indicator panes use execution timestamps and their own scales. Empty areas have no retained executions; they do not imply zero flow. Zoom to the recent execution window to inspect microstructure on a daily or weekly chart.</p></section>}
     <GlobalChartClock report={report}/>
     <p className="global-sma-readings">{[...report.indicators.sma.filter(s=>layers.sma!==false&&(pro&&layers.allSmas?[21,55,89,144,233]:[55]).includes(s.period)).map(s=>`SMA${s.period} ${globalPrice(report,s.points.at(-1)?.value)}`),...globalSetupStudyReadings(report,layers).map(s=>`${s.name} ${globalPrice(report,s.value)}`)].join(" · ")}</p>{pro&&layers.vwap&&globalVwapContextLine(report)&&<p className="global-meta">{globalVwapContextLine(report)}</p>}{pro&&globalChannelLines(report).map(line=><p key={line} className="global-meta">{line}</p>)}{pro&&<ContextChart report={report}/>}{report.entryStudy&&<div className="global-entry-detail" aria-label="Entry study candles" dangerouslySetInnerHTML={{__html:themeGlobalChartSvg(globalEntryStudySvg(report,660,selectedPathId)??"",appearance)}}/>}
     {pro&&report.orderFlow&&globalOrderFlowLines(report).map(line=><p className="global-meta" key={line}>{line}</p>)}

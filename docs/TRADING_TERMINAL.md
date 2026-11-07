@@ -7,10 +7,26 @@ Trading Terminal is an independent PULSE workspace at `/trading-terminal`, with 
 1. Connect the owner wallet and sign the Terminal login message. This authenticates private state; it is not a payment or trade.
 2. Review the server-published pass, supported payment network and capacity limits. Explicitly purchase access. A report purchase is not required.
 3. Select the asset and primary timeframe once. Inspect the shared Pro chart and its primary, execution and higher-context evidence roles.
-4. Use Market tools for measurements, Market Radar for ordered events, or Follow setup for one eligible plan.
-5. Record actual trades in My positions. Review observations, state changes and notification delivery in Alerts & activity.
+4. Use Market tools for measurements, Market Radar for ordered events, or Follow setup for one eligible plan. Install a tool from Indicators Market or build one in Create indicator, then compare its pane with the price chart.
+5. Record actual trades in My opened positions. Review observations, state changes and notification delivery in Alerts & Activity.
 
-The main website has an additional Terminal product section. Portfolio provides an entry to the owner's Terminal records while keeping unverified journal values outside verified Spot/Autopilot performance. The in-app handbook is `/docs#docs-trading-terminal`.
+The main website has separate Terminal and Indicator Market product sections. Portfolio provides an entry to the owner's Terminal records while keeping unverified journal values outside verified Spot/Autopilot performance. The in-app handbook is `/docs#docs-trading-terminal`, with additional `/docs#docs-indicator-market` and `/docs#docs-create-indicator` walkthroughs.
+
+### Workspace navigation
+
+The sidebar uses the same workspace pattern as Spot and Autopilot. A compact picker serves narrow screens. Section changes preserve the selected market/timeframe and do not replace the existing PULSE header or top tabs.
+
+| Destination | URL query | Purpose |
+|---|---|---|
+| Trading Terminal | `terminalSection=market` | Live price chart, current setup and applied indicator panes |
+| Market tools | `terminalSection=tools` | Profiles, executed flow, footprints, OI/funding and liquidity history |
+| Market Radar | `terminalSection=radar` | Create and manage ordered price-event watches |
+| Create indicator | `terminalSection=creator` | Formula authoring, numerical preview, export and publication |
+| Indicators Market | `terminalSection=indicators` | Discover listings, review service terms and install tools |
+| My opened positions | `terminalSection=positions` | Record and monitor actual user-reported fills |
+| Alerts & Activity | `terminalSection=activity` | Wallet-linked Telegram settings and dated item history |
+
+These query parameters apply to `/trading-terminal`. They are navigable destinations, not seven duplicate asset/timeframe selectors.
 
 Choose BTC, ETH, HYPE, SOL, DOGE, BNB, Zcash (ZEC) or OKB in the single Market dropdown. Other spot market opens the optional exact-pair input; unsupported pairs are never replaced with another asset. An independent timestamped ticker updates the current-price line across timeframe changes. The actual exchange-supplied developing candle follows that quote and refreshes its real volume. Hover or tap a candle to inspect its highlighted UTC time, OHLC, volume and change. Completed candles and confirmation studies remain separate; ticker updates preserve chart zoom, saved setup prices and original report exports.
 
@@ -21,7 +37,7 @@ To record a position, enter its market, direction, entry price and size. Choose 
 | Function | Input | Result |
 | --- | --- | --- |
 | Market tools | Market/frame and the stated captured source window | VWAP/value, executed flow/footprint, OI/funding and book evidence with provenance and coverage |
-| Indicator Market | Supported portable calculation package and actual Market-tools evidence | Locally evaluated indicator values, supported-kernel import/export and source coverage; no imported arbitrary code |
+| Indicator Market | Built-in or bounded creator formula and actual Market-tools evidence | Installed chart panes, portable calculation import/export, source coverage and versioned free/paid managed-service listings |
 | Market Radar | Boundary, detector, observation frame and expiry | Ordered Developing/Completed/Failed/Expired/Data needed events, with history and optional alerts |
 | Follow setup | A currently eligible immutable setup version | Its saved policy's next requirement and lifecycle; old plans cannot be revived by resetting the watch |
 | My positions | Actual user-recorded fills, protection and closes | A separate private journal with explicit provenance; observed prices do not prove executions |
@@ -86,7 +102,11 @@ Replay re-evaluates at most 512 retained source observations using the original 
 
 ### Portable indicators
 
-[PULSE Indicator Market](PULSE_INDICATOR_MARKET.md) is the approved extension for reusable tools across compatible Tapeout applications. Initial portable packages use supported CVD/net-participation kernels with the exact displayed Market-tools source and coverage. The circuit runtime performs the supported calculation locally; imported packages do not execute arbitrary JavaScript or amend a saved setup. Import/export portability is distinct from X Layer circuit registration and from confirmed support in a third-party application. The detailed document records implementation and deployment status; no local package alone establishes an on-chain deployment, profitable indicator or full MMT parity.
+[PULSE Indicator Market](PULSE_INDICATOR_MARKET.md) has dedicated **Indicators Market** and **Create indicator** workspace destinations. The public landing features it directly; the app handbook has separate illustrated [trader](https://app.ai-pulse.tech/docs#docs-indicator-market) and [creator](https://app.ai-pulse.tech/docs#docs-create-indicator) guides. Installed tools appear with the Terminal chart in independent indicator panes, preserving price scaling and the selected execution source window. Built-ins describe CVD/buyer participation; creator calculations use a bounded flow-expression compiler that generates actual TAP-02 NAND circuits. Importing a tool cannot execute JavaScript, access a wallet or amend a saved setup.
+
+Creators publish immutable versions as free tools or paid managed-installation services. Formulas remain public. Checkout follows an enabled supported network in the existing header: X Layer USDT0, Base native USDC or Arbitrum One native USDC. Each quote binds its exact chain/token, creator recipient, service/version and terms; it records wallet-owned entitlements and sales and supports original-payment recovery. No bridge or automatic conversion occurs. Arc/Robinhood indicator checkout is not implemented. Indicator purchases do not buy or renew Terminal time. Creator proceeds are 100% of service price with no additional platform fee, excluding network gas. See `INDICATOR_MARKET_MIN_PRICE_USDC`, `INDICATOR_MARKET_MAX_PRICE_USDC` and `INDICATOR_MARKET_QUOTE_TTL_SECONDS` in the detailed contract. The funded acceptance purchase was 0.001 USDC on Base; it does not establish funded acceptance on the other chains.
+
+A listing can attach a verified X Layer processor/circuit record only after its deployed netlist, ports and numeric results match the package. Three actual PULSE numerical circuits are now registered: CVD (1), buyer participation (2) and weighted flow (3), under processor `0x9e2849c04a513fe64db07521cbe52d078d905c0e`. See the [transaction and verification-block table](PULSE_INDICATOR_MARKET.md#registered-numerical-indicators). Registration status refers to the recorded verification block, not exchange-feed truth or creator originality. A new creator formula still needs a matching registration; catalog publication or a Radar circuit does not fabricate it. Portability does not establish third-party adoption, profitable trades or full third-party-indicator parity.
 
 Ask PULSE buttons retain the selected tool/indicator or setup context. The copilot uses explicit `GROK_COPILOT_MODEL` when set, otherwise `GROK_MODEL`. Model naming does not replace data freshness, source coverage, geometric qualification or live strategy validation.
 
@@ -155,7 +175,7 @@ The [6 November validation record](TRADING_TERMINAL_VALIDATION_2026-11-06.md) do
 
 Run the new feature paths with `FEATURE_TRADING_TERMINAL=1`, `NODE_ENV=test` and `PULSE_SKIP_DOTENV=1` to avoid inheriting production credentials/workers. Verify owner isolation, exact/env-configured prices, receipt recovery, expiry, scenario eligibility, causal Radar replay, missing sources, manual-fill accounting, notification consent/deduplication, chart-view preservation and mobile/Clarity readability.
 
-This task implements local application behavior. Deployment, public circuit publication, marketplace submission and live wallet transactions remain separate operator actions. Tests do not certify real-device wallet acceptance, complete retained historical depth or trading profitability.
+Deployment and public circuit fabrication/submission require their own recorded actions. Validation records must identify which wallet payments and circuit references were actually checked, rather than inferring them from local test doubles. Tests do not certify physical-device wallet acceptance, complete retained historical depth or trading profitability.
 
 The [4 November acceptance record](TRADING_TERMINAL_ACCEPTANCE_2026-11-04.md) documents the approved 1.50 USDC Base purchase, final API/browser checks, five-timeframe audit and remaining validation limits.
 

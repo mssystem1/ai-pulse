@@ -93,6 +93,33 @@
   display: block;
 }
 
+.docs-product .terminal-guide-section-links { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:20px 0 30px; }
+.docs-product .terminal-guide-section-links a { min-width:0;padding:14px 16px;border:1px solid var(--line2);border-radius:8px;text-decoration:none;background:var(--card); }
+.docs-product .terminal-guide-section-links a:hover,.docs-product .terminal-guide-section-links a:focus-visible { border-color:var(--mint);outline:2px solid var(--mint);outline-offset:2px; }
+.docs-product .terminal-guide-section-links strong,.docs-product .terminal-guide-section-links span { display:block; }
+.docs-product .terminal-guide-section-links span { margin-top:6px;font:14px/1.6 "Segoe UI",system-ui,sans-serif;color:var(--muted); }
+.docs-product .indicator-guide-figure { min-width:0;margin:28px 0; }
+.docs-product .indicator-guide-figure svg { display:block;width:100%;height:auto;border:1px solid var(--line2);border-radius:12px;font:16px "Segoe UI",system-ui,sans-serif;fill:var(--text); }
+.indicator-guide-background { fill:var(--card);stroke:var(--line2); }
+.indicator-guide-card { fill:var(--bg);stroke:var(--line2); }
+.indicator-guide-input { fill:var(--card);stroke:var(--line2); }
+.indicator-guide-eyebrow,.indicator-guide-label { font-size:12px;letter-spacing:.08em;fill:var(--mint); }
+.indicator-guide-title { font-size:24px;font-weight:700; }
+.indicator-guide-muted { font-size:13px;fill:var(--muted); }
+.indicator-guide-formula { font:22px monospace;fill:var(--text); }
+.indicator-guide-result { font-size:46px;font-weight:700;fill:var(--mint); }
+.indicator-guide-button { fill:var(--mint); }
+.indicator-guide-button-text { fill:#001d1c;font-weight:700;font-size:14px; }
+.indicator-guide-grid { stroke:var(--line2);fill:none; }
+.indicator-guide-divider { stroke:var(--line2); }
+.indicator-guide-price,.indicator-guide-series,.indicator-guide-arrow { fill:none;stroke:var(--mint);stroke-width:3; }
+.indicator-guide-series { stroke:var(--cyan,var(--mint)); }
+.indicator-guide-value { fill:var(--mint);font-weight:700; }
+.indicator-guide-footer { fill:var(--text);font-size:15px; }
+.docs-product .indicator-guide-figure figcaption { color:var(--muted);font:14px/1.6 "Segoe UI",system-ui,sans-serif;margin-top:12px; }
+.docs-product .indicator-guide blockquote { margin:20px 0;padding:16px 20px;border-left:3px solid var(--mint);background:var(--card);font:15px/1.7 "Segoe UI",system-ui,sans-serif; }
+@media(max-width:600px){.docs-product .terminal-guide-section-links{grid-template-columns:1fr}.docs-product .indicator-guide-figure{overflow:auto}.docs-product .indicator-guide-figure svg{min-width:620px}.docs-product .indicator-guide-figure figcaption{min-width:0}}
+
 /* Use the topic picker whenever the sidebar cannot fit beside the article.
    This also prevents its search and all topic links becoming one wide row. */
 @media (max-width: 1050px) {

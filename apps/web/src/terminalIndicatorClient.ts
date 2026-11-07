@@ -1,7 +1,35 @@
 import { parseIndicatorPackage, type IndicatorInput, type IndicatorKernel, type IndicatorManifest } from "@pulse/domain";
 import type { TerminalMarket } from "./terminalClient";
+import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
+export type IndicatorPaymentNetwork = "xlayer" | "base" | "arbitrum";
+export type IndicatorPaymentOption = { key: IndicatorPaymentNetwork; network: string; asset: string; symbol: string };
+export type IndicatorServiceQuote = {id:string;listingId:string;requestId:string;title?:string;version?:string;priceUsdc:string;priceUsd?:string;amountAtomic:string;asset:string;assetSymbol?:string;payee:string;network:IndicatorPaymentNetwork;expiresAt:string;path:string;resource:string;state?:"quoted"|"authorizing"|"granted"};
 
-export type IndicatorListing = { id: string; manifestId: string; version: string; title: string; description: string; author: string; kernel: IndicatorKernel; publisher: string | null; createdAt: string | null; canDelete: boolean; hosted: boolean };
+export function indicatorPaymentNetwork(value: WebNetworkKey | undefined): IndicatorPaymentNetwork | null {
+  return value === "xlayer" || value === "base" || value === "arbitrum" ? value : null;
+}
+export function indicatorPaymentLabel(network: IndicatorPaymentNetwork) {
+  const selected = WEB_NETWORKS[network];
+  return `${selected.payment.symbol} on ${selected.label}`;
+}
+/** A reviewed quote is pinned to the header's network, exact token, recipient,
+ * amount and service path before the wallet can be asked to sign. */
+export function validateIndicatorServiceQuote(quote: IndicatorServiceQuote, selected: WebNetworkKey | undefined): void {
+  if (!quote || !indicatorPaymentNetwork(quote.network) || quote.network !== selected) throw Error("Select the quote's payment network in the app header before paying.");
+  const network = WEB_NETWORKS[quote.network];
+  if (!/^iqu_[a-f0-9]{32}$/.test(quote.id) || !/^pmi_[a-f0-9]{32}$/.test(quote.listingId)
+    || quote.path !== `/v1/terminal/indicators/purchases/${quote.id}`
+    || String(quote.asset).toLowerCase() !== network.payment.address.toLowerCase()
+    || quote.assetSymbol !== undefined && quote.assetSymbol !== network.payment.symbol
+    || !/^0x[\da-f]{40}$/i.test(quote.payee) || !/^[1-9]\d*$/.test(quote.amountAtomic)
+    || !/^\d+(?:\.\d{1,6})?$/.test(quote.priceUsd ?? quote.priceUsdc)) throw Error("The indicator quote's payment terms could not be verified.");
+  if (new URL(quote.resource, "https://pulse.invalid").pathname !== `/${quote.network}${quote.path}`) throw Error("The indicator quote's resource does not match its payment network and service.");
+  const [whole, fraction = ""] = (quote.priceUsd ?? quote.priceUsdc).split(".");
+  if (BigInt(whole) * 1_000_000n + BigInt(fraction.padEnd(6, "0")) !== BigInt(quote.amountAtomic)) throw Error("The indicator quote's displayed price does not match its payment amount.");
+  if (!Number.isFinite(Date.parse(quote.expiresAt))) throw Error("The indicator quote has no valid expiry.");
+}
+
+export type IndicatorListing = { id: string; manifestId: string; version: string; title: string; description: string; author: string; kernel: IndicatorKernel; publisher: string | null; createdAt: string | null; canDelete: boolean; hosted: boolean; offer?: {priceUsdc:string;kind:"version-service";description:string}; entitled?:boolean; registration?: {processor:string;circuitId:string;transactionHash?:string;registeredAt?:string;observedAt?:number|string;blockNumber?:string;status?:string} };
 export const indicatorIdentity = (manifest: IndicatorManifest) => `${manifest.id}@${manifest.version}`;
 export function indicatorInputFromMarket(market: TerminalMarket, stream: "spot" | "perpetual", now = Date.now()): IndicatorInput {
   const flow = stream === "spot" ? market.tools.flow : market.tools.perpetualFlow;

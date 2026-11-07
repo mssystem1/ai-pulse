@@ -98,9 +98,13 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
     assert.ok(timerLater < timerStart && timerLater >= timerStart - 4, 'Countdown did not advance in real time');
     checked('paid_access_countdown_matches_original_grant_and_ticks', { timerStart, timerLater, expiry: expectedExpiry });
     {
+      assert.equal(await ev('document.querySelectorAll(".terminal-workspace-nav button").length'),7);checked('seven_dedicated_terminal_sidebar_destinations');
+      await click('.terminal-workspace-nav button:nth-of-type(5)');
       await until('document.querySelector("[data-indicator-market]")', 'Indicator Market missing in actual app', 500);
       await until('document.querySelector("[data-installed-indicator] svg")', 'Live CVD calculation did not render',500);
-      await button('Browse indicators');
+      if(await ev('[...document.querySelectorAll("button")].some(b=>!b.hidden&&b.textContent.trim()==="Browse indicators")'))await button('Browse indicators');
+      await until('document.querySelectorAll(".indicator-catalog-grid .indicator-registration").length===3','Registered built-in circuit metadata did not render',80).catch(async()=>{assert(await ev('document.querySelector(".indicator-catalog-grid").textContent.includes("753060")'),'Registered built-in circuit block evidence is missing');});
+      checked('actual_xlayer_registration_proofs_visible_in_catalog');
       await ev(`(()=>{const card=[...document.querySelectorAll('.indicator-catalog-grid article')].find(e=>e.querySelector('h4')?.textContent==='Buyer participation');card.querySelector('button').click();})()`);
       await until('document.querySelectorAll(".indicator-installed").length===2','Adding indicator failed');
       checked('live_indicator_catalog_install_two_numeric_panes');
@@ -109,12 +113,34 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
       assert.ok(await ev('document.querySelector("#terminal-question").value.includes("cumulative executed delta")'));
       await click('.terminal-ai-drawer button[aria-label="Close Ask PULSE"]');
       checked('indicator_ask_button_prefills_context_and_exposes_model');
+      await click('.terminal-workspace-nav button:nth-of-type(4)');
+      await until('document.querySelector(".indicator-creator")','Dedicated creator is missing');
+      await field('Package ID','qa.browser-weighted-flow');await field('Display title','Browser weighted flow');await field('Creator name','PULSE QA');await field('Description','A custom weighted execution formula created through the real browser.');await field('Formula','formula-v1');await field('Expression','buy*2-sell');await field('Accumulation','bar');
+      await button('Validate & compile indicator');
+      await until('document.querySelector(".indicator-creator output")?.textContent.includes("160")','Formula numerical preview did not produce weighted 120*2-80=160');
+      await button('Add my package');checked('creator_custom_formula_preview_160_and_install');
+      await click('.terminal-workspace-nav button:nth-of-type(1)');
+      await until('document.querySelector(".terminal-chart canvas")','Shared chart missing after install');
+      assert(await ev('document.querySelector(".terminal-chart").textContent.includes("Browser weighted flow")'));checked('custom_indicator_applied_to_actual_price_chart_pane');
+      await click('.terminal-workspace-nav button:nth-of-type(5)');
       for(const theme of ['base','xlayer'])for(const width of [1440,390]){
         await call('Emulation.setDeviceMetricsOverride',{width,height:width===390?844:1050,deviceScaleFactor:1,mobile:width===390});
         await ev(`document.documentElement.dataset.pulseTheme=${JSON.stringify(theme)}`);await pause(250);
         const overflow=await ev('document.documentElement.scrollWidth>innerWidth+1');assert.equal(overflow,false);
         await shot('indicator-'+theme+'-'+width,'[data-indicator-market]');checked('live_indicator_layout',{theme,width});
       }
+      await call('Page.navigate',{url:origin+'/docs#docs-indicator-market'});
+      await until('document.getElementById("docs-indicator-market")','Dedicated indicator guide anchor is missing');
+      assert(await ev('document.getElementById("docs-indicator-market").textContent.includes("Add to chart")'));
+      await shot('indicator-guide-390','#docs-indicator-market');
+      await ev('location.hash="docs-create-indicator"');await until('document.getElementById("docs-create-indicator")','Creator guide anchor is missing');
+      await shot('creator-guide-390','#docs-create-indicator');checked('illustrated_indicator_and_creator_docs_direct_links');
+      await call('Page.navigate',{url:origin+'/landing'});
+      await until('document.getElementById("indicator-market")','Dedicated public landing indicator section is missing');
+      assert(await ev('document.getElementById("indicator-market").textContent.includes("Indicator Market")'));
+      assert(await ev('[...document.getElementById("indicator-market").querySelectorAll("a")].some(a=>a.href.includes("terminalSection=indicators"))'));
+      assert.equal(await ev('document.documentElement.scrollWidth>innerWidth+1'),false);
+      await shot('indicator-landing-390','#indicator-market');checked('public_landing_indicator_market_and_direct_terminal_link');
       walletCalls.push(...await ev('window.__pulseTerminalWalletCalls??[]'));
       assert.equal(walletCalls.some(method=>/eth_send|eth_signTypedData|wallet_send/.test(method)),false);
       assert.equal(errors.length,0,errors.join('\n'));
