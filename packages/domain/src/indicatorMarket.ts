@@ -4,8 +4,11 @@
  * independently against factory membership, byte identity and golden vectors.
  */
 import { createFormulaIndicatorPackage, parseFormulaIndicatorPackage, interpretIndicatorFormula, type IndicatorFormulaManifest } from "./indicatorFormula.js";
+import { parseStudyIndicatorPackage, evaluateIndicatorStudySeries, type IndicatorStudyManifest } from "./indicatorStudy.js";
 export { createFormulaIndicatorPackage, compileIndicatorFormula, parseIndicatorFormula, interpretIndicatorFormula } from "./indicatorFormula.js";
 export type { IndicatorFormulaManifest, IndicatorFormulaOutput } from "./indicatorFormula.js";
+export { createStudyIndicatorPackage, parseIndicatorStudyDefinition, evaluateIndicatorStudySeries, indicatorStudyTemplates } from "./indicatorStudy.js";
+export type { IndicatorStudyManifest, IndicatorStudyDefinition, IndicatorStudyTransform, IndicatorStudySignal, IndicatorStudySample, IndicatorStudyTemplate } from "./indicatorStudy.js";
 export type IndicatorKernel = "executed-cvd-v1" | "buy-participation-v1" | "formula-v1";
 export type IndicatorBuiltinManifest = {
   format: "pulse-indicator-v1";
@@ -20,21 +23,25 @@ export type IndicatorBuiltinManifest = {
   runtime: { format: "tap-02-nand"; bitOrder: "least-significant-first"; inputBits: number; outputBits: number; maxPoints: 1024; netlist: string };
   publication: { chainId: 196; registered: false };
 };
-export type IndicatorManifest = IndicatorBuiltinManifest | IndicatorFormulaManifest;
+export type IndicatorManifest = IndicatorBuiltinManifest | IndicatorFormulaManifest | IndicatorStudyManifest;
 export type IndicatorInput = {
   instId: string; timeframe: string; source: string;
   status: "available" | "partial" | "stale" | "unavailable";
   knownAt: number; windowStart: number; windowEnd: number; units: "base" | "contracts";
   points: readonly { ts: number; end?: number; buy: number; sell: number }[];
+  /** Actual source-bar width, independent of the primary price timeframe. */
+  intervalMs?: number;
+  missingIntervals?: readonly { start: number; end: number }[];
   now?: number; maxAgeMs?: number;
 };
-export type IndicatorPoint = { ts: number; delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number };
+export type IndicatorPoint = { ts: number; delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; rawValue?: number; signal?: boolean; reset?: boolean; partial?: boolean };
 export type IndicatorResult = {
   id: string; status: IndicatorInput["status"]; reason?: string;
   points: IndicatorPoint[];
-  summary: { delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; label: string };
+  summary: { delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; rawValue?: number; signal?: boolean; label: string };
   precision: { quantityQuantum: number; maxCvdError: number; note: string };
-  provenance: { execution: "local-tap02"; chainId: 196; registered: false; source: string; knownAt: number; windowStart: number; windowEnd: number; gateCount: number; units: "base" | "contracts" };
+  provenance: { execution: "local-tap02"; chainId: 196; registered: false; source: string; knownAt: number; windowStart: number; windowEnd: number; gateCount: number; units: "base" | "contracts";
+    series?: { execution: "causal-host-series-v1"; kernel: "tap-02-per-bar"; gapPolicy: "reset"; warmup: "full-window"; transforms: IndicatorStudyManifest["study"]["transforms"]; plot: "line" | "histogram"; sourceIntervalMs?: number; resolvedPoints: number; resetCount: number; partialBucketCount: number } };
 };
 const MAX_POINTS = 1024, MAX_GATES = 40_000, MAX_PACKAGE_BYTES = 600_000;
 const fail = (message: string): never => { throw Error(`Indicator package: ${message}`); };
@@ -118,9 +125,9 @@ export function createIndicatorPackage(input: { id: string; title: string; descr
   return parseIndicatorPackage({ ...base, id: input.id, title: input.title, description: input.description, author: input.author, version: input.version ?? "1.0.0" }) as IndicatorBuiltinManifest;
 }
 
-/** Strict import: this release supports reviewed numeric kernels, not arbitrary
- * creator scripts. Changing a formula requires a new reviewed kernel version.
- * Exact comparison establishes formula identity; it does not authenticate feed data.
+/** Strict import supports exact builtin kernels, bounded creator expressions and
+ * declared causal studies. No package can introduce executable host code.
+ * Exact compilation establishes formula identity; it does not authenticate feeds.
  */
 export function parseIndicatorPackage(input: string | unknown): IndicatorManifest {
   if (typeof input === "string") {
@@ -129,6 +136,7 @@ export function parseIndicatorPackage(input: string | unknown): IndicatorManifes
   }
   const m = object(input);
   if (m.format === "pulse-indicator-v2") return parseFormulaIndicatorPackage(m);
+  if (m.format === "pulse-indicator-v3") return parseStudyIndicatorPackage(m);
   exactKeys(m, ["format", "id", "version", "title", "description", "author", "license", "kernel", "prerequisites", "runtime", "publication"]);
   if (m.kernel !== "executed-cvd-v1" && m.kernel !== "buy-participation-v1") fail("unsupported kernel version");
   const expected = canonical(m.kernel as IndicatorBuiltinManifest["kernel"]);
@@ -204,6 +212,8 @@ export function evaluateIndicator(manifest: IndicatorManifest, input: IndicatorI
   if (![input.knownAt, input.windowStart, input.windowEnd, now].every(Number.isSafeInteger) || input.knownAt < 0 || input.windowStart < 0 || input.windowEnd <= input.windowStart || input.knownAt > now + 30000) fail("invalid source clock");
   if (!Array.isArray(input.points) || input.points.length > MAX_POINTS) fail("source point limit exceeded");
   for (const [i, point] of input.points.entries()) if (!Number.isSafeInteger(point.ts) || point.ts < input.windowStart || point.ts >= input.windowEnd || point.ts > input.knownAt || point.end !== undefined && (!Number.isSafeInteger(point.end) || point.end <= point.ts || point.end > input.windowEnd || point.end > input.knownAt) || ![point.buy, point.sell].every(n => Number.isFinite(n) && n >= 0 && n <= 1e100) || i > 0 && point.ts <= input.points[i - 1].ts) fail("invalid, unordered or out-of-window execution point");
+  if (input.intervalMs !== undefined && (!Number.isSafeInteger(input.intervalMs) || input.intervalMs < 1 || input.intervalMs > 31 * 86400000)) fail("invalid source-bar interval");
+  if (input.missingIntervals !== undefined && (!Array.isArray(input.missingIntervals) || input.missingIntervals.length > 1024 || input.missingIntervals.some(gap => !Number.isSafeInteger(gap.start) || !Number.isSafeInteger(gap.end) || gap.start < 0 || gap.end <= gap.start))) fail("invalid source gaps");
   const maxAge = input.maxAgeMs ?? 300000;
   if (!Number.isSafeInteger(maxAge) || maxAge < 1000 || maxAge > 31 * 86400000) fail("invalid freshness limit");
   let status = input.status;
@@ -212,27 +222,53 @@ export function evaluateIndicator(manifest: IndicatorManifest, input: IndicatorI
   else if (status === "stale" || now - input.knownAt > maxAge) { status = "stale"; reason = "Source is stale; these are historical measurements, not a current trading signal."; }
   const max = input.points.reduce((n, point) => Math.max(n, point.buy, point.sell), 0), quantum = max > 0 ? max / 65535 : 1;
   if (!Number.isFinite(quantum) || quantum <= 0) fail("quantity scale outside supported precision");
-  let previous = 0;
-  const points: IndicatorPoint[] = status === "unavailable" ? [] : input.points.map(point => {
-    const buy = Math.min(65535, Math.round(point.buy / quantum)), sell = Math.min(65535, Math.round(point.sell / quantum));
+  const study = m.format === "pulse-indicator-v3" ? m.study : undefined;
+  let previous = 0, previousEnd: number | undefined, sourceGapCount = 0, partialBucketCount = 0;
+  let points: IndicatorPoint[] = status === "unavailable" ? [] : input.points.map(point => {
+    // A study's quantity encoding depends only on this completed source bar.
+    // Future high-volume bars cannot rescale and change its historical values.
+    const pointQuantum = study ? Math.max(point.buy, point.sell) > 0 ? Math.max(point.buy, point.sell) / 65535 : 1 : quantum;
+    const buy = Math.min(65535, Math.round(point.buy / pointQuantum)), sell = Math.min(65535, Math.round(point.sell / pointQuantum));
+    const knownPointEnd = point.end ?? (input.intervalMs ? Math.min(point.ts + input.intervalMs, input.windowEnd) : undefined);
+    const pointEnd = knownPointEnd ?? point.ts + 1;
+    const reset = Boolean(study && previousEnd !== undefined && point.ts > previousEnd);
+    previousEnd = knownPointEnd;
+    const partial = Boolean(study && input.intervalMs && knownPointEnd !== undefined && knownPointEnd - point.ts < input.intervalMs);
+    if (partial) partialBucketCount++;
+    const missing = Boolean(study && input.missingIntervals?.some(gap => gap.start < pointEnd && gap.end > point.ts));
+    if (reset || missing) sourceGapCount++;
+    if (missing) return { ts: point.ts, reset: true, ...(partial ? { partial: true } : {}) };
+    // A short captured edge is a useful per-bar reading, but not a completed
+    // bar for rolling/cumulative warm-up or a confirmed crossover event.
+    if (partial && study!.transforms.length > 0) return { ts: point.ts, reset: true, partial: true };
     if (m.kernel === "formula-v1") {
       const reference = interpretIndicatorFormula(m.formula.expression, buy, sell);
-      if (reference === undefined) return { ts: point.ts };
+      if (reference === undefined) return { ts: point.ts, ...(reset ? { reset: true } : {}), ...(partial ? { partial: true } : {}) };
       const expected = reference + (m.formula.output.accumulation === "cumulative" ? previous : 0);
       if (expected < -2147483648 || expected > 2147483647) fail("formula accumulation would overflow");
       const output = run(circuit, buy, sell, previous).valueQ!;
       if (output !== expected) fail("compiled formula disagrees with integer arithmetic");
       if (m.formula.output.accumulation === "cumulative") previous = output;
-      return { ts: point.ts, value: output * (m.formula.output.unit === "volume" ? quantum : 1) };
+      return { ts: point.ts, value: output * (m.formula.output.unit === "volume" ? pointQuantum : 1), ...(reset ? { reset: true } : {}), ...(partial ? { partial: true } : {}) };
     }
     if (m.kernel === "buy-participation-v1" && buy + sell === 0) return { ts: point.ts };
     const output = run(circuit, buy, sell, previous);
     if (output.cvdQ !== undefined && output.deltaQ !== undefined) { previous = output.cvdQ; return { ts: point.ts, delta: output.deltaQ * quantum, cvd: output.cvdQ * quantum }; }
     return { ts: point.ts, participationBps: output.participationBps, netParticipationBps: 2 * output.participationBps! - 10000 };
   });
+  if (study) {
+    points = evaluateIndicatorStudySeries(points, study);
+    if (sourceGapCount && status === "available") { status = "partial"; reason = "Execution coverage has gaps. Rolling, cumulative and crossover state restarted after each gap; earlier missing executions were not reconstructed."; }
+    if (partialBucketCount) {
+      if (status === "available") status = "partial";
+      reason = `${reason ? `${reason} ` : ""}Incomplete source bars describe captured executions only. They do not count toward rolling or cumulative warm-up, and cannot confirm a crossover.`;
+    }
+    if (points.length && !points.some(point => point.value !== undefined) && !reason) reason = "Waiting for enough complete, contiguous source bars to finish the study warm-up. Missing or zero-divisor bars are unknown.";
+  }
   const last = points.at(-1), summary = { ...last, label: m.kernel === "formula-v1" ? m.formula.output.label : m.kernel === "executed-cvd-v1" ? "Cumulative executed buy minus sell volume" : "Buyer share of the last source bar's executed volume" };
   return { id: m.id, status, reason, points, summary,
-    precision: { quantityQuantum: quantum, maxCvdError: input.points.length * quantum, note: m.kernel === "formula-v1" ? "Shared 16-bit volume inputs; arithmetic uses signed int32 and division truncates toward zero. A zero divisor is unknown. Volume outputs return to source units; ratio/bps/scalar outputs retain integer ABI units. Formula-dependent error can be larger than input quantization; no universal formula error bound is claimed." : "Shared 16-bit volume quantization; CVD absolute error is bounded by point count × quantity quantum. Buyer share is integer basis points after quantization; very small bars may be unresolved." },
-    provenance: { execution: "local-tap02", chainId: 196, registered: false, source: input.source, knownAt: input.knownAt, windowStart: input.windowStart, windowEnd: input.windowEnd, gateCount: circuit.gates.length / 2, units: input.units },
+    precision: { quantityQuantum: quantum, maxCvdError: input.points.length * quantum, note: m.kernel === "formula-v1" ? `${study ? "Per-source-bar" : "Shared"} 16-bit volume inputs; arithmetic uses signed int32 and division truncates toward zero. A zero divisor is unknown. Volume outputs return to source units; ratio/bps/scalar outputs retain integer ABI units. Formula-dependent error can be larger than input quantization; no universal formula error bound is claimed.${study ? " Causal host-side transforms use these decoded values; bps thresholds are in basis points (100 bps = 1%)." : ""}` : "Shared 16-bit volume quantization; CVD absolute error is bounded by point count × quantity quantum. Buyer share is integer basis points after quantization; very small bars may be unresolved." },
+    provenance: { execution: "local-tap02", chainId: 196, registered: false, source: input.source, knownAt: input.knownAt, windowStart: input.windowStart, windowEnd: input.windowEnd, gateCount: circuit.gates.length / 2, units: input.units,
+      ...(study ? { series: { execution: "causal-host-series-v1" as const, kernel: "tap-02-per-bar" as const, gapPolicy: "reset" as const, warmup: "full-window" as const, transforms: study.transforms, plot: study.plot, ...(input.intervalMs ? { sourceIntervalMs: input.intervalMs } : {}), resolvedPoints: points.filter(point => point.value !== undefined).length, resetCount: points.filter(point => point.reset).length, partialBucketCount } } : {}) },
   };
 }

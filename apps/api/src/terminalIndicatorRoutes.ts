@@ -10,12 +10,15 @@ import { BUILTIN_INDICATOR_DEPLOYMENTS } from "@pulse/market";
 import { terminalAccess } from "./terminalStore.js";
 import { createIndicatorCommerceRoutes, indicatorOffer, indicatorPaymentNetworks, type IndicatorCommerceDependencies } from "./terminalIndicatorCommerce.js";
 
-const REGISTRY_OWNER = "0x" + "0".repeat(40), TTL = 365 * 86400;
+const REGISTRY_OWNER = "0x" + "0".repeat(40), PACKAGE_TTL = 3650 * 86400;
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 /** Shared catalog holds only intentionally published packages, never journals,
  * report evidence, authentication tokens or private workspace records. */
 export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "store" | "now"> & { cfg?: AppConfig }, dependencies: IndicatorCommerceDependencies = {}) {
   const router = Router(), registry = new TerminalStore(runtime.store.storage, runtime.store.key("indicator-registry", "v1"), 365);
+  // Delisting changes discovery, never the identity/terms of an already
+  // published version. Keep this separate from the shorter catalog retention.
+  const versions = new TerminalStore(runtime.store.storage, runtime.store.key("indicator-version-registry", "v1"), 3650);
   const seeds = indicatorMarketCatalog();
   const checkout = createIndicatorCommerceRoutes(runtime, dependencies);
   const summary = (item: TerminalIndicatorPublication, owner: string, owned = false) => ({ ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== "packageRef")), canDelete: item.publisher === owner, entitled: !item.offer || item.publisher === owner || owned, hosted: true, publication: item.registration ? { ...item.registration, registered: true } : { chainId: 196, registered: false } });
@@ -37,11 +40,20 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
     const published = (await registry.get(REGISTRY_OWNER)).indicatorPublications?.find(item => item.id === id);
     const purchased = await checkout.owned(res.locals.terminalOwner, id);
     if (!published && !purchased) return res.status(404).json({ error: "Indicator not found" });
-    const item = published ?? { ...purchased!, id, manifestId: "purchased-version", description: purchased!.offer.description, author: purchased!.publisher, kernel: "purchased-version", createdAt: purchased!.createdAt };
-    const stored = await registry.storage.read<{ bytes: string }>(registry.key("package", item.packageRef));
+    // A receipt is authoritative even for a legacy listing that was changed
+    // after delisting. Never label newer bytes as a previously purchased copy.
+    const source = purchased ?? published!;
+    const stored = await registry.storage.read<{ bytes: string }>(registry.key("package", source.packageRef));
     const bytes = typeof stored?.bytes === "string" ? stored.bytes : null;
-    if (!bytes || digest(bytes) !== item.sha256) return res.status(503).json({ error: "Published package could not be verified. Import its original export or contact its publisher." });
-    return res.json({ item: summary(item, res.locals.terminalOwner, Boolean(purchased)), manifest: parseIndicatorPackage(bytes) });
+    if (!bytes || digest(bytes) !== source.sha256) return res.status(503).json({ error: "Published package could not be verified. Import its original export or contact its publisher." });
+    const manifest = parseIndicatorPackage(bytes);
+    const item: TerminalIndicatorPublication = purchased ? {
+      id, manifestId: manifest.id, version: purchased.version, title: manifest.title, description: manifest.description,
+      author: manifest.author, kernel: manifest.kernel, publisher: purchased.publisher, createdAt: purchased.createdAt,
+      sha256: purchased.sha256, packageRef: purchased.packageRef, offer: purchased.offer,
+      ...(published?.sha256 === purchased.sha256 && published.registration ? { registration: published.registration } : {}),
+    } : published!;
+    return res.json({ item: summary(item, res.locals.terminalOwner, Boolean(purchased)), manifest });
   }));
   router.post("/v1/terminal/indicators", asyncRoute(async (req, res) => {
     if (!req.body || !Object.hasOwn(req.body, "manifest") || Object.keys(req.body).some(key => !["manifest", "offer"].includes(key))) return res.status(400).json({ error: "Provide one portable indicator manifest and optional creator offer" });
@@ -53,20 +65,36 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
     if (manifest.id.startsWith("pulse.")) return res.status(400).json({ error: "Choose your own package ID; pulse.* is reserved for built-in tools" });
     const publisher = String(res.locals.terminalOwner).toLowerCase(), bytes = exportIndicatorPackage(manifest), sha256 = digest(bytes);
     const item: TerminalIndicatorPublication = { id: "pmi_" + digest(publisher + ":" + manifest.id + ":" + manifest.version).slice(0, 32), manifestId: manifest.id, version: manifest.version, title: manifest.title, description: manifest.description, author: manifest.author, kernel: manifest.kernel, publisher, createdAt: new Date(runtime.now()).toISOString(), sha256, packageRef: sha256, ...(offer ? { offer } : {}) };
-    const current = (await registry.get(REGISTRY_OWNER)).indicatorPublications ?? [], prior = current.find(p => p.id === item.id);
+    const catalog = await registry.get(REGISTRY_OWNER), current = catalog.indicatorPublications ?? [], prior = current.find(p => p.id === item.id);
     if (prior && (prior.sha256 !== sha256 || JSON.stringify(prior.offer) !== JSON.stringify(offer))) return res.status(409).json({ error: "This version already has different content or terms; increase its version" });
+    // Preserve paid legacy versions that predate the immutable version ledger.
+    if (catalog.indicatorSales?.some(sale => sale.listingId === item.id && (sale.sha256 !== sha256 || sale.priceUsdc !== offer?.priceUsdc))) return res.status(409).json({ error: "This version already has a purchase with different content or terms; increase its version" });
     // Reject known excess before writing package bytes. CAS below repeats these
     // checks to protect concurrent publishers from overwriting catalog entries.
     if (!prior && (current.length >= 100 || current.filter(p => p.publisher === publisher).length >= 20)) return res.status(409).json({ error: "Indicator catalog publication limit reached" });
+    let reserved = item;
+    try { await versions.mutate(publisher, value => {
+      const recorded = value.indicatorVersions?.[item.id];
+      if (recorded) {
+        if (recorded.sha256 !== sha256 || JSON.stringify(recorded.offer) !== JSON.stringify(offer)) throw Error("This published version keeps its original content and terms after delisting; increase its version");
+        reserved = recorded;
+        return false;
+      }
+      if (Object.keys(value.indicatorVersions ?? {}).length >= 1000) throw Error("Publisher version-history limit reached; contact support before publishing");
+      reserved = prior ?? item;
+      value.indicatorVersions = { ...(value.indicatorVersions ?? {}), [item.id]: reserved };
+    }); } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : "Version reservation changed. Retry publishing." }); }
     // Redis adapters decode top-level JSON strings. Wrap exact bytes so their
     // representation and checksum survive both memory and durable adapters.
-    await registry.storage.write(registry.key("package", item.packageRef), { bytes }, TTL);
-    let duplicate = false, storedItem = item;
+    // Content-addressed bytes may be shared by paid receipts. Republishing
+    // identical public bytes must not shorten their ten-year recovery window.
+    await registry.storage.write(registry.key("package", item.packageRef), { bytes }, PACKAGE_TTL);
+    let duplicate = false, storedItem = reserved;
     try { await registry.mutate(REGISTRY_OWNER, value => {
       const items = value.indicatorPublications ?? [], prior = items.find(p => p.id === item.id);
       if (prior) { if (prior.sha256 !== sha256 || JSON.stringify(prior.offer) !== JSON.stringify(offer)) throw Error("This version already has different content or terms; increase its version"); duplicate = true; storedItem = prior; return false; }
       if (items.length >= 100 || items.filter(p => p.publisher === publisher).length >= 20) throw Error("Indicator catalog publication limit reached");
-      value.indicatorPublications = [...items, item];
+      value.indicatorPublications = [...items, reserved];
     }); } catch (error) { return res.status(409).json({ error: error instanceof Error ? error.message : "Catalog changed. Retry publishing." }); }
     return res.status(duplicate ? 200 : 201).json({ item: summary(storedItem, publisher), manifest });
   }));
@@ -79,6 +107,11 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
     try {
       const { verifyIndicatorDeployment } = await import("@pulse/market");
       const registration = await verifyIndicatorDeployment(parseIndicatorPackage(stored.bytes), input);
+      await versions.mutate(owner, value => {
+        const previous = value.indicatorVersions?.[item.id];
+        if (previous && previous.sha256 !== item.sha256) throw Error("Version identity changed during verification");
+        value.indicatorVersions = { ...(value.indicatorVersions ?? {}), [item.id]: { ...(previous ?? item), registration } };
+      });
       await registry.mutate(REGISTRY_OWNER, value => { const current = value.indicatorPublications?.find(p => p.id === item.id); if (!current || current.sha256 !== item.sha256) throw Error("Listing changed during verification"); current.registration = registration; });
       return res.json({ registration, item: summary({ ...item, registration }, owner) });
     } catch (cause) { return res.status(422).json({ error: cause instanceof Error ? cause.message : "X Layer deployment did not match this numerical package" }); }
@@ -86,11 +119,23 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
   router.delete("/v1/terminal/indicators/:id", asyncRoute(async (req, res) => {
     const id = String(req.params.id), owner = String(res.locals.terminalOwner).toLowerCase();
     if (!/^pmi_[\da-f]{32}$/.test(id)) return res.status(404).json({ error: "Published indicator not found" });
-    try { await registry.mutate(REGISTRY_OWNER, value => {
+    const original = (await registry.get(REGISTRY_OWNER)).indicatorPublications?.find(item => item.id === id);
+    if (!original || original.publisher !== owner) return res.status(403).json({ error: "Only the publishing wallet can remove this package" });
+    try {
+      // Also migrate legacy listings before their last discoverable record is
+      // removed, including free versions with no sales to reconstruct them.
+      await versions.mutate(owner, value => {
+        const previous = value.indicatorVersions?.[id];
+        if (previous && (previous.sha256 !== original.sha256 || JSON.stringify(previous.offer) !== JSON.stringify(original.offer))) throw Error("Saved version identity differs; contact support before removal");
+        value.indicatorVersions = { ...(value.indicatorVersions ?? {}), [id]: original };
+      });
+      await registry.mutate(REGISTRY_OWNER, value => {
       const item = value.indicatorPublications?.find(p => p.id === id);
       if (!item || item.publisher !== owner) throw Error("Only the publishing wallet can remove this package");
+      if (item.sha256 !== original.sha256 || JSON.stringify(item.offer) !== JSON.stringify(original.offer)) throw Error("Listing changed during removal; refresh and retry");
       value.indicatorPublications = value.indicatorPublications!.filter(p => p.id !== id);
-    }); } catch (error) { return res.status(403).json({ error: error instanceof Error ? error.message : "Removal not allowed" }); }
+      });
+    } catch (error) { return res.status(403).json({ error: error instanceof Error ? error.message : "Removal not allowed" }); }
     return res.json({ removed: true, id });
   }));
   return router;

@@ -21,3 +21,17 @@ export function globalVisibleCandleExtrema(candles: ReadonlyArray<{ low: number;
   if (!visible.length) return null;
   return { minValue: Math.min(...visible.map(c => c.low)), maxValue: Math.max(...visible.map(c => c.high)) };
 }
+
+/** LWC logical indices belong to the union of all plotted timestamps. A minute
+ * indicator can insert thousands of points between daily/weekly candles, so
+ * candle selection must use the actual visible time range. Values are seconds. */
+export function globalVisibleTimeCandleExtrema(candles: ReadonlyArray<{ ts: number; low: number; high: number }>, range: { from: unknown; to: unknown } | null): { minValue: number; maxValue: number } | null {
+  if (!range || typeof range.from !== "number" || typeof range.to !== "number") return null;
+  const visible = candles.filter(c => c.ts >= (range.from as number) * 1000 && c.ts <= (range.to as number) * 1000);
+  return visible.length ? { minValue: Math.min(...visible.map(c => c.low)), maxValue: Math.max(...visible.map(c => c.high)) } : null;
+}
+/** Reserve plan space using actual union-axis indices, never candle counts. */
+export function globalLogicalSetupWindow(first: number, last: number, width: number, full = false): { from: number; to: number } {
+  const count = Math.max(1, last - first + 1), reserved = Math.min(width * .55, Math.max(300, width * .28));
+  return { from: full ? first - 5 : first, to: last + Math.ceil(count * reserved / Math.max(1, width - reserved)) };
+}

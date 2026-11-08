@@ -35,12 +35,23 @@ export function indicatorInputFromMarket(market: TerminalMarket, stream: "spot" 
   const flow = stream === "spot" ? market.tools.flow : market.tools.perpetualFlow;
   const points = flow?.displayPoints ?? flow?.points ?? [];
   const start = flow?.windowStart ?? points[0]?.ts ?? now - 60000, end = flow?.windowEnd ?? points.at(-1)?.ts! + 1;
-  return { instId: market.instId, timeframe: market.timeframe, source: flow?.source ?? "unavailable-perpetual-executions", status: flow?.status ?? "unavailable", knownAt: flow?.knownAt ?? 0,
-    windowStart: start, windowEnd: Number.isSafeInteger(end) && end > start ? end : start + 1, units: stream === "spot" ? "base" : "contracts", now,
-    // Assessment samples start inside a UTC display bucket. Its quantities
-    // already contain only captured executions; clip the label's boundaries
-    // rather than pretending earlier trades were observed or dropping volume.
-    points: points.map(point => ({ ts: Math.max(start, point.ts), ...("end" in point && typeof point.end === "number" ? { end: Math.min(end, point.end) } : {}), buy: point.buy, sell: point.sell })) };
+  const windowEnd=Number.isSafeInteger(end)&&end>start?end:start+1, knownAt=flow?.knownAt??0;
+  // Display buckets can overlap sample edges, or include a trailing bucket at
+  // the exclusive end of a retained session. Clip labels only for overlapping
+  // buckets; do not move entirely outside executions into this source window.
+  const eligible=points.flatMap(point=>{
+    const rawEnd="end" in point&&typeof point.end==="number"?point.end:undefined;
+    if(point.ts>=windowEnd||point.ts>knownAt||(rawEnd??point.ts+1)<=start)return [];
+    const ts=Math.max(start,point.ts),clippedEnd=rawEnd===undefined?undefined:Math.min(windowEnd,knownAt,rawEnd);
+    if(clippedEnd!==undefined&&clippedEnd<=ts)return [];
+    return [{ts,...(clippedEnd===undefined?{}:{end:clippedEnd}),buy:point.buy,sell:point.sell}];
+  }).sort((a,b)=>a.ts-b.ts);
+  const seen=new Set<number>(),unique=eligible.filter(point=>{if(seen.has(point.ts))return false;seen.add(point.ts);return true;});
+  const missingIntervals=flow?.missingIntervals?.map(({start,end})=>({start,end}));
+  const incomplete=unique.length!==points.length||Boolean(missingIntervals?.length);
+  return { instId: market.instId, timeframe: market.timeframe, source: flow?.source ?? "unavailable-perpetual-executions", status: incomplete&&flow?.status==="available"?"partial":flow?.status??"unavailable", knownAt,
+    windowStart:start,windowEnd,units:stream==="spot"?"base":"contracts",now,
+    ...(flow?.displayBucketMs?{intervalMs:flow.displayBucketMs}:{}),...(missingIntervals?{missingIntervals}:{}),points:unique };
 }
 /** Store calculation packages only, never market data or wallet credentials. */
 export function loadInstalledIndicators(storage: Pick<Storage, "getItem">, defaults: IndicatorManifest[]): IndicatorManifest[] {

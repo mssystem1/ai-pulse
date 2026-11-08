@@ -13,7 +13,7 @@ import { BUILTIN_INDICATOR_DEPLOYMENTS } from "../packages/market/src/indicatorD
 
 /** Real Base service purchase; the second creator's local access grant is an
  * explicit QA fixture. Its payout key is retained encrypted, never logged. */
-export async function auditIndicatorCommerce({origin,cfg,store,buyerToken,folder,record}:{origin:string;cfg:AppConfig;store:TerminalStore;buyerToken:string;folder:URL;record:(name:string,detail?:Record<string,unknown>)=>void}){
+export async function auditIndicatorCommerce({origin,cfg,store,buyerToken,folder,record,runBrowser}:{origin:string;cfg:AppConfig;store:TerminalStore;buyerToken:string;folder:URL;record:(name:string,detail?:Record<string,unknown>)=>void;runBrowser?:(commerce:Record<string,unknown>)=>Promise<void>}){
   const encryptionKey=createHash("sha256").update(cfg.TEST_WALLET_PRIVATE_KEY+":indicator-creator-qa").digest();
   let creatorKey:`0x${string}`;
   try{const encrypted=JSON.parse(await readFile(new URL("qa-creator.enc.json",folder),"utf8")),decipher=createDecipheriv("aes-256-gcm",encryptionKey,Buffer.from(encrypted.iv,"base64"));decipher.setAuthTag(Buffer.from(encrypted.tag,"base64"));creatorKey=Buffer.concat([decipher.update(Buffer.from(encrypted.ciphertext,"base64")),decipher.final()]).toString() as `0x${string}`;}
@@ -78,6 +78,41 @@ export async function auditIndicatorCommerce({origin,cfg,store,buyerToken,folder
   await request(`/v1/terminal/indicators/${listing.id}`,undefined,creatorToken,"DELETE");
   const after=await request(`/v1/terminal/indicators/${listing.id}`);assert(after.item.entitled);assert.equal(exportIndicatorPackage(after.manifest),exportIndicatorPackage(manifest));
   record("paid_custom_formula_receipt_replay_creator_sale_and_delisted_restore",{listingId:listing.id,formula:manifest.formula.expression});
+  if(runBrowser){
+    const browserManifest={...manifest,version:"4.0.0"},offer={kind:"version-service",priceUsdc:"0.001",description:"Temporary browser end-to-end managed installation of this version."};
+    const browserListing=(await request("/v1/terminal/indicators",{manifest:browserManifest,offer},creatorToken)).item;
+    const browserMarkerPath=new URL("browser-service-purchase.json",folder);
+    let browserMarker:any;try{browserMarker=JSON.parse(await readFile(browserMarkerPath,"utf8"));}catch(error:any){if(error.code!=="ENOENT")throw error;browserMarker={listingId:browserListing.id,attempted:false};}
+    assert.equal(browserMarker.listingId,browserListing.id);
+    const receiptBefore=(await request("/v1/terminal/indicators/purchases")).purchases.find((p:any)=>p.listingId===browserListing.id&&p.state==="granted");
+    if(browserMarker.attempted&&!receiptBefore)throw Error("The original browser payment needs reconciliation; no second authorization may be signed.");
+    let typedSignatures=0;
+    try{
+      await runBrowser({listingId:browserListing.id,manifestId:browserManifest.id,title:browserManifest.title,version:browserManifest.version,recipient:creator.address,alreadyPurchased:Boolean(receiptBefore),
+        signTypedData:async(data:any,review:any)=>{
+          assert(process.argv.includes("--spend"),"A new single 0.001 USDC browser purchase requires --spend");
+          assert.equal(browserMarker.attempted,false,"Never sign a second authorization for this browser test purchase");
+          const quote=(await request("/v1/terminal/indicators/purchases")).purchases.find((p:any)=>p.id===review?.id);
+          assert(quote&&quote.state==="quoted"&&quote.listingId===browserListing.id&&quote.network==="base");
+          const token=getNetwork("base").paymentAsset.address!;
+          assert.equal(quote.asset.toLowerCase(),token.toLowerCase());assert.equal(quote.amountAtomic,"1000");assert.equal(quote.payee.toLowerCase(),creator.address.toLowerCase());
+          assert.equal(Number(data.domain.chainId),8453);assert.equal(String(data.domain.verifyingContract).toLowerCase(),token.toLowerCase());
+          assert.equal(data.primaryType,"TransferWithAuthorization");assert.equal(String(data.message.from).toLowerCase(),buyer.address.toLowerCase());assert.equal(String(data.message.to).toLowerCase(),creator.address.toLowerCase());assert.equal(BigInt(data.message.value),1000n);
+          const currentSeconds=Math.floor(Date.now()/1000);assert(BigInt(data.message.validAfter)<=BigInt(currentSeconds));assert(BigInt(data.message.validBefore)>BigInt(currentSeconds)&&BigInt(data.message.validBefore)<=BigInt(currentSeconds+900));assert.match(data.message.nonce,/^0x[\da-f]{64}$/i);
+          browserMarker={...browserMarker,attempted:true,quote,nonce:data.message.nonce,validBefore:String(data.message.validBefore)};
+          await writeFile(browserMarkerPath,JSON.stringify(browserMarker,null,2));
+          const signature=await buyer.signTypedData(data);typedSignatures++;return signature;
+        },
+        delist:()=>request(`/v1/terminal/indicators/${browserListing.id}`,undefined,creatorToken,"DELETE")
+      });
+      const purchase=(await request("/v1/terminal/indicators/purchases")).purchases.find((p:any)=>p.listingId===browserListing.id&&p.state==="granted");
+      assert(purchase?.settlementTx,"Browser checkout did not produce a durable paid receipt");browserMarker={...browserMarker,transaction:purchase.settlementTx};await writeFile(browserMarkerPath,JSON.stringify(browserMarker,null,2));
+      const browserReceipt=await rpc.waitForTransactionReceipt({hash:purchase.settlementTx,timeout:90000});assert.equal(browserReceipt.status,"success");
+      assert(browserReceipt.logs.some(log=>{if(log.address.toLowerCase()!==purchase.asset.toLowerCase())return false;try{const event=decodeEventLog({abi:parseAbi(["event Transfer(address indexed from,address indexed to,uint256 value)"]),data:log.data,topics:log.topics});return event.args.from.toLowerCase()===buyer.address.toLowerCase()&&event.args.to.toLowerCase()===creator.address.toLowerCase()&&event.args.value===1000n;}catch{return false;}}));
+      assert.equal((await request("/v1/terminal/indicators/purchases",undefined,creatorToken)).sales.filter((s:any)=>s.listingId===browserListing.id).length,1);
+      record("real_base_browser_checkout_creator_transfer_and_delisted_restore",{listingId:browserListing.id,amountUSDC:"0.001",transaction:purchase.settlementTx,newTypedSignatures:typedSignatures});
+    } finally {try{await request(`/v1/terminal/indicators/${browserListing.id}`,undefined,creatorToken,"DELETE");}catch{/* Remove only this QA listing, retain all paid receipts. */}}
+  }
   } finally {try{await request(`/v1/terminal/indicators/${listing.id}`,undefined,creatorToken,"DELETE");}catch{/* Only this generated QA listing is affected. */}
   const remaining=(await request("/v1/terminal/indicators",undefined,creatorToken)).items.filter((item:any)=>item.publisher===creator.address.toLowerCase()&&item.manifestId===manifest.id&&item.title===manifest.title);
   for(const item of remaining)await request(`/v1/terminal/indicators/${item.id}`,undefined,creatorToken,"DELETE");

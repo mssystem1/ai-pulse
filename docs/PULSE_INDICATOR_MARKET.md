@@ -7,21 +7,51 @@ The PULSE header and top-level tabs remain intact. Trading Terminal stays immedi
 ## Use it
 
 1. Open Trading Terminal with an active pass and select the market and primary timeframe. Open **Indicators Market**: `/trading-terminal?terminalSection=indicators`.
-2. Leave **Market-tools execution window → Follow chart timeframe** selected, or deliberately choose a UTC session. This is the source window for installed indicators as well as the execution tools.
-3. Review the formula, supported inputs, creator wallet, immutable version, price and deployment status. Use **Add to chart** for a free tool. A paid managed-service listing first requires its separate reviewed quote and explicit payment. The formula remains open.
-4. Open **Trading Terminal** to compare the installed pane with price on the shared chart time axis. Quantity and percentage indicators keep their own scale. **Inspect execution window on chart** zooms to the retained input window; daily or weekly candles do not imply that an indicator has daily or weekly execution coverage. Hover or tap its pane to inspect values. The pane names the market, Spot/Futures stream, units, source window and coverage.
-5. Use **Export** to save its `.pulse-indicator.json` file. Another compatible host can import the same numerical circuit. No wallet credential, journal or private market history is in that package.
-6. Open **independent host**, import the file and enter numeric execution inputs. This separate HTML/ES-module application runs without PULSE's application bundle, API or wallet connection. It demonstrates portability, rather than claiming that unrelated third-party applications already support the format.
+2. For a first reading, select **Buyer participation** and **Add to chart**. Free tools install directly. Paid managed-service listings require their separate reviewed quote and explicit payment first.
+3. Open **Trading Terminal** and compare the installed percentage pane with price on the shared time axis. Quantity and percentage studies keep independent scales. Hover or tap a resolved point to inspect its timestamp and value. Check the named market, Spot/Futures stream, source interval, covered dates and gaps.
+4. Read actual bought/sold quantities for the same source bucket in the source details or Market tools. You do not need to type test numbers, import a file, provide a package ID or enter a contract address to use an indicator.
+5. Show/hide changes its visibility; Remove uninstalls it. **Inspect execution window on chart** is an optional way to inspect the covered input window. The printed source interval defines each calculation bar: twenty one-minute bars remain twenty minutes on a daily price chart. A broad price timeframe cannot manufacture historical executions.
 
-Example: with 120 units bought and 80 sold, delta is +40. A previous cumulative delta of +20 becomes +60. Buyer participation is 60%. These are executed-volume measurements, not forecasts or automatic entries.
+Worked reading: buyer participation is `buy / (buy + sell)`. If a captured bucket really contains 120 bought and 80 sold, its buyer share is 60% and normalized delta is 20%. Those numbers are an illustration; the live preview uses actual source quantities. Compare its corresponding candle and nearby price level. Aggressive buying can coincide with flat or falling price; participation is evidence about executions, not an automatic entry.
 
 ## Create and share
 
-Open **Create indicator**: `/trading-terminal?terminalSection=creator`. Enter the package ID, title, description, creator display name and semantic version, then choose a built-in formula or write a bounded expression. Validate numerical output, install it on your own chart and export/import the exact package before publishing. The publishing wallet is authenticated; the typed creator name is display information. `pulse.*` IDs are reserved for built-ins.
+Open **Create indicator**: `/trading-terminal?terminalSection=creator`. **Start with a working indicator** gives you a usable template before asking for publication details. Use **Inputs & formula** and **Appearance** alongside the actual selected-market preview. **Add & view on chart** installs the study and opens its chart; **Save draft** retains work in this browser. **Publish** is a separate optional step for name, creator display name, description and free/paid terms.
+
+Package IDs and versions are generated; technical identities, raw expressions and circuit details are advanced controls. No processor or circuit address is required for ordinary creation. Import/export belongs under **Move a saved indicator between apps**, not the mandatory creation path. Drafts and the private installed library remain browser-local; shared publications and purchased-version records use service storage. The publishing wallet is authenticated; a typed creator name is display information. `pulse.*` IDs are reserved for built-ins.
+
+### Templates and a worked build
+
+| Template | Formula and series behavior | Usable output |
+|---|---|---|
+| Buyer participation | Buyer volume divided by total executed volume; BPS arithmetic displayed as percent | A valid covered bar with non-zero volume |
+| Volume delta | `buy - sell` for each source bar | A valid covered bar |
+| Cumulative executed delta | Per-bar delta followed by cumulative host state | First full covered source bar of a contiguous segment; gaps restart it |
+| Delta % with EMA 8 | Normalized delta followed by an eight-bar EMA | Eight contiguous valid inputs, seeded by their SMA |
+| Rolling executed delta 20 | Per-bar delta followed by a twenty-bar rolling sum | Twenty contiguous valid source bars |
+
+To build **Rolling executed delta 20**, keep the selected market, choose its template and read the source → formula → rolling → condition → plot pipeline. In Inputs & formula, the period is twenty **source bars**, whose actual duration is printed. The first nineteen full, valid bars have no rolling result. The twentieth sums all twenty deltas; each subsequent result drops the oldest and adds the newest. A clipped short edge does not count as a full bar; ten eligible bars cannot produce a fabricated twenty-bar sum. A gap clears the window and requires twenty new contiguous valid bars. Choose line or histogram in Appearance, inspect the real preview, then Add & view on chart or Save draft. Publishing is optional after that workflow works. **Open saved draft** restores a browser-local draft against the market currently selected, not its old capture.
+
+An optional weighted-flow example uses `2 * buy - sell`; it is deliberately asymmetric and must not be presented as ordinary net volume or a profitable default.
+
+### Portable series recipe
+
+`pulse-indicator-v3` adds an explicit bounded **causal host series** recipe to a compiled per-bar formula. Older v1 kernels and v2 formulas remain readable. Its order is:
+
+`executed source → TAP-02 per-bar numerical kernel → series transforms → optional condition → plot`
+
+- Up to four transforms: EMA, SMA or rolling sum with integer periods from 2 to 200, or cumulative sum.
+- SMA and rolling sum wait for their entire input period. EMA also waits for a full period, seeds with its SMA and then applies `alpha = 2 / (period + 1)`. Chained transforms each require their own valid input warm-up.
+- A captured source edge whose `end - ts` is shorter than the declared interval is partial. It is excluded from every transform, including cumulative sum, rather than counted as a complete warm-up bar. A study without transforms can still expose that bar's raw numerical reading with `partial: true`; it cannot confirm a crossover. The latest resolved output may therefore predate the newest captured point; the preview names its actual time.
+- A source gap or unresolved input clears all rolling/cumulative state and prior condition memory. No interpolation, zero filling, look-ahead or partial-window average is used. The new segment starts and warms up explicitly.
+- Optional conditions are strictly above/below, cross above or cross below a finite threshold. A crossover requires available previous/current outputs and cannot bridge a gap. These conditions describe measurements; they do not silently create Radar watches, Telegram subscriptions or exchange orders.
+- Plots are lines or histograms. Percentage display converts BPS output to percent explicitly, retaining the raw numerical units for portable evaluation.
+
+The host performs series state, conditions and plotting; the NAND circuit performs the actual per-bar calculation. A registered kernel does not mean an entire EMA/rolling/condition pipeline ran on-chain. The exported recipe declares this split so another host can reproduce it. This is a bounded native executed-flow builder, not full Pine/MMT language parity, unrestricted price scripting or a strategy change.
 
 ### Custom formula language
 
-**`pulse-flow-expr-v1`** compiles creator expressions to TAP-02 NAND gates. It supports `buy`, `sell`, integer constants, parentheses, unary `+`/`-`, arithmetic `+ - * /`, and `abs`, `min`, `max`, `clamp`. Output is per bucket or cumulative, with an explicit volume, ratio, basis-points or scalar label. Buy and sell quantities share the host's declared scale.
+**`pulse-flow-expr-v1`** compiles optional advanced expressions to TAP-02 NAND gates. It supports `buy`, `sell`, integer constants, parentheses, unary `+`/`-`, arithmetic `+ - * /`, and `abs`, `min`, `max`, `clamp`. v2 formulas support per-bucket or cumulative output; v3 keeps the kernel per-bar and declares cumulative behavior in its host series recipe. Outputs carry an explicit volume, ratio, basis-points or scalar label. Buy and sell quantities within each evaluation share its declared scale. v3 scales each source bar separately, decodes the kernel result back to source units and then applies the host series recipe.
 
 | Expression | Buy 120, sell 80 | Meaning |
 |---|---:|---|
@@ -53,9 +83,11 @@ The server snapshots terms in an expiring quote and binds payer/payee/asset/amou
 
 ## What Tapeout does
 
-Both kernels carry actual combinational NAND netlists using TAP-02 signal numbering, least-significant-first bit packing and final-signal outputs. The calculations execute through these gates; the circuit is not a decorative approval flag. CVD computes subtraction and signed accumulation. Buyer participation computes multiplication and integer division.
+Numerical kernels carry actual combinational NAND netlists using TAP-02 signal numbering, least-significant-first bit packing and final-signal outputs. The calculations execute through these gates. The v1 CVD kernel computes subtraction and signed accumulation; buyer participation computes multiplication and integer division; creator kernels compute their compiled per-bar expression. The v3 recipe's rolling/EMA state, comparisons and visuals execute explicitly in the host and are not proved by a kernel registration.
 
 Local packages retain an unregistered publication declaration. A catalog listing can separately attach a **verified X Layer registration record** containing its processor, circuit ID, verification block and optional transaction reference. The publisher-only registration endpoint independently checks deployed ports/netlist and numerical vectors through two RPC sources before returning registered status. A creator-provided address alone is not accepted as evidence.
+
+For the trader, this means an inspectable, reusable numerical calculation instead of dependence on a screenshot or vendor-only expression. A compatible application can supply its own inputs and evaluate the same netlist, and a registered per-bar kernel also has a checkable on-chain executable identity. Neither ordinary preview nor installation requires manual circuit fields, transaction signing or deployment. Technical deployment controls remain optional developer tools.
 
 Publishing to PULSE, local preview and X Layer circuit registration are separate steps. Radar's existing circuit does not register an indicator. A verified existing deployment can be attached only when it matches that package. Fabrication itself requires a real transaction and feasible circuit size/gas. The app must not claim success from a browser flag or a quote. Review the listing's actual deployment status; this document does not assert that every built-in or creator formula has been fabricated. Registration does not prove exchange-feed truth or establish hackathon acceptance.
 
@@ -76,10 +108,11 @@ Sources: [TAP-02 netlist semantics](https://github.com/TapeOutProtocol/TAPs/blob
 ## Source coverage and precision
 
 - Inputs come from the exact selected execution source. Spot base-asset quantities and Futures contract quantities remain separate. Missing Futures data never falls back to Spot.
-- CVD resets at the selected source-window start. Uncollected intervals are excluded and explicitly marked partial. Lines break across known bucket gaps; the result is not reconstructed through missing executions.
-- Assessment display buckets are clipped to their genuinely observed source-window edges without adding or removing executed quantities. The input ABI uses uint16 buy/sell quantities and, for CVD, signed int32 prior accumulation. The chart host applies a shared volume scale; its quantum and CVD absolute error bound appear under **Calculation & portability**. Buyer-share rounding can leave tiny-volume buckets unresolved.
+- v3 cumulative studies start at the source segment's beginning and reset after a gap. Legacy CVD starts at the selected source-window start. Uncollected intervals are excluded and explicitly marked partial. Lines break across known bucket gaps; missing executions are not reconstructed.
+- A v3 full-window calculation cannot use a short clipped source bar as a complete observation. The point remains partial/unknown for transforms; the host must preserve its flag, reset and warm-up semantics. Plain per-bar values can be visible with a partial flag but must not confirm crossovers.
+- Assessment display buckets are clipped to genuinely observed source-window edges without adding or removing executions. The numeric ABI uses uint16 buy/sell quantities and signed int32 prior input where required. Legacy kernels/v2 formulas use a shared source-window quantum; v3 uses each bar's maximum buy/sell quantity divided by 65,535 (or quantum 1 for zero volume), rounds those inputs, then decodes quantity output before host transforms. Integer division and input quantization introduce error. The legacy CVD error bound is not a universal bound for custom, smoothed or rolling studies. A legacy shared scale can leave tiny-volume buckets unresolved; division by a zero denominator remains unknown in every version.
 - Sources and packages have bounded sizes, ordered timestamps and finite quantities. Up to 1,024 input buckets and eight installed packages are supported. A malformed or oversized input fails visibly.
-- Imported files cannot execute JavaScript, fetch an external URL, invoke a wallet or change trading conditions. The app verifies built-in netlists and rebuilds admitted formula circuits to check their declared calculation, ports and prerequisites. The independent demonstration host bounds circuit structure but does not endorse a formula or creator.
+- Imported files cannot execute JavaScript, fetch an external URL, invoke a wallet or change trading conditions. The app verifies built-in netlists and rebuilds admitted formula circuits to check their declared calculation, ports and prerequisites. v3 parsing also bounds transforms, periods and condition parameters. The independent host must implement the same causal recipe, gap resets and full-window warm-up; successful per-bar evaluation alone does not verify a full rolling study. It does not endorse a formula or creator.
 - Installed files are browser-local; export them for recovery. The shared catalog stores up to 100 publications, 20 per publishing wallet, Catalog metadata has 365-day retention refreshed by catalog mutations; each package has 365-day retention from its latest publication. Republish an expired package from its original export. Retain exports for durable recovery.
 
 ## Integration

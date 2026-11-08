@@ -22,6 +22,8 @@ export type TerminalFlowDisplayPoint = {
 };
 export type TerminalFlowTool = TerminalToolBase & {
   points:{ts:number;buy:number;sell:number;delta:number;cvd:number}[];
+  /** Authoritative source gaps can occur inside an aggregated display bucket. */
+  missingIntervals?:{start:number;end:number}[];
   /** Adaptive sample-only display; execution-frame observations stay in points. */
   displayPoints?:TerminalFlowDisplayPoint[];displayBucketMs?:number;
   buy?:number;sell?:number;delta?:number;marketType:"spot"|"perpetual";

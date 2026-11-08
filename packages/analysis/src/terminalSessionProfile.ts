@@ -44,7 +44,7 @@ export function terminalToolsFromSession(history:TerminalSessionHistory,timefram
  const covered=terminalCovered(intervals,start,end)&&!history.gaps.length&&history.complete;
  if(history.complete&&end>knownAt||intervals.some(interval=>interval.end>knownAt)||totals&&totals.lastTradeAt>knownAt)throw Error("Retained coverage extends beyond its actual source observation");
  const meta={source:history.source,knownAt,windowStart:start,windowEnd:end,status:covered?"available" as const:totals?"partial" as const:"unavailable" as const,units:history.quantityUnit,reason:covered?undefined:history.backfill.message??"Session collection is incomplete. Gaps remain unknown.",coverage:totals?{requestedStart:start,requestedEnd:end,capturedStart:intervals[0]?.start??start,capturedEnd:intervals.at(-1)?.end??start,firstTradeAt:totals.firstTradeAt,lastTradeAt:totals.lastTradeAt,tradeCount:totals.trades,completeRequestedWindow:covered,completeCapturedInterval:covered,horizon:"selected-session"}:undefined};
- const value:TerminalMarketTools["value"]={...meta,id:"value",label:"Session VWAP & value"},flow:TerminalMarketTools["flow"]={...meta,id:"flow",label:"Session executed flow",marketType:history.marketType,points:[]};
+ const value:TerminalMarketTools["value"]={...meta,id:"value",label:"Session VWAP & value"},flow:TerminalMarketTools["flow"]={...meta,id:"flow",label:"Session executed flow",marketType:history.marketType,points:[],missingIntervals:history.gaps.map(({start,end})=>({start,end}))};
  if(!totals){if(history.rows.length||history.bars.length)throw Error("Retained execution rows require their exact totals");return{value,flow};}
  validateTotals(totals,start,end);validateRows(history.rows,totals,history.priceStep);
  for(const [index,bar]of history.bars.entries()){

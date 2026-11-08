@@ -5,11 +5,11 @@ import { spawn } from 'node:child_process';
 
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 /** Real application + real local API. The caller holds the test key; this module only receives a restricted message signer. */
-export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign, record, expectedExpiry }) {
+export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign, record, expectedExpiry, commerce }) {
   const root = process.cwd(), origin = 'http://127.0.0.1:5288', cdpOrigin = 'http://127.0.0.1:9398';
   const out = path.join(folder, 'browser'); fs.mkdirSync(out, { recursive: true });
   const checks = [], errors = [], screenshots = [], walletCalls = [];
-  let vite, chrome, socket, signCount = 0;
+  let vite, chrome, socket, signCount = 0, typedSignCount = 0;
   const checked = (name, details = {}) => { checks.push({ name, ...details }); record(`browser_${name}`, details); };
   const redact = value => String(value).replace(/0x[\da-f]{100,}/gi, '[redacted-long-hex]').slice(0, 1200);
   try {
@@ -41,7 +41,15 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
       if (message.method === 'Runtime.bindingCalled' && message.params.name === '__pulseTerminalSign') {
         const request = JSON.parse(message.params.payload);
         try {
-          assert.equal(typeof request.message, 'string'); const signature = await sign(request.message); signCount++;
+          let signature;
+          if(request.kind==='typedData'){
+            assert(commerce?.signTypedData,'Payment signing is disabled for this browser run');
+            signature=await commerce.signTypedData(request.data,request.quote);typedSignCount++;
+          }else if(request.kind==='delist'){
+            assert(commerce?.delist);assert.equal(request.listingId,commerce.listingId);await commerce.delist();signature='delisted';
+          }else{
+            assert.equal(typeof request.message, 'string');signature=await sign(request.message);signCount++;
+          }
           await call('Runtime.evaluate', { expression: `window.__pulseTerminalSignReply(${JSON.stringify(request.id)},${JSON.stringify(signature)},null)` });
         } catch (error) { await call('Runtime.evaluate', { expression: `window.__pulseTerminalSignReply(${JSON.stringify(request.id)},null,${JSON.stringify(redact(error.message))})` }); }
       }
@@ -54,17 +62,19 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
     };
     const button = async (text, scope = 'document') => {
       const id = 'qa-' + Date.now() + '-' + Math.random().toString(36).slice(2);
-      assert.ok(await ev(`(()=>{const e=[...(${scope}).querySelectorAll('button')].find(e=>(e.textContent.trim()===${JSON.stringify(text)}||e.textContent.trim().startsWith(${JSON.stringify(text + ' · ')}))&&e.getBoundingClientRect().width);if(!e)return false;e.id=${JSON.stringify(id)};return true;})()`), 'Missing visible button: ' + text);
-      await click('#' + id);
+      assert.ok(await ev(`(()=>{const e=[...(${scope}).querySelectorAll('button')].find(e=>(e.textContent.trim()===${JSON.stringify(text)}||e.textContent.trim().startsWith(${JSON.stringify(text + ' · ')}))&&e.getBoundingClientRect().width);if(!e)return false;e.dataset.qaAction=${JSON.stringify(id)};return true;})()`), 'Missing visible button: ' + text);
+      await click('[data-qa-action="' + id + '"]');
     };
     const field = async (label, value, scope = 'document') => {
       await ev(`(()=>{const scope=${scope},label=[...scope.querySelectorAll('label')].find(l=>l.textContent.trim().startsWith(${JSON.stringify(label)}));let e=label?.querySelector('input,select,textarea');if(!e&&label?.htmlFor)e=document.getElementById(label.htmlFor);if(!e)throw Error('Missing field '+${JSON.stringify(label)});const proto=e.tagName==='SELECT'?HTMLSelectElement.prototype:e.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(e,${JSON.stringify(String(value))});e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));})()`); await pause(80);
     };
-    const shot = async (name, selector) => { await ev('document.fonts.ready'); await ev(selector ? `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'start'})` : 'scrollTo(0,0)'); await pause(150); const result = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }); const filename = name + '.png'; fs.writeFileSync(path.join(out, filename), Buffer.from(result.data, 'base64')); screenshots.push(filename); };
+    const shot = async (name, selector, fullElement=false) => { await ev('document.fonts.ready'); await ev(selector ? `document.querySelector(${JSON.stringify(selector)}).scrollIntoView({block:'start'})` : 'scrollTo(0,0)'); await pause(150); if(fullElement)await ev("(()=>{const style=document.createElement('style');style.id='qa-capture-header';style.textContent='header{visibility:hidden!important}';document.head.append(style);window.__qaCaptureOverlays=[...document.querySelectorAll('body *')].filter(element=>['fixed','sticky'].includes(getComputedStyle(element).position)&&!element.closest('.global-chart-stage')).map(element=>[element,element.style.visibility]);for(const [element] of window.__qaCaptureOverlays)element.style.visibility='hidden';})()");const clip=fullElement?await ev(`(()=>{const r=document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();return{x:r.left+scrollX,y:r.top+scrollY,width:r.width,height:r.height,scale:1};})()`):undefined;const result = await call('Page.captureScreenshot', { format: 'png', captureBeyondViewport: fullElement,...(clip?{clip}:{}) }); const filename = name + '.png'; fs.writeFileSync(path.join(out, filename), Buffer.from(result.data, 'base64')); screenshots.push(filename);if(fullElement)await ev("(()=>{document.getElementById('qa-capture-header')?.remove();for(const [element,visibility] of window.__qaCaptureOverlays??[])element.style.visibility=visibility;delete window.__qaCaptureOverlays;})()"); };
     await call('Page.enable'); await call('Runtime.enable'); await call('Runtime.addBinding', { name: '__pulseTerminalSign' });
     await call('Page.addScriptToEvaluateOnNewDocument', { source: `(()=>{
       const owner=${JSON.stringify(owner)},pending=new Map(),listeners=new Map();let serial=0;
       window.__pulseTerminalWalletCalls=[];
+      const realFetch=window.fetch.bind(window);window.fetch=async(...args)=>{const response=await realFetch(...args);const url=String(args[0]?.url??args[0]);if(response.ok&&url.includes('/indicators/')&&url.endsWith('/quote')){try{window.__pulseLastIndicatorQuote=(await response.clone().json()).quote;}catch{}}return response;};
+      window.__pulseAcceptanceAction=(kind,extra={})=>{const id=++serial;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});window.__pulseTerminalSign(JSON.stringify({id,kind,...extra}));});};
       window.__pulseTerminalSignReply=(id,result,error)=>{const p=pending.get(id);pending.delete(id);error?p?.reject(Error(error)):p?.resolve(result);};
       const provider={isMetaMask:true,chainId:'0x2105',selectedAddress:owner,on:(name,fn)=>{listeners.set(name,[...(listeners.get(name)||[]),fn]);},removeListener:(name,fn)=>{listeners.set(name,(listeners.get(name)||[]).filter(f=>f!==fn));},request:async({method,params=[]})=>{
         window.__pulseTerminalWalletCalls.push(method);
@@ -73,6 +83,7 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
         if(method==='wallet_getCapabilities')return {};
         if(method==='wallet_switchEthereumChain'){if(params[0]?.chainId!=='0x2105')throw Error('Only Base is enabled in this test');return null;}
         if(method==='personal_sign'){if(String(params[1]).toLowerCase()!==owner.toLowerCase())throw Error('Owner mismatch');let message=String(params[0]);if(/^0x[0-9a-f]+$/i.test(message))message=new TextDecoder().decode(Uint8Array.from(message.slice(2).match(/../g),v=>parseInt(v,16)));const id=++serial;return new Promise((resolve,reject)=>{pending.set(id,{resolve,reject});window.__pulseTerminalSign(JSON.stringify({id,message}));});}
+        if(method==='eth_signTypedData_v4'){if(String(params[0]).toLowerCase()!==owner.toLowerCase())throw Error('Payment owner mismatch');return window.__pulseAcceptanceAction('typedData',{data:JSON.parse(params[1]),quote:window.__pulseLastIndicatorQuote});}
         throw Error('Acceptance wallet forbids '+method);
       }};Object.defineProperty(window,'ethereum',{value:provider});
       window.addEventListener('eip6963:requestProvider',()=>window.dispatchEvent(new CustomEvent('eip6963:announceProvider',{detail:{info:{uuid:'pulse-terminal-acceptance',name:'Test EOA',icon:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg"/>',rdns:'tech.ai-pulse.qa'},provider}})));
@@ -99,6 +110,16 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
     checked('paid_access_countdown_matches_original_grant_and_ticks', { timerStart, timerLater, expiry: expectedExpiry });
     {
       assert.equal(await ev('document.querySelectorAll(".terminal-workspace-nav button").length'),7);checked('seven_dedicated_terminal_sidebar_destinations');
+      const destinations=[['market','.terminal-chart'],['tools','.terminal-retained-tools'],['radar','.terminal-radar'],['creator','[data-indicator-builder]'],['indicators','[data-indicator-market]'],['positions','.terminal-position-list,.terminal-empty'],['activity','.terminal-activity-guide']];
+      const selectedMarket=await ev('document.querySelector(".terminal-market-clock strong").textContent');
+      for(let index=0;index<destinations.length;index++){
+        const [destination,selector]=destinations[index];await click(`.terminal-workspace-nav button:nth-of-type(${index+1})`);
+        await until(`[...document.querySelectorAll(${JSON.stringify(selector)})].some(e=>e.getBoundingClientRect().width>0&&e.getBoundingClientRect().height>0)`,`The ${destination} destination did not open`);
+        assert.equal(await ev('new URL(location.href).searchParams.get("terminalSection")'),destination);
+        assert.equal(await ev('document.querySelector(".terminal-workspace-nav [aria-current=page]").textContent.includes('+JSON.stringify(index===5?'My open positions':index===6?'Alerts & activity':index===0?'Trading Terminal':index===1?'Market tools':index===2?'Market Radar':index===3?'Create indicator':'Indicator Market')+')'),true);
+        assert.equal(await ev('document.querySelector(".terminal-market-clock strong").textContent'),selectedMarket);
+        checked('sidebar_destination_opens_and_preserves_market',{destination});
+      }
       await click('.terminal-workspace-nav button:nth-of-type(5)');
       await until('document.querySelector("[data-indicator-market]")', 'Indicator Market missing in actual app', 500);
       await until('document.querySelector("[data-installed-indicator] svg")', 'Live CVD calculation did not render',500);
@@ -114,26 +135,122 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
       await click('.terminal-ai-drawer button[aria-label="Close Ask PULSE"]');
       checked('indicator_ask_button_prefills_context_and_exposes_model');
       await click('.terminal-workspace-nav button:nth-of-type(4)');
-      await until('document.querySelector(".indicator-creator")','Dedicated creator is missing');
-      await field('Package ID','qa.browser-weighted-flow');await field('Display title','Browser weighted flow');await field('Creator name','PULSE QA');await field('Description','A custom weighted execution formula created through the real browser.');await field('Formula','formula-v1');await field('Expression','buy*2-sell');await field('Accumulation','bar');
-      await button('Validate & compile indicator');
-      await until('document.querySelector(".indicator-creator output")?.textContent.includes("160")','Formula numerical preview did not produce weighted 120*2-80=160');
-      await button('Add my package');checked('creator_custom_formula_preview_160_and_install');
-      await click('.terminal-workspace-nav button:nth-of-type(1)');
-      await until('document.querySelector(".terminal-chart canvas")','Shared chart missing after install');
-      assert(await ev('document.querySelector(".terminal-chart").textContent.includes("Browser weighted flow")'));checked('custom_indicator_applied_to_actual_price_chart_pane');
+      await until('document.querySelector("[data-indicator-builder]")?.getBoundingClientRect().height','Dedicated in-app builder is missing');
+      await click('[data-indicator-template="weighted-flow"]');
+      await field('Indicator name','Browser weighted flow','document.querySelector("[data-indicator-builder]")');
+      await until('Number(document.querySelector("[data-builder-plotted-points]")?.dataset.builderPlottedPoints)>0','Builder real market preview has no numerical series',600);
+      assert.equal(await ev('document.querySelector("[data-indicator-builder]").textContent.includes("Package ID")'),false);
+      await button('Save draft','document.querySelector("[data-indicator-builder]")');
+      for(const width of [1440,390]){
+        await call('Emulation.setDeviceMetricsOverride',{width,height:width===390?844:1050,deviceScaleFactor:1,mobile:width===390});
+        assert.equal(await ev('document.documentElement.scrollWidth>innerWidth+1'),false);
+        await shot('native-creator-preview-'+width,'[data-indicator-builder]');
+      }
+      await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+      checked('native_builder_template_real_source_preview_and_private_draft');
+      await button('Add & view on chart','document.querySelector("[data-indicator-builder]")');
+      let customManifest=await ev('JSON.parse(localStorage.getItem("pulse-indicators-v1")).find(item=>item.title==="Browser weighted flow")');
+      assert.equal(customManifest.format,'pulse-indicator-v3');assert(customManifest.id.startsWith('trader.'));
+      await until(`Number(document.querySelector('[data-chart-indicator="${customManifest.id}@${customManifest.version}"]')?.dataset.plottedPoints)>0`,'Actual chart series has no plotted custom values');
+      const plotted=await ev(`({...document.querySelector('[data-chart-indicator="${customManifest.id}@${customManifest.version}"]').dataset})`);
+      assert.equal(plotted.plottedUnits,'BTC');assert(Number(plotted.plottedTo)>=Number(plotted.plottedFrom));
+      checked('created_indicator_has_nonempty_native_chart_series_and_auto_identity',{manifestId:customManifest.id,plottedPoints:Number(plotted.plottedPoints),units:plotted.plottedUnits});
+      await click('.terminal-workspace-nav button:nth-of-type(4)');
+      await button('Publish','document.querySelector(".indicator-builder-tabs")');
+      await button('Publish indicator','document.querySelector("[data-indicator-builder]")');
+      await until('document.querySelector("[data-indicator-market]").textContent.includes("Published. Other Terminal users")','Publishing the created native study failed');
       await click('.terminal-workspace-nav button:nth-of-type(5)');
+      await until(`[...document.querySelectorAll('[data-indicator-listing]')].some(e=>e.querySelector('h4')?.textContent==='Browser weighted flow')`,'Published custom indicator is not discoverable');
+      const ownListing=await ev(`(()=>{const e=[...document.querySelectorAll('[data-indicator-listing]')].find(e=>e.querySelector('h4')?.textContent==='Browser weighted flow');return e.dataset.indicatorListing;})()`);
+      await button('Unpublish',`document.querySelector('[data-indicator-listing="${ownListing}"]')`);
+      await until(`!document.querySelector('[data-indicator-listing="${ownListing}"]')`,'Unpublish did not finish removing the exact listing',500);
+      checked('native_builder_publish_discover_and_unpublish_exact_version',{manifestId:customManifest.id});
+      await click('.terminal-workspace-nav button:nth-of-type(4)');
+      await button('Publish','document.querySelector(".indicator-builder-tabs")');
+      await field('Installation','paid','document.querySelector("[data-indicator-builder]")');
+      await field('Creator price',0.002,'document.querySelector("[data-indicator-builder]")');
+      await button('Add & view on chart','document.querySelector("[data-indicator-builder]")');
+      const revisedManifest=await ev('JSON.parse(localStorage.getItem("pulse-indicators-v1")).find(item=>item.title==="Browser weighted flow")');
+      assert.equal(revisedManifest.id,customManifest.id);assert.equal(revisedManifest.version,'1.0.1');
+      customManifest=revisedManifest;
+      checked('edited_commercial_terms_advance_automatic_version_without_a_publication_or_payment');
+      await click('.terminal-workspace-nav button:nth-of-type(4)');
+      await click('[data-indicator-template="participation"]');
+      await field('Indicator name','Browser buyer share','document.querySelector("[data-indicator-builder]")');
+      await field('Threshold',60,'document.querySelector("[data-indicator-builder]")');
+      await button('Save draft','document.querySelector("[data-indicator-builder]")');
+      await field('Indicator name','Unsaved temporary edit','document.querySelector("[data-indicator-builder]")');
+      await button('Open saved draft','document.querySelector("[data-indicator-builder]")');
+      assert.equal(await ev('document.querySelector("[data-indicator-builder] input").value'),'Browser buyer share');
+      await until('[...document.querySelectorAll("[data-indicator-builder] button")].some(button=>button.textContent.trim()==="Add & view on chart"&&!button.disabled)','The restored draft is not ready to add');
+      await button('Add & view on chart','document.querySelector("[data-indicator-builder]")');
+      const participationManifest=await ev('JSON.parse(localStorage.getItem("pulse-indicators-v1")).find(item=>item.title==="Browser buyer share")');
+      await until(`document.querySelector('[data-chart-indicator="${participationManifest.id}@${participationManifest.version}"]')?.dataset.condition==='Above 60 %'`,'Edited condition was not carried to the real chart');
+      assert.equal(await ev(`document.querySelector('[data-chart-indicator="${participationManifest.id}@${participationManifest.version}"]').dataset.plottedUnits`),'%');
+      await until('[...document.querySelectorAll(".terminal-chart [data-chart-pane=indicator]")].length===4&&[...document.querySelectorAll(".terminal-chart [data-chart-pane=indicator]")].every(pane=>Number(pane.dataset.paneHeight)>=100)','Native indicator panes were compressed below a readable height');await pause(300);await button('Inspect execution window on chart','document.querySelector(".terminal-chart")');await pause(400);await shot('native-chart-created-condition-1440','.terminal-chart .global-chart-stage',true);
+      await until('Number(document.querySelector(".terminal-chart [data-execution-price-points]")?.dataset.executionPricePoints)>0','Captured Spot price context is missing at execution zoom');checked('private_draft_restore_and_custom_percentage_condition_on_native_chart');
+      for(const frame of ['1D','1W']){
+        await button(frame,'document.querySelector(".terminal-frames")');
+        await until('document.querySelector(".terminal-market-clock strong")?.textContent.endsWith('+JSON.stringify(frame)+')','Timeframe did not switch',800);
+        await until('document.querySelector(".terminal-chart [data-visible-time-from]")','Native viewport metadata missing');
+        await button('Reset view','document.querySelector(".terminal-chart")');await pause(250);
+        const reset=await ev('({...document.querySelector(".terminal-chart [data-visible-time-from]").dataset})');
+        assert(Number(reset.visibleTimeTo)>Number(reset.visibleTimeFrom));
+        assert(Number(reset.visibleTimeTo)-Number(reset.visibleTimeFrom)>86400,'Reset collapsed the primary chart into minute indices');
+        await button('Inspect execution window on chart','document.querySelector(".terminal-chart")');await pause(250);
+        const inspect=await ev('({...document.querySelector(".terminal-chart [data-visible-time-from]").dataset})');
+        assert(Number(inspect.visibleTimeTo)>Number(inspect.visibleTimeFrom));
+        assert(Number(inspect.visibleTimeTo)-Number(inspect.visibleTimeFrom)<Number(reset.visibleTimeTo)-Number(reset.visibleTimeFrom),'Inspect must focus the actual execution timestamps');
+        await shot('native-chart-'+frame+'-execution-window','.terminal-chart');
+        checked('daily_weekly_reset_and_actual_execution_time_inspection',{frame,resetFrom:Number(reset.visibleTimeFrom),resetTo:Number(reset.visibleTimeTo),inspectFrom:Number(inspect.visibleTimeFrom),inspectTo:Number(inspect.visibleTimeTo)});
+      }
+      await click('.terminal-workspace-nav button:nth-of-type(5)');
+      await field('Indicator inputs','perpetual','document.querySelector("[data-indicator-market]")');
+      await button('View chart with indicators','document.querySelector("[data-indicator-market]")');
+      await until(`document.querySelector('[data-chart-indicator="${customManifest.id}@${customManifest.version}"]')?.dataset.plottedUnits==='contracts'`,'Spot to Futures kept the BTC price formatter');
+      checked('same_installed_indicator_switches_native_chart_formatter_to_contracts');
+      await click('.terminal-workspace-nav button:nth-of-type(5)');
+      await field('Indicator inputs','spot','document.querySelector("[data-indicator-market]")');
       for(const theme of ['base','xlayer'])for(const width of [1440,390]){
         await call('Emulation.setDeviceMetricsOverride',{width,height:width===390?844:1050,deviceScaleFactor:1,mobile:width===390});
         await ev(`document.documentElement.dataset.pulseTheme=${JSON.stringify(theme)}`);await pause(250);
         const overflow=await ev('document.documentElement.scrollWidth>innerWidth+1');assert.equal(overflow,false);
         await shot('indicator-'+theme+'-'+width,'[data-indicator-market]');checked('live_indicator_layout',{theme,width});
       }
+      if(commerce){
+        await call('Emulation.setDeviceMetricsOverride',{width:1440,height:1050,deviceScaleFactor:1,mobile:false});
+        await click('.terminal-workspace-nav button:nth-of-type(5)');
+        const listingSelector=`[data-indicator-listing="${commerce.listingId}"]`;
+        await until(`document.querySelector(${JSON.stringify(listingSelector)})`,'The paid QA creator listing is missing');
+        if(!commerce.alreadyPurchased){
+          await button('Review 0.001 USDC on Base',`document.querySelector(${JSON.stringify(listingSelector)})`);
+          await until('document.querySelector(".indicator-purchase-review")','Creator purchase review did not open');
+          assert(await ev('document.querySelector(".indicator-purchase-review").textContent.includes('+JSON.stringify(commerce.recipient.toLowerCase())+')'));
+          await shot('creator-checkout-review-1440','.indicator-purchase-review');
+          await button('Approve 0.001 USDC on Base','document.querySelector(".indicator-purchase-review")');
+          await until(`document.querySelector('[data-installed-indicator="${commerce.manifestId}"]')`,'Paid browser checkout did not install the purchased indicator',1200);
+          assert.equal(typedSignCount,1);checked('funded_creator_checkout_from_browser_review_to_installed_indicator',{listingId:commerce.listingId,typedSignatures:typedSignCount});
+        }else{
+          await button('Restore to chart',`[...document.querySelectorAll('.indicator-receipts article')].find(e=>e.textContent.includes(${JSON.stringify(commerce.title)})&&e.textContent.includes(${JSON.stringify(commerce.version)}))`);
+        }
+        await ev(`window.__pulseAcceptanceAction('delist',{listingId:${JSON.stringify(commerce.listingId)}})`);
+        await button('Remove',`document.querySelector('[data-installed-indicator="${commerce.manifestId}"]')`);
+        assert.equal(await ev(`Boolean(document.querySelector('[data-installed-indicator="${commerce.manifestId}"]'))`),false);
+        await button('Restore to chart',`[...document.querySelectorAll('.indicator-receipts article')].find(e=>e.textContent.includes(${JSON.stringify(commerce.title)})&&e.textContent.includes(${JSON.stringify(commerce.version)}))`);
+        await until(`document.querySelector('[data-installed-indicator="${commerce.manifestId}"]')`,'Purchased indicator failed to restore after actual delisting');
+        assert.equal(typedSignCount,commerce.alreadyPurchased?0:1);checked('delisted_paid_indicator_restores_through_browser_without_another_signature');
+        await shot('creator-purchase-restored-1440',`[data-installed-indicator="${commerce.manifestId}"]`);
+      }
+      walletCalls.push(...await ev('window.__pulseTerminalWalletCalls??[]'));
+      const {runIndicatorPortabilityBrowser}=await import('./audit-indicator-portability-browser.mjs');
+      await runIndicatorPortabilityBrowser({call,ev,until,field,button,click,checked,shot,origin,manifestId:customManifest.id});
       await call('Page.navigate',{url:origin+'/docs#docs-indicator-market'});
       await until('document.getElementById("docs-indicator-market")','Dedicated indicator guide anchor is missing');
       assert(await ev('document.getElementById("docs-indicator-market").textContent.includes("Add to chart")'));
       await shot('indicator-guide-390','#docs-indicator-market');
       await ev('location.hash="docs-create-indicator"');await until('document.getElementById("docs-create-indicator")','Creator guide anchor is missing');
+      await ev('[...document.querySelectorAll("#docs-create-indicator img[src*=live-example]")].forEach(image=>image.loading="eager")');
+      await until('[...document.querySelectorAll("#docs-create-indicator img[src*=live-example]")].length===2&&[...document.querySelectorAll("#docs-create-indicator img[src*=live-example]")].every(image=>image.complete&&image.naturalWidth>0)','The actual builder and chart screenshots did not load');
       await shot('creator-guide-390','#docs-create-indicator');checked('illustrated_indicator_and_creator_docs_direct_links');
       await call('Page.navigate',{url:origin+'/landing'});
       await until('document.getElementById("indicator-market")','Dedicated public landing indicator section is missing');
@@ -142,9 +259,10 @@ export async function runTerminalBrowser({ apiOrigin, owner, payee, folder, sign
       assert.equal(await ev('document.documentElement.scrollWidth>innerWidth+1'),false);
       await shot('indicator-landing-390','#indicator-market');checked('public_landing_indicator_market_and_direct_terminal_link');
       walletCalls.push(...await ev('window.__pulseTerminalWalletCalls??[]'));
-      assert.equal(walletCalls.some(method=>/eth_send|eth_signTypedData|wallet_send/.test(method)),false);
+      assert.equal(walletCalls.some(method=>/eth_send|wallet_send/.test(method)),false);
+      assert.equal(walletCalls.filter(method=>method==='eth_signTypedData_v4').length,typedSignCount);
       assert.equal(errors.length,0,errors.join('\n'));
-      const result={at:new Date().toISOString(),scope:'Actual PULSE app, real Base-paid pass and restricted TEST_WALLET_ADDRESS sign-in; live market source, Indicator catalog/install, AI context, desktop/mobile in two themes; no payment signing, orders, journal mutations or Telegram sends',checks,screenshots,errors,walletCalls};
+      const result={at:new Date().toISOString(),scope:commerce?'Actual PULSE browser, real Base-paid pass and one guarded 0.001 USDC creator checkout when not already purchased; no exchange orders or Telegram sends':'Actual PULSE app and real Base-paid pass; payment signing disabled',checks,screenshots,errors,walletCalls,typedSignCount};
       fs.writeFileSync(path.join(out,'indicator-browser-validation.json'),JSON.stringify(result,null,2));return result;
     }
   } catch (error) {

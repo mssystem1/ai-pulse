@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type {TerminalSessionHistory,TerminalHistoryTotals,TerminalHistoryRow} from "@pulse/domain";
+import {createStudyIndicatorPackage,evaluateIndicator,type TerminalSessionHistory,type TerminalHistoryTotals,type TerminalHistoryRow} from "@pulse/domain";
 import {terminalSessionWindow,terminalCovered,terminalToolsFromSession} from "./terminalSessionProfile.js";
 
 const start=Date.UTC(2026,10,1),minute=60000;
@@ -32,6 +32,11 @@ test("70% value area expands from POC through real bins, conserving volume acros
 test("explicit source gaps preserve measured flow but exclude affected footprints and complete evidence",()=>{
  const history=session([{price:100.1,size:1,side:"buy"},{price:100.9,size:3,side:"sell"}]);history.gaps=[{start:start+minute,end:start+2*minute,reason:"Missing source interval"}];
  const {value,flow}=terminalToolsFromSession(history,"15m");assert.equal(value.status,"partial");assert.equal(value.orderFlow,undefined);assert.equal(value.sessionFootprints!.length,0);assert.equal(flow.sell,3);assert.equal(value.coverage!.completeRequestedWindow,false);
+ assert.deepEqual(flow.missingIntervals,[{start:start+minute,end:start+2*minute}]);
+ const manifest=createStudyIndicatorPackage({id:"test.coverage-gap",title:"Covered execution sum",description:"Cumulative volume with authoritative source coverage gaps.",author:"Test",expression:"buy-sell",output:{label:"Cumulative delta",unit:"volume",accumulation:"bar"},study:{transforms:[{kind:"cumulative"}],plot:"line",gapPolicy:"reset",warmup:"full-window"}});
+ const result=evaluateIndicator(manifest,{instId:history.instId,timeframe:"15m",source:flow.source,status:flow.status,knownAt:flow.knownAt,windowStart:history.requestedStart,windowEnd:history.requestedEnd,now:flow.knownAt,units:"base",intervalMs:flow.displayBucketMs,points:flow.displayPoints!,missingIntervals:flow.missingIntervals});
+ assert.equal(result.points[0].value,undefined,"a five-minute aggregate cannot conceal its missing interior minute");
+ assert.equal(result.points[0].reset,true);
 });
 
 test("an empty uncollected session remains unavailable rather than throwing on its zero source clock",()=>{
@@ -40,6 +45,7 @@ test("an empty uncollected session remains unavailable rather than throwing on i
  const {value,flow}=terminalToolsFromSession(history,"15m");
  assert.equal(value.status,"unavailable");assert.equal(value.knownAt,0);assert.equal(value.reason,"Collection queued");
  assert.equal(value.sessionProfile,undefined);assert.equal(flow.status,"unavailable");assert.deepEqual(flow.points,[]);
+ assert.deepEqual(flow.missingIntervals,[{start:history.requestedStart,end:history.requestedEnd}]);
 });
 
 test("an incomplete session keeps measured executions when the requested end advances beyond collection",()=>{

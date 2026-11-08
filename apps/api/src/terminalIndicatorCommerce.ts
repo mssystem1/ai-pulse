@@ -148,7 +148,12 @@ export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: In
         const previous = value.indicatorClaims?.[paymentId];
         if (previous && previous !== purchase.id) throw Error("Payment authorization belongs to another indicator purchase");
         value.indicatorClaims = { ...(value.indicatorClaims ?? {}), [paymentId]: purchase.id };
-      }); } catch { return res.status(409).json({ error: "This authorization has already been used; no new payment is requested", doNotPayAgain: true }); }
+      }); } catch {
+        // No settlement adapter has been called. A failed global reservation
+        // must not strand an unpaid quote in an unrecoverable processing state.
+        await commerce.mutate(owner,value=>{const current=value.indicatorPurchases?.find(p=>p.id===purchase.id);if(!current||current.state!=="authorizing"||current.paymentId!==paymentId)return false;current.state="quoted";delete current.paymentId;delete current.nonce;delete current.preparedBlock;});
+        return res.status(409).json({ error: "Payment preparation was not completed. No payment was submitted; retry this quote after the service recovers.", code:"indicator_payment_not_settled",doNotPayAgain:false });
+      }
     }
     const originalJson = res.json.bind(res);
     res.json = ((body: unknown) => {

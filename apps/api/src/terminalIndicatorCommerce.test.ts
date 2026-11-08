@@ -1,22 +1,23 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import express from "express";
 import { getNetwork, loadConfig } from "@pulse/config";
-import { createIndicatorPackage } from "@pulse/domain";
+import { createIndicatorPackage, exportIndicatorPackage } from "@pulse/domain";
 import { createTerminalIndicatorRoutes } from "./terminalIndicatorRoutes.js";
 import { TerminalStore, MemoryTerminalStorage, grantTerminalPass } from "./terminalStore.js";
-import { indicatorAtomic, indicatorOffer, indicatorPaymentNetworks } from "./terminalIndicatorCommerce.js";
+import { indicatorAtomic, indicatorOffer, indicatorPaymentNetworks, indicatorCommerceStores } from "./terminalIndicatorCommerce.js";
+import type { verifyTerminalPurchaseReceipt } from "./terminalPayments.js";
 import type { IndicatorPaymentNetwork } from "./terminalIndicatorTypes.js";
 
 const seller = "0x" + "11".repeat(20), buyer = "0x" + "22".repeat(20), stranger = "0x" + "33".repeat(20);
-async function fixture(networks: IndicatorPaymentNetwork[] = ["base"]) {
+async function fixture(networks: IndicatorPaymentNetwork[] = ["base"], verifyReceipt?: typeof verifyTerminalPurchaseReceipt) {
   let now = Date.now(), settlements = 0;
   const cfg = { ...loadConfig(), NODE_ENV: "test" as const, X402_MOCK: true, FEATURE_TRADING_TERMINAL: true, FEATURE_BASE_PAYMENTS: true, FEATURE_ARBITRUM_PAYMENTS: true, enabledNetworks: networks };
   const store = new TerminalStore(new MemoryTerminalStorage(), randomUUID(), 180);
   for (const owner of [seller, buyer, stranger]) await store.mutate(owner, value => { grantTerminalPass(value, { requestId: randomUUID(), duration: "24h", priceUsd: "1.5", amountAtomic: "1500000", network: "base", asset: "USDC", paymentId: randomUUID(), purchasedAt: new Date(now).toISOString(), simulated: true }); });
   const app = express(); app.use(express.json({ limit: "1mb" })); app.use((req, res, next) => { res.locals.terminalOwner = req.get("x-owner") ?? buyer; (req as any).pulseNetworkKey = req.get("x-network") ?? "base"; next(); });
-  app.use(createTerminalIndicatorRoutes({ store, cfg, now: () => now }, { paymentGate: dynamic => (req, res, next) => {
+  app.use(createTerminalIndicatorRoutes({ store, cfg, now: () => now }, { verifyReceipt, paymentGate: dynamic => (req, res, next) => {
     const path = req.path, route = dynamic.routes[`POST ${path}`];
     assert.equal(dynamic.PAY_TO_ADDRESS, seller); assert.equal(route.priceUsd, .123456);
     if (!req.get("PAYMENT-SIGNATURE")) return res.status(402).json({ amount: "123456", payTo: seller });
@@ -132,4 +133,90 @@ test("creator version price is immutable and unrelated wallets cannot attach a d
     assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.2" } }, seller)).status, 409);
     assert.equal((await f.request(`/${f.item.id}/registration`, "POST", { processor: seller, circuitId: "1" }, buyer)).status, 403);
   } finally { await f.close(); }
+});
+
+test("delisting keeps immutable version terms and permits only identical relisting for a pending quote", async () => {
+  const f = await fixture();
+  try {
+    const q = await f.quote();
+    assert.equal((await f.request(`/${f.item.id}`, "DELETE", undefined, seller)).status, 200);
+    const changedFormula = await f.request("", "POST", { manifest: { ...f.manifest, title: "Changed same-version formula package" }, offer: { priceUsdc: "0.123456" } }, seller);
+    assert.equal(changedFormula.status, 409);
+    assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.2" } }, seller)).status, 409);
+    const relisted = await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.123456" } }, seller);
+    assert.equal(relisted.status, 201);
+    assert.equal((await relisted.json()).item.id, f.item.id);
+    // The original immutable quote still names the same bytes, terms and ID.
+    assert.equal((await f.request(`/purchases/${q.id}`, "POST", { requestId: q.requestId }, buyer, "proof")).status, 201);
+    assert.equal(f.settlements(), 1);
+    assert.equal((await f.request(`/${f.item.id}`, "DELETE", undefined, seller)).status, 200);
+    assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.123456" } }, seller)).status, 201);
+    const restored = await (await f.request(`/${f.item.id}`)).json();
+    assert.equal(restored.item.sha256, q.sha256);
+    assert.deepEqual(restored.manifest, f.manifest);
+  } finally { await f.close(); }
+});
+
+test("legacy delisting migrates version identity before removing its last catalog entry", async () => {
+  const f = await fixture();
+  try {
+    const versions = new TerminalStore(f.store.storage, f.store.key("indicator-version-registry", "v1"), 3650);
+    await f.store.storage.take(versions.key("owner", seller)); // Emulate a pre-ledger publication with no sales.
+    assert.equal((await f.request(`/${f.item.id}`, "DELETE", undefined, seller)).status, 200);
+    assert.equal((await f.request("", "POST", { manifest: { ...f.manifest, title: "Rewritten legacy version" }, offer: { priceUsdc: "0.123456" } }, seller)).status, 409);
+    assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.123456" } }, seller)).status, 201);
+  } finally { await f.close(); }
+});
+
+test("a purchased receipt restores its exact bytes even if a legacy catalog version was replaced", async () => {
+  const f = await fixture();
+  try {
+    const q = await f.quote();
+    assert.equal((await f.request(`/purchases/${q.id}`, "POST", { requestId: q.requestId }, buyer, "proof")).status, 201);
+    const registry = new TerminalStore(f.store.storage, f.store.key("indicator-registry", "v1"), 365);
+    const changed = { ...f.manifest, title: "Different legacy catalog bytes" }, bytes = exportIndicatorPackage(changed), sha256 = createHash("sha256").update(bytes).digest("hex");
+    await registry.storage.write(registry.key("package", sha256), { bytes }, 3650 * 86400);
+    await registry.mutate("0x" + "0".repeat(40), value => {
+      const item = value.indicatorPublications!.find(p => p.id === f.item.id)!;
+      item.sha256 = sha256; item.packageRef = sha256; item.title = changed.title;
+    });
+    const restored = await (await f.request(`/${f.item.id}`)).json();
+    assert.deepEqual(restored.manifest, f.manifest);
+    assert.equal(restored.item.sha256, q.sha256);
+    assert.equal(restored.item.entitled, true);
+    for (const privateKey of ["packageRef", "nonce", "paymentId", "preparedBlock", "requestId", "owner"]) assert.equal(privateKey in restored.item, false);
+  } finally { await f.close(); }
+});
+
+test("publishing identical public bytes cannot shorten a purchased package's recovery retention", async () => {
+  const f = await fixture();
+  try {
+    const packageTtls: number[] = [], write = f.store.storage.write.bind(f.store.storage);
+    f.store.storage.write = async (key, value, ttl) => { if (key.includes(":terminal:package:")) packageTtls.push(ttl); await write(key, value, ttl); };
+    const q = await f.quote();
+    assert.equal((await f.request(`/purchases/${q.id}`, "POST", { requestId: q.requestId }, buyer, "proof")).status, 201);
+    assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.123456" } }, stranger)).status, 201);
+    assert(packageTtls.length >= 2);
+    assert(packageTtls.every(ttl => ttl >= 3650 * 86400));
+  } finally { await f.close(); }
+});
+
+test("failed reservation before the settlement adapter leaves an unpaid quote retryable",async()=>{
+ const f=await fixture();try{
+  const q=await f.quote(),compare=f.store.storage.compareAndSet.bind(f.store.storage);let fail=true;
+  f.store.storage.compareAndSet=async(key,revision,value,ttl,index)=>{if(fail&&key.includes("indicator-registry")&&Object.keys(value.indicatorClaims??{}).length){fail=false;throw Error("Injected reservation outage");}return compare(key,revision,value,ttl,index);};
+  const response=await f.request(`/purchases/${q.id}`,"POST",{requestId:q.requestId},buyer,"one-proof");
+  assert.equal(response.status,409);assert.equal((await response.json()).doNotPayAgain,false);assert.equal(f.settlements(),0);
+  assert.equal((await (await f.request("/purchases")).json()).purchases.find((p:any)=>p.id===q.id).state,"quoted");
+  assert.equal((await f.request(`/purchases/${q.id}`,"POST",{requestId:q.requestId},buyer,"one-proof")).status,201);assert.equal(f.settlements(),1);
+ }finally{await f.close();}
+});
+
+test("lost settlement acknowledgement recovers the saved network authorization after pass expiry without charging",async()=>{
+ let verified=false;
+ const f=await fixture(["base","arbitrum"],async(owner,purchase,hash)=>{assert.equal(owner,buyer);assert.equal(purchase.network,"arbitrum");assert.equal(purchase.asset,getNetwork("arbitrum").paymentAsset.address);assert.equal(purchase.amountAtomic,"123456");assert.equal(purchase.nonce,"0x"+"55".repeat(32));assert.equal(purchase.preparedBlock,"100");verified=true;return {settlementTx:hash,settledAt:new Date().toISOString()};});
+ try{const q=await f.quote("arbitrum"),{commerce}=indicatorCommerceStores(f.store);await commerce.mutate(buyer,value=>{const p=value.indicatorPurchases!.find(p=>p.id===q.id)!;p.state="authorizing";p.simulated=false;p.nonce="0x"+"55".repeat(32);p.preparedBlock="100";p.paymentId="original-intent";});f.advance(25*3600000);
+ const recovered=await f.request(`/purchases/${q.id}/recover`,"POST",{transactionHash:"0x"+"66".repeat(32)});assert.equal(recovered.status,200);assert.equal((await recovered.json()).entitled,true);assert(verified);assert.equal(f.settlements(),0);
+ assert.equal((await f.request(`/purchases/${q.id}/recover`,"POST",{})).status,200);assert.equal(f.settlements(),0);
+ }finally{await f.close();}
 });

@@ -114,7 +114,7 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   const [indicatorMarket,setIndicatorMarket]=useState<TerminalMarket|null>(null);
   const [chartIndicators,setChartIndicators]=useState<TerminalChartIndicator[]>([]);
   const updateIndicatorMarket=useCallback((value:TerminalMarket)=>setIndicatorMarket(value),[]);
-  const openChart=useCallback(()=>setView("market"),[]);
+  const openChart=useCallback(()=>{setView("market");const url=new URL(location.href);url.searchParams.set("terminalSection","market");history.replaceState(null,"",url);window.setTimeout(()=>{const chart=document.querySelector(".terminal-chart");chart?.scrollIntoView({block:"start",behavior:"smooth"});(chart?.querySelector(".terminal-chart-indicator-key button") as HTMLButtonElement|null)?.click();},200);},[]);
   const [instId, setInstId] = useState("BTC-USDT"), [marketInput, setMarketInput] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<TerminalTimeframe>("1H");
   const [currentCandle,setCurrentCandle] = useState<GlobalLiveCandle>();
@@ -434,7 +434,7 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
         <details><summary>How event detection works</summary><p>PULSE supplies source measurements. Market Radar uses a versioned Tapeout/X Layer circuit component for the actual event logic and retains private stage history. Source gaps remain unknown; repeated polls do not create later confirmation. Open a Radar in Alerts &amp; activity to inspect its sequence and circuit provenance.</p></details>
       </section>
       {selectedMarket && view==="market" && <details className="terminal-panel"><summary>All source clocks and coverage</summary>{selectedMarket.sources.map(source => <SourceDetail key={source.id} source={source} />)}</details>}
-      <TerminalIndicatorMarket wallet={wallet} networkKey={networkKey} market={indicatorMarket?.instId===instId&&indicatorMarket.timeframe===timeframe?indicatorMarket:selectedMarket} token={token} active={active} onAsk={ask} section={view==="creator"?"creator":view==="indicators"?"indicators":"hidden"} onChartChange={setChartIndicators} onOpenChart={openChart}/>
+      <TerminalIndicatorMarket assessmentMarket={selectedMarket} onOpenCreator={()=>{setView("creator");const url=new URL(location.href);url.searchParams.set("terminalSection","creator");history.replaceState(null,"",url);}} wallet={wallet} networkKey={networkKey} market={indicatorMarket?.instId===instId&&indicatorMarket.timeframe===timeframe?indicatorMarket:selectedMarket} token={token} active={active} onAsk={ask} section={view==="creator"?"creator":view==="indicators"?"indicators":"hidden"} onChartChange={setChartIndicators} onOpenChart={openChart}/>
     </div>
     {view === "positions" && <section className="terminal-panel"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">Actual fills · separate from a setup</span><h2>My positions</h2><p>{positions.filter(position => position.status !== "closed").length} open · {positions.length} total journal records.</p><p>Your actual cost basis and recorded protection. A touched chart level is never a filled trade.</p></div><button type="button" className="terminal-primary" disabled={!active || Boolean(busy)} onClick={() => setRecordOpen(previous => !previous)}>Record position</button></div>
       {recordOpen && <TerminalPositionForm market={instId} serverNow={passTime.now} active={active} busy={Boolean(busy)} onSubmit={recordPosition} onCancel={() => setRecordOpen(false)} />}

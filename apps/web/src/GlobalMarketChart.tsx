@@ -1,15 +1,15 @@
 import {globalChartColor,themeGlobalChartSvg} from "./globalChartTheme";
 import {useGlobalChartAppearance} from "./useGlobalChartAppearance";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createChart, CandlestickSeries, HistogramSeries, LineSeries, ColorType, type UTCTimestamp, type AutoscaleInfo, type Time, type IPriceLine } from "lightweight-charts";
+import { createChart, createSeriesMarkers, CandlestickSeries, HistogramSeries, LineSeries, ColorType, type UTCTimestamp, type AutoscaleInfo, type Time, type IPriceLine } from "lightweight-charts";
 import { parseCandleTimeframe, globalChartAnnotations, globalReportChartSvg, globalFibonacciAnchors, globalTradeCards, globalLabel, globalPrice, globalTimeframeLabel, globalTradePlan, globalSetupMap, globalSetupWindow, type GlobalReport, type GlobalChartLayers } from "@pulse/domain";
 import {globalOrderFlowLines,globalOrderFlowStudy,globalOrderFlowCoverageLabel} from "@pulse/domain";
 import {GlobalExportButton} from "./GlobalExportButton";
 import type {ReportExportAccess} from "./reportDownload";
 import {globalLiveCandle,type GlobalLiveCandle} from "./globalLiveCandle";
-import { terminalIndicatorSeries, type TerminalChartIndicator } from "./terminalIndicatorChart";
+import { terminalIndicatorSeries, terminalIndicatorPriceFormat, terminalIndicatorPlotInfo, type TerminalChartIndicator, type TerminalIndicatorPlotInfo } from "./terminalIndicatorChart";
 import {GlobalChartClock} from "./GlobalChartClock";
-import {globalVisibleCandleExtrema,resolveGlobalChartQuote,type GlobalChartCurrentQuote,type GlobalChartQuote} from "./globalChartQuote";
+import {globalVisibleTimeCandleExtrema,globalLogicalSetupWindow,resolveGlobalChartQuote,type GlobalChartCurrentQuote,type GlobalChartQuote} from "./globalChartQuote";
 import {globalDecision,globalContextLine,globalChannelLines,globalEntryStudySvg,globalDefaultChartLayers,globalStructureChartLayers,globalSetupStudySeries,globalSetupStudyReadings,globalStructuralScaleValues,globalStructuralWindow,globalChannelAvailability,globalFibonacciDescription,globalFrameReference,globalVwapContextLine} from "@pulse/domain";
 
 const stamp = (ts: number) => Math.floor(ts / 1000) as UTCTimestamp;
@@ -39,16 +39,18 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
   // Recreate series only when chart evidence changes, not narrative or identity.
   const evidenceKey=useMemo(()=>JSON.stringify({...report,narrative:undefined}),[report]);
   const chartReport=useMemo(()=>report,[evidenceKey]);
-  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;price:{from:number;to:number}|null;autoScale:boolean;anchor?:{ts:number;index:number}}|null>(null);
+  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;time:{from:Time;to:Time}|null;price:{from:number;to:number}|null;autoScale:boolean}|null>(null);
   const ref = useRef<HTMLDivElement>(null), reset = useRef<() => void>(() => {}),focus = useRef<() => void>(() => {}),history = useRef<() => void>(() => {}),fitFib=useRef<()=>void>(()=>{});
   const [chartView,setChartView]=useState<"setup"|"structure"|"history"|"fibonacci">("setup");
   const pro = report.tier === "pro", [layers, setLayers] = useState<GlobalChartLayers>(()=>globalDefaultChartLayers(report));
   const layerState=useRef(layers);layerState.current=layers;
   const indicatorState=useRef(terminalIndicators);indicatorState.current=terminalIndicators;
-  const indicatorIdentity=terminalIndicators.map(item=>item.id).join("|");
+  const indicatorIdentity=terminalIndicators.map(item=>item.id+":"+(item.plot??"line")).join("|");
   const focusTerminalIndicators=useRef<()=>void>(()=>{});
   const updateTerminalIndicators=useRef<(studies:TerminalChartIndicator[])=>void>(()=>{});
   const [indicatorReadings,setIndicatorReadings]=useState<Record<string,string>>({});
+  const [indicatorPlots,setIndicatorPlots]=useState<Record<string,TerminalIndicatorPlotInfo>>({});
+  const rsiLabelRef=useRef<HTMLSpanElement>(null);
   const chartHeight=(pro?660:540)+terminalIndicators.length*150;
   const updateLayers=useRef<(value:GlobalChartLayers)=>void>(()=>{});
   const [quoteClock,setQuoteClock]=useState(()=>performance.now());
@@ -75,15 +77,18 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     if (!ref.current || report.candles.length < 2) return;
     const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.snapshot.observedAt,report.tier]);
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
-    const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour", tickMarkFormatter: (time: Time) => typeof time === "number" && time > lastTime ? "" : null } });
+    const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour" || indicatorState.current.length > 0, tickMarkFormatter: (time: Time) => {
+      const latest=indicatorState.current.reduce<number>((end,item)=>item.points.reduce<number>((value,point)=>Math.max(value,Number(stamp(point.ts))),end),Number(stamp(formingState.current?.ts??report.candles.at(-1)!.ts)));
+      return typeof time === "number" && time > latest ? "" : null;
+    } } });
     const plan=globalTradePlan(report),qualified=report.decisionVersion==="decision-v5"||globalDecision(report).planningValid,values = [...(report.decisionVersion==="decision-v5"?globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop?[c.plan.referenceStop]:[]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]):[]),...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(qualified?plan.referenceEntry??[]:[]),...(qualified&&plan.referenceStop!==null?[plan.referenceStop]:[])];
     const candles = chart.addSeries(CandlestickSeries, { upColor: paint("#35d0aa"), downColor: paint("#ef6b85"), wickUpColor: paint("#35d0aa"), wickDownColor: paint("#ef6b85"), borderVisible: false, priceLineVisible:false,lastValueVisible:false, priceFormat: { type: "price", precision: report.snapshot.pricePrecision, minMove: 10 ** -report.snapshot.pricePrecision }, autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
       let info=base();
-      const visible=chart.timeScale().getVisibleLogicalRange(),extrema=globalVisibleCandleExtrema(formingState.current?[...report.candles,formingState.current]:report.candles,visible);
+      const visible=chart.timeScale().getVisibleRange(),extrema=globalVisibleTimeCandleExtrema(formingState.current?[...report.candles,formingState.current]:report.candles,visible);
       if(extrema){if(!info)info={priceRange:{...extrema}};else if(info.priceRange){info.priceRange.minValue=Math.min(info.priceRange.minValue,extrema.minValue);info.priceRange.maxValue=Math.max(info.priceRange.maxValue,extrema.maxValue);}}
-      const first=report.candles[Math.max(0,Math.floor(visible?.from??report.candles.length-globalSetupWindow(report)))];
+      const first=visible&&typeof visible.from==="number"?report.candles.find(c=>c.ts>=Number(visible.from)*1000):report.candles[Math.max(0,report.candles.length-globalSetupWindow(report))];
       const structureValues=first?globalStructuralScaleValues(report,first.ts,layerState.current):[];
-      const latestX=chart.timeScale().timeToCoordinate(lastTime),plotWidth=chart.timeScale().width(),latestVisible=visible&&visible.from<=report.candles.length-1&&visible.to>=report.candles.length-1;
+      const latestX=chart.timeScale().timeToCoordinate(lastTime),plotWidth=chart.timeScale().width(),latestStamp=stamp(formingState.current?.ts??report.candles.at(-1)!.ts),latestVisible=visible&&typeof visible.from==="number"&&typeof visible.to==="number"&&visible.from<=latestStamp&&visible.to>=latestStamp;
       // A manual price scale is retained by the library. During autoscale the
       // quote joins the visible latest candles, never replacing their wicks.
       const quoted=latestVisible&&quoteState.current?[quoteState.current.price]:[];
@@ -105,12 +110,12 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     volume.priceScale().applyOptions({ scaleMargins: { top: .82, bottom: 0 }, visible: false });
     volume.setData(data.map(c => ({ time: stamp(c.ts), value: c.volume, color: paint(c.close >= c.open ? (appearance==="light"?"#35d0aa99":"#35d0aa40") : (appearance==="light"?"#ef6b8599":"#ef6b8540")) })));
     updateForming.current=value=>{
-      const logical=chart.timeScale().getVisibleLogicalRange(),scale=chart.priceScale("right"),auto=scale.options().autoScale,priceRange=scale.getVisibleRange();
+      const time=chart.timeScale().getVisibleRange(),logical=chart.timeScale().getVisibleLogicalRange(),scale=chart.priceScale("right"),auto=scale.options().autoScale,priceRange=scale.getVisibleRange();
       const complete=data.map(c=>({time:stamp(c.ts),open:c.open,high:c.high,low:c.low,close:c.close}));
       const future=Array.from({length:300},(_,i)=>({time:stamp(last.ts+interval*(i+1))})).filter(c=>c.time!==stamp(value?.ts??-1));
       candles.setData([...complete,...(value?[{time:stamp(value.ts),open:value.open,high:value.high,low:value.low,close:value.close}]:[]),...future].sort((a,b)=>Number(a.time)-Number(b.time)));
       volume.setData([...data,...(value?[value]:[])].map(c=>({time:stamp(c.ts),value:c.volume,color:paint(c.close>=c.open?"#35d0aa80":"#ef6b8580")})));
-      if(logical)chart.timeScale().setVisibleLogicalRange(logical);if(!auto&&priceRange)scale.setVisibleRange(priceRange);
+      if(time)chart.timeScale().setVisibleRange(time);else if(logical)chart.timeScale().setVisibleLogicalRange(logical);if(!auto&&priceRange)scale.setVisibleRange(priceRange);
       setCandleDetail(previous=>!previous||previous.live?(value?{...value,live:true}:{...last,live:false}):previous);
     };
     updateForming.current(formingState.current);
@@ -135,22 +140,46 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       chart.panes()[1]?.setHeight(170);
     }
     const indicatorSeries = indicatorState.current.map((item, index) => {
-      const series=chart.addSeries(LineSeries,{color:paint(palette[index%palette.length]),lineWidth:2,priceLineVisible:false,lastValueVisible:true,title:item.title,priceFormat:{type:"custom",formatter:(value:number)=>value.toLocaleString(undefined,{maximumFractionDigits:4})+" "+item.units,minMove:.0001}},(pro?2:1)+index);
+      const common={color:paint(palette[index%palette.length]),priceLineVisible:false,lastValueVisible:true,title:item.title,priceFormat:terminalIndicatorPriceFormat(item.units)};
+      const series=item.plot==="histogram"?chart.addSeries(HistogramSeries,{...common,base:0},(pro?2:1)+index):chart.addSeries(LineSeries,{...common,lineWidth:2},(pro?2:1)+index);
       series.setData(terminalIndicatorSeries(item).map(point=>({...point,time:point.time as UTCTimestamp})));
       chart.panes()[(pro?2:1)+index]?.setHeight(150);
-      return {id:item.id,series};
+      const markers=createSeriesMarkers(series,[]);
+      return {id:item.id,series,markers,conditionLine:undefined as IPriceLine|undefined};
     });
-    focusTerminalIndicators.current=()=>{const points=indicatorState.current.flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
-    updateTerminalIndicators.current=studies=>{for(const entry of indicatorSeries){const item=studies.find(study=>study.id===entry.id);entry.series.setData(item?terminalIndicatorSeries(item).map(point=>({...point,time:point.time as UTCTimestamp})):[]);}};
+    const executionPrice=terminalIndicators.length?chart.addSeries(LineSeries,{color:paint("#ffcb76"),lineWidth:2,title:"Captured Spot execution price",priceFormat:{type:"price",precision:report.snapshot.pricePrecision,minMove:10**-report.snapshot.pricePrecision},priceLineVisible:false,lastValueVisible:true}):null;
+    // Assign all proportions after all panes exist. Sequential pixel sizing
+    // while adding panes otherwise compresses the earlier studies on resize.
+    chart.panes().forEach((pane,index)=>pane.setStretchFactor((index===0?(pro?490:540):pro&&index===1?170:150)/chartHeight));
+    focusTerminalIndicators.current=()=>{const points=indicatorState.current.flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
+    updateTerminalIndicators.current=studies=>{
+      const time=chart.timeScale().getVisibleRange();
+      const plots:Record<string,TerminalIndicatorPlotInfo>={};
+      const price=studies.find(item=>item.priceContext?.points.length)?.priceContext;
+      executionPrice?.setData(price?terminalIndicatorSeries({id:"execution-price",title:"Captured Spot execution price",units:report.snapshot.instId.split("-")[1]??"USDT",status:"partial",source:price.source,windowStart:0,windowEnd:0,bucketMs:price.bucketMs,points:price.points}).map(point=>({...point,time:point.time as UTCTimestamp})):[]);
+      if(ref.current)ref.current.dataset.executionPricePoints=String(price?.points.length??0);
+      for(const entry of indicatorSeries){
+        const item=studies.find(study=>study.id===entry.id);
+        if(item)entry.series.applyOptions({title:item.title,priceFormat:terminalIndicatorPriceFormat(item.units)});
+        entry.series.setData(item?terminalIndicatorSeries(item).map(point=>({...point,time:point.time as UTCTimestamp})):[]);
+        if(entry.conditionLine){entry.series.removePriceLine(entry.conditionLine);entry.conditionLine=undefined;}
+        if(item?.condition)entry.conditionLine=entry.series.createPriceLine({price:item.condition.threshold,title:item.condition.label,color:paint("#ffcb76"),lineStyle:2,lineWidth:1,axisLabelVisible:true});
+        entry.markers.setMarkers(item?.condition?item.points.filter(point=>point.signal&&!point.partial&&Number.isFinite(point.value)).map(point=>({time:stamp(point.ts),position:"aboveBar" as const,shape:"circle" as const,color:paint("#ffcb76"),text:"Observed"})):[]);
+        if(item)plots[entry.id]=terminalIndicatorPlotInfo(item.units,entry.series.data());
+      }
+      if(time)chart.timeScale().setVisibleRange(time);
+      setIndicatorPlots(plots);setIndicatorReadings({});
+    };
     // fitContent excludes trailing whitespace in Quick. An explicit logical
     // range reserves the same future scenario space in both tiers.
     const showWindow=(count:number,full=false)=>{
       chart.priceScale("right").applyOptions({autoScale:true});
       // Preserve the history count while allowing exact setup prices to fit
       // beside the candles on a narrow inspection chart as well as desktop.
-      const width=chart.timeScale().width(),reserved=Math.min(width*.55,Math.max(300,width*.28));
-      const future=Math.ceil(count*reserved/Math.max(1,width-reserved));
-      chart.timeScale().setVisibleLogicalRange({from:full?-5:Math.max(-5,data.length-count),to:data.length+future});
+      const scale=chart.timeScale(),logicalAt=(ts:number)=>{const coordinate=scale.timeToCoordinate(stamp(ts));return coordinate===null?null:scale.coordinateToLogical(coordinate);};
+      const first=data[Math.max(0,data.length-count)],lastTs=indicatorState.current.reduce((latest,item)=>item.points.reduce((end,point)=>Math.max(end,point.ts),latest),formingState.current?.ts??last.ts);
+      const from=logicalAt(first.ts),to=logicalAt(lastTs);
+      if(from!==null&&to!==null)scale.setVisibleLogicalRange(globalLogicalSetupWindow(from,to,scale.width(),full));
     };
     const resetView=()=>showWindow(globalSetupWindow(report));
     reset.current = resetView;
@@ -164,14 +193,14 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       if(original)setCandleDetail({ts,open:c.open,high:c.high,low:c.low,close:c.close,volume:original.volume,live:formingState.current?.ts===ts});
     }});
     let frame = 0, prior = "", firstFrame=true, hiddenSincePaint=false;
-    let previousWidth = chart.chartElement().clientWidth, previousRange = chart.timeScale().getVisibleLogicalRange();
+    let previousWidth = chart.chartElement().clientWidth, previousRange = chart.timeScale().getVisibleLogicalRange(),previousTime=chart.timeScale().getVisibleRange();
     const render = () => {
       const width = chart.chartElement().clientWidth, height = chart.panes()[0]?.getHeight() ?? 0;
       // Terminal keeps this pane mounted while another tab is shown. A hidden
       // zero-width ResizeObserver pass must not overwrite the user's viewport.
       if(width<=0||height<=0){hiddenSincePaint=true;frame=requestAnimationFrame(render);return;}
       if(hiddenSincePaint&&!firstFrame&&previousRange){
-        chart.timeScale().setVisibleLogicalRange(previousRange);
+        if(previousTime)chart.timeScale().setVisibleRange(previousTime);else chart.timeScale().setVisibleLogicalRange(previousRange);
         const saved=viewport.current;if(saved?.key===viewportKey&&!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
         previousWidth=width;
       }
@@ -179,22 +208,23 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       if(firstFrame&&width>0){
         const saved=viewport.current;
         if(saved?.key===viewportKey&&saved.logical){
-          const anchorIndex=viewportIdentity&&saved.anchor?data.findIndex(c=>c.ts===saved.anchor!.ts):-1;
-          const shift=anchorIndex>=0?anchorIndex-saved.anchor!.index:0;
-          chart.timeScale().setVisibleLogicalRange({from:saved.logical.from+shift,to:saved.logical.to+shift});
+          if(saved.time)chart.timeScale().setVisibleRange(saved.time);else chart.timeScale().setVisibleLogicalRange(saved.logical);
           if(!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
         }else resetView();
-        firstFrame=false;previousWidth=width;previousRange=chart.timeScale().getVisibleLogicalRange();
+        firstFrame=false;previousWidth=width;previousRange=chart.timeScale().getVisibleLogicalRange();previousTime=chart.timeScale().getVisibleRange();
       }
       // Auto-size preserves bar spacing, which adds blank history on a wider
       // viewport. Preserve the user's logical range, including a focused setup.
       if(width > 0 && width !== previousWidth && previousRange) chart.timeScale().setVisibleLogicalRange(previousRange);
-      previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange();
+      previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange();previousTime=chart.timeScale().getVisibleRange();
       const scale=chart.priceScale("right"),priceRange=scale.getVisibleRange();
-      const anchorIndex=Math.max(0,Math.min(data.length-1,Math.floor(previousRange?.from??0)));
-      viewport.current={key:viewportKey,logical:previousRange,price:priceRange,autoScale:scale.options().autoScale,anchor:{ts:data[anchorIndex].ts,index:anchorIndex}};
+      viewport.current={key:viewportKey,logical:previousRange,time:previousTime,price:priceRange,autoScale:scale.options().autoScale};
       if(ref.current){
+        chart.panes().forEach((pane,index)=>{const element=pane.getHTMLElement();if(element){element.dataset.chartPane=index===0?"price":pro&&index===1?"rsi":"indicator";element.dataset.paneHeight=String(pane.getHeight());}});
+        const rsiElement=pro?chart.panes()[1]?.getHTMLElement():null;
+        if(rsiLabelRef.current&&rsiElement){rsiLabelRef.current.style.top=String(rsiElement.getBoundingClientRect().top-ref.current.getBoundingClientRect().top+6)+"px";rsiLabelRef.current.style.bottom="auto";}
         ref.current.dataset.viewportFrom=String(previousRange?.from??"");ref.current.dataset.viewportTo=String(previousRange?.to??"");
+        ref.current.dataset.visibleTimeFrom=String(previousTime?.from??"");ref.current.dataset.visibleTimeTo=String(previousTime?.to??"");
         ref.current.dataset.priceFrom=String(priceRange?.from??"");ref.current.dataset.priceTo=String(priceRange?.to??"");ref.current.dataset.priceAutoscale=String(scale.options().autoScale);
       }
       const historyEnd = chart.timeScale().timeToCoordinate(stamp(formingState.current?.ts??last.ts)), first = chart.timeScale().timeToCoordinate(stamp(data[0].ts));
@@ -247,8 +277,8 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     {pro&&layers.volumeProfile&&report.orderFlow&&<p className="global-chart-profile-coverage">{globalOrderFlowCoverageLabel(report)} · {report.lang==="zh"?"仅该成交窗口，不是主要周期的完整分布。":"These levels describe this execution window, not the full primary timeframe."}</p>}
     <div className={`global-mobile-overview ${inspect?"is-inspecting":""}`} dangerouslySetInnerHTML={{__html:overview}} />
     <div className="global-mobile-inspect"><button aria-pressed={inspect} onClick={()=>setInspect(!inspect)}>{inspect?(report.lang==="zh"?"显示完整走势":"Saved report map"):(report.lang==="zh"?"检查 K 线":"Inspect candles")}</button><small>{report.lang==="zh"?"原图可下载；详细视图支持滑动和缩放。":"Download the original PNG for full detail. Swipe and zoom in the detailed view."}</small></div>
-    <div className={`global-chart-scroll ${inspect?"is-inspecting":""}`}><div className="global-chart-stage"><div ref={ref} style={{ height: chartHeight }} /><svg className="global-chart-overlay" style={{zIndex:5,width:overlay.width,height:overlay.height}} width={overlay.width} height={overlay.height} aria-label="Candles, saved setup indicators, range references, Entry, SL and TP" dangerouslySetInnerHTML={{ __html: overlay.svg }} />{pro&&<span className="global-rsi-label">RSI14 · {report.indicators.rsi.points.at(-1)?.value.toFixed(2)??"—"}</span>}</div></div>
-    {terminalIndicators.length>0&&<section className="terminal-chart-indicator-key" aria-label="Applied chart indicators"><strong>Applied indicators / shared chart time axis</strong><button type="button" onClick={()=>{setInspect(true);focusTerminalIndicators.current();}}>Inspect execution window on chart</button>{terminalIndicators.map(item=><div key={item.id} data-chart-indicator={item.id}><b>{item.title}</b><span>{indicatorReadings[item.id]??"Hover the indicator pane for its value"}</span><small>{item.units} ? {item.status} coverage ? {new Date(item.windowStart).toISOString().slice(0,16).replace("T"," ")} ? {new Date(item.windowEnd).toISOString().slice(0,16).replace("T"," ")} UTC</small></div>)}<p>Indicator panes use execution timestamps and their own scales. Empty areas have no retained executions; they do not imply zero flow. Zoom to the recent execution window to inspect microstructure on a daily or weekly chart.</p></section>}
+    <div className={`global-chart-scroll ${inspect?"is-inspecting":""}`}><div className="global-chart-stage"><div ref={ref} style={{ height: chartHeight }} /><svg className="global-chart-overlay" style={{zIndex:5,width:overlay.width,height:overlay.height}} width={overlay.width} height={overlay.height} aria-label="Candles, saved setup indicators, range references, Entry, SL and TP" dangerouslySetInnerHTML={{ __html: overlay.svg }} />{pro&&<span ref={rsiLabelRef} className="global-rsi-label">RSI14 · {report.indicators.rsi.points.at(-1)?.value.toFixed(2)??"—"}</span>}</div></div>
+    {terminalIndicators.length>0&&<section className="terminal-chart-indicator-key" aria-label="Applied chart indicators"><strong>Applied indicators / shared chart time axis</strong><button type="button" onClick={()=>{setInspect(true);focusTerminalIndicators.current();}}>Inspect execution window on chart</button>{terminalIndicators.map(item=>{const plotted=indicatorPlots[item.id];return <div key={item.id} data-chart-indicator={item.id} data-plotted-points={plotted?.points??0} data-plotted-units={plotted?.units??""} data-plotted-from={plotted?.firstTs??""} data-plotted-to={plotted?.lastTs??""} data-condition={item.condition?.label??""}><b>{item.title}</b><span>{indicatorReadings[item.id]??"Hover or tap the indicator pane for its value"}</span>{item.condition&&<small>{item.condition.label} / {item.points.filter(point=>point.signal&&!point.partial).length} complete-bar observations. Yellow markers highlight the condition, not a trade signal.</small>}<small>{plotted?`${plotted.points} plotted values / ${plotted.units}`:"Preparing chart values"} / {item.status} coverage / {new Date(item.windowStart).toISOString().slice(0,16).replace("T"," ")} / {new Date(item.windowEnd).toISOString().slice(0,16).replace("T"," ")} UTC</small>{plotted?.firstTs!==undefined&&plotted.lastTs!==undefined&&<small>Plotted execution times {new Date(plotted.firstTs).toISOString().slice(0,16).replace("T"," ")} / {new Date(plotted.lastTs).toISOString().slice(0,16).replace("T"," ")} UTC</small>}</div>;})}<p>{terminalIndicators.some(item=>item.priceContext?.points.length)&&<>The gold price line uses captured Spot execution-bucket closes on this same time axis. Primary candles keep their own timeframe. </>}Indicator panes use execution timestamps and their own scales. Empty areas have no retained executions; they do not imply zero flow. Zoom to the recent execution window to inspect microstructure on a daily or weekly chart.</p></section>}
     <GlobalChartClock report={report}/>
     <p className="global-sma-readings">{[...report.indicators.sma.filter(s=>layers.sma!==false&&(pro&&layers.allSmas?[21,55,89,144,233]:[55]).includes(s.period)).map(s=>`SMA${s.period} ${globalPrice(report,s.points.at(-1)?.value)}`),...globalSetupStudyReadings(report,layers).map(s=>`${s.name} ${globalPrice(report,s.value)}`)].join(" · ")}</p>{pro&&layers.vwap&&globalVwapContextLine(report)&&<p className="global-meta">{globalVwapContextLine(report)}</p>}{pro&&globalChannelLines(report).map(line=><p key={line} className="global-meta">{line}</p>)}{pro&&<ContextChart report={report}/>}{report.entryStudy&&<div className="global-entry-detail" aria-label="Entry study candles" dangerouslySetInnerHTML={{__html:themeGlobalChartSvg(globalEntryStudySvg(report,660,selectedPathId)??"",appearance)}}/>}
     {pro&&report.orderFlow&&globalOrderFlowLines(report).map(line=><p className="global-meta" key={line}>{line}</p>)}

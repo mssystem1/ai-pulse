@@ -1,14 +1,71 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Portable indicator host · PULSE</title><style>
-:root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#081118;color:#eef4fc}*{box-sizing:border-box}main{max-width:850px;margin:5vh auto;padding:24px}h1{font-size:2rem}p{line-height:1.7;color:#bacbdc}label{display:block;margin:16px 0;font-size:.9rem}input,button{padding:12px;border:1px solid #45606e;border-radius:8px;background:#101f2a;color:inherit;font:inherit;max-width:100%}input[type=number]{width:100%}button{background:#123e35;color:#74ffcf;cursor:pointer}fieldset{border:1px solid #45606e;border-radius:12px;margin:24px 0;padding:20px}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}output{display:block;padding:22px;background:#101f2a;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere}a{color:#74ffcf}#error{color:#ffc591}@media(max-width:600px){.fields{grid-template-columns:1fr}}
-</style></head><body><main><p>PORTABLE FINANCIAL TOOLS</p><h1>Run the same circuit in another host.</h1><p>This standalone example reads an exported PULSE indicator package and evaluates its numerical NAND circuit. It uses no PULSE API, wallet, market feed or application bundle. You can save these two host files and run them from your own static website.</p>
-<p>In Trading Terminal, choose <b>Export</b> on an installed indicator. Select that JSON file below. Enter integer buy/sell amounts in the same volume unit; for cumulative delta, also enter the previous accumulated value.</p>
-<label>Portable indicator file<input id="package" type="file" accept="application/json,.json"></label><p id="identity">No package selected.</p>
-<form id="calculate"><fieldset><legend>Execution inputs · integer numeric ABI</legend><div class="fields"><label>Executed buy volume<input id="buy" type="number" min="0" max="65535" step="1" value="120" required></label><label>Executed sell volume<input id="sell" type="number" min="0" max="65535" step="1" value="80" required></label><label>Previous cumulative delta<input id="prior" type="number" min="-2147483648" max="2147483647" step="1" value="20" required></label></div><button type="submit" disabled id="run">Calculate with imported circuit</button></fieldset></form>
-<p id="error" role="alert"></p><output id="result" aria-live="polite">Import a package to start.</output><p>The PULSE chart host scales decimal volumes into this fixed-width ABI. This demonstration uses integer inputs directly. Imported formulas are untrusted content: this host bounds gates and references and never executes scripts, but it does not certify the creator or the formula. Local evaluation does not mean X Layer deployment.</p><p><a href="/trading-terminal">Return to Trading Terminal</a></p>
-<script type="module">
-import { evaluatePortableCircuit } from './tap02-host.js';
-let manifest;
-const error=document.getElementById('error'),result=document.getElementById('result');
-document.getElementById('package').addEventListener('change',async event=>{try{const file=event.target.files[0];if(!file)return;if(file.size>600000)throw Error('Use a package smaller than 600 KB');const next=JSON.parse(await file.text());evaluatePortableCircuit(next,120,80,20);manifest=next;document.getElementById('identity').textContent=`${String(next.title).slice(0,80)} · ${String(next.id).slice(0,96)} · v${String(next.version).slice(0,20)}`;document.getElementById('run').disabled=false;error.textContent='';result.textContent='Package loaded. Enter values and calculate.';}catch(e){manifest=undefined;document.getElementById('run').disabled=true;error.textContent=e.message;}});
-document.getElementById('calculate').addEventListener('submit',event=>{event.preventDefault();try{const values=evaluatePortableCircuit(manifest,Number(document.getElementById('buy').value),Number(document.getElementById('sell').value),Number(document.getElementById('prior').value));result.textContent=JSON.stringify(values,null,2);error.textContent='';}catch(e){error.textContent=e.message;}});
-</script></main></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Portable indicator host · PULSE</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,Segoe UI,sans-serif;background:#081118;color:#eef4fc}*{box-sizing:border-box}main{max-width:950px;margin:5vh auto;padding:24px}h1{font-size:2rem}h2{font-size:1.35rem}p{line-height:1.7;color:#bacbdc}label{display:block;margin:16px 0;font-size:.9rem}input,textarea,button{padding:12px;border:1px solid #45606e;border-radius:8px;background:#101f2a;color:inherit;font:inherit;max-width:100%}input[type=number],textarea{width:100%}textarea{font-family:ui-monospace,monospace;line-height:1.5;resize:vertical}button{background:#123e35;color:#74ffcf;cursor:pointer}button:disabled{opacity:.5;cursor:default}fieldset,section{border:1px solid #45606e;border-radius:12px;margin:24px 0;padding:20px}.fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}.actions{display:flex;flex-wrap:wrap;gap:12px}output{display:block;padding:22px;background:#101f2a;border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:550px;overflow:auto}a{color:#74ffcf}#error{color:#ffc591}.notice{border-left:3px solid #74ffcf;padding-left:16px}.small{font-size:.85rem}code{overflow-wrap:anywhere}@media(max-width:600px){main{padding:16px}.fields{grid-template-columns:1fr}fieldset,section{padding:16px}}
+  </style>
+</head>
+<body><main>
+  <p>PORTABLE FINANCIAL TOOLS</p>
+  <h1>Run your indicator in another application.</h1>
+  <p>This independent host imports a PULSE indicator and runs its actual numerical NAND circuit. A v3 study also carries its rolling calculation, condition and plot definition. This page uses no PULSE API, wallet, market feed or application bundle. Save this page and <code>tap02-host.js</code> to your own static website to use the same host.</p>
+  <p>In Trading Terminal, create an indicator and choose <b>Export</b>. Select that JSON file below. Importing files is for moving a calculation between applications; it is optional when creating and applying an indicator inside PULSE.</p>
+  <label>Exported indicator file <input id="package" type="file" accept="application/json,.json"></label>
+  <p id="identity">No indicator selected.</p>
+  <p id="definition" class="notice" hidden></p>
+  <section id="series-section">
+    <h2>Run the complete study over source bars</h2>
+    <p>For v3 indicators, each input row supplies the actual executed buy and sell quantities for one source bar. The per-bar circuit uses that bar's quantity scale; the declared host pipeline then computes rolling values and conditions without looking ahead. A gap resets the calculation and its warm-up. If a captured edge bar is shorter than the declared bar width, it cannot count toward a rolling or cumulative window. A study without rolling transforms can show that captured reading with <code>partial: true</code>; it cannot confirm a crossover.</p>
+    <p class="notice"><b>Numerical example only.</b> These twenty contiguous rows are arithmetic examples with elapsed-millisecond timestamps. They are not market observations or a backtest. Replace them with your application's genuine source bars and source-coverage intervals.</p>
+    <label>Source bars · JSON array <textarea id="bars" rows="12" spellcheck="false" aria-describedby="series-help"></textarea></label>
+    <p id="series-help" class="small">Each row: <code>{"ts":60000,"end":120000,"buy":3,"sell":1}</code>. Quantities may be decimals in one consistent base-asset or contract unit. At most 1,024 ordered bars. Unknown source intervals must be supplied below; they are not filled with invented trades.</p>
+    <div class="fields">
+      <label>Source-bar width · milliseconds <input id="interval" type="number" min="1" max="2678400000" step="1" value="60000"></label>
+      <label>Missing intervals · JSON array <textarea id="gaps" rows="3" spellcheck="false">[]</textarea></label>
+    </div>
+    <div class="actions"><button type="button" id="run-series" disabled>Run imported study</button><button type="button" id="load-example">Load twenty-bar numerical example</button></div>
+    <p id="series-summary" aria-live="polite">Import a v3 study to run the complete pipeline.</p>
+    <output id="series-result" aria-live="polite">No study evaluated.</output>
+    <p class="small">The result includes <code>rawValue</code> from the per-bar NAND kernel, <code>value</code> after the pipeline, and an optional observed <code>signal</code>. A missing value means warm-up or unknown coverage. Values with unit <code>bps</code> remain basis points in JSON: divide by 100 to display percent. A threshold condition is an observation, not an order or a promised trade outcome.</p>
+  </section>
+  <details>
+    <summary>Developer check: one-bar circuit inputs</summary>
+    <p>This checks the fixed-width numeric circuit only. It does not apply a v3 study's EMA, SMA, rolling sum, cumulative transform or threshold condition. These series operations are declared host logic; X Layer circuit registration does not certify a source history.</p>
+    <form id="calculate"><fieldset><legend>One-bar integer numeric ABI</legend><div class="fields">
+      <label>Executed buy integer <input id="buy" type="number" min="0" max="65535" step="1" value="120" required></label>
+      <label>Executed sell integer <input id="sell" type="number" min="0" max="65535" step="1" value="80" required></label>
+      <label>Previous cumulative value · legacy kernels <input id="prior" type="number" min="-2147483648" max="2147483647" step="1" value="20" required></label>
+    </div><button type="submit" disabled id="run">Run one-bar circuit</button></fieldset></form>
+    <output id="result" aria-live="polite">Import an indicator to start.</output>
+  </details>
+  <p id="error" role="alert"></p>
+  <p>Imported formulas are untrusted content. This host bounds gates, references, expressions and state; it never executes creator scripts. It does not certify the creator, source feed or profitability. Local evaluation requires no X Layer registration. A registered circuit proves only the numeric kernel's recorded identity.</p>
+  <p><a href="/trading-terminal">Return to Trading Terminal</a></p>
+  <script type="module">
+    import { evaluatePortableCircuit, evaluatePortableStudySeries } from './tap02-host.js';
+    let manifest;
+    const byId=id=>document.getElementById(id),error=byId('error'),result=byId('result');
+    function loadExample(){byId('bars').value=JSON.stringify(Array.from({length:20},(_,i)=>({ts:(i+1)*60000,end:(i+2)*60000,buy:i<10?3:1,sell:i<10?1:3})),null,2);byId('interval').value='60000';byId('gaps').value='[]';}
+    loadExample();byId('load-example').addEventListener('click',loadExample);
+    byId('package').addEventListener('change',async event=>{try{
+      const file=event.target.files[0];if(!file)return;if(file.size>600000)throw Error('Use an indicator file smaller than 600 KB');
+      const next=JSON.parse(await file.text());evaluatePortableCircuit(next,120,80,20);manifest=next;
+      byId('identity').textContent=`${String(next.title).slice(0,80)} · v${String(next.version).slice(0,20)}`;
+      byId('run').disabled=false;byId('run-series').disabled=next.format!=='pulse-indicator-v3';
+      byId('definition').hidden=false;
+      byId('definition').textContent=next.format==='pulse-indicator-v3'?`Per-bar formula: ${next.formula.expression}. Pipeline: ${next.study.transforms.map(step=>step.kind+(step.period?' '+step.period:'')).join(' → ')||'per-bar value'}. Plot: ${next.study.plot}. Gaps reset state; warm-up needs a full window.`:'This legacy indicator carries a per-bar numeric circuit. Use the developer check below. Create and export a v3 study in PULSE to move a complete rolling pipeline between applications.';
+      byId('series-summary').textContent=next.format==='pulse-indicator-v3'?'Study loaded. Review the numerical example or supply your own source bars, then run it.':'A v3 study is required for this series runner; the imported legacy circuit remains usable below.';
+      byId('series-result').textContent='No study evaluated.';error.textContent='';result.textContent='Indicator loaded. Run the one-bar developer check if needed.';
+    }catch(e){manifest=undefined;byId('run').disabled=true;byId('run-series').disabled=true;error.textContent=e.message;}});
+    byId('calculate').addEventListener('submit',event=>{event.preventDefault();try{result.textContent=JSON.stringify(evaluatePortableCircuit(manifest,Number(byId('buy').value),Number(byId('sell').value),Number(byId('prior').value)),null,2);error.textContent='';}catch(e){error.textContent=e.message;}});
+    byId('run-series').addEventListener('click',()=>{try{
+      const rows=JSON.parse(byId('bars').value),missingIntervals=JSON.parse(byId('gaps').value),intervalMs=byId('interval').value?Number(byId('interval').value):undefined;
+      const points=evaluatePortableStudySeries(manifest,rows,{intervalMs,missingIntervals}),resolved=points.filter(point=>point.value!==undefined),last=points.at(-1);
+      byId('series-summary').textContent=`${resolved.length} of ${points.length} source bars have resolved outputs. Last value: ${last?.value===undefined?'unknown or warming up':last.value}. Output unit: ${manifest.formula.output.unit}.`;
+      byId('series-result').textContent=JSON.stringify(points,null,2);error.textContent='';
+    }catch(e){error.textContent=e.message;}});
+  </script>
+</main></body></html>

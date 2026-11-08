@@ -7,9 +7,9 @@ import type { ExecutionNetwork } from "./executionContracts.js";
 const receiptAbi = parseAbi(["event Transfer(address indexed from, address indexed to, uint256 value)", "event AuthorizationUsed(address indexed authorizer, bytes32 indexed nonce)"]);
 /** Recovery is bound to the authorization saved BEFORE settlement, not merely
  * an arbitrary transfer of the same amount to PULSE. */
-export async function verifyTerminalPurchaseReceipt(owner: string, purchase: TerminalPurchase, txHash: string) {
+export async function verifyTerminalPurchaseReceipt(owner: string, purchase: TerminalPurchase, txHash: string, suppliedClient?: Pick<ReturnType<typeof executionPublicClient>,"getTransactionReceipt"|"getBlock">) {
   if (!/^0x[\da-f]{64}$/i.test(txHash) || !purchase.nonce || !/^0x[\da-f]{64}$/i.test(purchase.nonce) || !purchase.preparedBlock || !/^\d+$/.test(purchase.preparedBlock)) throw new Error("The saved authorization, pre-settlement block and settlement transaction are required for receipt recovery");
-  const client = executionPublicClient(purchase.network as ExecutionNetwork), receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` });
+  const client = suppliedClient ?? executionPublicClient(purchase.network as ExecutionNetwork), receipt = await client.getTransactionReceipt({ hash: txHash as `0x${string}` });
   if (receipt.status !== "success") throw new Error("Settlement transaction did not succeed");
   if (receipt.blockNumber <= BigInt(purchase.preparedBlock)) throw new Error("Receipt predates the saved Terminal purchase intent; another service's earlier payment cannot activate this pass");
   let transfer = false, authorization = false;
