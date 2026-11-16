@@ -1,5 +1,7 @@
 # Railway Redis + Vercel Blob
 
+For the November 2026 Redis 8.10.1 `lost+found`/AOF permission failure, see the [startup incident and applied ownership repair](REDIS_STARTUP_PERMISSION_INCIDENT_2026-11-16.md). Connectivity is restored; historical-data recovery is tracked separately there.
+
 Status (September 10): native Redis support is implemented and locally tested.
 The PULSE-only RDB snapshot has been imported into Railway Redis and verified.
 The API remains stopped; application cutover and missing-payment reconciliation

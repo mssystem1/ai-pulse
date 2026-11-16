@@ -23,3 +23,6 @@ docs/backtests/**/*.joblib binary
 docs/xo-published-setups/*.json text eol=lf
 docs/xo-published-setups/*.html text eol=lf
 scripts/templates/global-xo-publications.html text eol=lf
+
+# Redis's Linux startup command must retain LF when generated on Windows.
+scripts/railway-redis-start.sh text eol=lf
