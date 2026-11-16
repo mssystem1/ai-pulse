@@ -1,6 +1,6 @@
 # Redis startup permission incident — November 16, 2026
 
-Redis connectivity was repaired on the existing Railway Redis service. Historical data recovery remains a separate, unresolved check.
+Redis connectivity was repaired on the existing Railway Redis service. A subsequent owner-scoped recovery restored part of the TEST wallet's history from independent evidence; the missing historical Railway volume remains unresolved. See the [recovery audit](TEST_WALLET_HISTORY_RECOVERY_2026-11-16.md).
 
 ## Cause established from the supplied logs
 
@@ -31,14 +31,20 @@ The final deployment, including the guards, is `83eba177-a180-4ebb-ae41-4df0374f
 - Redis returned `PONG` through its configured public endpoint.
 - AOF was enabled with successful writes; RDB save status was successful. Configuration remained `/data`, `everysec`, `yes`, `noeviction` and `60 1`.
 - PULSE's public health reported native Redis **online**. TEST wallet authentication and workspace/catalog/receipt reads succeeded without a payment.
-- The TEST wallet's historical access, watches and purchased-indicator receipts were absent. The new startup log created new AOF files. Connectivity recovery therefore does **not** establish historical data recovery.
+- Immediately after connectivity repair, the TEST wallet's historical access, watches and purchased-indicator receipts were absent. The new startup log created new AOF files. Connectivity recovery therefore did **not** establish historical data recovery.
 - Railway reports the logical volume was created September 9, but its current mounted volume instance was created **November 12 at 15:17:55 UTC**, immediately before the failed deployment. That instance lists no backups or backup schedules. This metadata does not by itself explain where earlier records went.
 - The owner confirms they did not touch Redis around November 12. Deployment metadata labels the November 12 deployment `rollback`. A bounded project/environment audit query for 15:00-15:30 UTC returned no entries; that does not establish the actor or exclude platform events.
 - After explicit approval, one temporary SSH key was registered for read-only persistence-file metadata inspection, then successfully removed. The local private/public key files were deleted. Inspection found only November 16 persistence files: an 89-byte base RDB, incremental AOF, manifest, and currently updated `dump.rdb`. `lost+found` is dated November 12, 15:17 UTC. No earlier persistence file was visible within the mounted volume's inspected paths.
 - Files were not inspected before the first successful start. With AOF enabled, an older RDB-only layout can be ignored; normal later persistence could overwrite an older `dump.rdb`. We therefore cannot prove whether an earlier RDB existed then or was preserved. The newly added guards address this gap for future starts.
-- No backup restore, data import, volume deletion, fresh payment or trade was performed. Connectivity recovery is verified; historical recovery is unresolved.
+- No backup restore, data import, volume deletion, fresh payment or trade was performed during connectivity repair. Subsequent selective history recovery is documented separately below.
 
-The original September 10 export remains a historical recovery source, not a current backup. It cannot reconstruct later purchases, passes, Radar history or indicator sales. Do not restore it over a live database or invent missing receipts. Continue inspecting existing files/recovery points and reconcile any recovery against original settlement evidence.
+The original September 10 export remains a historical source, not a current backup. It cannot alone reconstruct later purchases, passes, Radar history or indicator sales. Do not restore it over a live database or invent missing receipts.
+
+## Subsequent selective wallet recovery
+
+The legacy Upstash database remained readable. Owner-scoped records from it and the September export restored 31 report job/payment-history records, 30 reports, 149 activity records, 590 strategy evaluations, six paused strategies and 16 closed orders. Original namespaces and known expiries were retained, and newer data was preserved. Two paid QA indicator versions and one expired Terminal pass history were reconstructed from original local acceptance evidence plus confirmed chain settlements; their proven portable entitlements were explicitly made available to the deployed workspace. No fresh payment, paid time or active automation was created.
+
+Actual deployed API reads verified 15 report-history entries, 14 readable reports and both exact purchased packages. Direct Redis verification matched all 868 planned record/field values. This is **partial wallet recovery from independent sources**, not proof that the old Railway volume was recovered. Later drafts, publications, Radars, notifications and position journals remain unresolved. Plans, encrypted report files and validation are preserved privately; details and browser recovery steps are in the [wallet recovery audit](TEST_WALLET_HISTORY_RECOVERY_2026-11-16.md).
 
 ## Platform incident and required follow-up
 
