@@ -62,6 +62,7 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   // with the purchased report. It does not rewrite the saved report itself.
   if(Number.isFinite(quote)&&quote>0&&Number.isFinite(quoteAt)&&quoteAt<=asOf+5000&&asOf-quoteAt<=60000)report.currentMarket={...(report.currentMarket??{source:market.source,frames:[]}),quote:{price:quote,ts:quoteAt}};
   const admission=globalSetupAdmission(report);
+  if(admission.blockers.includes("stop_already_breached"))blockers.push("cancelled");
   if(admission.blockers.includes("reward"))blockers.push("reward");
   if(admission.blockers.includes("geometry"))blockers.push("levels");
   if(admission.blockers.includes("objective_already_reached"))blockers.push("objective_already_reached");
@@ -78,7 +79,8 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   if (!integrity) scenario = applyGlobalScenario(report, initial) ?? undefined;
   const assessed = scenario ?? advanceGlobalScenario(definition, initial, [], asOf);
   let state: GlobalAssessment["state"];
-  if (assessed.state === "invalidated") { state = "invalidated"; blockers.push(assessed.reason ?? "invalidated"); }
+  if(blockers.includes("cancelled"))state="invalidated";
+  else if (assessed.state === "invalidated") { state = "invalidated"; blockers.push(assessed.reason ?? "invalidated"); }
   else if (assessed.state === "expired") { state = "expired"; blockers.push(assessed.reason ?? "expired"); }
   else if (assessed.state === "completed") { state = "no_trade"; blockers.push("scenario_completed"); }
   else if (assessed.state === "entry_observed") { state = "no_trade"; blockers.push("entry_already_observed", "observation_only"); }
@@ -105,6 +107,7 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   if (integrity) lines.push(zh ? "历史数据不完整、过期或被修订；不推进情景记录，避免跳过未知价格路径。" : "History is incomplete, stale or revised. The scenario cursor is not advanced across an unknown price path.");
   if (blockers.includes("context")) lines.push(zh ? "高周期背景缺失或与此方向相反；原价格计划保留，入场授权受阻。" : "Higher-timeframe context is unavailable or opposing; the saved prices remain intact and entry authorization is blocked.");
   if (opposing.length) lines.push(zh ? "原入场区域与主周期反向区域重叠；价格回测本身不证明已突破该区域，不能授权入场。" : "The saved Entry overlaps primary-timeframe opposition. A price retest alone does not prove acceptance through that zone and cannot authorize entry.");
+  if(admission.blockers.includes("stop_already_breached"))lines.unshift(...admission.reasons);
   if(blockers.includes("reward"))lines.push(zh?`最近障碍仅提供 ${firstObstacleRewardRisk.toFixed(2)}R；本计划的最低要求为 ${admission.minimumRewardRisk.toFixed(2)}R。已观察的价格确认不能弥补不足的收益空间；需要新的有依据结构。`:`The nearest opposing level offers only ${firstObstacleRewardRisk.toFixed(2)}R; this saved policy requires ${admission.minimumRewardRisk.toFixed(2)}R. An observed price confirmation cannot repair insufficient reward; a new supported structure is required.`);
   if(blockers.includes("objective_already_reached"))lines.push(zh?"当前报价已到达或越过原首目标区域；不能通过改用更远的目标来重新授权本次入场。":"The current quote has reached or passed the saved first target area. A farther target cannot make this a fresh entry opportunity.");
   if (blockers.includes("quote")) lines.push(zh ? "需要更新的同市场报价，不能用旧收盘替代当前报价。" : "A fresh quote from the same market is required; an old close does not replace the current quote.");

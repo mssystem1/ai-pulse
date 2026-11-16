@@ -18,14 +18,14 @@ export type TerminalRadar = { id: string; instId: string; timeframe: string; det
 export type TerminalPositionEvent = { id: string; requestId: string; kind: "open" | "add" | "close" | "protection"; quantity?: number; price?: number; executedAt: string; recordedAt: string; hardStop?: number | null; targets?: number[]; provenance: "user_reported" };
 export type TerminalPositionMark = { price: number; at: string; source: string; kind: "spot-reference" | "perpetual-mark-reference"; venueMatches: boolean };
 export type TerminalPosition = { id: string; instId: string; timeframe: string; side: "long" | "short"; venue: string; instrumentType: "spot" | "perpetual"; createdAt: string; paused: boolean; telegram: boolean; setupVersionId?: string; quantity: number; quantityUnit?: "base"; pnlCurrency?: string; averageEntry: number; realizedPnl: number; hardStop: number | null; targets: number[]; protectionStatus: "user_reported"; status: "open" | "closed"; events: TerminalPositionEvent[]; lastMark?: TerminalPositionMark; lastMarkObservation?: TerminalPositionMark; lastRiskState?: string };
-export type TerminalWorkspace = { version: "terminal-workspace-v1"; revision: number; owner: string; grants: TerminalPassGrant[]; pendingPurchases?: TerminalPurchase[]; watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalActivity[]; deliveries: TerminalDelivery[]; answers?: Array<{ id: string; at: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; model?: string }>; indicatorPublications?: TerminalIndicatorPublication[]; indicatorVersions?: Record<string, TerminalIndicatorPublication>; indicatorPurchases?: IndicatorPurchase[]; indicatorSales?: IndicatorSale[]; indicatorClaims?: Record<string, string>; telegram: { enabled: boolean; events: string[] }; aiUsage: { day: string; count: number }; lastMonitorAt?: number; monitoringLease?: { token: string; until: number } };
+export type TerminalWorkspace = { version: "terminal-workspace-v1"; revision: number; owner: string; grants: TerminalPassGrant[]; pendingPurchases?: TerminalPurchase[]; watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalActivity[]; deliveries: TerminalDelivery[]; answers?: Array<{ id: string; at: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; model?: string }>; indicatorPublications?: TerminalIndicatorPublication[]; indicatorVersions?: Record<string, TerminalIndicatorPublication>; indicatorPurchases?: IndicatorPurchase[]; indicatorSales?: IndicatorSale[]; indicatorClaims?: Record<string, string>; telegram: { enabled: boolean; events: string[] }; aiUsage: { day: string; count: number }; lastMonitorAt?: number; nextMonitorAt?: number; monitoringLease?: { token: string; until: number } };
 
 export interface TerminalStorage {
   read<T>(key: string): Promise<T | null>;
   write(key: string, value: unknown, ttlSeconds: number): Promise<void>;
   take<T>(key: string): Promise<T | null>;
   compareAndSet(key: string, expectedRevision: number, value: TerminalWorkspace, ttlSeconds: number, ownerIndex: string): Promise<boolean>;
-  owners(key: string, limit: number): Promise<string[]>;
+  owners(key: string, limit: number, dueBefore?: number): Promise<string[]>;
 }
 export class MemoryTerminalStorage implements TerminalStorage {
   private values = new Map<string, { value: unknown; expiresAt: number }>();
@@ -38,9 +38,9 @@ export class MemoryTerminalStorage implements TerminalStorage {
     const current = this.values.get(key); const valid = current && current.expiresAt > Date.now() ? current.value as TerminalWorkspace : null;
     if ((valid?.revision ?? 0) !== revision) return false;
     this.values.set(key, { value: structuredClone(value), expiresAt: Date.now() + ttl * 1000 });
-    const owners = this.indexes.get(index) ?? new Map<string, number>(); owners.set(value.owner, value.lastMonitorAt ?? 0); this.indexes.set(index, owners); return true;
+    const owners = this.indexes.get(index) ?? new Map<string, number>(); owners.set(value.owner, terminalMonitoringDueAt(value)); this.indexes.set(index, owners); return true;
   }
-  async owners(key: string, limit: number) { return [...(this.indexes.get(key) ?? [])].sort((a,b) => a[1] - b[1]).slice(0, limit).map(([owner]) => owner); }
+  async owners(key: string, limit: number, dueBefore = Date.now()) { return [...(this.indexes.get(key) ?? [])].filter(([,due]) => due <= dueBefore).sort((a,b) => a[1] - b[1]).slice(0, limit).map(([owner]) => owner); }
 }
 const CAS = `local old=redis.call('GET',KEYS[1]);local rev=0;if old then rev=cjson.decode(old).revision end;if rev~=tonumber(ARGV[1]) then return 0 end;redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]);redis.call('ZADD',KEYS[2],ARGV[4],ARGV[5]);return 1`;
 export class RedisTerminalStorage implements TerminalStorage {
@@ -48,8 +48,8 @@ export class RedisTerminalStorage implements TerminalStorage {
   async read<T>(key: string) { return this.redis.get<T>(key); }
   async write(key: string, value: unknown, ttl: number) { await this.redis.set(key, value, { ex: ttl }); }
   async take<T>(key: string): Promise<T | null> { const raw = await this.redis.eval(`local v=redis.call('GET',KEYS[1]);if v then redis.call('DEL',KEYS[1]) end;return v`, [key], []); return typeof raw === "string" ? JSON.parse(raw) as T : null; }
-  async compareAndSet(key: string, revision: number, value: TerminalWorkspace, ttl: number, index: string) { return Number(await this.redis.eval(CAS, [key, index], [revision, JSON.stringify(value), ttl, value.lastMonitorAt ?? 0, value.owner])) === 1; }
-  async owners(key: string, limit: number) { return this.redis.zrange<string[]>(key, 0, limit - 1); }
+  async compareAndSet(key: string, revision: number, value: TerminalWorkspace, ttl: number, index: string) { return Number(await this.redis.eval(CAS, [key, index], [revision, JSON.stringify(value), ttl, terminalMonitoringDueAt(value), value.owner])) === 1; }
+  async owners(key: string, limit: number, dueBefore = Date.now()) { const result = await this.redis.eval("return redis.call('ZRANGEBYSCORE',KEYS[1],'-inf',ARGV[1],'LIMIT',0,ARGV[2])", [key], [dueBefore, limit]); return Array.isArray(result) ? result.map(String) : []; }
 }
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export function terminalOwner(value: string) { if (!/^0x[\da-f]{40}$/i.test(value)) throw new Error("Valid wallet owner required"); return value.toLowerCase(); }
@@ -57,6 +57,29 @@ export const terminalAccess = (workspace: TerminalWorkspace, now = Date.now()) =
   const expiresAt = workspace.grants.reduce((max, grant) => Date.parse(grant.expiresAt) > Date.parse(max) ? grant.expiresAt : max, new Date(0).toISOString());
   return { active: Date.parse(expiresAt) > now, expiresAt: workspace.grants.length ? expiresAt : null, grants: workspace.grants };
 };
+/** Only due, live work belongs in the recurring monitoring queue. Historical
+ * journals and handled expiries remain readable without being polled forever. */
+function terminalHasMonitoringWork(value:TerminalWorkspace){
+ return value.watches.some(w=>!w.paused&&!["invalidated","expired","completed","entry_observed"].includes(w.state))||value.radars.some(r=>!r.paused&&!["completed","failed","expired"].includes(r.state))||value.positions.some(p=>!p.paused&&p.status==="open")||value.deliveries.some(d=>d.state==="queued"||d.state==="sending");
+}
+export function terminalMonitoringDueAt(value: TerminalWorkspace, now = Date.now()): number {
+  const access = terminalAccess(value, now), last = value.grants.at(-1);
+  if (!access.active) return last && !value.activity.some(e => e.id === `expired:${last.id}`) || value.telegram.enabled || [...value.watches,...value.radars,...value.positions].some(item=>!item.paused) || value.deliveries.some(d => d.state === "queued" || d.state === "sending") ? 0 : Number.MAX_SAFE_INTEGER;
+  const work=terminalHasMonitoringWork(value);
+  return work ? value.nextMonitorAt ?? 0 : Date.parse(access.expiresAt!);
+}
+/** Expiry is a durable suspension. Renewing access does not silently re-enable
+ * Telegram or revive a Radar; the owner explicitly resumes desired items. */
+export function suspendExpiredTerminal(value: TerminalWorkspace, now: number): boolean {
+  if (terminalAccess(value, now).active) return false;
+  let changed = false;
+  for (const item of [...value.watches, ...value.radars, ...value.positions]) if (!item.paused) { item.paused = true; changed = true; }
+  if (value.telegram.enabled) { value.telegram.enabled = false; changed = true; }
+  for (const item of value.deliveries) { if (item.state === "queued") { item.state = "cancelled"; changed = true; } else if(item.state === "sending") { item.state="uncertain";item.error="Pass expired during an unresolved delivery; automatic resend is suppressed.";changed=true; } }
+  const last = value.grants.at(-1);
+  if (last && !value.activity.some(e => e.id === `expired:${last.id}`)) { appendTerminalActivity(value, {id:`expired:${last.id}`,at:new Date(now).toISOString(),kind:"pass_expired",subjectId:last.id,message:"Terminal pass expired. Radars, setup watches, position monitoring and Telegram notifications are paused. Renew access, then explicitly resume the items you want."}); changed = true; }
+  return changed;
+}
 export function emptyTerminalWorkspace(owner: string): TerminalWorkspace { return { version: "terminal-workspace-v1", revision: 0, owner: terminalOwner(owner), grants: [], watches: [], radars: [], positions: [], activity: [], deliveries: [], telegram: { enabled: false, events: [] }, aiUsage: { day: "", count: 0 } }; }
 export class TerminalStore {
   constructor(readonly storage: TerminalStorage, private namespace: string, private retentionDays: number) {}
@@ -88,7 +111,7 @@ export class TerminalStore {
   async mutate(owner: string, apply: (value: TerminalWorkspace) => void | boolean) {
     owner = terminalOwner(owner);
     for (let attempt = 0; attempt < 12; attempt++) {
-      const value = await this.get(owner), previous = value.revision;
+      const value = await this.get(owner), previous = value.revision, hadMonitoringWork=terminalHasMonitoringWork(value);
       let migrated = false;
       // Preserve existing lifecycle/expiry byte-for-byte while splitting legacy
       // inline source objects before any next owner-document mutation.
@@ -98,6 +121,7 @@ export class TerminalStore {
       }
       const unchanged = apply(value) === false;
       if (unchanged && !migrated) return value;
+      if(!hadMonitoringWork&&terminalHasMonitoringWork(value))value.nextMonitorAt=0;
       value.revision = previous + 1;
       // Paid periods always survive through their expiry plus the disclosed history retention.
       const until = Math.max(Date.now(), ...value.grants.map(grant => Date.parse(grant.expiresAt))) + this.retentionDays * 86_400_000;
@@ -105,7 +129,7 @@ export class TerminalStore {
     }
     throw new Error("Terminal workspace changed concurrently. Refresh and retry.");
   }
-  async owners(limit = 50) { return this.storage.owners(`${this.namespace}:terminal:owners`, limit); }
+  async owners(limit = 25, dueBefore = Date.now()) { return this.storage.owners(`${this.namespace}:terminal:owners`, limit, dueBefore); }
   async ready() { await this.storage.write(this.key("ready", "probe"), { ready: true }, 60); }
 }
 export function createTerminalStore(cfg: AppConfig) {

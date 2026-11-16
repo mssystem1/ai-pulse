@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, randomUUID } from "node:crypto";
 import express from "express";
 import { getNetwork, loadConfig } from "@pulse/config";
-import { createIndicatorPackage, exportIndicatorPackage } from "@pulse/domain";
+import { createIndicatorPackage, createGraphIndicatorPackage, indicatorGraphTemplates, exportIndicatorPackage } from "@pulse/domain";
 import { createTerminalIndicatorRoutes } from "./terminalIndicatorRoutes.js";
 import { TerminalStore, MemoryTerminalStorage, grantTerminalPass } from "./terminalStore.js";
 import { indicatorAtomic, indicatorOffer, indicatorPaymentNetworks, indicatorCommerceStores } from "./terminalIndicatorCommerce.js";
@@ -11,7 +11,7 @@ import type { verifyTerminalPurchaseReceipt } from "./terminalPayments.js";
 import type { IndicatorPaymentNetwork } from "./terminalIndicatorTypes.js";
 
 const seller = "0x" + "11".repeat(20), buyer = "0x" + "22".repeat(20), stranger = "0x" + "33".repeat(20);
-async function fixture(networks: IndicatorPaymentNetwork[] = ["base"], verifyReceipt?: typeof verifyTerminalPurchaseReceipt) {
+async function fixture(networks: IndicatorPaymentNetwork[] = ["base"], verifyReceipt?: typeof verifyTerminalPurchaseReceipt, graph = false) {
   let now = Date.now(), settlements = 0;
   const cfg = { ...loadConfig(), NODE_ENV: "test" as const, X402_MOCK: true, FEATURE_TRADING_TERMINAL: true, FEATURE_BASE_PAYMENTS: true, FEATURE_ARBITRUM_PAYMENTS: true, enabledNetworks: networks };
   const store = new TerminalStore(new MemoryTerminalStorage(), randomUUID(), 180);
@@ -29,7 +29,7 @@ async function fixture(networks: IndicatorPaymentNetwork[] = ["base"], verifyRec
   const server = app.listen(0, "127.0.0.1"); await new Promise<void>(r => server.once("listening", r));
   const base = `http://127.0.0.1:${(server.address() as any).port}/v1/terminal/indicators`;
   const request = (path = "", method = "GET", body?: unknown, owner = buyer, proof?: string, network = "base") => fetch(base + path, { method, headers: { "content-type": "application/json", "x-owner": owner, "x-network": network, ...(proof ? { "PAYMENT-SIGNATURE": proof } : {}) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
-  const manifest = createIndicatorPackage({ id: "creator.test-flow", title: "Creator flow", author: "Creator", description: "Managed executed volume indicator installation.", kernel: "executed-cvd-v1" });
+  const manifest = graph ? createGraphIndicatorPackage({...indicatorGraphTemplates()[0],id:"creator.price-graph",author:"Graph Publisher"}) : createIndicatorPackage({ id: "creator.test-flow", title: "Creator flow", author: "Creator", description: "Managed executed volume indicator installation.", kernel: "executed-cvd-v1" });
   const offer = { priceUsdc: "0.123456" }, published = await request("", "POST", { manifest, offer }, seller);
   assert.equal(published.status, 201); const item = (await published.json()).item;
   const quote = async (network: IndicatorPaymentNetwork = "base") => { const response = await request(`/${item.id}/quote`, "POST", { requestId: randomUUID(), network }); assert.equal(response.status, 201); return (await response.json()).quote; };
@@ -61,6 +61,7 @@ for (const network of ["xlayer", "base", "arbitrum"] as const) {
       assert.equal(quote.asset, getNetwork(network).paymentAsset.address);
       assert.equal(quote.assetSymbol, getNetwork(network).paymentAsset.symbol);
       assert.equal(quote.amountAtomic, "123456");
+      assert.equal(quote.publisherName, "Creator");
       assert(quote.resource.includes(`/${network}/v1/terminal/indicators/purchases/`));
       const conflicting = await f.request(`/${f.item.id}/quote`, "POST", { requestId: quote.requestId, network: wrong });
       assert.equal(conflicting.status, 409);
@@ -75,6 +76,7 @@ for (const network of ["xlayer", "base", "arbitrum"] as const) {
       const sales = await (await f.request("/purchases", "GET", undefined, seller)).json();
       assert.equal(sales.sales[0].network, network);
       assert.equal(sales.sales[0].asset, getNetwork(network).paymentAsset.address);
+      assert.equal(sales.sales[0].publisherName, "Creator");
     } finally { await f.close(); }
   });
 }
@@ -132,6 +134,44 @@ test("creator version price is immutable and unrelated wallets cannot attach a d
   try {
     assert.equal((await f.request("", "POST", { manifest: f.manifest, offer: { priceUsdc: "0.2" } }, seller)).status, 409);
     assert.equal((await f.request(`/${f.item.id}/registration`, "POST", { processor: seller, circuitId: "1" }, buyer)).status, 403);
+    const malformed = await f.request(`/${f.item.id}/registration`, "POST", { processor: "unknown", circuitId: "0" }, seller);
+    assert.equal(malformed.status, 400); assert.equal((await malformed.json()).code, "indicator_registration_input");
+  } finally { await f.close(); }
+});
+
+test("legacy receipt and sale publisher names come from their purchased bytes after catalog metadata changes", async () => {
+  const f = await fixture();
+  try {
+    const quote = await f.quote();
+    assert.equal((await f.request(`/purchases/${quote.id}`, "POST", { requestId: quote.requestId }, buyer, "proof")).status, 201);
+    const { registry, commerce } = indicatorCommerceStores(f.store);
+    await commerce.mutate(buyer, value => { delete value.indicatorPurchases!.find(p => p.id === quote.id)!.publisherName; });
+    await registry.mutate("0x" + "0".repeat(40), value => {
+      value.indicatorPublications!.find(p => p.id === f.item.id)!.author = "A different current catalog author";
+      delete value.indicatorSales!.find(s => s.id === quote.id)!.publisherName;
+    });
+    const owned = await (await f.request("/purchases")).json(), sales = await (await f.request("/purchases", "GET", undefined, seller)).json();
+    assert.equal(owned.purchases[0].publisherName, f.manifest.author); assert.equal(sales.sales[0].publisherName, f.manifest.author);
+    assert.equal(owned.sales.length, 0); assert.equal(sales.purchases.length, 0);
+    const retry = await f.request(`/${f.item.id}/quote`, "POST", { requestId: quote.requestId, network: "base" });
+    assert.equal(retry.status, 409, "An owned version never requests a second payment");
+    assert.equal((await f.request(`/purchases/${quote.id}/recover`, "POST", {})).status, 200);
+    assert.equal((await commerce.get(buyer)).indicatorPurchases![0].publisherName, f.manifest.author);
+    assert.equal(f.settlements(), 1);
+  } finally { await f.close(); }
+});
+
+test("an unavailable legacy display-name blob cannot hide the original purchase receipt", async () => {
+  const f = await fixture();
+  try {
+    const quote = await f.quote();
+    assert.equal((await f.request(`/purchases/${quote.id}`, "POST", { requestId: quote.requestId }, buyer, "proof")).status, 201);
+    const { registry, commerce } = indicatorCommerceStores(f.store);
+    await commerce.mutate(buyer, value => { delete value.indicatorPurchases![0].publisherName; });
+    const originalRead = f.store.storage.read.bind(f.store.storage);
+    f.store.storage.read = async key => { if (key === registry.key("package", quote.sha256)) throw Error("Optional original package is temporarily unavailable"); return originalRead(key); };
+    const response = await f.request("/purchases"), value = await response.json();
+    assert.equal(response.status, 200); assert.equal(value.purchases[0].id, quote.id); assert.equal(value.purchases[0].publisher, seller); assert.equal(value.purchases[0].state, "granted"); assert.equal(value.purchases[0].publisherName, undefined); assert.equal(f.settlements(), 1);
   } finally { await f.close(); }
 });
 
@@ -219,4 +259,9 @@ test("lost settlement acknowledgement recovers the saved network authorization a
  const recovered=await f.request(`/purchases/${q.id}/recover`,"POST",{transactionHash:"0x"+"66".repeat(32)});assert.equal(recovered.status,200);assert.equal((await recovered.json()).entitled,true);assert(verified);assert.equal(f.settlements(),0);
  assert.equal((await f.request(`/purchases/${q.id}/recover`,"POST",{})).status,200);assert.equal(f.settlements(),0);
  }finally{await f.close();}
+});
+
+
+test("v4 price graph can be purchased once and its immutable package restored after delisting",async()=>{
+ const f=await fixture(["base"],undefined,true);try{const q=await f.quote();assert.equal(q.publisherName,"Graph Publisher");assert.equal((await f.request(`/purchases/${q.id}`,"POST",{requestId:q.requestId},buyer,"proof")).status,201);assert.equal((await f.request(`/purchases/${q.id}`,"POST",{requestId:q.requestId},buyer,"proof")).status,200);assert.equal(f.settlements(),1);assert.equal((await f.request(`/${f.item.id}`,"DELETE",undefined,seller)).status,200);const restored=await(await f.request(`/${f.item.id}`)).json();assert.deepEqual(restored.manifest,f.manifest);assert.equal(restored.item.entitled,true);assert.equal(restored.item.author,"Graph Publisher");}finally{await f.close();}
 });

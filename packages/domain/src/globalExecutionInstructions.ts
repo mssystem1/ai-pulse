@@ -44,7 +44,7 @@ export function globalExecutionInstructions(report: GlobalReport): string | null
   const instruction = policy.mode === "passive_limit"
     ? zh
       ? `被动限价计划：仅在 ${zone} 的${family}考虑${p.side === "long" ? "买入" : "卖出"}。该计划不以随后出现的确认作为当前入场证据。`
-      : `Passive limit plan: ${p.side === "long" ? "buy" : "sell"} only within ${zone} at the ${family}. This policy does not require a later confirmation to justify the limit entry.`
+      : `Passive limit plan: ${p.side === "long" ? "buy" : "sell"} only within ${zone} at the ${family}. This policy does not require a later confirmation. A limit order may be prepared at this saved region now once its payoff and current eligibility checks pass. It remains unfilled until the venue confirms execution.`
     : confirmationObserved
       ? zh
         ? `${frame} 的价格回测事件已经观察到。仅在所示 ${zone} 的回测区域复核入场；该事件不代表完整入场资格或实际成交。`

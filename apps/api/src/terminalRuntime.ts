@@ -6,7 +6,7 @@ import { globalSetupAdmission, terminalFrameProfile, type TerminalMarketSnapshot
 import { GlobalReportSchema, GlobalScenarioSchema, type GlobalAssessment, type GlobalReport, type GlobalScenario } from "@pulse/schemas";
 import { recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
 import { TerminalAuth } from "./terminalAuth.js";
-import { appendTerminalActivity, createTerminalStore, terminalAccess, type TerminalActivity, type TerminalPosition, type TerminalRadar, type TerminalSourceIssue, type TerminalStore, type TerminalWatch, type TerminalWorkspace } from "./terminalStore.js";
+import { appendTerminalActivity, createTerminalStore, terminalAccess, suspendExpiredTerminal, terminalMonitoringDueAt, type TerminalActivity, type TerminalPosition, type TerminalRadar, type TerminalSourceIssue, type TerminalStore, type TerminalWatch, type TerminalWorkspace } from "./terminalStore.js";
 import { inspectTelegramConfiguration } from "./telegram.js";
 import { StoreRedis } from "./storeRedis.js";
 import { createGlobalScenarioStore, GlobalScenarioHistoryUnavailableError, reconcileGlobalScenarioAssessment, type GlobalScenarioStore } from "./globalScenarioStore.js";
@@ -182,7 +182,8 @@ export class TerminalRuntime {
     return linked?.wallet === owner ? id : null;
   }
   async workspace(owner: string) {
-    const value = await this.store.get(owner), configuration = inspectTelegramConfiguration();
+    let value = await this.store.get(owner); if (!terminalAccess(value, this.now()).active && terminalMonitoringDueAt(value, this.now()) === 0) value = await this.store.mutate(owner, draft => suspendExpiredTerminal(draft, this.now()));
+    const configuration = inspectTelegramConfiguration();
     let linkUnavailable = false;
     const linked = await this.recipient(owner).catch(() => { linkUnavailable = true; return null; });
     const botUsername = /^[A-Za-z\d_]{5,32}$/.test(configuration.botUsername) ? configuration.botUsername : null;
@@ -253,7 +254,9 @@ export class TerminalRuntime {
     const now = this.now(), token = randomUUID();
     const claimed = await this.store.mutate(owner, value => {
       if (value.monitoringLease && value.monitoringLease.until > now || now - (value.lastMonitorAt ?? 0) < this.cfg.TERMINAL_MONITOR_INTERVAL_MS) return false;
-      value.monitoringLease = { token, until: now + 120_000 }; value.lastMonitorAt = now;
+      const due=terminalMonitoringDueAt(value,now);
+      if(due>now){if(value.nextMonitorAt!==due){value.nextMonitorAt=due;return;}return false;}
+      value.monitoringLease = { token, until: now + 120_000 }; value.lastMonitorAt = now; value.nextMonitorAt = now + this.cfg.TERMINAL_MONITOR_INTERVAL_MS;
     });
     if (claimed.monitoringLease?.token !== token) return { skipped: true };
     try {
@@ -264,10 +267,7 @@ export class TerminalRuntime {
           // Checkout can renew access while recipient/source reads are pending.
           // The claimed copy cannot end a pass that is active in this CAS.
           if (terminalAccess(value, this.now()).active) return false;
-          if (!value.grants.length) return false;
-          const last = value.grants.at(-1)!;
-          this.publish(value, { id: `expired:${last.id}`, at: new Date(now).toISOString(), kind: "pass_expired", subjectId: last.id, message: "Terminal access expired. Monitoring and AI are paused; recorded positions and exchange protection are unchanged." }, true, recipient);
-          for (const item of value.deliveries) if (item.state === "queued" && value.activity.find(e => e.id === item.eventId)?.kind !== "pass_expired") item.state = "cancelled";
+          return suspendExpiredTerminal(value, this.now());
         });
       } else {
         const watches = await Promise.all(claimed.watches.filter(w => !w.paused && !["invalidated", "expired", "completed", "entry_observed"].includes(w.state)).map(async watch => {
@@ -296,7 +296,12 @@ export class TerminalRuntime {
           } else if (snapshot.status === "data_needed") issue = terminalRadarSourceIssue(snapshot);
           return { radar, snapshot, issue };
         }));
-        const positions = await Promise.all(claimed.positions.filter(p => !p.paused && p.status === "open").map(async position => ({ position, market: await this.snapshot(position.instId, position.timeframe).catch(() => null) })));
+        const positions = await Promise.all(claimed.positions.filter(p => !p.paused && p.status === "open").map(async position => {
+          // Spot journal risk needs the current ticker, not a full multi-frame
+          // report and every market tool. Injected snapshots remain supported.
+          if(position.instrumentType==="spot"&&!this.deps.snapshot)return{position,market:null,reference:await this.quote(position.instId).catch(()=>null)};
+          return{position,market:await this.snapshot(position.instId,position.timeframe).catch(()=>null),reference:null};
+        }));
         await this.store.mutate(owner, value => {
           if (!this.ownsMonitoringLease(value, token)) return false;
           if (!terminalAccess(value, this.now()).active) return false;
@@ -304,12 +309,13 @@ export class TerminalRuntime {
             const current = value.watches.find(w => w.id === watch.id); if (!current || current.paused || current.lastObservedAt !== watch.lastObservedAt) continue;
             const bad = !assessment || assessment.blockers.some(b => ["history", "source_revised", "quote"].includes(b));
             const scenario = bad ? current.scenario : assessment.scenario ?? current.scenario;
-            const state = bad ? "data_needed" : scenario.state;
-            const sourceIssue = bad ? terminalWatchSourceIssue({ assessment, sourceReportUnavailable, error }, now) : undefined;
-            const reason = sourceIssue?.message ?? scenario.reason ?? assessment!.lines[0] ?? terminalScenarioNext(state);
-            for (const event of scenario.events.filter(e => !current.scenario.events.some(old => old.id === e.id))) this.publish(value, { id: `watch:${current.id}:${event.id}`, at: new Date(now).toISOString(), sourceAt: new Date(event.at).toISOString(), kind: event.kind === "confirmation" ? "conditions_satisfied" : `watch_${event.kind}`, subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: event.kind === "confirmation" ? terminalConfirmationMessage(assessment!, scenario.state) : `${event.kind}: ${terminalScenarioNext(scenario.state)} Price observations do not establish a venue fill.` }, current.telegram, recipient);
+            const stopBreach=assessment?.state==="invalidated"&&assessment.blockers.includes("cancelled");
+            const state = stopBreach?"invalidated":bad ? "data_needed" : scenario.state;
+            const sourceIssue = bad&&!stopBreach ? terminalWatchSourceIssue({ assessment, sourceReportUnavailable, error }, now) : undefined;
+            const reason = stopBreach?"A fresh same-market quote reached the saved fixed hard stop. This setup supplies no new entry; no exchange fill or order cancellation is asserted.":sourceIssue?.message ?? scenario.reason ?? assessment!.lines[0] ?? terminalScenarioNext(state);
+            for (const event of (stopBreach?[]:scenario.events.filter(e => !current.scenario.events.some(old => old.id === e.id)))) this.publish(value, { id: `watch:${current.id}:${event.id}`, at: new Date(now).toISOString(), sourceAt: new Date(event.at).toISOString(), kind: event.kind === "confirmation" ? "conditions_satisfied" : `watch_${event.kind}`, subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: event.kind === "confirmation" ? terminalConfirmationMessage(assessment!, scenario.state) : `${event.kind}: ${terminalScenarioNext(scenario.state)} Price observations do not establish a venue fill.` }, current.telegram, recipient);
             if (state !== current.state || sourceIssue && sourceIssue.code !== current.sourceIssue?.code) this.publish(value, { id: `watch-state:${current.id}:${state}:${sourceIssue?.code ?? "verified"}:${now}`, at: new Date(now).toISOString(), kind: state === "data_needed" ? "source_interruption" : `watch_${state}`, subjectId: current.id, instId: current.instId, timeframe: current.timeframe, message: reason }, current.telegram, recipient);
-            current.scenario = scenario; current.state = state; current.reason = reason; current.nextEvent = bad ? "Monitoring retries automatically. Refresh conditions to retry now; incomplete intervals must be verified before progress resumes." : terminalScenarioNext(state); current.lastObservedAt = new Date(now).toISOString();
+            current.scenario = scenario; current.state = state; current.reason = reason; current.nextEvent = bad&&!stopBreach ? "Monitoring retries automatically. Refresh conditions to retry now; incomplete intervals must be verified before progress resumes." : terminalScenarioNext(state); current.lastObservedAt = new Date(now).toISOString();
             if (sourceIssue) current.sourceIssue = sourceIssue; else delete current.sourceIssue;
           }
           for (const { radar, snapshot, issue } of radars) {
@@ -324,11 +330,11 @@ export class TerminalRuntime {
             if (issue) retained.notificationIssue = issue; else delete retained.notificationIssue;
             current.snapshot = snapshot; current.state = snapshot.status; current.reason = issue?.message ?? snapshot.events.at(-1)?.reason ?? snapshot.next; current.nextEvent = snapshot.next; current.lastObservedAt = new Date(now).toISOString();
           }
-          for (const { position, market } of positions) {
+          for (const { position, market, reference } of positions) {
             const current = value.positions.find(p => p.id === position.id); if (!current || current.paused || current.status !== "open") continue;
             const derivatives = market?.tools.derivatives;
-            const q = current.instrumentType === "perpetual" ? derivatives?.markPrice !== undefined ? { price: derivatives.markPrice, ts: derivatives.markPriceAt ?? 0 } : undefined : market?.report.currentMarket?.quote;
-            const source = current.instrumentType === "perpetual" ? `${derivatives?.source}:${derivatives?.instrumentId ?? "unknown-contract"}` : `${market?.report.snapshot.source}:${current.instId}`;
+            const q = current.instrumentType === "perpetual" ? derivatives?.markPrice !== undefined ? { price: derivatives.markPrice, ts: derivatives.markPriceAt ?? 0 } : undefined : reference??market?.report.currentMarket?.quote;
+            const source = current.instrumentType === "perpetual" ? `${derivatives?.source}:${derivatives?.instrumentId ?? "unknown-contract"}` : `${reference?.source??market?.report.snapshot.source}:${current.instId}`;
             const kind = current.instrumentType === "perpetual" ? "perpetual-mark-reference" as const : "spot-reference" as const;
             // Keep the accepted source cursor independently of the displayed
             // fresh mark. Outages must not erase chronology and permit a later
@@ -351,10 +357,13 @@ export class TerminalRuntime {
       }
       await this.deliver(owner, token);
       return { skipped: false };
-    } finally { await this.store.mutate(owner, value => { if (value.monitoringLease?.token !== token) return false; delete value.monitoringLease; }); }
+    } finally { await this.store.mutate(owner, value => { if (value.monitoringLease?.token !== token) return false; delete value.monitoringLease; value.nextMonitorAt=terminalMonitoringDueAt(value,this.now()); }); }
   }
   async deliver(owner: string, monitoringToken?: string) {
-    const now = this.now(), recipient = await this.recipient(owner);
+    const now = this.now(), before = await this.store.get(owner);
+    if (!before.deliveries.some(item => item.state === "queued" || item.state === "sending")) return;
+    if (!terminalAccess(before, now).active) { await this.store.mutate(owner, value => suspendExpiredTerminal(value, this.now())); return; }
+    const recipient = await this.recipient(owner);
     let selectedId: string | undefined;
     const prepared = await this.store.mutate(owner, value => {
       selectedId = undefined;
@@ -363,7 +372,7 @@ export class TerminalRuntime {
         if (item.state === "sending") { item.state = "uncertain"; item.error = "Delivery acknowledgement was interrupted; automatic resend is suppressed."; }
         const event = value.activity.find(e => e.id === item.eventId), subject = [...value.watches, ...value.radars, ...value.positions].find(s => s.id === item.subjectId);
         const active = terminalAccess(value, this.now()).active;
-        if (item.state === "queued" && (!recipient || item.recipientId !== recipient || !value.telegram.enabled || !event || !terminalNotificationConsent(event, value.telegram.events) || (event?.kind === "pass_expired" ? active : !active || !subject || subject.paused || !subject.telegram))) item.state = "cancelled";
+        if (item.state === "queued" && (!recipient || item.recipientId !== recipient || !value.telegram.enabled || !event || !terminalNotificationConsent(event, value.telegram.events) || (!active || event?.kind === "pass_expired" || !subject || subject.paused || !subject.telegram))) item.state = "cancelled";
       }
       const item = value.deliveries.find(d => d.state === "queued");
       if (item) { item.state = "sending"; item.attemptedAt = new Date(now).toISOString(); selectedId = item.id; }
@@ -373,6 +382,12 @@ export class TerminalRuntime {
     let messageId: number | undefined, failure: string | undefined;
     try {
       if (!event || !recipient) throw new Error("Notification event or recipient is unavailable");
+      // Recheck after asynchronous recipient lookup and preparation. Expiry
+      // or revocation during either await must prevent the external send.
+      const latest = await this.store.get(owner), subject = [...latest.watches,...latest.radars,...latest.positions].find(s=>s.id===item.subjectId);
+      if (!terminalAccess(latest,this.now()).active || !latest.telegram.enabled || !subject || subject.paused || !subject.telegram || !terminalNotificationConsent(event,latest.telegram.events)) {
+        await this.store.mutate(owner,value=>{const saved=value.deliveries.find(d=>d.id===item.id);if(!saved||saved.state!=="sending")return false;saved.state="cancelled";}); return;
+      }
       const text = formatTerminalNotification(event);
       if (this.deps.telegramSend) messageId = await this.deps.telegramSend(recipient, text);
       else {
@@ -389,15 +404,16 @@ export class TerminalRuntime {
 const runtimes = new Map<string, TerminalRuntime>();
 export function registerTerminalRuntime(runtime: TerminalRuntime) { runtimes.set(runtime.cfg.PERSISTENCE_NAMESPACE, runtime); }
 export async function runTerminalCycle(cfg: AppConfig) {
-  if (!cfg.FEATURE_TRADING_TERMINAL) return { skipped: true };
+  if (!cfg.FEATURE_TRADING_TERMINAL || cfg.TERMINAL_BACKGROUND_PAUSED) return { skipped: true };
   const runtime = runtimes.get(cfg.PERSISTENCE_NAMESPACE); if (!runtime) return { skipped: true, reason: "terminal_storage_unavailable" };
-  const owners = await runtime.store.owners();
+  const owners = await runtime.store.owners(cfg.TERMINAL_MONITOR_BATCH_SIZE, runtime.now());
   const results = [], deadline = Date.now() + 45_000;
   for (const owner of owners) { if (Date.now() >= deadline) break; results.push(await runtime.cycleOwner(owner).catch(() => ({ failed: true }))); }
   return { owners: owners.length, failures: results.filter(result => "failed" in result).length };
 }
 export function startTerminalMonitorWorker(cfg: AppConfig) {
-  if (!cfg.FEATURE_TRADING_TERMINAL || cfg.NODE_ENV === "test" || process.env.AUTOMATION_WORKER_ENABLED !== "1") return () => {};
-  const timer = setInterval(() => void runTerminalCycle(cfg).catch(() => console.warn("[terminal] Monitoring cycle unavailable; durable progress is preserved")), cfg.TERMINAL_MONITOR_INTERVAL_MS);
+  if (!cfg.FEATURE_TRADING_TERMINAL || cfg.TERMINAL_BACKGROUND_PAUSED || cfg.NODE_ENV === "test" || process.env.AUTOMATION_WORKER_ENABLED !== "1") return () => {};
+  let running=false, failures=0, retryAt=0;
+  const timer = setInterval(() => { if(running||Date.now()<retryAt)return; running=true; void runTerminalCycle(cfg).then(()=>{failures=0;}).catch(()=>{failures++;retryAt=Date.now()+Math.min(900_000,cfg.TERMINAL_MONITOR_INTERVAL_MS*2**Math.min(failures,5));console.warn("[terminal] Monitoring unavailable; retry backoff active");}).finally(()=>{running=false;}); }, cfg.TERMINAL_MONITOR_INTERVAL_MS);
   timer.unref(); return () => clearInterval(timer);
 }

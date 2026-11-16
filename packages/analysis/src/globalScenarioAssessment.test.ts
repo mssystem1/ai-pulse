@@ -47,6 +47,7 @@ test("v8 dispatch keeps passive limit prices and never borrows canonical confirm
   assert.equal(a.scenario?.definition.hardStop, 95); assert.deepEqual(a.scenario?.definition.entryZone, [99, 101]);
   assert.match(a.lines.join("\n"), /does not borrow later confirmation/); assert.deepEqual(report, before);
   assert.deepEqual(assessGlobalReport(report, market, context, entry), a);
+  market.ticker.last=94;const breached=assessGlobalEntryReport(report,market,context,entry);assert.equal(breached.state,"invalidated");assert(breached.blockers.includes("cancelled"));assert.equal(breached.permittedEntry,null);assert.match(breached.lines.join(" "),/fixed hard stop/);
 });
 
 test("a causal confirmed retest can be reviewed only at the original bounded Entry", () => {

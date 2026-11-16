@@ -1,8 +1,8 @@
 # PULSE Indicator Market
 
-PULSE Indicator Market turns numerical calculations into versioned, portable trading tools. It has visible destinations in Trading Terminal: **Indicators Market** for discovery and installation and **Create indicator** for authoring. Installed tools appear alongside the price chart. The public landing has a dedicated **PULSE Indicator Market** section, and the app has illustrated [installation](https://app.ai-pulse.tech/docs#docs-indicator-market) and [creator](https://app.ai-pulse.tech/docs#docs-create-indicator) guides.
+PULSE Indicator Market turns numerical calculations into versioned, portable trading tools. It has dedicated destinations in Trading Terminal: **Indicator Market** for discovery/purchases, **Create indicator** for authoring and **My indicators** for creations, purchases and chart use. Installed tools appear alongside the price chart. The public landing has a dedicated **PULSE Indicator Market** section, and the app has illustrated [installation](https://app.ai-pulse.tech/docs#docs-indicator-market) and [creator](https://app.ai-pulse.tech/docs#docs-create-indicator) guides.
 
-The PULSE header and top-level tabs remain intact. Trading Terminal stays immediately after Portfolio. Its seven-section workspace separates Trading Terminal, Market tools, Market Radar, Create indicator, Indicators Market, My opened positions and Alerts & Activity. One selected market and timeframe carry between sections. Terminal passes, Global reports and creator indicator services remain separate products.
+The PULSE header and top-level tabs remain intact. Trading Terminal stays immediately after Portfolio. Its eight-section workspace separates Trading Terminal, Market tools, Market Radar, Create indicator, Indicator Market, My indicators, My open positions and Alerts & activity. One selected market and timeframe carry between sections. Terminal passes, Global reports and creator indicator services remain separate products.
 
 ## Use it
 
@@ -10,15 +10,74 @@ The PULSE header and top-level tabs remain intact. Trading Terminal stays immedi
 2. For a first reading, select **Buyer participation** and **Add to chart**. Free tools install directly. Paid managed-service listings require their separate reviewed quote and explicit payment first.
 3. Open **Trading Terminal** and compare the installed percentage pane with price on the shared time axis. Quantity and percentage studies keep independent scales. Hover or tap a resolved point to inspect its timestamp and value. Check the named market, Spot/Futures stream, source interval, covered dates and gaps.
 4. Read actual bought/sold quantities for the same source bucket in the source details or Market tools. You do not need to type test numbers, import a file, provide a package ID or enter a contract address to use an indicator.
-5. Show/hide changes its visibility; Remove uninstalls it. **Inspect execution window on chart** is an optional way to inspect the covered input window. The printed source interval defines each calculation bar: twenty one-minute bars remain twenty minutes on a daily price chart. A broad price timeframe cannot manufacture historical executions.
+5. In **My indicators → Applied & installed indicators**, show/hide changes its visibility; Remove uninstalls it. **Inspect execution window on chart** is an optional way to inspect the covered input window. The printed source interval defines each calculation bar: twenty one-minute bars remain twenty minutes on a daily price chart. A broad price timeframe cannot manufacture historical executions.
 
 Worked reading: buyer participation is `buy / (buy + sell)`. If a captured bucket really contains 120 bought and 80 sold, its buyer share is 60% and normalized delta is 20%. Those numbers are an illustration; the live preview uses actual source quantities. Compare its corresponding candle and nearby price level. Aggressive buying can coincide with flat or falling price; participation is evidence about executions, not an automatic entry.
 
-## Create and share
+## Visual and script Studio
 
-Open **Create indicator**: `/trading-terminal?terminalSection=creator`. **Start with a working indicator** gives you a usable template before asking for publication details. Use **Inputs & formula** and **Appearance** alongside the actual selected-market preview. **Add & view on chart** installs the study and opens its chart; **Save draft** retains work in this browser. **Publish** is a separate optional step for name, creator display name, description and free/paid terms.
+**Create indicator** opens **Visual & script Studio**. Start with a working price, volatility, executed-flow or sequential-condition template. Enter **Indicator name** and **Publisher name**; IDs and versions are automatic. Publisher names appear on catalog cards, creations, installed studies, purchases and the native chart legend. The publishing wallet identifies the account that published a version; a typed name alone is not verified identity.
 
-Package IDs and versions are generated; technical identities, raw expressions and circuit details are advanced controls. No processor or circuit address is required for ordinary creation. Import/export belongs under **Move a saved indicator between apps**, not the mandatory creation path. Drafts and the private installed library remain browser-local; shared publications and purchased-version records use service storage. The publishing wallet is authenticated; a typed creator name is display information. `pulse.*` IDs are reserved for built-ins.
+| Studio template | Source and chart result |
+|---|---|
+| EMA trend 20 / 50 | Completed primary-timeframe closes; two price overlays and a separate crossover condition |
+| Bollinger-style bands 20 / 2 | SMA20 plus/minus two population standard deviations on price |
+| RSI 14 | Wilder-smoothed completed-close RSI in a percentage pane; fourteen close changes required |
+| ATR 14 & volatility bands | Wilder true range plus close ± two ATR price overlays |
+| Sweep → reclaim → hold stateflow | Capture the prior twenty-bar low at the sweep, then require distinct later reclaim/hold bars within the configured window |
+| Tapeout executed delta & EMA 8 | Actual bought-minus-sold quantities through the numerical NAND kernel, then an eight-execution-source-bar EMA |
+
+**Visual blocks** connects earlier inputs to calculations and named outputs. Select periods, source nodes and sequential-condition stages. Each output declares its price-overlay/indicator-pane destination, line/histogram style, units and color. **Script editor** edits the same graph; **Compile script & update preview** must succeed before that text becomes the working calculation. No arbitrary JavaScript runs.
+
+### Complete example: EMA overlays and crossover
+
+1. Select a market/timeframe in Trading Terminal, open Create indicator and choose **EMA trend 20 / 50**. Fill in your publisher name and a useful indicator name.
+2. Inspect the `close → EMA20`, `close → EMA50` and crossover blocks, or open Script editor and compile:
+
+```text
+fast = ema(close,20)
+slow = ema(close,50)
+cross = crossover(fast,slow)
+plot(fast,"EMA 20","price","line","price","#22d3ee")
+plot(slow,"EMA 50","price","line","price","#fbbf24")
+plot(cross,"Bullish EMA crossover","indicator","histogram","scalar","#34d399")
+```
+
+3. Preview actual completed candles for the chosen primary timeframe. EMA50 needs fifty contiguous eligible closes. Warm-up and gaps remain blank; a crossover requires earlier and current resolved values. It cannot cross a source gap.
+4. **Save to My indicators** retains a private device-local working copy. **Add & view on chart** applies the calculation and opens its plotted chart. EMA20/50 are price overlays; the named crossover appears in an indicator pane, with its own units and publisher legend.
+5. Open **My indicators** to reopen a creation, manage applied studies or restore a purchased version. Reopening a creation makes a new working version; it does not alter a previously purchased package.
+6. Publishing is optional. On Create indicator, choose a calculation reference only when an exact matching registered numerical core is recommended. A pure price graph should remain **Local calculation**. In **Publish or sell this indicator**, describe the tool and choose free access or a paid version; publish only after inspecting its real preview.
+
+### Stateflow and language boundaries
+
+The stateflow template first detects a sweep of the prior twenty-bar low, captures that boundary and compares later reclaim/hold conditions against the captured level. Distinct later completed bars must advance each stage within the configured span. Gaps reset state. This is an indicator event; it does not automatically create Market Radar, Telegram delivery, an order or a position.
+
+The additive **`pulse-indicator-v4`** format carries a bounded causal graph with up to **64 ordered nodes**, **8 plots**, and periods **1–200**. Sources are completed `open/high/low/close/volume` and actual executed `buy/sell`. Supported operations include arithmetic, EMA/SMA/sum, population standard deviation, rolling extrema, RSI, ATR, lag, comparisons/crosses, captured values and ordered sequences. Cycles, forward references, lookahead, loops, imports, external fetches and arbitrary code are rejected. Mixed price/flow calculations require aligned actual source clocks; missing alignment remains unknown. This is a PULSE language and does not accept unrestricted Pine scripts.
+
+The earlier **Executed-flow builder** remains available for v3 formula/rolling recipes described below. v1/v2/v3 packages remain readable. OHLCV and stateful graph calculations run in the compatible host. A `tap_delta(buy,sell)` block executes the exact per-bar delta using Tapeout; pure price graphs do not silently use the bundled flow core.
+
+### Reuse a registered calculation while creating
+
+The **Portable calculation core** picker is on **Create indicator**, before publication. It lists recommended cores from the existing registered catalog only when the numerical netlist, input bits and output bits match exactly. It deduplicates the same processor/circuit. Select a recommendation without entering an address, or leave Local calculation. Advanced creators can supply another existing reference on this same page; manual attachment fields are not in the marketplace.
+
+PULSE independently checks a selected reference before attaching it to the published version. If the listing publishes but this separate check fails, the UI explicitly reports that the listing exists without the reference; it does not claim a successful attachment. The same unchanged version can retry. A reference identifies reusable math across compatible Tapeout apps. It cannot improve returns, certify exchange data, prove an entire host graph ran on-chain or replace a trading strategy. A pure price graph without an active numerical kernel is never recommended an unrelated flow registration.
+
+Actual UI captures for this workflow: [Studio](../apps/web/public/docs/indicator-studio-live-example.png), [My indicators](../apps/web/public/docs/indicator-my-library-live-example.png). They are historical test-session images; check market, timeframe, coverage and UTC clocks instead of treating them as a current call.
+
+## My indicators and purchasing
+
+**My indicators** is a separate sidebar destination: `/trading-terminal?terminalSection=my-indicators`.
+
+- **Created by you:** private creations/drafts saved on this device; Open in builder edits a working copy.
+- **Your published indicators:** catalog versions published by the signed-in wallet.
+- **Purchased indicators:** immutable wallet-owned receipts with restoration even after delisting.
+- **Applied & installed indicators:** show/hide, View chart, export or remove installed packages. Numerical mini-previews are collapsed; the shared Terminal chart is the trading view.
+
+In Indicator Market read the publisher name/wallet, exact version, description and offer. Select an enabled payment network in the existing header, choose **Review purchase**, then review indicator, publisher recipient, token, network, amount and quote expiry. Approve the exact payment once. The purchased version installs and the receipt appears in My indicators. Restoring it never charges again, and delisting does not replace its bytes with a newer package. Unresolved payment acknowledgement must recover the original transaction instead of requesting another payment. Buying an indicator does not renew a Terminal pass, buy future versions or purchase profitable trades. Private working copies are browser-local; purchase receipts are service-backed and wallet-scoped.
+
+## Executed-flow builder
+
+Select **Executed-flow builder** on Create indicator for the earlier formula-and-series workflow. Imports and technical IDs are optional. Authoring, preview and chart use do not require a file or circuit address. Publisher name is visible; the wallet identifies a publication.
 
 ### Templates and a worked build
 
@@ -47,7 +106,7 @@ An optional weighted-flow example uses `2 * buy - sell`; it is deliberately asym
 - Optional conditions are strictly above/below, cross above or cross below a finite threshold. A crossover requires available previous/current outputs and cannot bridge a gap. These conditions describe measurements; they do not silently create Radar watches, Telegram subscriptions or exchange orders.
 - Plots are lines or histograms. Percentage display converts BPS output to percent explicitly, retaining the raw numerical units for portable evaluation.
 
-The host performs series state, conditions and plotting; the NAND circuit performs the actual per-bar calculation. A registered kernel does not mean an entire EMA/rolling/condition pipeline ran on-chain. The exported recipe declares this split so another host can reproduce it. This is a bounded native executed-flow builder, not full Pine/MMT language parity, unrestricted price scripting or a strategy change.
+The host performs series state, conditions and plotting; the NAND circuit performs the actual per-bar calculation. A registered kernel does not mean an entire EMA/rolling/condition pipeline ran on-chain. The exported recipe declares this split so another host can reproduce it. This v3 mode is the bounded executed-flow builder. Studio v4 separately supports the completed-OHLCV graph above; neither mode provides unrestricted Pine/MMT language parity or changes a report strategy.
 
 ### Custom formula language
 
@@ -83,7 +142,7 @@ The server snapshots terms in an expiring quote and binds payer/payee/asset/amou
 
 ## What Tapeout does
 
-Numerical kernels carry actual combinational NAND netlists using TAP-02 signal numbering, least-significant-first bit packing and final-signal outputs. The calculations execute through these gates. The v1 CVD kernel computes subtraction and signed accumulation; buyer participation computes multiplication and integer division; creator kernels compute their compiled per-bar expression. The v3 recipe's rolling/EMA state, comparisons and visuals execute explicitly in the host and are not proved by a kernel registration.
+Numerical kernels carry actual combinational NAND netlists using TAP-02 signal numbering, least-significant-first bit packing and final-signal outputs. These numerical calculations execute through the gates. The v1 CVD kernel computes subtraction and signed accumulation; buyer participation computes multiplication and integer division; v2/v3 creator kernels compute their compiled per-bar expression. A v4 graph executes its numerical delta kernel only when an explicit `tap_delta` node is active. Pure OHLCV graphs use host calculations without claiming kernel execution. Rolling/EMA state, graph calculations, comparisons and visuals execute explicitly in the host and are not proved by a numerical-core registration.
 
 Local packages retain an unregistered publication declaration. A catalog listing can separately attach a **verified X Layer registration record** containing its processor, circuit ID, verification block and optional transaction reference. The publisher-only registration endpoint independently checks deployed ports/netlist and numerical vectors through two RPC sources before returning registered status. A creator-provided address alone is not accepted as evidence.
 
@@ -128,7 +187,9 @@ const result = evaluateIndicator(manifest, {
 });
 ```
 
-The standalone files `/indicator-market/portable-host.html` and `/indicator-market/tap02-host.js` demonstrate an independent numeric host. They can be served by another static application. Integrators remain responsible for truthful market inputs, source coverage and their host's security.
+For v4 Studio packages, also supply actual completed price inputs when required: `price: {source,status,knownAt,windowStart,windowEnd,intervalMs,candles}`. Each candle carries `ts,end,open,high,low,close,volume`; declared missing intervals remain unknown. `result.outputs` lists each declared plot with its resolved timestamped values. Do not interpret its multiple price/RSI/condition outputs using the per-bar kernel's volume units.
+
+The standalone files `/indicator-market/portable-host.html` and `/indicator-market/tap02-host.js` demonstrate an independent host. They can be served by another static application. Integrators remain responsible for truthful market inputs, source coverage and their host's security. Graph execution and numerical-kernel execution remain explicitly distinguished.
 
 Wallet authentication and the Terminal feature gate apply. Publishing and managed-service purchase require an active Terminal pass. Private purchase/sales data stays scoped to the signed-in wallet:
 
@@ -165,7 +226,7 @@ From the repository root, with the configured test wallet, durable storage and p
 node --import tsx scripts/audit-terminal-indicator-market.ts --live --browser
 ```
 
-This uses an existing wallet-wide pass and refuses to sign a new payment without `--spend`. That flag permits the strictly capped 1.50 USDC Base 24-hour test pass when access is absent; it is not blanket authorization for creator purchases or X Layer fabrication. Its persisted marker prevents automatic repayment after an uncertain attempt; reconcile the original receipt first. Artifacts are written under `.tmp/indicator-market-e2e/`, with proof encrypted rather than printed. The browser uses only a restricted ownership-message signer; it cannot send a transaction. QA catalog publications are removed after testing.
+This reuses an existing wallet-wide pass and refuses new payment authorization without `--spend`. Its Base pass ceiling is 1.50 USDC for 24 hours when access is absent; it is not blanket permission for creator purchases or X Layer fabrication. The separate `--commerce --browser --browser-commerce` path tests the actual creator checkout UI against its pinned QA listing and original receipt. With `--spend`, that path permits only its specifically bounded 0.001 USDC Base creator authorization when no original attempt exists. Its persisted marker prevents automatic repayment after an uncertain attempt; reconcile the original receipt first. Artifacts are under `.tmp/indicator-market-e2e/`, with proof encrypted rather than printed. The test browser has restricted ownership signing and narrowly validated typed-payment signing; it cannot send arbitrary wallet transactions. QA catalog publications are removed after testing. A prior successful payment is evidence for its recorded checkout, not automatic acceptance of later UI or language changes.
 
 ## Ask PULSE and models
 
@@ -174,3 +235,8 @@ Purple **✦ / Ask PULSE** buttons open an evidence-bound question. Indicator ex
 Ask PULSE uses `GROK_COPILOT_MODEL` when explicitly set; an empty/omitted value inherits `GROK_MODEL` (default `grok-4.7`). `GROK_REASONING_COPILOT` controls explanation effort (default low); `GROK_MAX_OUTPUT_COPILOT` controls its output limit. The service catalog and each newly saved answer record the selected/returned model. Explicit older overrides remain intentional operator settings. Restart/redeploy the service after changing its environment.
 
 Grok 4.7 is documented for reasoning and knowledge work; model-provider benchmarks do not establish profitable trading performance. [Official model documentation](https://docs.x.ai/developers/models/grok-4.7).
+
+
+## November 16 local workflow acceptance
+
+See [the ten-issue record](TERMINAL_TEN_ISSUE_AUDIT_2026-11-16.md) for the current Studio/library/circuit-selection and resource-control checks. The offline replay uses committed public BTC inputs, local API state and TEST_WALLET_ADDRESS login. It generates no fresh paid report, uses no Railway/Redis and does not sign a payment. This is separate from the earlier funded acceptance records above.

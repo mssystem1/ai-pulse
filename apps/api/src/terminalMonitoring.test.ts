@@ -4,7 +4,7 @@ import { loadConfig, type AppConfig } from "@pulse/config";
 import type { TerminalMarketSnapshot } from "@pulse/domain";
 import type { GlobalAssessment, GlobalReport } from "@pulse/schemas";
 import { TerminalRuntime, terminalConfirmationMessage } from "./terminalRuntime.js";
-import { applyTerminalPositionEvent, grantTerminalPass, MemoryTerminalStorage, TerminalStore, terminalAccess, type TerminalPosition, type TerminalWorkspace } from "./terminalStore.js";
+import { applyTerminalPositionEvent, grantTerminalPass, MemoryTerminalStorage, TerminalStore, terminalAccess, suspendExpiredTerminal, terminalMonitoringDueAt, type TerminalPosition, type TerminalWorkspace } from "./terminalStore.js";
 
 const OWNER = `0x${"12".repeat(20)}`, BORN = Date.parse("2026-11-04T10:00:00Z"), MINUTE = 60_000;
 const cfg = (): AppConfig => ({ ...loadConfig(), NODE_ENV: "test", FEATURE_TRADING_TERMINAL: true, QUEUE_PROVIDER: "memory", STORAGE_PROVIDER: "memory", PERSISTENCE_NAMESPACE: "terminal-monitoring-test", FEATURE_TELEGRAM: true, TERMINAL_MONITOR_INTERVAL_MS: 15_000 });
@@ -125,7 +125,7 @@ test("expiry publication and delivery cannot continue after their monitoring lea
   let value = await state.get(OWNER);
   assert.equal(value.activity.filter(event => event.kind === "pass_expired").length, 0); assert.equal(sends, 0);
   await runtime.cycleOwner(OWNER); value = await state.get(OWNER);
-  assert.equal(value.activity.filter(event => event.kind === "pass_expired").length, 1); assert.equal(sends, 1);
+  assert.equal(value.activity.filter(event => event.kind === "pass_expired").length, 1); assert.equal(sends, 0, "Expired passes suspend all Telegram delivery, including expiry messages");
 });
 
 test("sequential leases cannot rewind mark clocks or accept revised prices at an already observed timestamp", async t => {
@@ -172,4 +172,42 @@ test("price-policy confirmation keeps canonical WAIT, payoff and blockers distin
   assert.match(message, /Price policy confirmation observed/); assert.match(message, /WAIT \(waiting_retest\)/);
   assert.match(message, /Blockers: reward, context/); assert.match(message, /0\.62R/);
   assert.match(message, /event alone does not qualify an entry/); assert.match(message, /no venue fill or order authorization/);
+});
+
+
+test("expiry suspends all subjects and delivery, preserves journal data and stays out of recurring idle work",async()=>{
+  const storage=new MemoryTerminalStorage();let writes=0;const cas=storage.compareAndSet.bind(storage);storage.compareAndSet=async(...args)=>{writes++;return cas(...args);};
+  const state=new TerminalStore(storage,"expiry-budget",180);let now=BORN,sourceCalls=0,sends=0;
+  await state.mutate(OWNER,value=>{grant(value,BORN-25*60*MINUTE,"expired");value.positions.push(position());value.radars.push({id:"radar-1",paused:false,telegram:true,state:"watching"} as any);value.telegram={enabled:true,events:["pass_expired","target_touched"]};value.activity.push({id:"queued-event",at:new Date(BORN).toISOString(),kind:"target_touched",subjectId:"position-1",message:"Old queued alert"});value.deliveries.push({id:"queued",eventId:"queued-event",subjectId:"position-1",recipientId:123,state:"queued",createdAt:new Date(BORN).toISOString()});});
+  const runtime=new TerminalRuntime(cfg(),{store:state,now:()=>now,snapshot:async()=>{sourceCalls++;return market(now,now);},telegramRecipient:async()=>123,telegramSend:async()=>++sends});
+  await runtime.cycleOwner(OWNER);const value=await state.get(OWNER);
+  assert(value.positions[0].paused);assert(value.radars[0].paused);assert.equal(value.positions[0].quantity,1);assert.equal(value.telegram.enabled,false);assert.equal(value.deliveries[0].state,"cancelled");assert.equal(sends,0);assert.equal(sourceCalls,0);assert.equal(terminalMonitoringDueAt(value,now),Number.MAX_SAFE_INTEGER);
+  const settledWrites=writes;now+=MINUTE;await runtime.cycleOwner(OWNER);assert.equal(writes,settledWrites,"Handled expired workspaces incur no repeated CAS writes");
+  await state.mutate(OWNER,v=>{grant(v,now,"renewed");});const renewed=await state.get(OWNER);assert(renewed.positions[0].paused);assert(renewed.radars[0].paused);assert.equal(renewed.telegram.enabled,false);
+  await state.mutate(OWNER,v=>{v.positions[0].paused=false;});assert.equal((await state.get(OWNER)).nextMonitorAt,0,"Explicit resume must put work back into the due queue");await runtime.cycleOwner(OWNER);assert.equal(sourceCalls,1);
+});
+
+test("expiry during recipient lookup cancels a previously queued alert before external Telegram send",async()=>{
+  const state=store();let now=BORN,sends=0;
+  await state.mutate(OWNER,v=>{grant(v,BORN-24*60*MINUTE+1000);v.positions.push(position());v.telegram={enabled:true,events:["target_touched"]};v.activity.push({id:"touch",at:new Date(BORN).toISOString(),kind:"target_touched",subjectId:"position-1",message:"Observed"});v.deliveries.push({id:"send",eventId:"touch",subjectId:"position-1",recipientId:123,state:"queued",createdAt:new Date(BORN).toISOString()});});
+  const runtime=new TerminalRuntime(cfg(),{store:state,now:()=>now,telegramRecipient:async()=>{now+=2000;return 123;},telegramSend:async()=>++sends});await runtime.deliver(OWNER);assert.equal(sends,0);assert.equal((await state.get(OWNER)).deliveries[0].state,"cancelled");
+});
+
+test("empty active workspace is scheduled for expiry rather than scanned every worker tick",async()=>{
+  const state=store();await state.mutate(OWNER,v=>{grant(v,Date.now());});const value=await state.get(OWNER),expiry=Date.parse(value.grants[0].expiresAt);assert.equal(terminalMonitoringDueAt(value),expiry);assert.deepEqual(await state.owners(25,Date.now()),[]);assert.deepEqual(await state.owners(25,expiry),[OWNER]);
+});
+
+
+test("Spot journal monitoring uses one ticker without generating a multi-timeframe report",async()=>{
+ const state=store();await state.mutate(OWNER,v=>{grant(v);v.positions.push(position());});let tickers=0;
+ const runtime=new TerminalRuntime(cfg(),{store:state,now:()=>BORN,quote:async()=>{tickers++;return{instId:"BTC-USDT",last:111,ts:BORN} as any;}});
+ await runtime.cycleOwner(OWNER);const value=await state.get(OWNER);assert.equal(tickers,1);assert.equal(value.positions[0].lastMark?.price,111);assert.equal(value.positions[0].lastRiskState,"target_touched");assert.equal(value.positions[0].status,"open");
+});
+
+
+test("an interrupted send at expiry becomes uncertain and cannot keep the recurring queue alive",()=>{
+ const value={...({} as TerminalWorkspace),owner:OWNER,grants:[],watches:[],radars:[],positions:[],activity:[],telegram:{enabled:false,events:[]},deliveries:[{id:"sending",eventId:"old",subjectId:"old",recipientId:123,state:"sending" as const,createdAt:new Date(BORN).toISOString()}]};assert.equal(suspendExpiredTerminal(value,BORN),true);assert.equal(value.deliveries[0].state,"uncertain");assert.equal(terminalMonitoringDueAt(value,BORN),Number.MAX_SAFE_INTEGER);assert.equal(suspendExpiredTerminal(value,BORN),false);
+ // Earlier versions recorded expiry without pausing the saved items. Those
+ // already-logged expiries still need one suspension migration.
+ grant(value,BORN-25*60*MINUTE,"legacy-expired");const last=value.grants.at(-1)!;value.activity.push({id:`expired:${last.id}`,at:new Date(BORN).toISOString(),kind:"pass_expired",subjectId:last.id,message:"Legacy expiry"});value.positions.push(position());const count=value.activity.length;assert.equal(terminalMonitoringDueAt(value,BORN),0);assert.equal(suspendExpiredTerminal(value,BORN),true);assert(value.positions[0].paused);assert.equal(value.activity.length,count);assert.equal(terminalMonitoringDueAt(value,BORN),Number.MAX_SAFE_INTEGER);
 });

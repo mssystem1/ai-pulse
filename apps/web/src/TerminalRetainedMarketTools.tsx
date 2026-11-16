@@ -1,3 +1,4 @@
+import {startTerminalPolling} from "./terminalPolling";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import type {TerminalSessionHistory,TerminalLiquidityHistory as BookHistory,TerminalMarketTools as Tools} from "@pulse/domain";
 import type {TerminalMarket,TerminalAskContext} from "./terminalClient";
@@ -10,7 +11,7 @@ import {terminalRetainedToolSource} from "./terminalRetainedToolSource";
 import "./terminalHistory.css";
 
 type Response={session:TerminalSessionHistory;perpetualSession:TerminalSessionHistory;tools:Pick<Tools,"value"|"flow"|"perpetualFlow">;evidenceSnapshotId?:string;setupVersionId?:string;observedAt:number};
-type Props={market:TerminalMarket;token:string;active:boolean;onAsk:(question:string,context?:TerminalAskContext)=>void;onRadar:(price:number,side:"above"|"below")=>void;onToolsChange?:(market:TerminalMarket,scope:"assessment"|"session")=>void};
+type Props={market:TerminalMarket;token:string;active:boolean;visible?:boolean;onAsk:(question:string,context?:TerminalAskContext)=>void;onRadar:(price:number,side:"above"|"below")=>void;onToolsChange?:(market:TerminalMarket,scope:"assessment"|"session")=>void};
 
 /** One request per selection at a time. A late success, error or finally from an
  * old owner/asset/window can never change the current selection's state. */
@@ -30,20 +31,20 @@ function useRetainedRead<T>(key:string,active:boolean,read:(signal:AbortSignal)=
     if(current())setState({key,value,busy:false,error:""});
    }catch(error){
     if(current())setState(previous=>({key,value:previous.key===key?previous.value:null,busy:false,error:error instanceof Error?error.message:"Retained history could not be loaded."}));
+    if(!controller.signal.aborted)throw error;
    }finally{
     pending=false;
     if(current())setState(previous=>previous.key===key?{...previous,busy:false}:previous);
    }
   };
-  refreshRef.current=load;void load();
-  const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void load();},15_000);
-  return()=>{closed=true;controller.abort();window.clearInterval(timer);if(refreshRef.current===load)refreshRef.current=async()=>{};};
+  refreshRef.current=load;const poll=startTerminalPolling(load,60_000);
+  return()=>{closed=true;controller.abort();poll.stop();if(refreshRef.current===load)refreshRef.current=async()=>{};};
  },[key,active]);
- const refresh=useCallback(()=>refreshRef.current(),[]);
+ const refresh=useCallback(()=>refreshRef.current().catch(()=>{}),[]);
  return{value:state.key===key?state.value:null,busy:state.key===key?state.busy:false,error:state.key===key?state.error:"",refresh};
 }
 
-export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,onToolsChange}:Props){
+export function TerminalRetainedMarketTools({market,token,active,visible=true,onAsk,onRadar,onToolsChange}:Props){
  const preferenceKey=TERMINAL_HISTORY_PREFERENCE_PREFIX+market.instId;
  const [preferences]=useState(()=>{try{return terminalHistoryPreferences(sessionStorage.getItem(preferenceKey));}catch{return terminalHistoryPreferences(null);}});
  const [sessionSelection,setSessionSelection]=useState<TerminalHistorySessionSelection>(preferences.sessionSelection);
@@ -55,14 +56,14 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,o
  const accessKey=JSON.stringify([token,active,market.instId]);
  const sessionKey=JSON.stringify([accessKey,market.timeframe,market.evidenceSnapshotId,market.setupVersionId,preset,preset==="custom"?applied:null]);
  const bookKey=JSON.stringify([accessKey,hours]);
- const readSession=useRetainedRead(sessionKey,active&&(preset!=="custom"||applied!==null),async(signal)=>{
+ const readSession=useRetainedRead(sessionKey,active&&visible&&(preset!=="custom"||applied!==null),async(signal)=>{
   const source=market;
   const params=new URLSearchParams({instId:source.instId,timeframe:source.timeframe,session:preset,...(source.evidenceSnapshotId?{evidenceSnapshotId:source.evidenceSnapshotId}:{}),...(preset==="custom"&&applied?{start:String(applied.start),end:String(applied.end)}:{})});
   const result=await terminalRequest<Response>("history/session?"+params,{token,signal});
   if(!terminalSessionEvidenceMatches(result,source,preset==="custom"?applied??undefined:undefined))throw Error("Retained history did not match the reviewed market, UTC range or setup. Refresh the selected evidence.");
   return{source,result};
  });
- const readBook=useRetainedRead(bookKey,active,async(signal)=>{
+ const readBook=useRetainedRead(bookKey,active&&visible,async(signal)=>{
   const result=await terminalRequest<BookHistory>("history/liquidity?instId="+encodeURIComponent(market.instId)+"&hours="+hours,{token,signal});
   if(result.instrumentId!==market.instId||result.requestedEnd-result.requestedStart!==hours*3600000)throw Error("Liquidity history did not match the selected market and window.");
   return result;
@@ -72,7 +73,7 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,o
  const collectRef=useRef<()=>Promise<void>>(async()=>{});
  const [collection,setCollection]=useState({key:accessKey,busy:false,message:"",error:false});
  useEffect(()=>{
-  if(!active)return;
+  if(!active||!visible)return;
   const controller=new AbortController();let pending=false,closed=false;
   const current=()=>!closed&&!controller.signal.aborted&&currentAccess.current===accessKey;
   const collect=async()=>{
@@ -81,7 +82,7 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,o
    try{
     await terminalRequest("history/collect",{token,method:"POST",body:{instId:market.instId},signal:controller.signal,timeoutMs:210_000});
     if(current()){
-     setCollection({key:accessKey,busy:false,message:"History update checked. The session and liquidity views below show what was saved and which intervals still need data. Collection continues automatically while this view is active.",error:false});
+     setCollection({key:accessKey,busy:false,message:"History update checked. The session and liquidity views below show what was saved and which intervals still need data. Background collection follows server settings. Use Update history to request another batch.",error:false});
      await Promise.all([refreshReaders.current.session(),refreshReaders.current.book()]);
     }
    }catch(error){
@@ -92,10 +93,9 @@ export function TerminalRetainedMarketTools({market,token,active,onAsk,onRadar,o
     }
    }finally{pending=false;if(current())setCollection(previous=>previous.key===accessKey?{...previous,busy:false}:previous);}
   };
-  collectRef.current=collect;void collect();
-  const timer=window.setInterval(()=>{if(document.visibilityState==="visible")void collect();},30_000);
-  return()=>{closed=true;controller.abort();window.clearInterval(timer);if(collectRef.current===collect)collectRef.current=async()=>{};};
- },[accessKey,active,token,market.instId]);
+  collectRef.current=collect;
+  return()=>{closed=true;controller.abort();if(collectRef.current===collect)collectRef.current=async()=>{};};
+ },[accessKey,active,visible,token,market.instId]);
  const record=readSession.value,result=record?.result;
  // Retained measurements belong to the exact source/report that requested them,
  // including its setup version. A subsequent parent refresh is a new selection.

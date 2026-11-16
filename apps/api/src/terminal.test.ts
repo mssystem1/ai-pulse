@@ -93,8 +93,9 @@ test("perpetual mark uses derivative source; Telegram transition dedup and expir
   assert.equal(value.positions[0].quantity, 1); assert.equal(value.positions[0].status, "open"); assert.equal(sends, 1);
   now += MINUTE; await runtime.cycleOwner(OWNER); assert.equal(sends, 1);
   now += 25 * 60 * MINUTE; await runtime.cycleOwner(OWNER); assert.equal(terminalAccess(await state.get(OWNER), now).active, false);
-  assert.equal((await state.get(OWNER)).positions[0].status, "open"); assert.equal(sends, 2);
-  await runtime.cycleOwner(OWNER); assert.equal(sends, 2);
+  assert.equal((await state.get(OWNER)).positions[0].status, "open"); assert.equal(sends, 1);
+  assert.equal((await state.get(OWNER)).positions[0].paused,true);
+  await runtime.cycleOwner(OWNER); assert.equal(sends, 1);
 });
 
 test("notification consent is checked again before delivery; ambiguous send is never blindly retried", async () => {

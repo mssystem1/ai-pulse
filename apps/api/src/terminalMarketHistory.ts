@@ -33,9 +33,9 @@ type Chunk={step:number;bars:TerminalHistoryBar[];knownAt:number;hashes:string[]
 type Work={start:number;end:number;cursor?:string;refs:string[];oldest?:number;pages:number};
 type DayState=Revisioned&{instId:string;marketType:"spot"|"perpetual";day:number;target:number;coveredEnd:number;refs:string[];work?:Work;retryAt?:number;error?:string;knownAt:number};
 type BookHour=Revisioned&{frames:TerminalBookHistoryFrame[];source:string};
-type Queue=Revisioned&{days:string[];books:string[];markets:string[];requestedMarkets?:string[];priorityDays?:string[];priorityCursor?:number;priorityUntil?:number;cursor?:number;bookCursor?:number;marketCursor?:number;liveBookCursor?:number;phaseCursor?:number};
+type Queue=Revisioned&{days:string[];books:string[];markets:string[];bookDemand?:Record<string,number>;requestedMarkets?:string[];priorityDays?:string[];priorityCursor?:number;priorityUntil?:number;cursor?:number;bookCursor?:number;marketCursor?:number;liveBookCursor?:number;phaseCursor?:number};
 type BookJob=Revisioned&{instId:string;day:number;state:"queued"|"complete"|"failed";retryAt?:number;error?:string;hash?:string;gaps?:{start:number;end:number;reason:string}[];knownAt?:number};
-type Options={storage:TerminalHistoryStorage;namespace?:string;now?:()=>number;client?:OkxTradeHistoryClient;fetchTrades?:(input:{instId:string;start:number;end:number;afterId?:string;afterAt?:number;maxPages?:number})=>Promise<OkxHistoryBatch>;fetchBook?:(instId:string,depth:number)=>Promise<TerminalBookHistoryFrame>;tradeArchive?:(input:{instId:string;start:number;end:number})=>Promise<OkxHistoryBatch>;bookArchive?:(input:{instId:string;date:string;sampleMs:number;depth:number})=>Promise<{frames:TerminalBookHistoryFrame[];gaps:{start:number;end:number;reason:string}[];sha256?:string}>;retentionDays?:number;bookRetentionDays?:number;sampleMs?:number;depth?:number;maxPages?:number;markets?:string[]};
+type Options={storage:TerminalHistoryStorage;namespace?:string;now?:()=>number;client?:OkxTradeHistoryClient;fetchTrades?:(input:{instId:string;start:number;end:number;afterId?:string;afterAt?:number;maxPages?:number})=>Promise<OkxHistoryBatch>;fetchBook?:(instId:string,depth:number)=>Promise<TerminalBookHistoryFrame>;tradeArchive?:(input:{instId:string;start:number;end:number})=>Promise<OkxHistoryBatch>;bookArchive?:(input:{instId:string;date:string;sampleMs:number;depth:number})=>Promise<{frames:TerminalBookHistoryFrame[];gaps:{start:number;end:number;reason:string}[];sha256?:string}>;retentionDays?:number;bookRetentionDays?:number;sampleMs?:number;depth?:number;maxPages?:number;markets?:string[];bookDemandOnly?:boolean};
 const round=(n:number)=>Number(n.toPrecision(14)),hash=(s:string)=>createHash("sha256").update(s).digest("hex");
 const priceIndex=(price:number,step:number)=>{const q=price/step,nearest=Math.round(q);return Math.abs(q-nearest)<=8*Number.EPSILON*Math.max(1,Math.abs(q))?nearest:Math.floor(q);};
 const exact=(id:string)=>/^[A-Z0-9]{2,20}-(USDT|USDC|USD)$/.test(id);
@@ -80,10 +80,11 @@ export class TerminalMarketHistory{
   }
   const priorityDays=[...dayKeys].sort((a,b)=>Number(b.slice(b.lastIndexOf(":")+1))-Number(a.slice(a.lastIndexOf(":")+1)));
   await this.mutate<Queue>(this.key("queue"),()=>({revision:0,days:[],books:[],markets:[]}),v=>{if(!v.markets.includes(input.instId)&&v.markets.length>=32)throw Error("Public history market capacity reached");
-   const changed=!v.markets.includes(input.instId)||dayKeys.some(id=>!v.days.includes(id))||bookKeys.some(id=>!v.books.includes(id)),priorityChanged=input.priority!==false&&(JSON.stringify(v.priorityDays)!==JSON.stringify(priorityDays)||(v.priorityUntil??0)<this.now()+4*MINUTE);
-   if(!changed&&!priorityChanged)return false;
+   const changed=!v.markets.includes(input.instId)||dayKeys.some(id=>!v.days.includes(id))||bookKeys.some(id=>!v.books.includes(id)),priorityChanged=input.priority!==false&&(JSON.stringify(v.priorityDays)!==JSON.stringify(priorityDays)||(v.priorityUntil??0)<this.now()+MINUTE);
+   const demandChanged=input.priority!==false&&(v.bookDemand?.[input.instId]??0)<this.now()+5*MINUTE;
+   if(!changed&&!priorityChanged&&!demandChanged)return false;
    v.days=[...new Set([...v.days,...dayKeys])].slice(-32*46*2);v.books=[...new Set([...v.books,...bookKeys])].slice(-32*32);v.markets=[...new Set([...v.markets,input.instId])];
-   if(input.priority!==false){v.requestedMarkets=[...(v.requestedMarkets??[]).filter(id=>id!==input.instId),input.instId].slice(-32);if(JSON.stringify(v.priorityDays)!==JSON.stringify(priorityDays))v.priorityCursor=0;v.priorityDays=priorityDays;v.priorityUntil=this.now()+5*MINUTE;}
+   if(input.priority!==false){v.bookDemand={...v.bookDemand,[input.instId]:this.now()+15*MINUTE};v.requestedMarkets=[...(v.requestedMarkets??[]).filter(id=>id!==input.instId),input.instId].slice(-32);if(JSON.stringify(v.priorityDays)!==JSON.stringify(priorityDays))v.priorityCursor=0;v.priorityDays=priorityDays;v.priorityUntil=this.now()+5*MINUTE;}
   });
  }
  /** Seed usable UTC presets on startup/day rollover, without needing an open browser. */
@@ -98,11 +99,14 @@ export class TerminalMarketHistory{
  }
  /** An independent live sampler: a slow archive must never hold this lease. */
  async collectLiveBooks(input:{maxWorkMs?:number}={}){
+  const queued=await this.storage.get<Queue>(this.key("queue"))??{revision:0,days:[],books:[],markets:[]};
+  const demanded=Object.entries(queued.bookDemand??{}).filter(([,until])=>until>this.now()).map(([id])=>id);
+  if(this.options.bookDemandOnly&&!demanded.length)return{alreadyRunning:false,books:0,inactive:true};
   const token=randomUUID(),lease=this.key("live-book-collector-lease"),fence={key:lease,token};
   if(!await this.storage.acquire(lease,token,300))return{alreadyRunning:true,books:0};
   let books=0,attempted=0;const deadline=Date.now()+(input.maxWorkMs??20000);
   try{
-   const queue=await this.storage.get<Queue>(this.key("queue"))??{revision:0,days:[],books:[],markets:[]},markets=[...new Set([...(this.options.markets??[]),...queue.markets])],offset=(queue.liveBookCursor??0)%Math.max(1,markets.length),ordered=[...markets.slice(offset),...markets.slice(0,offset)];
+   const queue=queued,markets=this.options.bookDemandOnly?demanded:[...new Set([...(this.options.markets??[]),...queue.markets])],offset=(queue.liveBookCursor??0)%Math.max(1,markets.length),ordered=[...markets.slice(offset),...markets.slice(0,offset)];
    for(const instId of ordered){if(Date.now()>deadline)break;attempted++;try{const frame=await(this.options.fetchBook??((id,depth)=>this.bookClient.book(id,depth)))(instId,this.depth);await this.appendBooks(instId,[frame],"okx-public-spot-book-snapshots",fence);books++;}catch(error){if(error instanceof HistoryLeaseLostError)throw error;}}
    await this.mutate<Queue>(this.key("queue"),()=>queue,v=>{v.liveBookCursor=(offset+attempted)%Math.max(1,markets.length);},this.ttl(),fence);
    return{alreadyRunning:false,books};
@@ -203,6 +207,6 @@ export function createTerminalMarketHistory(cfg:AppConfig,options:Partial<Option
  const url=cfg.QUEUE_PROVIDER==="redis"?cfg.REDIS_URL:cfg.QUEUE_PROVIDER==="upstash_kv"?cfg.KV_REST_API_URL:"",key=cfg.PERSISTENCE_NAMESPACE+":"+url;
  if(!Object.keys(options).length&&shared.has(key))return shared.get(key)!;
  const storage=options.storage??(url?new RedisTerminalHistoryStorage(new StoreRedis(url,cfg.KV_REST_API_TOKEN)):process.env.NODE_ENV==="test"?new MemoryTerminalHistoryStorage(options.now):null);if(!storage)throw Error("Durable public-market history storage is required");
- const result=new TerminalMarketHistory({storage,namespace:cfg.PERSISTENCE_NAMESPACE,retentionDays:cfg.TERMINAL_HISTORY_RETENTION_DAYS,bookRetentionDays:cfg.TERMINAL_HISTORY_BOOK_RETENTION_DAYS,sampleMs:cfg.TERMINAL_HISTORY_BOOK_SAMPLE_MS,depth:cfg.TERMINAL_HISTORY_BOOK_LEVELS,maxPages:cfg.TERMINAL_HISTORY_PAGES_PER_BATCH,markets:cfg.TERMINAL_HISTORY_MARKETS.split(",").map(s=>s.trim()).filter(exact),...options});
+ const result=new TerminalMarketHistory({storage,namespace:cfg.PERSISTENCE_NAMESPACE,retentionDays:cfg.TERMINAL_HISTORY_RETENTION_DAYS,bookRetentionDays:cfg.TERMINAL_HISTORY_BOOK_RETENTION_DAYS,sampleMs:cfg.TERMINAL_HISTORY_BOOK_SAMPLE_MS,depth:cfg.TERMINAL_HISTORY_BOOK_LEVELS,maxPages:cfg.TERMINAL_HISTORY_PAGES_PER_BATCH,bookDemandOnly:cfg.TERMINAL_HISTORY_BOOK_DEMAND_ONLY,markets:cfg.TERMINAL_HISTORY_MARKETS.split(",").map(s=>s.trim()).filter(exact),...options});
  if(!Object.keys(options).length)shared.set(key,result);return result;
 }

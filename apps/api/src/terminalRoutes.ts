@@ -11,7 +11,7 @@ import { asyncRoute } from "./httpResilience.js";
 import { applyTerminalPositionEvent, appendTerminalActivity, terminalAccess, terminalDurationMs, type TerminalDuration, type TerminalPosition } from "./terminalStore.js";
 import { registerTerminalRuntime, terminalLimits, TerminalRuntime, TerminalRadarRequestConflictError, type TerminalDependencies } from "./terminalRuntime.js";
 import { TerminalPayments } from "./terminalPayments.js";
-import { replayTerminalRadar } from "@pulse/analysis";
+import { replayTerminalRadar, TerminalMarketSourceUnavailableError } from "@pulse/analysis";
 import { terminalAiContext, TerminalInspectionUnavailableError, type TerminalInspectionEvidence } from "./terminalAiContext.js";
 import { GlobalScenarioHistoryUnavailableError } from "./globalScenarioStore.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
@@ -89,10 +89,23 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   if(runtime)beforePayment.use(createTerminalHistoryRoutes(runtime,dependencies.history));
   if(runtime)beforePayment.use(createTerminalIndicatorRoutes(runtime));
   beforePayment.get("/v1/terminal/market", active, asyncRoute(async (req, res) => {
-    const input = marketSchema.parse(req.query);
+    const parsed = marketSchema.extend({lang:z.enum(["en","zh"]).optional()}).strict().safeParse(req.query);
+    if (!parsed.success) return res.status(400).json({ error: "Choose one supported market and timeframe", code: "terminal_market_input" });
+    const input = parsed.data;
     let snapshot: TerminalMarketSnapshot;
     try { snapshot = await runtime!.ownerSnapshot(res.locals.terminalOwner, input.instId, input.timeframe); }
-    catch (error) { if (error instanceof GlobalScenarioHistoryUnavailableError) return res.status(409).json({ error: error.message, code: "terminal_scenario_history_unavailable" }); throw error; }
+    catch (error) {
+      if (error instanceof GlobalScenarioHistoryUnavailableError) return res.status(409).json({ error: error.message, code: "terminal_scenario_history_unavailable" });
+      if (error instanceof TerminalMarketSourceUnavailableError) {
+        // Keep a diagnosis for operations without logging provider payloads,
+        // credentials, auth headers or private wallet/setup contents.
+        console.warn(JSON.stringify({ event: "terminal_market_source_unavailable", instId: input.instId, timeframe: input.timeframe, reason: error.reason, causeType: error.sourceCause instanceof Error ? error.sourceCause.name : undefined }));
+        res.setHeader("Retry-After", "5");
+        return res.status(503).json({ error: error.message, code: error.code, reason: error.reason, recoverable: true, retryAfterSeconds: 5, instId: input.instId, timeframe: terminalFrameProfile(input.timeframe).timeframe });
+      }
+      throw error;
+    }
+    if(input.lang)snapshot={...snapshot,report:{...snapshot.report,lang:input.lang}};
     const version = snapshot.report.scenario?.revisionId ?? null;
     if (version) await runtime!.store.storage.write(runtime!.store.key("setup", `${res.locals.terminalOwner}:${version}`), snapshot, 3600);
     const evidence: TerminalInspectionEvidence = { instId: snapshot.instId, timeframe: snapshot.timeframe, observedAt: snapshot.observedAt, tools: snapshot.tools, ...(version ? { setupVersionId: version } : {}) };

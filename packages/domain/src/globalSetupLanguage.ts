@@ -1,6 +1,7 @@
 import {candleCloseTime,type GlobalReport} from "@pulse/schemas";
 import {globalFrameReference} from "./globalContext.js";
 import {globalScenarioEvidence,globalEntryCondition} from "./globalScenarioEvidence.js";
+import {globalSetupAdmission} from "./globalSetupAdmission.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
 
 /** Direction and an exact entry sentence, independent of internal status codes. */
@@ -16,10 +17,10 @@ export function globalSetupLanguage(report:GlobalReport,p:NonNullable<GlobalRepo
   if(report.decisionVersion==="decision-v5"){
     const cards=globalTradeCards(report),card=cards[0],selection=report.setupSelection;
     const direction=report.discretionaryPlan?(report.discretionaryPlan.side==="long"?"LONG":"SHORT"):selection?.assessment==="sideways"?"SIDEWAYS":selection?.assessment==="long"?"LONG":selection?.assessment==="short"?"SHORT":p.side==="long"?"LONG":p.side==="short"?"SHORT":"SIDEWAYS";
-    const label=qualified?(zh?"入场信号已确认":"Entry signal confirmed"):card?.state??(zh?"计划依据":"Setup evidence");
+    const label=report.discretionaryPlan&&!globalSetupAdmission(report).geometryEligible?(zh?"\u65e0\u65b0\u5165\u573a":"NO ENTRY"):qualified?(zh?"入场信号已确认":"Entry signal confirmed"):card?.state??(zh?"计划依据":"Setup evidence");
     const heading=`${report.strategy?.name.toUpperCase()??""} · ${zh?"观点":"BIAS"} ${direction} · ${label}`;
     const entryInstruction=qualified?(zh?"入场信号已确认；复核 Entry、SL、TP1 与新报价费用。":"Entry signal confirmed. Review Entry, SL, TP1 and fresh quote costs before an order."):card?.plan.blockers.includes("reward")?(zh?"所选策略到最近障碍的收益不足；需要新结构，不能仅靠再次确认。":"The selected setup needs better reward to the nearest barrier. A new supported structure is required; another confirmation alone does not qualify entry."):card?(report.discretionaryPlan?`${card.condition} ${card.location}`:`${card.state}. ${card.condition}. ${card.location}`).trim():(selection?.limitations[0]??(zh?"尚无有依据的单一入场策略。":"No supported entry strategy is available."));
-    return {direction,heading,entryInstruction,planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
+    return {direction,heading,entryInstruction,planningValid:report.discretionaryPlan?globalSetupAdmission(report).geometryEligible:planningValid,signalObserved,entryTimeframe:tf,structureTimeframe:report.snapshot.timeframe,scenarios:globalScenarioEvidence(report)};
   }
   const mixed=Boolean(report.decisionVersion)&&primary?.bias==="mixed"&&!qualified;
   const direction=(report.range||path?.direction==="range")&&!signalObserved?"RANGE":mixed?"BUY / SELL":p.side==="short"?"SHORT":p.side==="long"?"LONG":path?.direction==="down"?"SHORT":path?.direction==="up"?"LONG":"RANGE";

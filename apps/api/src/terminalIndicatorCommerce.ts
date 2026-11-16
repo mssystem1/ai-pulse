@@ -44,21 +44,36 @@ export function indicatorCommerceStores(store: TerminalStore) {
 /** Per-version, direct-to-creator service purchases. Formula bytes stay public. */
 export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: IndicatorCommerceDependencies = {}) {
   const router = Router(), { registry, commerce } = indicatorCommerceStores(runtime.store), cfg = runtime.cfg;
+  const originalPublisherName = async (value: { publisherName?: string; sha256: string; packageRef?: string }) => {
+    if (value.publisherName?.trim()) return value.publisherName;
+    // These bytes were strictly validated when published. A receipt's immutable
+    // hash, never today's catalog entry, determines the legacy display author.
+    // A missing optional display name must not hide an otherwise intact receipt
+    // or turn its history into an opaque server error during a blob outage.
+    try {
+      const original = await registry.storage.read<{ bytes: string }>(registry.key("package", value.packageRef ?? value.sha256));
+      if (!original?.bytes || digest(original.bytes) !== value.sha256) return undefined;
+      const author = JSON.parse(original.bytes).author;
+      return typeof author === "string" && author.trim() && author.length <= 160 ? author : undefined;
+    } catch { return undefined; }
+  };
   const owned = async (owner: string, listingId: string) => (await commerce.get(owner)).indicatorPurchases?.find(p => p.listingId === listingId && p.state === "granted");
   const finish = async (owner: string, quoteId: string, receipt: { settlementTx?: string; settledAt: string }) => {
     const original = (await commerce.get(owner)).indicatorPurchases?.find(p=>p.id===quoteId);
     if(!original)throw Error("Original service purchase is unavailable");
     const packageObject=await registry.storage.read<{bytes:string}>(registry.key("package",original.packageRef));
     if(!packageObject?.bytes||digest(packageObject.bytes)!==original.sha256)throw Error("Purchased package bytes need recovery; preserve the receipt");
+    const publisherName = await originalPublisherName(original);
     await registry.storage.write(registry.key("package",original.packageRef),packageObject,3650*86400);
     const updated = await commerce.mutate(owner, value => {
       const purchase = value.indicatorPurchases?.find(p => p.id === quoteId);
       if (!purchase || !["authorizing", "granted"].includes(purchase.state)) throw Error("Original paid authorization is unavailable; do not pay again");
-      if (purchase.state === "granted") return false;
+      if (purchase.state === "granted") { if (!purchase.publisherName && publisherName) { purchase.publisherName = publisherName; return; } return false; }
       purchase.state = "granted"; purchase.grantedAt = receipt.settledAt; purchase.settlementTx = receipt.settlementTx;
+      if (publisherName) purchase.publisherName = publisherName;
     });
     const purchase = updated.indicatorPurchases!.find(p => p.id === quoteId)!;
-    const sale: IndicatorSale = { id: quoteId, listingId: purchase.listingId, publisher: purchase.publisher, buyer: owner, title: purchase.title, version: purchase.version, sha256: purchase.sha256, amountAtomic: purchase.amountAtomic, priceUsdc: purchase.priceUsdc, asset: purchase.asset, network: purchase.network, settlementTx: purchase.settlementTx, at: purchase.grantedAt!, simulated: purchase.simulated };
+    const sale: IndicatorSale = { id: quoteId, listingId: purchase.listingId, publisher: purchase.publisher, ...(purchase.publisherName ? { publisherName: purchase.publisherName } : {}), buyer: owner, title: purchase.title, version: purchase.version, sha256: purchase.sha256, amountAtomic: purchase.amountAtomic, priceUsdc: purchase.priceUsdc, asset: purchase.asset, network: purchase.network, settlementTx: purchase.settlementTx, at: purchase.grantedAt!, simulated: purchase.simulated };
     // Receipt is the source of truth. A retry repairs the creator index after a crash.
     await registry.mutate(INDICATOR_REGISTRY_OWNER, value => { if (value.indicatorSales?.some(s => s.id === quoteId)) return false; value.indicatorSales = [...(value.indicatorSales ?? []), sale]; });
     return { entitled: true, purchase: publicIndicatorPurchase(purchase, cfg!.BASE_URL), recovered: true };
@@ -67,7 +82,9 @@ export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: In
     const owner = String(res.locals.terminalOwner).toLowerCase();
     const purchases = (await commerce.get(owner)).indicatorPurchases ?? [];
     const sales = ((await registry.get(INDICATOR_REGISTRY_OWNER)).indicatorSales ?? []).filter(s => s.publisher === owner);
-    return res.json({ purchases: purchases.map(p => publicIndicatorPurchase(p, cfg?.BASE_URL ?? "")), sales, creatorReceivesPercent: 100, platformFeePercent: 0 });
+    const namedPurchases = await Promise.all(purchases.map(async p => publicIndicatorPurchase({ ...p, publisherName: await originalPublisherName(p) }, cfg?.BASE_URL ?? "")));
+    const namedSales = await Promise.all(sales.map(async sale => ({ ...sale, publisherName: await originalPublisherName(sale) })));
+    return res.json({ purchases: namedPurchases, sales: namedSales, creatorReceivesPercent: 100, platformFeePercent: 0 });
   }));
   router.post("/v1/terminal/indicators/:id/quote", asyncRoute(async (req, res) => {
     if (!cfg) return res.status(503).json({ error: "Creator checkout is not configured; no payment requested" });
@@ -78,13 +95,13 @@ export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: In
     const existing = (await commerce.get(owner)).indicatorPurchases?.find(p => p.requestId === input.requestId);
     if (existing) {
       if (existing.listingId !== req.params.id || existing.network !== input.network) return res.status(409).json({ error: "Request identity belongs to another indicator" });
-      return res.json({ quote: publicIndicatorPurchase(existing, cfg.BASE_URL) });
+      return res.json({ quote: publicIndicatorPurchase({ ...existing, publisherName: await originalPublisherName(existing) }, cfg.BASE_URL) });
     }
     const item = (await registry.get(INDICATOR_REGISTRY_OWNER)).indicatorPublications?.find(item => item.id === req.params.id);
     if (!item?.offer) return res.status(404).json({ error: "Paid indicator listing not found; free packages need no purchase" });
     if(Number(item.offer.priceUsdc)<cfg.INDICATOR_MARKET_MIN_PRICE_USDC||Number(item.offer.priceUsdc)>cfg.INDICATOR_MARKET_MAX_PRICE_USDC)return res.status(422).json({error:"This listing price is outside current settlement limits. Ask the creator for a new version; no payment requested."});
     const now = runtime.now(), asset = getNetwork(input.network).paymentAsset.address!;
-    const quote: IndicatorPurchase = { id: "iqu_" + randomUUID().replaceAll("-", ""), requestId: input.requestId, owner, listingId: item.id, publisher: item.publisher, title: item.title, version: item.version, sha256: item.sha256, packageRef: item.packageRef, offer: item.offer, priceUsdc: item.offer.priceUsdc, amountAtomic: indicatorAtomic(item.offer.priceUsdc), network: input.network, asset, payee: item.publisher, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + cfg.INDICATOR_MARKET_QUOTE_TTL_SECONDS * 1000).toISOString(), state: "quoted", simulated: cfg.X402_MOCK };
+    const quote: IndicatorPurchase = { id: "iqu_" + randomUUID().replaceAll("-", ""), requestId: input.requestId, owner, listingId: item.id, publisher: item.publisher, publisherName: item.author, title: item.title, version: item.version, sha256: item.sha256, packageRef: item.packageRef, offer: item.offer, priceUsdc: item.offer.priceUsdc, amountAtomic: indicatorAtomic(item.offer.priceUsdc), network: input.network, asset, payee: item.publisher, createdAt: new Date(now).toISOString(), expiresAt: new Date(now + cfg.INDICATOR_MARKET_QUOTE_TTL_SECONDS * 1000).toISOString(), state: "quoted", simulated: cfg.X402_MOCK };
     let result = quote;
     await commerce.mutate(owner, value => {
       const old = value.indicatorPurchases?.find(p => p.requestId === input.requestId);

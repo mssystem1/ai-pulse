@@ -1,9 +1,11 @@
 /** Independent TAP-02 combinational host. No PULSE API, app bundle or wallet. */
+import { parseGraphIndicatorPackage, evaluateIndicatorGraph } from './graph-runtime.js';
 export function evaluatePortableCircuit(manifest, buy, sell, previous = 0) {
   const r = manifest?.runtime;
-  const custom=["pulse-indicator-v2","pulse-indicator-v3"].includes(manifest?.format) && manifest.kernel === "formula-v1";
+  const custom=["pulse-indicator-v2","pulse-indicator-v3","pulse-indicator-v4"].includes(manifest?.format) && manifest.kernel === "formula-v1";
   if (!(custom || manifest?.format === "pulse-indicator-v1" && ["executed-cvd-v1", "buy-participation-v1"].includes(manifest.kernel)) || r?.format !== "tap-02-nand" || r.bitOrder !== "least-significant-first" || !/^0x(?:00[\da-f]{12}){1,40000}$/i.test(r.netlist ?? "")) throw Error("Unsupported or malformed portable circuit");
   if(manifest?.format==="pulse-indicator-v3"){studyDefinition(manifest.study);if(manifest.formula?.output?.accumulation!=="bar")throw Error("Study kernels must use per-bar accumulation; declare cumulative state as a series transform");}
+  if(manifest?.format==="pulse-indicator-v4")parseGraphIndicatorPackage(manifest);
   const cvd = manifest.kernel === "executed-cvd-v1";
   if (r.inputBits !== (cvd || custom ? 64 : 32) || r.outputBits !== (cvd ? 64 : custom ? 32 : 14)) throw Error("Circuit numeric ports do not match the selected formula");
   if (![buy, sell].every(n => Number.isInteger(n) && n >= 0 && n <= 65535) || !Number.isInteger(previous) || previous < -2147483648 || previous > 2147483647 || cvd && (previous + buy - sell < -2147483648 || previous + buy - sell > 2147483647)) throw Error("Use uint16 buy/sell amounts and a non-overflowing signed int32 prior delta");
@@ -23,6 +25,18 @@ export function evaluatePortableCircuit(manifest, buy, sell, previous = 0) {
   const word = (start, width, signed = false) => { let n = 0; for (let bit = 0; bit < width; bit++) n += signals[offset + start + bit] * 2 ** bit; return signed && n >= 2 ** (width - 1) ? n - 2 ** width : n; };
   if(custom){const value=word(0,32,true);if(value!==expected)throw Error("Imported circuit disagrees with its formula");return {value,label:String(manifest.formula.output.label).slice(0,80),unit:manifest.formula.output.unit};}
   return cvd ? { delta: word(0, 32, true), cvd: word(32, 32, true) } : { buyerSharePercent: word(0, 14) / 100 };
+}
+
+/** A compatible host for v4 packages: the shared bounded graph interpreter
+ * runs series/stateflow; this independent NAND implementation runs tap_delta.
+ * Pure OHLC graphs never invoke the NAND callback or claim on-chain execution. */
+export function evaluatePortableGraph(manifest,input){
+  const parsed=parseGraphIndicatorPackage(manifest);
+  return evaluateIndicatorGraph(parsed,{...input,evaluateDeltaKernel:(buy,sell)=>{
+    const quantum=Math.max(buy,sell)>0?Math.max(buy,sell)/65535:1;
+    if(!Number.isFinite(quantum)||quantum<=0)throw Error("Quantity scale outside supported precision");
+    return evaluatePortableCircuit(parsed,Math.min(65535,Math.round(buy/quantum)),Math.min(65535,Math.round(sell/quantum)),0).value*quantum;
+  }});
 }
 
 /** Independent bounded arithmetic reference; never eval/Function or imports. */

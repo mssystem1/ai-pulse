@@ -1,4 +1,4 @@
-import { parseIndicatorPackage, type IndicatorInput, type IndicatorKernel, type IndicatorManifest } from "@pulse/domain";
+import { parseIndicatorPackage, candleCloseTime, type IndicatorInput, type IndicatorKernel, type IndicatorManifest } from "@pulse/domain";
 import type { TerminalMarket } from "./terminalClient";
 import { WEB_NETWORKS, type WebNetworkKey } from "./networks";
 export type IndicatorPaymentNetwork = "xlayer" | "base" | "arbitrum";
@@ -49,9 +49,12 @@ export function indicatorInputFromMarket(market: TerminalMarket, stream: "spot" 
   const seen=new Set<number>(),unique=eligible.filter(point=>{if(seen.has(point.ts))return false;seen.add(point.ts);return true;});
   const missingIntervals=flow?.missingIntervals?.map(({start,end})=>({start,end}));
   const incomplete=unique.length!==points.length||Boolean(missingIntervals?.length);
+  const candles=(market.report?.candles??[]).flatMap(candle=>{const end=candleCloseTime(candle.ts,market.timeframe);return candle.confirmed===true&&end&&end<=market.observedAt?[{ts:candle.ts,end,open:candle.open,high:candle.high,low:candle.low,close:candle.close,volume:candle.volume}]:[];}).slice(-1024);
+  const priceInterval=candles.length?candles[0].end-candles[0].ts:0,priceGaps=candles.flatMap((candle,index)=>index&&candle.ts>candles[index-1].end?[{start:candles[index-1].end,end:candle.ts}]:[]);
+  const price=candles.length?{source:market.report.snapshot.source,knownAt:market.observedAt,units:"base" as const,status:market.observedAt-candles.at(-1)!.end>priceInterval+5000?"stale" as const:priceGaps.length?"partial" as const:"available" as const,windowStart:candles[0].ts,windowEnd:candles.at(-1)!.end,intervalMs:priceInterval,candles,missingIntervals:priceGaps}:undefined;
   return { instId: market.instId, timeframe: market.timeframe, source: flow?.source ?? "unavailable-perpetual-executions", status: incomplete&&flow?.status==="available"?"partial":flow?.status??"unavailable", knownAt,
     windowStart:start,windowEnd,units:stream==="spot"?"base":"contracts",now,
-    ...(flow?.displayBucketMs?{intervalMs:flow.displayBucketMs}:{}),...(missingIntervals?{missingIntervals}:{}),points:unique };
+    ...(flow?.displayBucketMs?{intervalMs:flow.displayBucketMs}:{}),...(missingIntervals?{missingIntervals}:{}),...(price?{price}:{}),points:unique };
 }
 /** Store calculation packages only, never market data or wallet credentials. */
 export function loadInstalledIndicators(storage: Pick<Storage, "getItem">, defaults: IndicatorManifest[]): IndicatorManifest[] {

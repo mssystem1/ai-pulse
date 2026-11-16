@@ -26,6 +26,8 @@ test("a remote target cannot hide nearer active primary opposition, symmetricall
 test("a first target crossed by current quote cannot be replaced by its far wick or TP2",()=>{
  const report=fixture(),p=report.discretionaryPlan!;p.priceZones!.targets[0]={lower:120,upper:125};report.currentMarket!.quote!.price=121;
  const admission=globalSetupAdmission(report);assert.equal(admission.targetRewardRisk,19/11);assert.equal(admission.allowed,false);assert.ok(admission.blockers.includes("objective_already_reached"));assert.equal(p.targets[0].price,125);
+ report.currentMarket!.quote!.price=p.stop-1;assert(globalSetupAdmission(report).blockers.includes("stop_already_breached"));assert.equal(globalSetupAdmission(report).allowed,false);
+ report.currentMarket!.quote!.ts-=60001;assert.equal(globalSetupAdmission(report).blockers.includes("stop_already_breached"),false,"A stale quote cannot establish a current stop breach");
 });
 test("overlapping opposition gives zero clearance and an ended record cannot be followed again",()=>{
  const report=fixture(),p=report.discretionaryPlan!;report.horizonContext!.zones=[{id:"overlap",role:"resistance",lower:100,upper:102,anchorIds:["source"],basis:"confirmed_pivot_wicks",startTs:p.stopBasis.anchorTs,knownAt:p.stopBasis.knownAt}];
@@ -37,4 +39,14 @@ test("daily short and weekly long remain distinct hypotheses; both must clear th
  const daily=fixture("short"),d=daily.discretionaryPlan!;d.entry=80396;d.stop=83941;d.priceZones!.entry={lower:80396,upper:80636,sourceLower:80396,sourceUpper:80636,sourcePrice:80396};d.targets[0].price=66885;d.priceZones!.targets=[{lower:66000,upper:66885}];d.barriers=[{price:77306,timeframe:"1Dutc",anchorTs:d.stopBasis.anchorTs,knownAt:d.stopBasis.knownAt}];daily.currentMarket!.quote!.price=76084;
  const weekly=fixture("long"),w=weekly.discretionaryPlan!;weekly.snapshot.timeframe="1Wutc";weekly.horizonContext!.timeframe="1Wutc";w.objectiveTimeframe="1Wutc";w.entry=78675;w.stop=73739;w.priceZones!.entry={lower:76577,upper:78675,sourceLower:76577,sourceUpper:78675,sourcePrice:78675};w.targets[0].price=87399;w.priceZones!.targets=[{lower:80636,upper:87399}];weekly.currentMarket!.quote!.price=76084;
  assert.equal(globalSetupAdmission(daily).state,"blocked");assert.equal(globalSetupAdmission(weekly).state,"blocked");assert.equal(d.side,"short");assert.equal(w.side,"long");assert.equal(globalSetupAdmission(weekly).targetRewardRisk,(80636-78675)/(78675-73739));
+});
+
+
+for(const example of [
+ {name:"Nov9 daily",entry:[74856.9,74883.6],stop:76471.83,target:[73500,74846.4],barrier:74846.4,expected:.006502,quote:74289.5},
+ {name:"Nov9 weekly",entry:[75868,76011.8],stop:79110,target:[60000,70334],barrier:74501.6,expected:.421468,quote:74305},
+ {name:"Nov2 daily",entry:[78107.5,78649.3],stop:82362.89,target:[76053,77007.5],barrier:77624.6,expected:.113474,quote:77853.5},
+])test(`${example.name}: supplied report geometry is blocked before a short entry is advertised`,()=>{
+ const report=fixture("short"),p=report.discretionaryPlan!;p.entry=example.entry[0];p.stop=example.stop;p.targets[0].price=example.target[0];p.priceZones!.entry={lower:example.entry[0],upper:example.entry[1],sourceLower:example.entry[0],sourceUpper:example.entry[1],sourcePrice:example.entry[0]};p.priceZones!.targets=[{lower:example.target[0],upper:example.target[1]}];p.barriers=[{price:example.barrier,timeframe:"1Dutc",knownAt:0,anchorTs:0}];report.currentMarket!.quote!.price=example.quote;
+ const before=structuredClone(p),admission=globalSetupAdmission(report),card=globalDiscretionaryCard(report)!;assert.equal(admission.geometryEligible,false);assert(admission.firstObstacleRewardRisk!<1);assert.match(card.state,/NO ENTRY/);assert.match(card.condition,/No new entry/);assert.equal(card.plan.state,"avoid");assert.deepEqual(p,before,"Poor payoff must not move the entry, stop or target to make it pass");
 });

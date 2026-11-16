@@ -1,3 +1,4 @@
+import {startTerminalPolling} from "./terminalPolling";
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { globalDecision, globalSetupAdmission, globalPriceBandText, globalPriceZonePayoff, globalSetupEvidenceLines, globalStrategyMixLines, globalTradeCards, type GlobalReport } from "@pulse/domain";
 import type { GlobalLiveCandle } from "./globalLiveCandle";
@@ -33,8 +34,8 @@ export type TradingTerminalWorkspaceProps = {
   networkKey: WebNetworkKey; wallet: string | null; lang?: Lang;
   onNavigate?: (tab: PulseTab) => void; onNeedWallet?: () => void;
 };
-type View = "market" | "tools" | "radar" | "creator" | "indicators" | "positions" | "activity";
-const TERMINAL_SECTIONS:ReadonlyArray<{id:View;title:string;description:string}>=[{id:"market",title:"Trading Terminal",description:"Price chart, setup and applied indicators"},{id:"tools",title:"Market tools",description:"Value, flow, footprint and liquidity"},{id:"radar",title:"Market Radar",description:"Create and follow market-event sequences"},{id:"creator",title:"Create indicator",description:"Compile, preview and publish a formula"},{id:"indicators",title:"Indicator Market",description:"Discover, install and share indicators"},{id:"positions",title:"My open positions",description:"Record fills and monitor protection"},{id:"activity",title:"Alerts & activity",description:"Telegram, watches and your event log"}];
+type View = "market" | "tools" | "radar" | "creator" | "indicators" | "my-indicators" | "positions" | "activity";
+const TERMINAL_SECTIONS:ReadonlyArray<{id:View;title:string;description:string}>=[{id:"market",title:"Trading Terminal",description:"Price chart, setup and applied indicators"},{id:"tools",title:"Market tools",description:"Value, flow, footprint and liquidity"},{id:"radar",title:"Market Radar",description:"Create and follow market-event sequences"},{id:"creator",title:"Create indicator",description:"Design, preview and publish a calculation"},{id:"indicators",title:"Indicator Market",description:"Discover indicators and review purchases"},{id:"my-indicators",title:"My indicators",description:"Your creations, purchases and applied studies"},{id:"positions",title:"My open positions",description:"Record fills and monitor protection"},{id:"activity",title:"Alerts & activity",description:"Telegram, watches and your event log"}];
 const frameName = (frame: string) => frame.replace("utc", "");
 const messageOf = (error: unknown) => error instanceof Error ? error.message : "This request could not be completed. Retry when the connection returns.";
 const errorIgnored = (error: unknown) => error instanceof DOMException && error.name === "AbortError";
@@ -114,7 +115,7 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   const [indicatorMarket,setIndicatorMarket]=useState<TerminalMarket|null>(null);
   const [chartIndicators,setChartIndicators]=useState<TerminalChartIndicator[]>([]);
   const updateIndicatorMarket=useCallback((value:TerminalMarket)=>setIndicatorMarket(value),[]);
-  const openChart=useCallback(()=>{setView("market");const url=new URL(location.href);url.searchParams.set("terminalSection","market");history.replaceState(null,"",url);window.setTimeout(()=>{const chart=document.querySelector(".terminal-chart");chart?.scrollIntoView({block:"start",behavior:"smooth"});(chart?.querySelector(".terminal-chart-indicator-key button") as HTMLButtonElement|null)?.click();},200);},[]);
+  const openChart=useCallback(()=>{setView("market");const url=new URL(location.href);url.searchParams.set("terminalSection","market");history.replaceState(null,"",url);window.setTimeout(()=>{const chart=document.querySelector(".terminal-chart");chart?.scrollIntoView({block:"start",behavior:"smooth"});},200);},[]);
   const [instId, setInstId] = useState("BTC-USDT"), [marketInput, setMarketInput] = useState("BTC-USDT");
   const [timeframe, setTimeframe] = useState<TerminalTimeframe>("1H");
   const [currentCandle,setCurrentCandle] = useState<GlobalLiveCandle>();
@@ -187,19 +188,20 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   useEffect(() => { void refreshCatalog().catch(error => { if (alive.current && !errorIgnored(error)) setMessage(messageOf(error)); }); }, [refreshCatalog]);
   useEffect(() => {
     if (!token) return;
-    const refresh = (monitor = active) => { if (document.visibilityState === "visible") void syncWorkspace(token, monitor).catch(error => {
+    const refresh = (monitor = false) => syncWorkspace(token, monitor).catch(error => {
       if (!alive.current || errorIgnored(error)) return;
       if (error instanceof TerminalApiError && error.status === 401) lockWorkspace();
       setMessage(messageOf(error));
-    }); };
-    const visible = () => refresh(false);
-    refresh(); const timer = window.setInterval(() => refresh(), 30_000);
+      throw error;
+    });
+    const poll=startTerminalPolling(()=>refresh(false),60_000);
+    const visible = () => poll.refresh();
     document.addEventListener("visibilitychange", visible);
-    return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
+    return () => { poll.stop(); document.removeEventListener("visibilitychange", visible); };
   }, [token, syncWorkspace, active, lockWorkspace]);
   useEffect(() => {
     setLiveQuote(previous => previous?.instId === instId ? previous : null); setQuoteError("");
-    if (!token || !active) return;
+    if (!token || !active || !["market","tools"].includes(view)) return;
     let cancelled = false, pending = false;
     const refresh = async () => {
       if (pending || document.visibilityState !== "visible") return;
@@ -210,23 +212,23 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
         const now = quoteClock.current ?? quote.observedAt;
         if (!terminalAcceptLiveQuote(null, quote, instId, now)) throw new Error("The current quote is unavailable or stale. Saved analysis prices are shown separately.");
         setLiveQuote(previous => terminalAcceptLiveQuote(previous, quote, instId, now)); setQuoteError("");
-      } catch (error) { if (!cancelled && !errorIgnored(error)) setQuoteError(messageOf(error)); }
+      } catch (error) { if (!cancelled && !errorIgnored(error)) setQuoteError(messageOf(error)); throw error; }
       finally { pending = false; }
     };
-    void refresh(); const timer = window.setInterval(() => void refresh(), 10_000);
-    const foreground = () => { void refresh(); }; document.addEventListener("visibilitychange", foreground);
-    return () => { cancelled = true; window.clearInterval(timer); document.removeEventListener("visibilitychange", foreground); };
-  }, [token, active, instId]);
+    const poll=startTerminalPolling(refresh,15_000);
+    const foreground = () => poll.refresh(); document.addEventListener("visibilitychange", foreground);
+    return () => { cancelled = true; poll.stop(); document.removeEventListener("visibilitychange", foreground); };
+  }, [token, active, instId, view]);
   useEffect(()=>{
-    setCurrentCandle(undefined);if(!token||!active)return;
+    setCurrentCandle(undefined);if(!token||!active||view!=="market")return;
     let cancelled=false,pending=false;
     const refresh=async()=>{if(pending||document.visibilityState!=="visible")return;pending=true;
       try{const value=await terminalRequest<GlobalLiveCandle>("live-candle?instId="+encodeURIComponent(instId)+"&timeframe="+encodeURIComponent(timeframe),{token,signal:abort.current.signal});
         if(!cancelled&&value.instId===instId&&value.timeframe===timeframe)setCurrentCandle(previous=>!previous||value.observedAt>=previous.observedAt?value:previous);
-      }catch{/* Saved candles remain readable; never manufacture a forming OHLC. */}finally{pending=false;}};
-    void refresh();const timer=window.setInterval(()=>void refresh(),5000);document.addEventListener("visibilitychange",refresh);
-    return()=>{cancelled=true;window.clearInterval(timer);document.removeEventListener("visibilitychange",refresh);};
-  },[token,active,instId,timeframe]);
+      }catch(error){throw error;}finally{pending=false;}};
+    const poll=startTerminalPolling(refresh,15_000);const foreground=()=>poll.refresh();document.addEventListener("visibilitychange",foreground);
+    return()=>{cancelled=true;poll.stop();document.removeEventListener("visibilitychange",foreground);};
+  },[token,active,instId,timeframe,view]);
   const refreshMarket = useCallback(async (manual = false) => {
     if (!token || !active) return;
     const generation = ++marketGeneration.current;
@@ -236,16 +238,14 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
       if (!alive.current || generation !== marketGeneration.current) return;
       if (data.instId !== instId || data.timeframe !== timeframe || !data.report?.candles?.length) throw new Error("Market evidence did not match the selected instrument and timeframe. Retry this view.");
       setMarket(data); setMarketError("");
-    } catch (error) { if (alive.current && generation === marketGeneration.current && !errorIgnored(error)) setMarketError(messageOf(error)); }
+    } catch (error) { if (alive.current && generation === marketGeneration.current && !errorIgnored(error)) setMarketError(messageOf(error)); if(!manual)throw error; }
     finally { if (alive.current && generation === marketGeneration.current) setMarketBusy(false); }
   }, [token, active, instId, timeframe, lang]);
   useEffect(() => {
     marketGeneration.current += 1; setMarket(null); setMarketError(""); setReviewFollow(null);
     if (!active || !token) { setMarketBusy(false); return; }
-    void refreshMarket();
-    const refresh = () => { if (document.visibilityState === "visible" && !["positions","activity"].includes(currentView.current)) void refreshMarket(); };
-    const timer = window.setInterval(refresh, 60_000);
-    return () => { window.clearInterval(timer); marketGeneration.current += 1; };
+    const poll=startTerminalPolling(()=>refreshMarket(),120_000,()=>document.visibilityState==="visible"&&!["positions","activity"].includes(currentView.current));
+    return () => { poll.stop(); marketGeneration.current += 1; };
   }, [token, active, instId, timeframe, lang]);
   async function run(name: string, operation: () => Promise<void>) {
     if (pendingMutation.current) return;
@@ -420,21 +420,21 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
     {pendingPurchases.length > 0 && <section className="terminal-panel" aria-labelledby="terminal-recover-heading"><h2 id="terminal-recover-heading">Recover your existing payment</h2><p>A payment is awaiting reconciliation. Do not purchase again. Recover the saved request so the service can verify its exact original terms.</p>{pendingPurchases.map(purchase => <article className="terminal-watch" key={purchase.requestId}><h3>{purchase.duration} · {purchase.priceUsd} · {purchase.network}</h3><p>Status: {terminalLabel(purchase.state)} · started {terminalUtc(purchase.createdAt)}</p><label className="terminal-field">Settlement transaction hash{purchase.state === "authorizing" ? " · if acknowledgement was lost" : " · optional"}<input aria-label={`Settlement transaction hash ${purchase.duration}`} value={recoveryTransactions[purchase.requestId] ?? purchase.settlementTx ?? ""} placeholder="0x…" onChange={event => setRecoveryTransactions(previous => ({ ...previous, [purchase.requestId]: event.target.value }))} /></label><button type="button" className="terminal-primary" disabled={Boolean(busy)} onClick={() => void recoverPurchase(purchase.requestId)}>Recover access without a new payment</button><small>Request {purchase.requestId}</small></article>)}</section>}
     {(!active || showPasses) && <section className="terminal-panel terminal-introduction"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">A separate workspace · no report purchase required</span><h2>From market evidence to a plan you can follow.</h2><p>Inspect value and executed flow, detect ordered events with Market Radar, and keep actual positions separate from conditional setups.</p></div></div><div className="terminal-feature-grid"><div><h3>Market tools</h3><p>VWAP, volume profile, footprint, executed buy/sell flow, positioning and current liquidity—with each source's coverage.</p></div><div><h3>Market Radar</h3><p>Track a sweep/reclaim, breakout acceptance or failure around your chosen boundary. Inspect each stage and what comes next.</p></div><div><h3>Your trading journal</h3><p>Record actual fills, inspect protection references and follow conditions. Optional Telegram alerts require your consent.</p></div></div>
       <div className="terminal-pass-plans" aria-label="Terminal access passes">{catalog?.plans.map(plan => <button type="button" key={plan.duration} className="terminal-pass-plan" disabled={!catalog.available || !paymentSupported || pendingPurchases.length > 0 || Boolean(busy)} onClick={() => setReviewPass(plan)}><b>{plan.duration === "24h" ? "24 hours" : plan.duration === "7d" ? "7 days" : "30 days"}</b><strong>${terminalPassPrice(plan.priceUsd)}</strong><span>Review pass · {network.payment.symbol}</span></button>) ?? <p>Loading published pass prices…</p>}</div>{catalog && !paymentSupported && <p className="terminal-warning">Choose a supported payment network in the existing header: {catalog.paymentNetworks?.map(item => `${item.key} · ${item.asset}`).join(", ") || "no payment routes currently listed"}.</p>}{catalog && !catalog.available && <p className="terminal-warning">{catalog.reason || "The service is not ready for checkout. No payment is requested."}</p>}{catalog?.limits && <details><summary>Included service limits</summary><dl>{Object.entries(catalog.limits).map(([key, value]) => <div key={key}><dt>{terminalLabel(key)}</dt><dd>{String(value)}</dd></div>)}</dl><p>These service limits are supplied with the current catalog. Source availability remains instrument-specific.</p></details>}<p className="terminal-hint">Prices come from the service catalog. Terminal and Autopilot passes are separate. On expiry your journal stays readable; a Terminal pass does not close trades or cancel exchange protection.</p></section>}
-    <div className="terminal-workspace-shell"><nav className="terminal-workspace-nav" aria-label="Terminal views"><div className="terminal-nav-heading"><span className="terminal-eyebrow">Your trading workspace</span><strong>Trading Terminal</strong><small>One selected market. Dedicated tools.</small></div>{TERMINAL_SECTIONS.map((item,index)=><button type="button" aria-current={view===item.id?"page":undefined} key={item.id} onClick={()=>{setView(item.id);const url=new URL(location.href);url.searchParams.set("terminalSection",item.id);history.replaceState(null,"",url);}}><span className="terminal-nav-number">{String(index+1).padStart(2,"0")}</span><span><strong>{item.title}{item.id==="positions"&&positions.some(position=>position.status!=="closed")?` / ${positions.filter(position=>position.status!=="closed").length} open`:""}</strong><small>{item.description}</small></span><span aria-hidden="true">&rsaquo;</span></button>)}</nav><div className="terminal-workspace-content" id="terminal-workspace-content">
+    <div className="terminal-workspace-shell"><nav className="terminal-workspace-nav" aria-label="Terminal views"><div className="terminal-nav-heading"><span className="terminal-eyebrow">Your trading workspace</span><strong>Trading Terminal</strong><small>One selected market. Dedicated tools.</small></div>{TERMINAL_SECTIONS.map((item,index)=><button type="button" aria-current={view===item.id?"page":undefined} key={item.id} data-terminal-view={item.id} onClick={()=>{setView(item.id);const url=new URL(location.href);url.searchParams.set("terminalSection",item.id);history.replaceState(null,"",url);}}><span className="terminal-nav-number">{String(index+1).padStart(2,"0")}</span><span><strong>{item.title}{item.id==="positions"&&positions.some(position=>position.status!=="closed")?` / ${positions.filter(position=>position.status!=="closed").length} open`:""}</strong><small>{item.description}</small></span><span aria-hidden="true">&rsaquo;</span></button>)}</nav><div className="terminal-workspace-content" id="terminal-workspace-content">
 
     <div className="terminal-market-pane" hidden={view === "positions" || view === "activity"}><section className="terminal-market-controls"><TerminalMarketSelector instId={instId} marketInput={marketInput} onInput={setMarketInput} onChoose={chooseMarket} disabled={Boolean(busy)} /><div><span className="terminal-field-label">Primary timeframe</span><div className="terminal-frames" role="group" aria-label="Primary timeframe">{TERMINAL_FRAMES.map(frame => <button type="button" key={frame} aria-pressed={timeframe === frame} onClick={() => setTimeframe(frame)}>{frameName(frame)}</button>)}</div></div><div className="terminal-frame-roles"><span>Execution <b>{roles.entry}</b></span><span>Context <b>{roles.context}</b></span><small>Value context: {roles.window} · UTC</small></div><button type="button" disabled={!active || marketBusy} onClick={() => void refreshMarket(true)}>{marketBusy ? "Checking sources…" : "Refresh evidence"}</button></section>
       {active && quoteError && <p className="terminal-hint" role="status">Current ticker: {quoteError}</p>}
       {marketError && <div className="terminal-notice terminal-error" role="alert"><p>{marketError}</p><button type="button" disabled={marketBusy} onClick={() => void refreshMarket(true)}>Retry market</button>{selectedMarket && <small>The displayed assessment is retained from {terminalUtc(selectedMarket.observedAt)}. New entry monitoring requires fresh evidence.</small>}</div>}
       {selectedMarket ? <><div className="terminal-market-clock"><strong>{instId} · {frameName(timeframe)}</strong><span>Assessment {terminalUtc(selectedMarket.observedAt)}</span><span><b>{currentQuote ? "Current quote" : "Saved quote at assessment"}</b> {terminalPrice(currentQuote?.price ?? selectedMarket.report.currentMarket?.quote?.price, terminalPricePrecision(currentQuote?.price ?? selectedMarket.report.currentMarket?.quote?.price))} · {terminalUtc(currentQuote?.ts ?? selectedMarket.report.currentMarket?.quote?.ts)}</span><span>Completed primary close {terminalPrice(selectedMarket.report.snapshot.price)}</span></div><div hidden={view!=="market"}><SetupCard report={selectedMarket.report} onFollow={() => { if (wallet) setReviewFollow(terminalFollowReview(selectedMarket, wallet)); }} onAsk={ask} canFollow={active && Boolean(selectedMarket.setupVersionId) && !busy && !marketBusy && !marketError} />
         <section className="global-chart-panel terminal-chart"><GlobalMarketChart report={selectedMarket.report} selectedPathId={selectedCard?.key ?? null} viewportIdentity={`terminal:${instId}:${timeframe}`} currentQuote={currentQuote} currentCandle={currentCandle} terminalIndicators={chartIndicators.filter(item=>item.instId===instId)} /></section></div>
-        <div hidden={view!=="tools"}><TerminalRetainedMarketTools key={instId} onToolsChange={updateIndicatorMarket} token={token} active={active} market={selectedMarket} onAsk={ask} onRadar={(price, outside) => { setRadarBoundary(String(price)); setRadarSide(outside); setRadarDetector(outside === "below" ? "sweep_reclaim" : "breakout_acceptance"); setRadarOpen(true); setView("radar"); window.setTimeout(() => document.querySelector(".terminal-radar")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); }} /></div>
+        <div hidden={view!=="tools"}><TerminalRetainedMarketTools visible={view==="tools"} key={instId} onToolsChange={updateIndicatorMarket} token={token} active={active} market={selectedMarket} onAsk={ask} onRadar={(price, outside) => { setRadarBoundary(String(price)); setRadarSide(outside); setRadarDetector(outside === "below" ? "sweep_reclaim" : "breakout_acceptance"); setRadarOpen(true); setView("radar"); window.setTimeout(() => document.querySelector(".terminal-radar")?.scrollIntoView({ behavior: "smooth", block: "start" }), 30); }} /></div>
       </> : <section className="terminal-panel terminal-empty"><strong>{marketBusy ? `Loading ${instId} · ${frameName(timeframe)} evidence…` : active ? "Select a market to inspect" : "Market evidence opens with an active pass"}</strong><p>{active ? "Each timeframe uses its own structure, execution policy, value window and risk references." : "Your report purchases stay in Global Market. Terminal has its own market selection and ongoing workspace."}</p></section>}
       <section hidden={view!=="radar"} className="terminal-panel terminal-radar"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">A market event · independent of a setup</span><h3>Market Radar</h3><p>Detect an ordered sequence around your level. See each stage, its timestamp, and the next required event.</p></div><button type="button" className="terminal-primary" disabled={!active || Boolean(busy)} onClick={() => { setRadarOpen(previous => !previous); if (!radarBoundary && selectedMarket) setRadarBoundary(String(selectedMarket.report.snapshot.price ?? "")); }}>Create Radar</button></div><div className="terminal-feature-grid"><div><h4>Sweep &amp; reclaim</h4><p>Move beyond a boundary → return inside → later hold. A wick alone does not finish the sequence.</p></div><div><h4>Breakout acceptance</h4><p>Completed break → later hold or retest. See acceptance separately from initial penetration.</p></div><div><h4>Breakout failure</h4><p>Break outside → return inside → later failed hold. Review its relevance to an existing position.</p></div></div>
         {radarOpen && <TerminalRadarPlanner key={timeframe + radarBoundary + radarDetector + radarSide} market={selectedMarket} initialFrame={timeframe} initialBoundary={radarBoundary} initialSide={radarSide} initialDetector={radarDetector} active={active} busy={Boolean(busy)} telegramLinked={Boolean(workspace?.telegram.linked)} telegramEnabled={Boolean(workspace?.telegram.enabled)} accessEndsAt={workspace?.access.expiresAt} serverNow={passTime.now} onCancel={() => setRadarOpen(false)} onCreate={draft => void createRadar(draft)} />}
         <details><summary>How event detection works</summary><p>PULSE supplies source measurements. Market Radar uses a versioned Tapeout/X Layer circuit component for the actual event logic and retains private stage history. Source gaps remain unknown; repeated polls do not create later confirmation. Open a Radar in Alerts &amp; activity to inspect its sequence and circuit provenance.</p></details>
       </section>
       {selectedMarket && view==="market" && <details className="terminal-panel"><summary>All source clocks and coverage</summary>{selectedMarket.sources.map(source => <SourceDetail key={source.id} source={source} />)}</details>}
-      <TerminalIndicatorMarket assessmentMarket={selectedMarket} onOpenCreator={()=>{setView("creator");const url=new URL(location.href);url.searchParams.set("terminalSection","creator");history.replaceState(null,"",url);}} wallet={wallet} networkKey={networkKey} market={indicatorMarket?.instId===instId&&indicatorMarket.timeframe===timeframe?indicatorMarket:selectedMarket} token={token} active={active} onAsk={ask} section={view==="creator"?"creator":view==="indicators"?"indicators":"hidden"} onChartChange={setChartIndicators} onOpenChart={openChart}/>
+      <TerminalIndicatorMarket assessmentMarket={selectedMarket} marketError={marketError} marketLoading={marketBusy} onOpenCreator={()=>{setView("creator");const url=new URL(location.href);url.searchParams.set("terminalSection","creator");history.replaceState(null,"",url);}} onOpenLibrary={()=>{setView("my-indicators");const url=new URL(location.href);url.searchParams.set("terminalSection","my-indicators");history.replaceState(null,"",url);}} wallet={wallet} networkKey={networkKey} market={indicatorMarket?.instId===instId&&indicatorMarket.timeframe===timeframe?indicatorMarket:selectedMarket} token={token} active={active} onAsk={ask} section={view==="creator"?"creator":view==="indicators"?"indicators":view==="my-indicators"?"my-indicators":"hidden"} onChartChange={setChartIndicators} onOpenChart={openChart}/>
     </div>
     {view === "positions" && <section className="terminal-panel"><div className="terminal-section-heading"><div><span className="terminal-eyebrow">Actual fills · separate from a setup</span><h2>My positions</h2><p>{positions.filter(position => position.status !== "closed").length} open · {positions.length} total journal records.</p><p>Your actual cost basis and recorded protection. A touched chart level is never a filled trade.</p></div><button type="button" className="terminal-primary" disabled={!active || Boolean(busy)} onClick={() => setRecordOpen(previous => !previous)}>Record position</button></div>
       {recordOpen && <TerminalPositionForm market={instId} serverNow={passTime.now} active={active} busy={Boolean(busy)} onSubmit={recordPosition} onCancel={() => setRecordOpen(false)} />}

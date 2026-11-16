@@ -11,6 +11,21 @@ const round=(n:number)=>Number(n.toPrecision(12));
 // shared profile reconciliation. Decimal bins retain the captured quantities.
 const profileRowSize=(low:number,high:number,vwap:number)=>10**Math.ceil(Math.log10(Math.max(vwap*1e-6,(high-low)/80)));
 const profileUnavailable=(value:TerminalMarketTools["value"],reason:string)=>({...value,status:value.status==="stale"?"stale" as const:"partial" as const,reason:[value.reason,reason].filter(Boolean).join(" ")});
+/** The caller may retry a source failure without treating an empty chart as a
+ * successful calculation. Provider messages/URLs never become public copy. */
+export class TerminalMarketSourceUnavailableError extends Error {
+  readonly code = "terminal_market_source_unavailable";
+  constructor(readonly reason: "timeout" | "upstream" | "invalid_source", readonly sourceCause?: unknown) {
+    super(reason === "timeout" ? "The market source timed out. Retry market data; your indicator draft is preserved." : reason === "invalid_source" ? "The returned market evidence could not be validated. Retry market data; your indicator draft is preserved." : "The exchange market source is temporarily unavailable. Retry market data; your indicator draft is preserved.");
+    this.name = "TerminalMarketSourceUnavailableError";
+  }
+}
+async function boundedTerminalSource<T>(load:()=>Promise<T>, timeoutMs:number):Promise<T> {
+  let timer:ReturnType<typeof setTimeout>|undefined;
+  try {
+    return await Promise.race([Promise.resolve().then(load),new Promise<never>((_resolve,reject)=>{timer=setTimeout(()=>reject(new TerminalMarketSourceUnavailableError("timeout")),timeoutMs);})]);
+  } finally { if(timer!==undefined)clearTimeout(timer); }
+}
 export function terminalValueWindowStart(timeframe:string,asOf:number,cycleStart?:number):number{
   const {valueWindow}=terminalFrameProfile(timeframe),d=new Date(asOf),day=Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate());
   return valueWindow==="utc-day"?day:valueWindow==="utc-week"?day-(d.getUTCDay()+6)%7*86400000:valueWindow==="cycle"?cycleStart??Date.UTC(d.getUTCFullYear()-4,0,1):Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1);
@@ -69,20 +84,25 @@ export function terminalToolsFromParticipation(p:TerminalParticipation,input:{ti
   return tools;
 }
 
-export async function createTerminalMarketSnapshot(input:{instId:string;timeframe:string;now?:number;loadMarket?:typeof buildMarketContext;loadParticipation?:(input:{instId:string;start:number;end:number})=>Promise<TerminalParticipation>}):Promise<TerminalMarketSnapshot>{
+export async function createTerminalMarketSnapshot(input:{instId:string;timeframe:string;now?:number;sourceTimeoutMs?:number;loadMarket?:typeof buildMarketContext;loadParticipation?:(input:{instId:string;start:number;end:number})=>Promise<TerminalParticipation>}):Promise<TerminalMarketSnapshot>{
   if(!/^[A-Z0-9]{2,20}-(USDT|USDC|USD)$/.test(input.instId))throw Error("Unsupported Terminal instrument");
-  const profile=terminalFrameProfile(input.timeframe),started=input.now??Date.now(),start=terminalValueWindowStart(profile.timeframe,started);
-  const [set,participation]=await Promise.all([loadGlobalMarketSet({instId:input.instId,timeframe:profile.timeframe},input.loadMarket??buildMarketContext),
-    (input.loadParticipation??loadTerminalParticipation)({instId:input.instId,start,end:started}).catch(()=>({capture:null,reason:"Executed-trade feed unavailable.",derivatives:{instId:`${input.instId}-SWAP`,knownAt:0},liquidity:{knownAt:0}} satisfies TerminalParticipation))]);
+  const profile=terminalFrameProfile(input.timeframe),started=input.now??Date.now(),start=terminalValueWindowStart(profile.timeframe,started),sourceTimeoutMs=Math.max(1,Math.min(input.sourceTimeoutMs??30000,30000));
+  const load:typeof buildMarketContext=request=>boundedTerminalSource(()=>(input.loadMarket??buildMarketContext)(request),sourceTimeoutMs);
+  const [set,participation]=await Promise.all([loadGlobalMarketSet({instId:input.instId,timeframe:profile.timeframe},load).catch(cause=>{throw cause instanceof TerminalMarketSourceUnavailableError?cause:new TerminalMarketSourceUnavailableError("upstream",cause);}),
+    boundedTerminalSource(()=>(input.loadParticipation??loadTerminalParticipation)({instId:input.instId,start,end:started}),sourceTimeoutMs).catch(()=>({capture:null,reason:"Executed-trade feed unavailable. Retry market data for a fresh execution sample.",derivatives:{instId:`${input.instId}-SWAP`,knownAt:0},liquidity:{knownAt:0}} satisfies TerminalParticipation))]);
   const observedAt=input.now??Date.now(),stamp=new Date(observedAt).toISOString();
   const market={...set.market,fetchedAt:stamp},hierarchyMarkets=set.hierarchyMarkets.map(m=>({...m,fetchedAt:stamp})),contextMarket=set.contextMarket?{...set.contextMarket,fetchedAt:stamp}:null;
+  try { if(!completedGlobalCandles(market).length)throw new TerminalMarketSourceUnavailableError("invalid_source"); }
+  catch(cause) { throw cause instanceof TerminalMarketSourceUnavailableError?cause:new TerminalMarketSourceUnavailableError("invalid_source",cause); }
   const tools=terminalToolsFromParticipation(participation,{timeframe:profile.timeframe,start,asOf:observedAt});
   const sampled=tools.value.orderFlow,capture=participation.capture;
   // The shared Pro contract uses the primary frame and canonical venue ID.
   // Tool footprint remains in the execution frame; never relabel its bars.
   let reportFlow:ReturnType<typeof buildGlobalOrderFlow>=null;
   if(sampled&&capture&&market.source==="okx-public-spot")try{reportFlow=buildGlobalOrderFlow({...capture,source:market.source},{timeframe:profile.timeframe,start:sampled.profile.start,end:sampled.profile.end,asOf:observedAt,rowSize:sampled.profile.rowSize});}catch{tools.value=profileUnavailable(tools.value,"The primary-frame report profile could not be reconciled and is omitted; the execution-window tool profile remains separately sourced.");}
-  const report=prepareGlobalReport({market:{...market,...(reportFlow?{orderFlow:reportFlow}:{})},hierarchyMarkets,contextMarket,tier:"premium",decisionVersion:"decision-v5",targetPolicy:"active-zones-v1"});
+  let report:ReturnType<typeof prepareGlobalReport>;
+  try { report=prepareGlobalReport({market:{...market,...(reportFlow?{orderFlow:reportFlow}:{})},hierarchyMarkets,contextMarket,tier:"premium",decisionVersion:"decision-v5",targetPolicy:"active-zones-v1"}); }
+  catch(cause) { throw new TerminalMarketSourceUnavailableError("invalid_source",cause); }
   const entry=hierarchyMarkets.find(m=>m.bar===profile.execution),observations=entry?completedGlobalCandles(entry).slice(-128).map(c=>({id:`${entry.source}:${input.instId}:${entry.bar}:${c.ts}`,instId:input.instId,timeframe:entry.bar,source:entry.source,start:c.ts,at:candleCloseTime(c.ts,entry.bar)!,knownAt:observedAt,open:c.open,high:c.high,low:c.low,close:c.close,complete:true,sequence:c.ts})):[];
   const latest=observations.at(-1),sources:TerminalSourceStatus[]=[{id:"price",source:market.source,knownAt:latest?.at??0,status:latest&&observedAt-latest.at<=candleTimeframeMs(profile.execution)+60000?"available":"stale",windowStart:observations[0]?.start,windowEnd:latest?.at},tools.value,tools.flow,...(tools.perpetualFlow?[tools.perpetualFlow]:[]),tools.derivatives,tools.liquidity];
   return {version:"terminal-market-v1",instId:input.instId,timeframe:profile.timeframe,observedAt,report,tools,observations,sources};

@@ -21,10 +21,10 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
   const versions = new TerminalStore(runtime.store.storage, runtime.store.key("indicator-version-registry", "v1"), 3650);
   const seeds = indicatorMarketCatalog();
   const checkout = createIndicatorCommerceRoutes(runtime, dependencies);
-  const summary = (item: TerminalIndicatorPublication, owner: string, owned = false) => ({ ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== "packageRef")), canDelete: item.publisher === owner, entitled: !item.offer || item.publisher === owner || owned, hosted: true, publication: item.registration ? { ...item.registration, registered: true } : { chainId: 196, registered: false } });
+  const summary = (item: TerminalIndicatorPublication, owner: string, owned = false) => ({ ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== "packageRef")), publisherName: item.author, canDelete: item.publisher === owner, entitled: !item.offer || item.publisher === owner || owned, hosted: true, publication: item.registration ? { ...item.registration, registered: true } : { chainId: 196, registered: false } });
   const seedSummary = (m: typeof seeds[number]) => {
     const candidate=BUILTIN_INDICATOR_DEPLOYMENTS[m.id],registration=candidate?.netlistHash===`sha256:${digest(Buffer.from(m.runtime.netlist.slice(2),"hex"))}`?candidate:undefined;
-    return { id: m.id, manifestId: m.id, version: m.version, title: m.title, description: m.description, author: m.author, kernel: m.kernel, publisher: null, createdAt: null, canDelete: false, hosted: false, entitled:true, ...(registration?{registration}:{}), publication: registration?{...registration,registered:true}:m.publication };
+    return { id: m.id, manifestId: m.id, version: m.version, title: m.title, description: m.description, author: m.author, publisherName: m.author, kernel: m.kernel, publisher: null, createdAt: null, canDelete: false, hosted: false, entitled:true, ...(registration?{registration}:{}), publication: registration?{...registration,registered:true}:m.publication };
   };
   router.use("/v1/terminal/indicators", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); if (!/^0x[\da-f]{40}$/i.test(res.locals.terminalOwner ?? "")) return res.status(401).json({ error: "Sign in to your wallet workspace first" }); next(); });
   router.use(checkout.router);
@@ -99,7 +99,9 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
     return res.status(duplicate ? 200 : 201).json({ item: summary(storedItem, publisher), manifest });
   }));
   router.post("/v1/terminal/indicators/:id/registration", asyncRoute(async (req, res) => {
-    const input = z.object({ processor: z.string().regex(/^0x[\da-f]{40}$/i), circuitId: z.string().regex(/^[1-9]\d{0,18}$/), transactionHash: z.string().regex(/^0x[\da-f]{64}$/i).optional() }).strict().parse(req.body);
+    const parsed = z.object({ processor: z.string().regex(/^0x[\da-f]{40}$/i), circuitId: z.string().regex(/^[1-9]\d{0,18}$/), transactionHash: z.string().regex(/^0x[\da-f]{64}$/i).optional() }).strict().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: "Choose an existing processor address and a positive circuit ID, with an optional registration transaction", code: "indicator_registration_input" });
+    const input = parsed.data;
     const owner = String(res.locals.terminalOwner).toLowerCase(), item = (await registry.get(REGISTRY_OWNER)).indicatorPublications?.find(p => p.id === req.params.id);
     if (!item || item.publisher !== owner) return res.status(403).json({ error: "Only the publisher can attach a circuit deployment" });
     const stored = await registry.storage.read<{ bytes: string }>(registry.key("package", item.packageRef));

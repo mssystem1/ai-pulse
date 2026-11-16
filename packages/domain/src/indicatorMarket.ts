@@ -5,6 +5,9 @@
  */
 import { createFormulaIndicatorPackage, parseFormulaIndicatorPackage, interpretIndicatorFormula, type IndicatorFormulaManifest } from "./indicatorFormula.js";
 import { parseStudyIndicatorPackage, evaluateIndicatorStudySeries, type IndicatorStudyManifest } from "./indicatorStudy.js";
+import { parseGraphIndicatorPackage, evaluateIndicatorGraph, type IndicatorGraphManifest, type IndicatorGraphPlot, type IndicatorPriceInput } from "./indicatorGraph.js";
+export { createGraphIndicatorPackage, parseGraphIndicatorPackage, parseIndicatorGraph, parseIndicatorScript, serializeIndicatorScript, evaluateIndicatorGraph, indicatorGraphTemplates } from "./indicatorGraph.js";
+export type { IndicatorGraphManifest, IndicatorGraphDefinition, IndicatorGraphNode, IndicatorGraphPlot, IndicatorGraphTemplate, IndicatorPriceInput, IndicatorGraphExecutionInput, IndicatorGraphResult } from "./indicatorGraph.js";
 export { createFormulaIndicatorPackage, compileIndicatorFormula, parseIndicatorFormula, interpretIndicatorFormula } from "./indicatorFormula.js";
 export type { IndicatorFormulaManifest, IndicatorFormulaOutput } from "./indicatorFormula.js";
 export { createStudyIndicatorPackage, parseIndicatorStudyDefinition, evaluateIndicatorStudySeries, indicatorStudyTemplates } from "./indicatorStudy.js";
@@ -23,7 +26,7 @@ export type IndicatorBuiltinManifest = {
   runtime: { format: "tap-02-nand"; bitOrder: "least-significant-first"; inputBits: number; outputBits: number; maxPoints: 1024; netlist: string };
   publication: { chainId: 196; registered: false };
 };
-export type IndicatorManifest = IndicatorBuiltinManifest | IndicatorFormulaManifest | IndicatorStudyManifest;
+export type IndicatorManifest = IndicatorBuiltinManifest | IndicatorFormulaManifest | IndicatorStudyManifest | IndicatorGraphManifest;
 export type IndicatorInput = {
   instId: string; timeframe: string; source: string;
   status: "available" | "partial" | "stale" | "unavailable";
@@ -32,15 +35,19 @@ export type IndicatorInput = {
   /** Actual source-bar width, independent of the primary price timeframe. */
   intervalMs?: number;
   missingIntervals?: readonly { start: number; end: number }[];
+  /** Genuine completed primary candles, independent of the execution sample. */
+  price?: IndicatorPriceInput;
   now?: number; maxAgeMs?: number;
 };
 export type IndicatorPoint = { ts: number; delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; rawValue?: number; signal?: boolean; reset?: boolean; partial?: boolean };
 export type IndicatorResult = {
   id: string; status: IndicatorInput["status"]; reason?: string;
   points: IndicatorPoint[];
+  outputs?: { plot: IndicatorGraphPlot; points: IndicatorPoint[]; quantitySource?: "price" | "executions" | "mixed"; quantityUnits?: "base" | "contracts" }[];
   summary: { delta?: number; cvd?: number; participationBps?: number; netParticipationBps?: number; value?: number; rawValue?: number; signal?: boolean; label: string };
   precision: { quantityQuantum: number; maxCvdError: number; note: string };
-  provenance: { execution: "local-tap02"; chainId: 196; registered: false; source: string; knownAt: number; windowStart: number; windowEnd: number; gateCount: number; units: "base" | "contracts";
+  provenance: { execution: "local-tap02" | "local-causal-graph"; chainId: 196; registered: false; source: string; knownAt: number; windowStart: number; windowEnd: number; gateCount: number; units: "base" | "contracts";
+    graph?: { execution: "causal-host-graph-v1"; kernel: "tap-02-delta" | "not-used"; sourceKind: "completed-ohlcv" | "executed-flow" | "aligned-ohlcv-and-executions"; nodeCount: number; plotCount: number; resetCount: number; resolvedPoints: number; sourceIntervalMs?: number; priceUnits?: "base" | "contracts"; executionUnits?: "base" | "contracts"; gapPolicy: "reset"; warmup: "full-window" };
     series?: { execution: "causal-host-series-v1"; kernel: "tap-02-per-bar"; gapPolicy: "reset"; warmup: "full-window"; transforms: IndicatorStudyManifest["study"]["transforms"]; plot: "line" | "histogram"; sourceIntervalMs?: number; resolvedPoints: number; resetCount: number; partialBucketCount: number } };
 };
 const MAX_POINTS = 1024, MAX_GATES = 40_000, MAX_PACKAGE_BYTES = 600_000;
@@ -137,6 +144,7 @@ export function parseIndicatorPackage(input: string | unknown): IndicatorManifes
   const m = object(input);
   if (m.format === "pulse-indicator-v2") return parseFormulaIndicatorPackage(m);
   if (m.format === "pulse-indicator-v3") return parseStudyIndicatorPackage(m);
+  if (m.format === "pulse-indicator-v4") return parseGraphIndicatorPackage(m);
   exactKeys(m, ["format", "id", "version", "title", "description", "author", "license", "kernel", "prerequisites", "runtime", "publication"]);
   if (m.kernel !== "executed-cvd-v1" && m.kernel !== "buy-participation-v1") fail("unsupported kernel version");
   const expected = canonical(m.kernel as IndicatorBuiltinManifest["kernel"]);
@@ -207,7 +215,19 @@ export function evaluateIndicatorCircuit(manifest: IndicatorManifest, input: { b
  * pretending a fixed-width Boolean circuit preserves arbitrary float precision.
  */
 export function evaluateIndicator(manifest: IndicatorManifest, input: IndicatorInput): IndicatorResult {
-  const m = parseIndicatorPackage(manifest), circuit = compile(m), now = input.now ?? Date.now();
+  const m = parseIndicatorPackage(manifest);
+  if (m.format === "pulse-indicator-v4") {
+    if (!input.instId || !input.timeframe || !["base", "contracts"].includes(input.units)) fail("source identity or units missing");
+    const kernelUsed = m.graph.nodes.some(node => node.kind === "kernel"), circuit = kernelUsed ? compile(m) : undefined;
+    const result = evaluateIndicatorGraph(m, { price: input.price, executions: input, now: input.now, maxAgeMs: input.maxAgeMs,
+      evaluateDeltaKernel: kernelUsed ? (buy, sell) => { const quantum = Math.max(buy, sell) > 0 ? Math.max(buy, sell) / 65535 : 1; if (!Number.isFinite(quantum) || quantum <= 0) fail("quantity scale outside supported precision"); const buyQ = Math.min(65535, Math.round(buy / quantum)), sellQ = Math.min(65535, Math.round(sell / quantum)); return run(circuit!, buyQ, sellQ, 0).valueQ! * quantum; } : undefined });
+    const points = result.outputs[0]?.points ?? [], last = points.at(-1);
+    return { id: m.id, status: result.status, reason: result.reason, points, outputs: result.outputs, summary: { ...last, label: result.outputs[0]?.plot.label ?? m.title },
+      precision: { quantityQuantum: 0, maxCvdError: 0, note: `Graph calculations use finite JavaScript double precision with full-window causal warm-up. ${kernelUsed ? "tap_delta executes the embedded TAP-02 NAND kernel using per-bar 16-bit quantity quantization; other graph nodes and stateflow execute in the host. Formula-dependent error is not universally bounded." : "The graph uses completed OHLCV host calculations. Its embedded compatibility kernel is not executed and does not certify these readings."}` },
+      provenance: { execution: "local-causal-graph", chainId: 196, registered: false, source: result.source, knownAt: result.knownAt, windowStart: result.windowStart, windowEnd: result.windowEnd, gateCount: circuit ? circuit.gates.length / 2 : 0, units: input.units,
+        graph: { execution: "causal-host-graph-v1", kernel: kernelUsed ? "tap-02-delta" : "not-used", sourceKind: result.sourceKind, nodeCount: m.graph.nodes.length, plotCount: m.graph.plots.length, resetCount: result.resetCount, resolvedPoints: result.resolvedPoints, ...(result.priceUnits ? { priceUnits: result.priceUnits } : {}), ...(result.executionUnits ? { executionUnits: result.executionUnits } : {}), ...(result.intervalMs ? { sourceIntervalMs: result.intervalMs } : {}), gapPolicy: "reset", warmup: "full-window" } } };
+  }
+  const circuit = compile(m), now = input.now ?? Date.now();
   if (!input.instId || !input.timeframe || !input.source || !["base", "contracts"].includes(input.units) || !["available", "partial", "stale", "unavailable"].includes(input.status)) fail("source identity or units missing");
   if (![input.knownAt, input.windowStart, input.windowEnd, now].every(Number.isSafeInteger) || input.knownAt < 0 || input.windowStart < 0 || input.windowEnd <= input.windowStart || input.knownAt > now + 30000) fail("invalid source clock");
   if (!Array.isArray(input.points) || input.points.length > MAX_POINTS) fail("source point limit exceeded");

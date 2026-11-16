@@ -42,6 +42,7 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const rowBand=(index:number)=>zones?(index===0?zones.entry:index===1?zones.stop:zones.targets[index-2]):undefined;
   const rowText=(index:number)=>{const zone=rowBand(index);return zone?globalPriceBandText(report,zone):index===0?card.entry:price(rows[index].price);};
   let svg=`<g data-trade-plan="${escape(card.key)}" data-confirmed="${card.confirmed}" data-price-labels="exact">`;
+  if(p.state==="avoid")svg+=txt(g.historyEnd+12,g.top+22,zh?"\u65e0\u65b0\u5165\u573a / \u4ec5\u4f9b\u590d\u6838":"NO ENTRY / REFERENCES FOR REVIEW","#ffcb76",9);
   // Start at the conditional entry. Connecting today's close to a remote entry
   // invents an unsupported pullback/rebound forecast, even with a dashed line.
   const projectionColor=card.side==="long"?"#53dabb":"#f0738c";

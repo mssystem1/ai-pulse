@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { indicatorMarketCatalog, evaluateIndicator,createStudyIndicatorPackage } from "@pulse/domain";
+import { indicatorMarketCatalog, evaluateIndicator,createStudyIndicatorPackage,createGraphIndicatorPackage,parseIndicatorScript } from "@pulse/domain";
 import { indicatorInputFromMarket, installIndicator, loadInstalledIndicators } from "./terminalIndicatorClient";
 import type { TerminalMarket } from "./terminalClient";
 
@@ -58,4 +58,46 @@ test("authoritative source gaps inside full-width display bars reset study warm-
   assert.deepEqual(isolated.missingIntervals,[]);
   assert.equal(isolated.status,"available");
   assert.notEqual(evaluateIndicator(manifest,isolated).points[1].value,undefined);
+});
+
+const HOUR=3_600_000,DAY=24*HOUR,PRICE_START=Date.UTC(2026,10,8);
+function completedPriceMarket():TerminalMarket {
+  const observedAt=PRICE_START+3*HOUR+2000;
+  const candles=Array.from({length:4},(_,index)=>({ts:PRICE_START+index*HOUR,open:100+index,high:102+index,low:99+index,close:101+index,volume:10+index,confirmed:index!==3}));
+  const flow={source:"real-spot-executions",status:"available",knownAt:observedAt,windowStart:PRICE_START+2*HOUR,windowEnd:PRICE_START+3*HOUR,displayBucketMs:HOUR,displayPoints:[{ts:PRICE_START+2*HOUR,end:PRICE_START+3*HOUR,buy:30,sell:20}],points:[]};
+  return {instId:"BTC-USDT",timeframe:"1H",observedAt,report:{snapshot:{source:"okx-public-spot",timeframe:"1H"},candles,currentMarket:{quote:{price:999,ts:observedAt}},entryStudy:{candles:[{...candles[0],close:888}]}},tools:{flow,perpetualFlow:{...flow,source:"real-perpetual-executions",displayPoints:[{ts:PRICE_START+2*HOUR,end:PRICE_START+3*HOUR,buy:300,sell:200}]}}} as unknown as TerminalMarket;
+}
+
+test("professional price studies use completed primary OHLCV, never the live quote, forming candle or entry study",()=>{
+  const market=completedPriceMarket(),before=structuredClone(market),input=indicatorInputFromMarket(market,"perpetual",market.observedAt+10*60000);
+  assert.equal(input.units,"contracts");assert.equal(input.source,"real-perpetual-executions");assert.equal(input.points[0].buy,300);
+  assert(input.price);assert.equal(input.price.source,"okx-public-spot");assert.equal(input.price.knownAt,market.observedAt);assert.equal(input.price.units,"base");
+  assert.equal(input.price.intervalMs,HOUR);assert.equal(input.price.status,"available");assert.equal(input.price.windowStart,PRICE_START);assert.equal(input.price.windowEnd,PRICE_START+3*HOUR);
+  assert.deepEqual(input.price.candles.map(c=>c.close),[101,102,103]);assert.deepEqual(input.price.candles.map(c=>c.volume),[10,11,12]);
+  assert(input.price.candles.every(c=>c.end<=market.observedAt));assert.notEqual(input.price.candles,market.report.candles);assert.deepEqual(market,before);
+});
+
+test("completed price gaps and stale source clocks stay separate from fresh execution coverage",()=>{
+  const market=completedPriceMarket();market.report.candles.splice(1,1);
+  const input=indicatorInputFromMarket(market,"spot",market.observedAt);
+  assert.equal(input.status,"available");assert.equal(input.price!.status,"partial");assert.deepEqual(input.price!.missingIntervals,[{start:PRICE_START+HOUR,end:PRICE_START+2*HOUR}]);
+  market.observedAt=PRICE_START+4*HOUR+6000;
+  const stale=indicatorInputFromMarket(market,"spot",market.observedAt);
+  assert.equal(stale.price!.status,"stale");assert.deepEqual(stale.price!.missingIntervals,input.price!.missingIntervals);assert.equal(stale.price!.windowEnd,PRICE_START+3*HOUR);
+});
+
+test("weekly primary prices retain UTC weekly candle ends instead of appending today's quote as a completed bar",()=>{
+  const market=completedPriceMarket(),weekStart=Date.UTC(2026,9,19);
+  market.timeframe="1Wutc";market.observedAt=Date.UTC(2026,10,8,10);
+  market.report.candles=Array.from({length:3},(_,index)=>({ts:weekStart+index*7*DAY,open:100+index,high:102+index,low:99+index,close:101+index,volume:1000+index,confirmed:index!==2}));
+  const price=indicatorInputFromMarket(market,"spot",market.observedAt).price!;
+  assert.equal(price.intervalMs,7*DAY);assert.equal(price.candles.length,2);assert.equal(price.windowEnd,Date.UTC(2026,10,2));assert.deepEqual(price.candles.map(c=>c.end),[Date.UTC(2026,9,26),Date.UTC(2026,10,2)]);
+  assert.equal(price.candles.at(-1)!.close,102);assert.equal(price.status,"available");
+});
+
+test("a v4 multi-plot creation installs and restores as one immutable library item",()=>{
+  const manifest=createGraphIndicatorPackage({id:"trader.ema-two-plots",title:"EMA and crossover",description:"A complete portable price study with two chart outputs.",author:"Alice Quant",graph:parseIndicatorScript('average = ema(close,2)\ncondition = above(close,average)\nplot(average,"EMA 2","price","line","price","#22d3ee")\nplot(condition,"Close above EMA","indicator","histogram","scalar","#34d399")')});
+  const installed=installIndicator([],manifest),restored=loadInstalledIndicators({getItem:()=>JSON.stringify(installed)},[]);
+  assert.equal(installed.length,1);assert.equal(restored.length,1);assert.deepEqual(restored[0],manifest);assert.equal(installIndicator(restored,manifest),restored);
+  assert.throws(()=>installIndicator(restored,{...manifest,author:"Someone else"}),/different content/);
 });

@@ -162,3 +162,11 @@ test("retained books require explicit bounded clock proof for a measured exchang
  await assert.rejects(history.appendBook("BTC-USDT",{...led,knownAt:-1,exchangeClockVerifiedAt:0}),/clock calibration|Invalid real book/);
  await assert.rejects(history.appendBook("BTC-USDT",{...led,ts:end+20000}),/Invalid real book/);
 });
+
+
+test("economy book collection samples only recently requested markets and stops after demand expires",async()=>{
+ let now=end,calls=0;const history=new TerminalMarketHistory({storage:new MemoryTerminalHistoryStorage(()=>now),now:()=>now,bookDemandOnly:true,markets:["BTC-USDT","ETH-USDT"],fetchBook:async()=>{calls++;return{...(await book()),ts:now-1000,knownAt:now};}});
+ assert.equal((await history.collectLiveBooks()).books,0);assert.equal(calls,0);
+ await history.ensure({instId:"BTC-USDT",start:day,end});assert.equal((await history.collectLiveBooks()).books,1);assert.equal(calls,1);
+ now+=16*60000;assert.equal((await history.collectLiveBooks()).books,0);assert.equal(calls,1,"Unused configured markets must not generate ongoing exchange requests");
+});

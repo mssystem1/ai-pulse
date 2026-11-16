@@ -1,3 +1,4 @@
+import {globalSetupAdmission} from "@pulse/domain";
 import type {GlobalExecutionSettings} from "./globalExecutionPolicy.js";
 import {applyGlobalStrategyMix,globalStrategyMixObjectives} from "./globalStrategyMix.js";
 import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
@@ -7,7 +8,7 @@ import {globalRouteObstacles} from "./globalRouteObstacles.js";
 
 /** A complete conditional scenario when an observed signal is not established.
  * It does not change the canonical signal, history or execution permission. */
-export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={}){
+export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false){
   if(report.decisionVersion!=="decision-v5"||report.strategy?.targetPolicy!=="active-zones-v1")return;
   delete report.discretionaryPlan;
   delete report.scenario;
@@ -33,6 +34,7 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   const primaryAtr=report.indicators.atr.points.at(-1)?.value??atr;
   const coreChoice=selectGlobalSetupContext(report,{bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff});
   const mixed=applyGlobalStrategyMix(report,report.marketEvidence);
+  if(coreOnly){mixed.choice=undefined;mixed.candidate=undefined;delete mixed.mix.selectedVariant;}
   mixed.mix.primary={family:coreChoice.family,side:coreChoice.side,variant:"core",reason:"Core source selection retained alongside separately admitted complementary price events."};
   report.strategyMix=mixed.mix;
   const {side,family,entryBasis,evidence}=mixed.choice??coreChoice;
@@ -109,4 +111,11 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   const barriers=globalRouteObstacles(report,side).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5);
   report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
   applyGlobalPriceZones(report,settings);
+  // A completed price event is not admission. A weak complementary event
+  // cannot replace a supported core limit plan merely by being more recent.
+  // Compare only these independently sourced plans; never move their prices.
+  if(!coreOnly&&mixed.choice&&!globalSetupAdmission(report).geometryEligible){
+    const alternate=structuredClone(report);applyGlobalDiscretionaryPlan(alternate,settings,true);
+    if(alternate.discretionaryPlan&&globalSetupAdmission(alternate).geometryEligible){report.discretionaryPlan=alternate.discretionaryPlan;report.strategyMix=alternate.strategyMix;}
+  }
 }
