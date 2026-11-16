@@ -59,7 +59,7 @@ export function terminalPassPrice(priceUsd: string): string {
   return Number(priceUsd).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 6 });
 }
 export class TerminalApiError extends Error {
-  constructor(message: string, readonly status: number, readonly details?: { code?: string; doNotPayAgain?: boolean; transactionHash?: string }) { super(message); this.name = "TerminalApiError"; }
+  constructor(message: string, readonly status: number, readonly details?: { code?: string; doNotPayAgain?: boolean; transactionHash?: string; retryAfterSeconds?: number }) { super(message); this.name = "TerminalApiError"; }
 }
 export type TerminalSession = { token: string; owner: string; expiresAt: string };
 let currentSession: TerminalSession | null = null;
@@ -88,7 +88,7 @@ export async function terminalRequest<T>(path: string, options: { token?: string
   const controller = new AbortController(), cancel = () => controller.abort(signal?.reason);
   signal?.addEventListener("abort", cancel, { once: true }); if (signal?.aborted) cancel();
   const deadline = setTimeout(() => controller.abort(new DOMException("Terminal request timed out. Retry this request.", "TimeoutError")), options.timeoutMs??(networkRoute ? 180_000 : 90_000));
-  let response: Response, data: { error?: string; code?: string; doNotPayAgain?: boolean; transactionHash?: string };
+  let response: Response, data: { error?: string; code?: string; doNotPayAgain?: boolean; transactionHash?: string; retryAfterSeconds?: number };
   try { response = await fetcher(`${API_BASE}${networkRoute ? `/${networkRoute}` : ""}/v1/terminal/${path.replace(/^\//, "")}`, {
     method, headers: { Accept: "application/json", ...(body === undefined ? {} : { "Content-Type": "application/json" }), ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }), cache: "no-store", referrerPolicy: "no-referrer", signal: controller.signal,
@@ -98,7 +98,12 @@ export async function terminalRequest<T>(path: string, options: { token?: string
   } finally { clearTimeout(deadline); signal?.removeEventListener("abort", cancel); }
   if (!response.ok) {
     if (response.status === 401 && token === currentSession?.token) clearTerminalSession();
-    throw new TerminalApiError(data.error || `Terminal request failed (${response.status}). Retry without paying again if your payment was already approved.`, response.status, { code: data.code, doNotPayAgain: data.doNotPayAgain, transactionHash: data.transactionHash });
+    const retry = Number(data.retryAfterSeconds ?? response.headers.get("Retry-After"));
+    const retryAfterSeconds = Number.isFinite(retry) && retry > 0 ? Math.min(3600, Math.ceil(retry)) : undefined;
+    const message = data.code === "KV_TEMPORARILY_UNAVAILABLE"
+      ? "Terminal storage is temporarily unavailable. Your saved workspace cannot be read right now. Local indicator drafts remain available; retry signing in or syncing later. Do not approve another payment to restore existing access."
+      : data.error || `Terminal request failed (${response.status}). Retry without paying again if your payment was already approved.`;
+    throw new TerminalApiError(message, response.status, { code: data.code, doNotPayAgain: data.doNotPayAgain, transactionHash: data.transactionHash, retryAfterSeconds });
   }
   return data as T;
 }

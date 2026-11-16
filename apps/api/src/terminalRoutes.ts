@@ -16,6 +16,7 @@ import { terminalAiContext, TerminalInspectionUnavailableError, type TerminalIns
 import { GlobalScenarioHistoryUnavailableError } from "./globalScenarioStore.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import type { ExecutionNetwork } from "./executionContracts.js";
+import { isKvUnavailableError, isTransientConnectivityError } from "./resilientKv.js";
 
 const durationSchema = z.enum(["24h", "7d", "30d"]);
 const marketSchema = z.object({ instId: z.string().regex(/^[A-Z0-9]{2,20}-(USDT|USDC|USD)$/), timeframe: z.enum(["15m", "1H", "4H", "1D", "1W", "1Dutc", "1Wutc"]) });
@@ -47,7 +48,14 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   if (cfg.FEATURE_TRADING_TERMINAL) { try { runtime = new TerminalRuntime(cfg, dependencies); registerTerminalRuntime(runtime); } catch { reason = "Durable Terminal storage is not ready. Purchases are unavailable."; } }
   const publicRouter = Router(), beforePayment = Router(), afterPayment = Router();
   const payments = runtime ? new TerminalPayments(runtime.store, runtime.now) : null;
-  publicRouter.get("/v1/terminal/catalog", (_req, res) => { res.setHeader("Cache-Control", "no-store"); res.json(terminalCatalog(cfg, Boolean(runtime), reason)); });
+  publicRouter.get("/v1/terminal/catalog", (_req, res) => {
+    // Read the existing connection circuit; never probe Redis for a public catalog.
+    const storage = runtime?.store.storage.availability?.();
+    const unavailable = storage?.available === false;
+    res.setHeader("Cache-Control", "no-store");
+    if (unavailable) res.setHeader("Retry-After", String(Math.max(1, storage.retryAfterSeconds)));
+    res.json({ ...terminalCatalog(cfg, Boolean(runtime) && !unavailable, unavailable ? "Terminal storage is temporarily unavailable. Sign-in, saved workspaces and purchases will resume when storage recovers. Your local indicator drafts remain available." : reason), ...(unavailable ? { retryAfterSeconds: storage.retryAfterSeconds } : {}) });
+  });
   const guard: RequestHandler = asyncRoute(async (req, res, next) => {
     res.setHeader("Cache-Control", "private, no-store");
     if (!cfg.FEATURE_TRADING_TERMINAL) return res.status(404).json({ error: "Trading Terminal is disabled" });
@@ -67,7 +75,11 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
     if (!runtime) return res.status(cfg.FEATURE_TRADING_TERMINAL ? 503 : 404).json({ error: reason ?? "Trading Terminal is disabled" });
     const body = z.object({ challengeId: z.string().min(20).max(100), signature: z.string().regex(/^0x[\da-f]{130}$/i) }).strict().parse(req.body);
     try { return res.json(await runtime.auth.verify(body.challengeId, body.signature as `0x${string}`, runtime.now())); }
-    catch { return res.status(401).json({ error: "Wallet signature is invalid or expired. Sign in again." }); }
+    catch (error) {
+      // Storage loss is recoverable service failure, not a bad wallet signature.
+      if (isKvUnavailableError(error) || isTransientConnectivityError(error)) throw error;
+      return res.status(401).json({ error: "Wallet signature is invalid or expired. Sign in again." });
+    }
   }));
   beforePayment.use("/v1/terminal", guard);
   beforePayment.get("/v1/terminal/workspace", asyncRoute(async (_req, res) => { return res.json(await runtime!.workspace(res.locals.terminalOwner)); }));

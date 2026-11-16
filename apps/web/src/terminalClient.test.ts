@@ -56,6 +56,23 @@ test("an expired server session is cleared, while payment errors retain their st
   await assert.rejects(terminalRequest("pass/24h", { fetcher: unavailable }), error => error instanceof TerminalApiError && error.status === 503 && /recoverable/.test(error.message));
 });
 
+test("storage outages retain owner credentials and expose the server cooldown without blaming the signature", async () => {
+  setTerminalSession({ owner, token: "keep-owner-session", expiresAt: "2030-01-01T00:00:00Z" }, owner);
+  const fetcher = (async () => Response.json({ error: "A remote dependency is temporarily unavailable", code: "KV_TEMPORARILY_UNAVAILABLE", retryAfterSeconds: 300 }, { status: 503 })) as typeof fetch;
+  await assert.rejects(terminalRequest("workspace", { token: "keep-owner-session", fetcher }), error => {
+    assert(error instanceof TerminalApiError);
+    assert.equal(error.status, 503); assert.equal(error.details?.retryAfterSeconds, 300);
+    assert.match(error.message, /Terminal storage.*temporarily unavailable/);
+    assert.match(error.message, /Local indicator drafts remain available/);
+    assert.doesNotMatch(error.message, /invalid.*signature/i);
+    return true;
+  });
+  assert.equal(terminalSession(owner)?.token, "keep-owner-session");
+  const headerOnly = (async () => Response.json({ error: "Wait for service" }, { status: 503, headers: { "Retry-After": "120" } })) as typeof fetch;
+  await assert.rejects(terminalRequest("workspace", { fetcher: headerOnly }), error => error instanceof TerminalApiError && error.details?.retryAfterSeconds === 120);
+  clearTerminalSession();
+});
+
 test("execution times labelled UTC are independent of the browser's local timezone and reject impossible dates", () => {
   assert.equal(terminalExecutionTime("2026-11-03T08:20"), "2026-11-03T08:20:00.000Z");
   assert.equal(terminalExecutionTime("2028-02-29T08:20:31"), "2028-02-29T08:20:31.000Z");

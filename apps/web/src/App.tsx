@@ -56,6 +56,7 @@ import {
 import { connectCircleWallet, isCircleWalletConnected, restoreCircleWallet } from "./circleWallet";
 import { selectAppKitNetwork } from "./appkit";
 import { hasRecoverablePayment } from "./paymentRecovery";
+import { startTerminalPolling } from "./terminalPolling";
 
 type Tab = PulseTab;
 type Candle = { ts: number; open: number; high: number; low: number; close: number; volume: number };
@@ -75,6 +76,7 @@ export function App() {
   const [health, setHealth] = useState<"…" | "ONLINE" | "OFFLINE">("…");
   const [, setModel] = useState("");
   const [apiHint, setApiHint] = useState("");
+  const [storageUnavailable, setStorageUnavailable] = useState(false);
   const [routePrices, setRoutePrices] = useState<Record<string, number>>({
     "/v1/analysis/base": .20, "/v1/analysis/premium": .30,
     "/v1/analysis/spot/standard": .20, "/v1/analysis/spot/premium": .30,
@@ -255,28 +257,35 @@ export function App() {
     }
   }, [wallet, neededUsdt, networkKey]);
 
-  const refreshHealth = useCallback(async () => {
-    const r = await apiGet("/healthz");
+  const refreshHealth = useCallback(async (signal?: AbortSignal) => {
+    const r = await apiGet("/healthz", { signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15_000)]) : AbortSignal.timeout(15_000) });
+    if (signal?.aborted) return;
     if (r.ok) {
       setHealth("ONLINE");
-      const data = r.data as { grokModel?: string };
+      const data = r.data as { grokModel?: string; dependencies?: { kv?: { state?: string; retryAfterSeconds?: number } } };
+      const kv = data.dependencies?.kv, unavailable = kv?.state === "degraded" || kv?.state === "recovering";
+      setStorageUnavailable(unavailable);
       setModel(data.grokModel || "");
       setApiHint(API_BASE || "same-origin");
+      if (unavailable) throw Object.assign(new Error("Saved workspace storage is temporarily unavailable"), { details: { retryAfterSeconds: kv?.retryAfterSeconds } });
     } else {
       setHealth("OFFLINE");
+      setStorageUnavailable(false);
       setApiHint(API_BASE || "same-origin");
+      throw new Error("API health check unavailable");
     }
   }, []);
 
   useEffect(() => {
-    void refreshHealth();
-    void apiGet("/v1/meta").then((response) => {
-      if (!response.ok) return;
+    const controller = new AbortController();
+    const poll = startTerminalPolling(() => refreshHealth(controller.signal), 60_000);
+    const foreground = () => poll.refresh(); document.addEventListener("visibilitychange", foreground);
+    void apiGet("/v1/meta", { signal: controller.signal }).then((response) => {
+      if (controller.signal.aborted || !response.ok) return;
       const routes = (response.data as { routes?: Array<{ route?: string; priceUsd?: number }> }).routes || [];
       setRoutePrices((current) => ({ ...current, ...Object.fromEntries(routes.filter((item) => item.route?.startsWith("POST ") && Number.isFinite(item.priceUsd)).map((item) => [item.route!.slice(5), Number(item.priceUsd)])) }));
     });
-    const id = window.setInterval(() => void refreshHealth(), 8000);
-    return () => window.clearInterval(id);
+    return () => { controller.abort(); poll.stop(); document.removeEventListener("visibilitychange", foreground); };
   }, [refreshHealth]);
 
 
@@ -893,8 +902,8 @@ export function App() {
             <button type="button" className={lang === "en" ? "active" : ""} onClick={() => setLang("en")}>EN</button>
             <button type="button" className={lang === "zh" ? "active" : ""} onClick={() => setLang("zh")}>中文</button>
           </div>
-          <span className={`network-status ${health === "ONLINE" ? "live" : health === "…" ? "checking" : ""}`} title={`${health === "…" ? "Checking API" : health === "ONLINE" ? d.online : d.offline} · ${apiHint}`}>
-            <i /> {health === "…" ? (lang === "zh" ? "正在检查 API" : "Checking API…") : health === "ONLINE" ? d.apiLive : d.apiOffline}
+          <span className={`network-status ${storageUnavailable ? "checking" : health === "ONLINE" ? "live" : health === "…" ? "checking" : ""}`} title={`${storageUnavailable ? (lang === "zh" ? "API 可连接；工作区存储暂时不可用" : "API reachable; saved workspace storage is temporarily unavailable") : health === "…" ? "Checking API" : health === "ONLINE" ? d.online : d.offline} · ${apiHint}`}>
+            <i /> {storageUnavailable ? (lang === "zh" ? "API 部分可用" : "API limited") : health === "…" ? (lang === "zh" ? "正在检查 API" : "Checking API…") : health === "ONLINE" ? d.apiLive : d.apiOffline}
           </span>
           {wallet ? (
             <button

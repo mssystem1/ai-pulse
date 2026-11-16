@@ -2,6 +2,8 @@
 
 The agreed scope is **10 issues**. Changes are local until deployed. Local code cannot restore a suspended Railway subscription.
 
+Post-deployment checks and the observed Redis outage are recorded in [Terminal deployment check](TERMINAL_DEPLOYED_CHECK_2026-11-16.md). Public UI checks passed; signed live/funded acceptance remains incomplete while the deployed Redis connection is unavailable.
+
 | # | Issue | Change |
 | --- | --- | --- |
 | 1 | Missing candles/data | Primary-clock overview; explicit original-time execution inspection; no invented OHLC; exclude unconfirmed inputs. |

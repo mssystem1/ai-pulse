@@ -250,8 +250,8 @@ function TradingTerminalContent({ wallet, networkKey, lang = "en", onNavigate, o
   async function run(name: string, operation: () => Promise<void>) {
     if (pendingMutation.current) return;
     pendingMutation.current = true; setBusy(name); setMessage("");
-    try { await operation(); }
-    catch (error) { if (alive.current && !errorIgnored(error)) { setMessage(messageOf(error)); if (error instanceof TerminalApiError && error.status === 401) lockWorkspace(); } }
+    try { await operation(); if (name === "sync") await refreshCatalog(); }
+    catch (error) { if (alive.current && !errorIgnored(error)) { setMessage(messageOf(error)); if (error instanceof TerminalApiError && error.status === 401) lockWorkspace(); if (error instanceof TerminalApiError && error.details?.code === "KV_TEMPORARILY_UNAVAILABLE") void refreshCatalog().catch(() => {}); } }
     finally { pendingMutation.current = false; if (alive.current) setBusy(""); }
   }
   async function signIn(): Promise<string> {

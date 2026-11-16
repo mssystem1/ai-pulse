@@ -1,4 +1,4 @@
-import { runKvCommand, type KvConnection } from "./resilientKv.js";
+import { kvCircuitStatus, runKvCommand, type KvConnection } from "./resilientKv.js";
 
 /** The small command surface used by jobs, report metadata and Arc budgets.
  * Raw trading/pass callers keep raw Redis strings; these stores use JSON values.
@@ -11,6 +11,8 @@ export class StoreRedis {
       : { provider: "upstash_kv", url, token };
   }
   private command(command: unknown[]) { return runKvCommand(command, "Durable store", this.connection); }
+  /** Passive transport status: catalog reads must not spend another Redis command. */
+  status() { return kvCircuitStatus(Date.now(), this.connection); }
   async get<T>(key: string): Promise<T | null> {
     const raw = await this.command(["GET", key]);
     if (raw === null || raw === undefined) return null;

@@ -21,6 +21,7 @@ export type TerminalPosition = { id: string; instId: string; timeframe: string; 
 export type TerminalWorkspace = { version: "terminal-workspace-v1"; revision: number; owner: string; grants: TerminalPassGrant[]; pendingPurchases?: TerminalPurchase[]; watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalActivity[]; deliveries: TerminalDelivery[]; answers?: Array<{ id: string; at: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; model?: string }>; indicatorPublications?: TerminalIndicatorPublication[]; indicatorVersions?: Record<string, TerminalIndicatorPublication>; indicatorPurchases?: IndicatorPurchase[]; indicatorSales?: IndicatorSale[]; indicatorClaims?: Record<string, string>; telegram: { enabled: boolean; events: string[] }; aiUsage: { day: string; count: number }; lastMonitorAt?: number; nextMonitorAt?: number; monitoringLease?: { token: string; until: number } };
 
 export interface TerminalStorage {
+  availability?(): { available: boolean; retryAfterSeconds: number };
   read<T>(key: string): Promise<T | null>;
   write(key: string, value: unknown, ttlSeconds: number): Promise<void>;
   take<T>(key: string): Promise<T | null>;
@@ -45,6 +46,7 @@ export class MemoryTerminalStorage implements TerminalStorage {
 const CAS = `local old=redis.call('GET',KEYS[1]);local rev=0;if old then rev=cjson.decode(old).revision end;if rev~=tonumber(ARGV[1]) then return 0 end;redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]);redis.call('ZADD',KEYS[2],ARGV[4],ARGV[5]);return 1`;
 export class RedisTerminalStorage implements TerminalStorage {
   constructor(private redis: StoreRedis) {}
+  availability() { const status = this.redis.status(); return { available: status.state === "online" || status.state === "local", retryAfterSeconds: status.retryAfterSeconds }; }
   async read<T>(key: string) { return this.redis.get<T>(key); }
   async write(key: string, value: unknown, ttl: number) { await this.redis.set(key, value, { ex: ttl }); }
   async take<T>(key: string): Promise<T | null> { const raw = await this.redis.eval(`local v=redis.call('GET',KEYS[1]);if v then redis.call('DEL',KEYS[1]) end;return v`, [key], []); return typeof raw === "string" ? JSON.parse(raw) as T : null; }

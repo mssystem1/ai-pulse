@@ -8,3 +8,10 @@ test("failed API polls back off and success restores the ordinary cadence",async
 test("polls never overlap and hidden views make no API calls",async t=>{
  t.mock.timers.enable({apis:["setTimeout"]});let visible=true,calls=0,release!:()=>void;const held=new Promise<void>(resolve=>release=resolve);const poll=startTerminalPolling(async()=>{calls++;if(calls===1)await held;},100,()=>visible);poll.refresh();poll.refresh();assert.equal(calls,1);visible=false;release();await settle();t.mock.timers.tick(1000);await settle();assert.equal(calls,1);visible=true;poll.refresh();await settle();assert.equal(calls,2);poll.stop();
 });
+
+test("server cooldown survives foreground refreshes and success restores the polling cadence",async t=>{
+ t.mock.timers.enable({apis:["setTimeout","Date"],now:0});let calls=0;const poll=startTerminalPolling(async()=>{if(++calls===1)throw {details:{retryAfterSeconds:300}};},1000,()=>true);
+ await settle();assert.equal(calls,1);t.mock.timers.tick(120000);poll.refresh();await settle();assert.equal(calls,1);
+ t.mock.timers.tick(179999);poll.refresh();await settle();assert.equal(calls,1);t.mock.timers.tick(1);await settle();assert.equal(calls,2);
+ t.mock.timers.tick(1000);await settle();assert.equal(calls,3);poll.stop();
+});

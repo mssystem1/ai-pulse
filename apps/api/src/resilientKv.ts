@@ -65,13 +65,12 @@ export function kvConfigured() {
   return Boolean(kvConnection());
 }
 
-export function kvCircuitStatus(now = Date.now()) {
-  const connection = kvConnection();
+export function kvCircuitStatus(now = Date.now(), connection = kvConnection()) {
   const circuit = circuitFor(connection);
   return Object.freeze({
     provider: connection?.provider || "memory",
-    configured: kvConfigured(),
-    state: !kvConfigured() ? "local" : circuit.failures === 0 ? "online" : now < circuit.openUntil ? "degraded" : "recovering",
+    configured: Boolean(connection),
+    state: !connection ? "local" : circuit.failures === 0 ? "online" : now < circuit.openUntil ? "degraded" : "recovering",
     retryAfterSeconds: Math.max(0, Math.ceil((circuit.openUntil - now) / 1000)),
     lastError: circuit.lastError,
     lastFailureAt: circuit.lastFailureAt,
