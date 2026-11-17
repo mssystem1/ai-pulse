@@ -95,6 +95,17 @@ test("best fill touching an opposing zone has zero obstacle reward, including bo
   }
 });
 
+test("short card R and stop distance use the least favorable edge of a wide entry band",()=>{
+  const report=overlapFixture("short",90,95),d=report.discretionaryPlan!;
+  d.entry=110;d.stop=120;d.priceZones!.entry={lower:100,upper:110,sourceLower:100,sourceUpper:110,sourcePrice:110};
+  d.targets[0].price=70;d.priceZones!.targets=[{lower:70,upper:80}];
+  report.horizonContext!.zones=[];report.currentMarket!.quote!.price=95;
+  const card=globalDiscretionaryCard(report)!;
+  assert.equal(card.rr,1);assert.equal(card.riskPercent,20);assert.ok(Math.abs(card.targets[0].movePercent+20)<1e-10);
+  assert.match(card.lines.at(-2)!,/R:R → TP1: 1\.00 · Entry–SL: 20\.00%/);
+  assert.equal(card.admission.targetRewardRisk,1);
+});
+
 test("non-overlapping, same-side and future zones do not replace the saved obstacle",()=>{
   for(const report of [overlapFixture("long",111,115),overlapFixture("short",95,99)]){
     assert.equal(globalOpposingEntryZones(report).length,0);assert.equal(globalPriceZonePayoff(report)!.worstToObstacle,1);

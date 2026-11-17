@@ -12,8 +12,8 @@ function packageFor(script: string) { return createGraphIndicatorPackage({ id: "
 function values(script: string, closes: number[]) { return evaluateIndicator(packageFor(script), input(closes)).outputs![0].points.map(point => point.value); }
 const plot = '\nplot(value,"Result","indicator","line","scalar","#22d3ee")';
 
-test("all six graph templates compile, export and parse without changing bytes or publisher", () => {
-  assert.equal(indicatorGraphTemplates().length, 6);
+test("all nine graph templates compile, export and parse without changing bytes or publisher", () => {
+  assert.equal(indicatorGraphTemplates().length, 9);
   for (const template of indicatorGraphTemplates()) {
     const manifest = createGraphIndicatorPackage({ ...template, id: `trader.${template.id}`, author: "Alice Quant" });
     assert.equal(manifest.author, "Alice Quant");

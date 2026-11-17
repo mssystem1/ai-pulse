@@ -36,6 +36,24 @@ test("floating price ledger clears full target bands and role labels in both the
   assert.equal(JSON.stringify(report),before,"Layout must not alter setup prices or source data");
 });
 
+test("ledger headline reflects admission instead of presenting an unqualified side as an action",()=>{
+  const blocked=fixture(),b=blocked.discretionaryPlan!;
+  b.barriers=[{price:81,timeframe:"1H",anchorTs:b.reference.candleTs,knownAt:Date.parse(blocked.snapshot.observedAt)}];
+  const blockedSvg=globalTradeAnnotations(blocked,geometry,{});
+  assert.match(blockedSvg,/>LONG \/ NO ENTRY<\/text>/);
+  assert.match(blockedSvg,/NO ENTRY \/ REFERENCES FOR REVIEW/);
+  assert.doesNotMatch(blockedSvg,/>LONG \/ BUY<\/text>/);
+
+  const qualified=fixture(),q=qualified.discretionaryPlan!;
+  q.side="short";q.entry=86;q.stop=90;q.entryBasis.price=86;q.targets[0].price=70;q.targets[1].price=60;
+  q.priceZones!.entry={lower:84,upper:86,sourceLower:84,sourceUpper:86,sourcePrice:86};
+  q.priceZones!.stop={lower:90,upper:91};q.priceZones!.targets=[{lower:70,upper:72},{lower:60,upper:62}];
+  qualified.currentMarket={source:qualified.snapshot.source,quote:{price:85,ts:Date.parse(qualified.snapshot.observedAt)},frames:[]};
+  const qualifiedSvg=globalTradeAnnotations(qualified,geometry,{});
+  assert.match(qualifiedSvg,/>CONDITIONAL SHORT<\/text>/);
+  assert.doesNotMatch(qualifiedSvg,/>SHORT \/ SELL<\/text>/);
+});
+
 test("dense forecast bands omit only the optional floating ledger",()=>{
   const report=fixture();report.discretionaryPlan!.priceZones!.targets[1]={lower:20,upper:160};const before=JSON.stringify(report);
   for(const appearance of ["dark","light"] as const){

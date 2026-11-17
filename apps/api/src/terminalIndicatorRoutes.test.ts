@@ -34,7 +34,7 @@ test("Indicator catalog publishes immutable portable versions without exposing w
     const seed = await (await request("/pulse.executed-cvd")).json(); assert.equal(parseIndicatorPackage(seed.manifest).kernel, "executed-cvd-v1");
     const manifest = createIndicatorPackage({ id: "alice.flow", title: "Alice Flow", description: "A reusable executed-volume calculation.", author: "Alice", kernel: "executed-cvd-v1" });
     const published = await request("", "POST", { manifest }); assert.equal(published.status, 201); const item = (await published.json()).item;
-    assert.equal(item.publisher, owner); assert.equal(item.canDelete, true); assert.equal(item.packageRef, undefined); assert.equal(item.publication.registered, false);
+    assert.equal(item.calculation, "nand"); assert.equal(item.publisher, owner); assert.equal(item.canDelete, true); assert.equal(item.packageRef, undefined); assert.equal(item.publication.registered, false);
     assert.equal((await request("", "POST", { manifest })).status, 200);
     assert.equal((await request("", "POST", { manifest: { ...manifest, title: "Changed title" } })).status, 409);
     assert.equal((await request("", "POST", { manifest: { ...manifest, publication: { chainId: 196, registered: true } } })).status, 400);

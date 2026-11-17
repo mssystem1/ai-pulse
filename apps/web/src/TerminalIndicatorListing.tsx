@@ -1,3 +1,4 @@
+import {IndicatorRuntimeBadge} from "./IndicatorRuntimeBadge";
 import { terminalUtc } from "./terminalClient";
 import type { IndicatorListing } from "./terminalIndicatorClient";
 import { WEB_NETWORKS } from "./networks";
@@ -8,7 +9,7 @@ export function IndicatorRegistration({ registration }: { registration?: Indicat
 
 export function TerminalIndicatorListing({ item, active, busy, paymentLabel, onUse, onExport, onDelete, onOpenCreator }: { item: IndicatorListing; active: boolean; busy: boolean; paymentLabel?: string; onUse: () => void; onExport: () => void; onDelete: () => void; onOpenCreator?: () => void }) {
   const paid = Boolean(item.offer && !item.entitled && !item.canDelete);
-  return <article data-indicator-listing={item.id}><span className="terminal-status">Community / v{item.version}</span><h4>{item.title}</h4><p>Publisher: <b>{item.author}</b></p><small>Publishing wallet {item.publisher}</small><p>{item.description}</p>
+  return <article data-indicator-listing={item.id}><span className="terminal-status">Community / v{item.version}</span><h4>{item.title}</h4><p>Publisher: <b>{item.author}</b></p><small>Publishing wallet {item.publisher}</small><IndicatorRuntimeBadge calculation={item.calculation}/><p>{item.description}</p>
     <p><b>{item.offer ? `${item.offer.priceUsdc} ${paymentLabel ?? "USD / supported stablecoin"}` : "Free installation"}</b></p>{item.offer && <p>{item.offer.description}</p>}
     {paid && <p className="terminal-hint">Review the exact token, network, publisher and immutable version before your wallet asks for approval. The purchase installs this version and keeps a restorable receipt in My indicators.</p>}
     {item.entitled && item.offer && !item.canDelete && <span className="terminal-status positive">Purchased / restore without paying again</span>}

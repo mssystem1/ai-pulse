@@ -2,6 +2,7 @@ import { API_BASE } from "./api";
 import type { GlobalReport, TerminalMarketSnapshot, TerminalRadarState, TerminalSourceStatus } from "@pulse/domain";
 import { globalSetupAdmission } from "@pulse/domain";
 import { terminalUsdAtomic } from "./terminalPricing";
+import type { TerminalSection } from "./terminalAskContext";
 
 export type TerminalDuration = "24h" | "7d" | "30d";
 export type TerminalTimeframe = "15m" | "1H" | "4H" | "1Dutc" | "1Wutc";
@@ -29,13 +30,13 @@ export type TerminalWorkspace = {
   watches: TerminalWatch[]; radars: TerminalRadar[]; positions: TerminalPosition[]; activity: TerminalEvent[];
   telegram: { linked: boolean; enabled: boolean; events: string[]; configured?: boolean; botUsername?: string | null; botUrl?: string | null; linkUrl?: string | null; linkState?: "linked" | "not_linked" | "unavailable"; linkedWallet?: string | null; nextStep?: string }; limits?: Record<string, number | string>;
   deliveries?: Array<{ id: string; eventId: string; subjectId: string; state: string; createdAt: string; attemptedAt?: string; error?: string }>;
-  answers?: Array<{ id: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; at: string; model?: string }>;
+  answers?: Array<{ section?: TerminalSection; id: string; instId: string; timeframe: string; question: string; answer: string; sources: unknown[]; at: string; model?: string }>;
   pendingPurchases?: Array<{ requestId: string; duration: TerminalDuration; priceUsd: string; amountAtomic: string; network: string; asset: string; createdAt: string; state: "authorizing" | "settled" | "granted"; paymentId: string; settlementTx?: string; settledAt?: string }>;
 };
 export type TerminalToolStatus = TerminalSourceStatus;
 export type TerminalMarket = TerminalMarketSnapshot & { setupVersionId?: string; evidenceSnapshotId?: string };
 export type TerminalInspection = { tool: "value" | "flow" | "footprint" | "derivatives" | "liquidity"; stream?: "spot" | "perpetual"; footprintStart?: number };
-export type TerminalAskContext = { positionId?: string; watchId?: string; radarId?: string; instId?: string; timeframe?: string; setupVersionId?: string; evidenceSnapshotId?: string; inspection?: TerminalInspection };
+export type TerminalAskContext = { section?: TerminalSection; positionId?: string; watchId?: string; radarId?: string; instId?: string; timeframe?: string; setupVersionId?: string; evidenceSnapshotId?: string; inspection?: TerminalInspection };
 export type TerminalFollowReview = { owner: string; instId: string; timeframe: string; setupVersionId: string; observedAt: number; report: GlobalReport };
 /** Review the source that opened the dialog; a later poll is a different
  * candidate, never implicit consent to follow its changed prices/version. */

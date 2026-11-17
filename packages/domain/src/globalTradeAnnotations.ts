@@ -2,6 +2,7 @@ import type {GlobalReport} from "@pulse/schemas";
 import type {GlobalChartCoordinates,GlobalChartOptions} from "./globalChart.js";
 import {globalTradeCards} from "./globalTradeDisplay.js";
 import {globalPriceBandText} from "./globalPriceZones.js";
+import {globalSetupAdmission} from "./globalSetupAdmission.js";
 
 const escape=(s:unknown)=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&apos;"}[c]!));
 const selectedCard=(report:GlobalReport,options:GlobalChartOptions)=>{const cards=globalTradeCards(report);return cards.find(c=>c.key===options.selectedPathId||c.pathId===options.selectedPathId)??cards.find(c=>c.selected)??cards[0];};
@@ -29,7 +30,7 @@ function ledgerGap(top:number,bottom:number,height:number,occupied:Array<{top:nu
  * prices. Future horizontal spacing is illustrative, never a target date. */
 export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordinates,options:GlobalChartOptions){
   const cards=globalTradeCards(report),card=selectedCard(report,options);
-  const zh=report.lang==="zh",future=g.right-g.historyEnd,price=(n:number)=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
+  const zh=report.lang==="zh",blocked=Boolean(report.discretionaryPlan)&&!globalSetupAdmission(report).geometryEligible,future=g.right-g.historyEnd,price=(n:number)=>n.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision});
   const txt=(x:number,y:number,s:unknown,color="#c9d8e9",size=10,anchor="start")=>`<text x="${x}" y="${y}" text-anchor="${anchor}" fill="${color}" font-size="${size}">${escape(s)}</text>`;
   const p=card?.plan;
   if(!card||!p?.referenceEntry||p.referenceStop===null){
@@ -79,7 +80,8 @@ export function globalTradeAnnotations(report:GlobalReport,g:GlobalChartCoordina
   const ledgerY=ledgerGap(g.top,g.bottom,ledgerHeight,occupied,mean>(g.top+g.bottom)/2),lx=g.historyEnd+14,lw=Math.max(100,future-30);
   if(ledgerY!==null){
   svg+=`<g data-trade-price-ledger="${escape(card.key)}" data-layout-status="clear-forecast-gap"><rect x="${lx}" y="${ledgerY}" width="${lw}" height="${ledgerHeight}" rx="5" fill="#0f1c2b" fill-opacity=".96" stroke="#3b4c60"/>`;
-  svg+=txt(lx+10,ledgerY+17,`${card.side==="long"?"LONG / BUY":"SHORT / SELL"}${report.discretionaryPlan?"":` · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`}`,card.side==="long"?"#53dabb":"#f0738c",11);
+  const heading=blocked?`${card.side==="long"?"LONG":"SHORT"} / NO ENTRY`:report.discretionaryPlan?`CONDITIONAL ${card.side==="long"?"LONG":"SHORT"}`:`${card.side==="long"?"LONG / BUY":"SHORT / SELL"} · ${card.confirmed?zh?"已确认":"signal confirmed":zh?"计划":"planned"}`;
+  svg+=txt(lx+10,ledgerY+17,zh&&blocked?"无新入场 / 仅供复核":heading,blocked?"#ffcb76":card.side==="long"?"#53dabb":"#f0738c",11);
   rows.forEach((row,i)=>{svg+=txt(lx+10,ledgerY+37+i*18,row.role,row.color,10)+txt(lx+lw-9,ledgerY+37+i*18,rowText(i),row.color,zones?9:10,"end");});
   if(zones)svg+=txt(lx+10,ledgerY+37+rows.length*18,`${zh?"硬止损":"Hard SL"}: ${price(p.referenceStop)}`,"#f0738c",10);
   svg+="</g>";

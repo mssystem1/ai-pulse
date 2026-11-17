@@ -13,6 +13,18 @@ const tail = (value: unknown, limit: number) => Array.isArray(value) ? value.sli
 const priceRows = (value: unknown, limit = 8) => (Array.isArray(value) ? value.slice().sort((a, b) => Number(object(b).buy ?? 0) + Number(object(b).sell ?? 0) - Number(object(a).buy ?? 0) - Number(object(a).sell ?? 0)).slice(0, limit) : []).map(row => pick(row, ["low", "high", "buy", "sell", "trades"]));
 export type TerminalToolInspection = { tool: "value" | "flow" | "footprint" | "derivatives" | "liquidity"; stream?: "spot" | "perpetual"; footprintStart?: number };
 export type TerminalInspectionEvidence = Pick<TerminalMarketSnapshot, "instId" | "timeframe" | "observedAt" | "tools"> & { setupVersionId?: string };
+export const terminalAiSections = ["terminal", "market-tools", "radar", "create-indicator", "market", "my-indicators", "positions", "alerts"] as const;
+export type TerminalAiSection = typeof terminalAiSections[number];
+export const terminalAiSectionFocus: Record<TerminalAiSection, string> = {
+  terminal: "Explain the current market and setup, eligibility and limitations.",
+  "market-tools": "Explain the selected market tool and its exact source window, freshness and coverage.",
+  radar: "Explain the selected radar boundary, detector, stage and next condition from recorded evidence.",
+  "create-indicator": "Guide the user through describing a study, previewing it, applying it to the chart and publishing it manually when ready. Indicator generation uses the dedicated Studio copilot flow; general Ask PULSE explains the workflow and supported concepts.",
+  market: "Guide indicator discovery and publishing: explain free versus paid access, exact indicator version identity, supported payment networks and purchase receipts. Do not claim current prices, listings, networks or receipts unless supplied in the context.",
+  "my-indicators": "Explain the selected local indicator, its input requirements, plots and preview.",
+  positions: "Explain only supplied user-recorded position facts and protection status; never infer venue fills or authorize orders.",
+  alerts: "Explain selected watch, radar or position alert conditions, delivery state and source limits.",
+};
 export class TerminalInspectionUnavailableError extends Error {}
 
 /** A question about the displayed tool must retain that source window, stream

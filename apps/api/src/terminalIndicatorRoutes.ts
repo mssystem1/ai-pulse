@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { createHash } from "node:crypto";
-import { indicatorMarketCatalog, parseIndicatorPackage, exportIndicatorPackage } from "@pulse/domain";
+import { indicatorMarketCatalog, parseIndicatorPackage, exportIndicatorPackage, type IndicatorManifest } from "@pulse/domain";
 import type { TerminalRuntime } from "./terminalRuntime.js";
 import { TerminalStore, type TerminalIndicatorPublication } from "./terminalStore.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -11,6 +11,7 @@ import { terminalAccess } from "./terminalStore.js";
 import { createIndicatorCommerceRoutes, indicatorOffer, indicatorPaymentNetworks, type IndicatorCommerceDependencies } from "./terminalIndicatorCommerce.js";
 
 const REGISTRY_OWNER = "0x" + "0".repeat(40), PACKAGE_TTL = 3650 * 86400;
+const calculation=(manifest:IndicatorManifest):"nand"|"hybrid"|"host"=>manifest.format==="pulse-indicator-v4"?manifest.graph.nodes.some(node=>node.kind==="kernel")?"hybrid":"host":"nand";
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 /** Shared catalog holds only intentionally published packages, never journals,
  * report evidence, authentication tokens or private workspace records. */
@@ -24,7 +25,7 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
   const summary = (item: TerminalIndicatorPublication, owner: string, owned = false) => ({ ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== "packageRef")), publisherName: item.author, canDelete: item.publisher === owner, entitled: !item.offer || item.publisher === owner || owned, hosted: true, publication: item.registration ? { ...item.registration, registered: true } : { chainId: 196, registered: false } });
   const seedSummary = (m: typeof seeds[number]) => {
     const candidate=BUILTIN_INDICATOR_DEPLOYMENTS[m.id],registration=candidate?.netlistHash===`sha256:${digest(Buffer.from(m.runtime.netlist.slice(2),"hex"))}`?candidate:undefined;
-    return { id: m.id, manifestId: m.id, version: m.version, title: m.title, description: m.description, author: m.author, publisherName: m.author, kernel: m.kernel, publisher: null, createdAt: null, canDelete: false, hosted: false, entitled:true, ...(registration?{registration}:{}), publication: registration?{...registration,registered:true}:m.publication };
+    return { calculation:calculation(m), id: m.id, manifestId: m.id, version: m.version, title: m.title, description: m.description, author: m.author, publisherName: m.author, kernel: m.kernel, publisher: null, createdAt: null, canDelete: false, hosted: false, entitled:true, ...(registration?{registration}:{}), publication: registration?{...registration,registered:true}:m.publication };
   };
   router.use("/v1/terminal/indicators", (_req, res, next) => { res.setHeader("Cache-Control", "no-store"); if (!/^0x[\da-f]{40}$/i.test(res.locals.terminalOwner ?? "")) return res.status(401).json({ error: "Sign in to your wallet workspace first" }); next(); });
   router.use(checkout.router);
@@ -53,7 +54,7 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
       sha256: purchased.sha256, packageRef: purchased.packageRef, offer: purchased.offer,
       ...(published?.sha256 === purchased.sha256 && published.registration ? { registration: published.registration } : {}),
     } : published!;
-    return res.json({ item: summary(item, res.locals.terminalOwner, Boolean(purchased)), manifest });
+    return res.json({ item: {...summary(item, res.locals.terminalOwner, Boolean(purchased)),calculation:calculation(manifest)}, manifest });
   }));
   router.post("/v1/terminal/indicators", asyncRoute(async (req, res) => {
     if (!req.body || !Object.hasOwn(req.body, "manifest") || Object.keys(req.body).some(key => !["manifest", "offer"].includes(key))) return res.status(400).json({ error: "Provide one portable indicator manifest and optional creator offer" });
@@ -64,7 +65,7 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
     try { offer = indicatorOffer(req.body.offer, runtime.cfg?.INDICATOR_MARKET_MAX_PRICE_USDC, runtime.cfg?.INDICATOR_MARKET_MIN_PRICE_USDC); } catch { return res.status(400).json({ error: "Choose a free listing or a stablecoin price within the configured settlement minimum and maximum, with at most six decimal places" }); }
     if (manifest.id.startsWith("pulse.")) return res.status(400).json({ error: "Choose your own package ID; pulse.* is reserved for built-in tools" });
     const publisher = String(res.locals.terminalOwner).toLowerCase(), bytes = exportIndicatorPackage(manifest), sha256 = digest(bytes);
-    const item: TerminalIndicatorPublication = { id: "pmi_" + digest(publisher + ":" + manifest.id + ":" + manifest.version).slice(0, 32), manifestId: manifest.id, version: manifest.version, title: manifest.title, description: manifest.description, author: manifest.author, kernel: manifest.kernel, publisher, createdAt: new Date(runtime.now()).toISOString(), sha256, packageRef: sha256, ...(offer ? { offer } : {}) };
+    const item: TerminalIndicatorPublication = { calculation:calculation(manifest), id: "pmi_" + digest(publisher + ":" + manifest.id + ":" + manifest.version).slice(0, 32), manifestId: manifest.id, version: manifest.version, title: manifest.title, description: manifest.description, author: manifest.author, kernel: manifest.kernel, publisher, createdAt: new Date(runtime.now()).toISOString(), sha256, packageRef: sha256, ...(offer ? { offer } : {}) };
     const catalog = await registry.get(REGISTRY_OWNER), current = catalog.indicatorPublications ?? [], prior = current.find(p => p.id === item.id);
     if (prior && (prior.sha256 !== sha256 || JSON.stringify(prior.offer) !== JSON.stringify(offer))) return res.status(409).json({ error: "This version already has different content or terms; increase its version" });
     // Preserve paid legacy versions that predate the immutable version ledger.

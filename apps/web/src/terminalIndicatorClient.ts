@@ -29,7 +29,7 @@ export function validateIndicatorServiceQuote(quote: IndicatorServiceQuote, sele
   if (!Number.isFinite(Date.parse(quote.expiresAt))) throw Error("The indicator quote has no valid expiry.");
 }
 
-export type IndicatorListing = { id: string; manifestId: string; version: string; title: string; description: string; author: string; kernel: IndicatorKernel; publisher: string | null; createdAt: string | null; canDelete: boolean; hosted: boolean; offer?: {priceUsdc:string;kind:"version-service";description:string}; entitled?:boolean; registration?: {processor:string;circuitId:string;transactionHash?:string;registeredAt?:string;observedAt?:number|string;blockNumber?:string;status?:string} };
+export type IndicatorListing = { calculation?:"nand"|"hybrid"|"host"; id: string; manifestId: string; version: string; title: string; description: string; author: string; kernel: IndicatorKernel; publisher: string | null; createdAt: string | null; canDelete: boolean; hosted: boolean; offer?: {priceUsdc:string;kind:"version-service";description:string}; entitled?:boolean; registration?: {processor:string;circuitId:string;transactionHash?:string;registeredAt?:string;observedAt?:number|string;blockNumber?:string;status?:string} };
 export const indicatorIdentity = (manifest: IndicatorManifest) => `${manifest.id}@${manifest.version}`;
 export function indicatorInputFromMarket(market: TerminalMarket, stream: "spot" | "perpetual", now = Date.now()): IndicatorInput {
   const flow = stream === "spot" ? market.tools.flow : market.tools.perpetualFlow;
@@ -57,12 +57,15 @@ export function indicatorInputFromMarket(market: TerminalMarket, stream: "spot" 
     ...(flow?.displayBucketMs?{intervalMs:flow.displayBucketMs}:{}),...(missingIntervals?{missingIntervals}:{}),...(price?{price}:{}),points:unique };
 }
 /** Store calculation packages only, never market data or wallet credentials. */
+export const INDICATOR_LIBRARY_LIMIT = 64;
+export const INDICATOR_CHART_LIMIT = 8;
+export const indicatorChartStorageKey = (wallet?: string | null) => `pulse-indicator-chart-v1:${wallet?.toLowerCase() ?? "local"}`;
 export function loadInstalledIndicators(storage: Pick<Storage, "getItem">, defaults: IndicatorManifest[]): IndicatorManifest[] {
   const raw = storage.getItem("pulse-indicators-v1");
   if (raw === null) return defaults.slice(0, 1);
   if (raw.length > 4_800_000) throw Error("Saved indicator library is too large; remove its browser storage to reset it");
   const items: unknown = JSON.parse(raw);
-  if (!Array.isArray(items) || items.length > 8) throw Error("Saved indicator library is invalid");
+  if (!Array.isArray(items) || items.length > INDICATOR_LIBRARY_LIMIT) throw Error("Saved indicator library is invalid");
   const valid = items.map(parseIndicatorPackage);
   if (new Set(valid.map(indicatorIdentity)).size !== valid.length) throw Error("Duplicate installed indicator version");
   return valid;
@@ -71,6 +74,23 @@ export function installIndicator(current: IndicatorManifest[], candidate: unknow
   const valid = parseIndicatorPackage(candidate), identity = indicatorIdentity(valid);
   const same = current.find(item => indicatorIdentity(item) === identity);
   if (same) { if (JSON.stringify(same) !== JSON.stringify(valid)) throw Error("This indicator version is already installed with different content"); return current; }
-  if (current.length >= 8) throw Error("Keep up to eight installed indicators; remove one before adding another");
+  if (current.length >= INDICATOR_LIBRARY_LIMIT) throw Error(`Your library has ${INDICATOR_LIBRARY_LIMIT} saved indicators. Remove an unused package before saving another.`);
   return [...current, valid];
+}
+
+/** Saving a package and displaying it are separate actions. New chart studies
+ * can replace an older visible slot without deleting any saved creation. */
+export function activateChartIndicator(current: readonly string[], identity: string): string[] {
+  return [...current.filter(id => id !== identity), identity].slice(-INDICATOR_CHART_LIMIT);
+}
+export function loadChartIndicatorIds(storage: Pick<Storage, "getItem">, installed: readonly IndicatorManifest[], wallet?: string | null): string[] {
+  const allowed = new Set(installed.map(indicatorIdentity));
+  try {
+    const raw = storage.getItem(indicatorChartStorageKey(wallet));
+    if (raw !== null) {
+      const saved: unknown = JSON.parse(raw);
+      if (Array.isArray(saved) && saved.every(id => typeof id === "string")) return [...new Set(saved as string[])].filter(id => allowed.has(id)).slice(-INDICATOR_CHART_LIMIT);
+    }
+  } catch { /* A corrupt visibility preference must not discard saved packages. */ }
+  return [...allowed].slice(-INDICATOR_CHART_LIMIT);
 }

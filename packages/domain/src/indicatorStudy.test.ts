@@ -17,8 +17,8 @@ const source = (volumes: [number, number][], overrides: Partial<IndicatorInput> 
 test("professional study templates compile real per-bar NAND kernels and preserve all declared series settings", () => {
   const catalogBefore = indicatorMarketCatalog();
   const templates = indicatorStudyTemplates();
-  assert.equal(templates.length, 6);
-  assert.deepEqual(templates.map(item => item.id), ["volume-delta", "cvd", "participation", "delta-ema", "rolling-delta", "weighted-flow"]);
+  assert.equal(templates.length, 9);
+  assert.deepEqual(templates.map(item => item.id), ["volume-delta", "cvd", "participation", "delta-ema", "rolling-delta", "weighted-flow", "sell-share", "delta-sma", "delta-sum-8"]);
   for (const item of templates) {
     const manifest = template(item.id);
     assert.equal(manifest.format, "pulse-indicator-v3");
