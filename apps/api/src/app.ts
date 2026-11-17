@@ -96,6 +96,9 @@ import { createV6Router } from "./v6Routes.js";
 import { createTelegramRouter, deliverTelegramReportDurably, isTelegramDeliveryCapability, telegramReportUrl, configureTelegramReportReader } from "./telegram.js";
 import { isKvUnavailableError, isTransientConnectivityError, kvCircuitStatus } from "./resilientKv.js";
 import { ReportHistoryAuth } from "./reportHistoryAuth.js";
+import { RecoveredReportArchive, readArchivedReport } from "./recoveredReportArchive.js";
+import { reportHistoryPage } from "./reportHistoryPage.js";
+import { StoreRedis } from "./storeRedis.js";
 import { createAutomationTickRouter, type AutomationTickDependencies } from "./automationTick.js";
 import { collectTokenRiskEvidence } from "./tokenRiskEvidence.js";
 import { reportDelivery, fullReportDelivery } from "./reportDelivery.js";
@@ -155,6 +158,7 @@ function findDocsDir(): string {
 export function createApp(cfg: AppConfig, dependencies: {
   polymarket?: PolymarketClient;
   persistence?: ReturnType<typeof createPersistence>;
+  recoveredReports?: RecoveredReportArchive;
   arcBudget?: ArcBudgetStore;
   spotContext?: typeof buildMarketContext;
   globalOrderFlowFeed?:GlobalOrderFlowFeed|null;
@@ -190,6 +194,7 @@ export function createApp(cfg: AppConfig, dependencies: {
     if (shouldRunDurableWorker) void durableWorker?.notify();
   };
   const reportHistoryAuth = new ReportHistoryAuth(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN, cfg.PERSISTENCE_NAMESPACE);
+  const recoveredReports = dependencies.recoveredReports || new RecoveredReportArchive(cfg.QUEUE_PROVIDER === "memory" ? undefined : new StoreRedis(cfg.QUEUE_PROVIDER === "redis" ? cfg.REDIS_URL : cfg.KV_REST_API_URL, cfg.KV_REST_API_TOKEN), cfg.PERSISTENCE_NAMESPACE);
   const loadSpotContext = dependencies.spotContext || ((input: Parameters<typeof buildMarketContext>[0]) =>
     executionMarketContext(cfg, { ...input, timeframe: input.timeframe ?? "1H", candleLimit: input.candleLimit ?? 100 }));
   const globalOrderFlowFeed=dependencies.globalOrderFlowFeed!==undefined?dependencies.globalOrderFlowFeed:dependencies.spotContext?null:defaultGlobalOrderFlowSource();
@@ -993,12 +998,20 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.get("/v1/report-history", asyncRoute(async (req, res) => {
     const session = await historySession(req);
     if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
-    const jobs = await persistence.jobs.listByPayer(session.wallet, session.networkKey, 30);
-    return res.json({ wallet: session.wallet, networkKey: session.networkKey, reports: jobs.map((job) => ({ id: job.id, mode: job.mode, tier: job.tier, stage: job.stage, label: historyLabel(job), createdAt: job.createdAt, updatedAt: job.updatedAt, ready: Boolean(job.reportId) })) });
+    const query = z.object({scope:z.enum(["spot","prediction","risk"]).optional(),offset:z.coerce.number().int().min(0).max(10000).default(0)}).parse(req.query);
+    const [jobs, archive] = await Promise.all([persistence.jobs.listByPayer(session.wallet, session.networkKey, 30), recoveredReports.list(session.wallet,session.networkKey)]);
+    const page = reportHistoryPage(jobs.map(job=>({id:job.id,reportId:job.reportId,mode:job.mode,tier:job.tier,stage:job.stage,label:historyLabel(job),createdAt:job.createdAt,updatedAt:job.updatedAt,ready:Boolean(job.reportId)})),archive,query.scope,query.offset);
+    return res.json({wallet:session.wallet,networkKey:session.networkKey,...page});
   }));
   app.get("/v1/report-history/:jobId/report", asyncRoute(async (req, res) => {
     const session = await historySession(req);
     if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
+    if(String(req.params.jobId).startsWith("archive:")){
+      const row = await recoveredReports.get(session.wallet,String(req.params.jobId));
+      if(!row)return res.status(404).json({error:"Archived report not found"});
+      if(row.networkKey!==null&&row.networkKey!==session.networkKey)return res.status(403).json({error:"This archived report belongs to another payment network"});
+      return res.json({report:await readArchivedReport(row,cfg.REPORT_ENCRYPTION_KEY),metadata:privateRecordView(row.metadata),recoveredArchive:{readOnly:true,originalJobId:row.originalJobId,originalExpiresAt:row.originalExpiresAt,networkUnknown:row.networkKey===null}});
+    }
     const job = await persistence.jobs.get(String(req.params.jobId));
     if (!job) return res.status(404).json({ error: "Report job not found" });
     if (job.payer.toLowerCase() !== session.wallet || job.networkKey !== session.networkKey) return res.status(403).json({ error: "This report does not belong to the authenticated wallet and network" });
@@ -1010,6 +1023,12 @@ export function createApp(cfg: AppConfig, dependencies: {
   app.post("/v1/report-history/:jobId/retry", asyncRoute(async (req, res) => {
     const session = await historySession(req);
     if (!session) return res.status(401).json({ error: "A current wallet-signed report-history session is required" });
+    if(String(req.params.jobId).startsWith("archive:")){
+      const row=await recoveredReports.get(session.wallet,String(req.params.jobId));
+      if(!row)return res.status(404).json({error:"Archived report not found"});
+      if(row.networkKey!==null&&row.networkKey!==session.networkKey)return res.status(403).json({error:"This archived report belongs to another payment network"});
+      return res.status(409).json({error:"This recovered report is read only. It cannot regenerate a job or authorize a payment."});
+    }
     const job = await persistence.jobs.get(String(req.params.jobId));
     if (!job) return res.status(404).json({ error: "Report job not found" });
     if (job.payer.toLowerCase() !== session.wallet || job.networkKey !== session.networkKey) {

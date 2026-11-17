@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
-import { PublicActivityStore, researchDelivery, jobResearchDelivery } from "./publicActivity.js";
+import { PublicActivityStore, researchDelivery, jobResearchDelivery, verifiedJobResearchDelivery } from "./publicActivity.js";
 import type { PaymentReceipt, AnalysisJob } from "./jobs.js";
 
 function receipt(key: keyof typeof NETWORK_REGISTRY, id = "payment"): PaymentReceipt {
@@ -56,4 +56,22 @@ test("execution projection counts a confirmed transaction once and keeps exact s
   assert.equal(snapshot.execution.spot?.byChain[0].amount,"1.234567");
   assert.equal(snapshot.execution.spot?.byChain[0].symbol,"USDC");
   assert.equal(snapshot.execution.autopilot,null);
+});
+
+test("historical projection requires the original owned live report and excludes fixtures", async () => {
+  const paid = receipt("base");
+  const job = { id:"job", payer:"0xabc", reportId:"report", stage:"completed_partial", mode:"spot", receipt:paid, updatedAt:paid.settledAt } as AnalysisJob;
+  const metadata = { id:"report", ownerWallet:"0xAbC", visibility:"private" as const, blobPath:"private", checksum:"saved", createdAt:paid.createdAt };
+  const report = { analysisProfile:{mode:"live"} };
+  const delivery = verifiedJobResearchDelivery(job, metadata, report);
+  assert(delivery);
+  for (const body of [null, {}, {fixture:true, ...report}, {analysisProfile:{mode:"fixture"}}]) assert.equal(verifiedJobResearchDelivery(job,metadata,body),null);
+  assert.equal(verifiedJobResearchDelivery(job,{...metadata,id:"different"},report),null);
+  assert.equal(verifiedJobResearchDelivery(job,{...metadata,ownerWallet:"0xother"},report),null);
+  const store = new PublicActivityStore();
+  assert.equal(await store.record(delivery),true);
+  assert.equal(await store.record(verifiedJobResearchDelivery({...job,id:"migrated-job"},metadata,report)),false);
+  const result = await store.snapshot();
+  assert.equal(result.research.global?.count,1);
+  assert.equal(result.research.global?.partial,1);
 });

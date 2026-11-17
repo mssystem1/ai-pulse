@@ -1,7 +1,7 @@
 /** Operator-only, dry-run by default. Never invoked by public page visits. */
 import { loadConfig } from "@pulse/config";
 import { createPersistence, type AnalysisJob } from "./jobs.js";
-import { createPublicActivityStore, jobResearchDelivery, PublicActivityStore } from "./publicActivity.js";
+import { createPublicActivityStore, jobResearchDelivery, verifiedJobResearchDelivery, PublicActivityStore } from "./publicActivity.js";
 import { StoreRedis } from "./storeRedis.js";
 import { parseBackfillOptions } from "./publicActivityBackfillOptions.js";
 
@@ -32,8 +32,9 @@ do {
       // Neither its content nor its wallet/recovery credentials are printed or made public.
       const record = await persistence.reports.get(job.reportId);
       const report = record && await persistence.reports.read(record) as { fixture?: boolean; analysisProfile?: { mode?: string } } | null;
-      if (!report || report.fixture || report.analysisProfile?.mode !== "live") { unverifiable++; continue; }
-      if (await projection.record(delivery)) added++;
+      const verified = record && verifiedJobResearchDelivery(job, record, report);
+      if (!verified) { unverifiable++; continue; }
+      if (await projection.record(verified)) added++;
     } catch { unverifiable++; }
   }
   pages++;

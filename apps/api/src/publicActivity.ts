@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { NETWORK_REGISTRY, LEGACY_ARC_TESTNET } from "@pulse/config";
-import type { AnalysisJob, PaymentReceipt } from "./jobs.js";
+import type { AnalysisJob, PaymentReceipt, StoredReport } from "./jobs.js";
 import { StoreRedis } from "./storeRedis.js";
 
 export type ResearchService = "global" | "prediction" | "risk";
@@ -34,6 +34,14 @@ export function researchDelivery(receipt: PaymentReceipt | null, service: Resear
 export function jobResearchDelivery(job: AnalysisJob): ResearchDelivery | null {
   if (!job.reportId || !["completed", "completed_partial"].includes(job.stage) || !["spot", "prediction", "risk"].includes(job.mode)) return null;
   return researchDelivery(job.receipt, job.mode === "spot" ? "global" : job.mode === "risk" ? "risk" : "prediction", job.receipt?.completedAt || job.updatedAt, job.stage === "completed_partial");
+}
+
+/** Recovery must prove an original live report belongs to this completed job.
+ * Call only after the body has passed its stored checksum/decryption checks. */
+export function verifiedJobResearchDelivery(job: AnalysisJob, metadata: StoredReport, report: { fixture?: boolean; analysisProfile?: { mode?: string } } | null): ResearchDelivery | null {
+  if (metadata.id !== job.reportId || metadata.ownerWallet.toLowerCase() !== job.payer.toLowerCase()
+    || !report || report.fixture || report.analysisProfile?.mode !== "live") return null;
+  return jobResearchDelivery(job);
 }
 
 // One atomic dedupe + update. No expiry: job/report retention must not erase totals.
