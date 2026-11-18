@@ -64,8 +64,8 @@ export function deriveGlobalExecutionPolicy(
   const targetAllocations=plan.targets.length===1?[1]:plan.targets.length===2?[.5,.5]:[.5,.3,.2];
   return {entry,policy:{
     version:"execution-policy-v1",
-    id:overrides.boundaryRetest?`${plan.family}-boundary-retest-v1`:observed?"observed-reclaim-retest-v1":sourceEdge?"structural-edge-passive-v2":spec.id,
-    configurationKey:`${report.snapshot.instId}:${report.snapshot.timeframe}:${plan.family}:${sourceEdge?"source-edge-v2":"v1"}`,
+    id:overrides.boundaryRetest?`${plan.family}-boundary-retest-v1`:observed?"observed-reclaim-retest-v1":sourceEdge?"structural-edge-passive-v3":spec.id,
+    configurationKey:`${report.snapshot.instId}:${report.snapshot.timeframe}:${plan.family}:${sourceEdge?"source-edge-v3":"v1"}`,
     family:plan.family,mode,sourceBoundary,eventTimeframe:frame,eventKnownAt,eventAfter,
     expiresAt:cutoff+duration*settings.timeToLiveBars,
     confirmationBars:observed?1:settings.confirmationBars,fillWindowBars:settings.fillWindowBars,

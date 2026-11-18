@@ -69,7 +69,7 @@ export function applyGlobalTradeMap(report:GlobalReport,targetPolicy:"active-zon
 export function reviewGlobalTargetReport(saved:GlobalReport):GlobalReport {
   if(saved.decisionVersion!=="decision-v5")return saved;
   if(saved.strategy?.targetPolicy==="active-zones-v1"&&saved.setupSelection?.version==="single-setup-v4"){
-    if(saved.setupPolicyVersion==="source-limits-v2"&&saved.horizonContext&&(saved.discretionaryPlan?saved.discretionaryPlan.version==="discretionary-plan-v8":saved.tradePlan?.state==="confirmed"))return saved;
+    if(saved.setupPolicyVersion==="source-limits-v3"&&saved.horizonContext&&(saved.discretionaryPlan?saved.discretionaryPlan.version==="discretionary-plan-v8":saved.tradePlan?.state==="confirmed"))return saved;
     const report=structuredClone(saved);restoreGlobalSetupStudies(report);applyGlobalDiscretionaryPlan(report);
     if(report.discretionaryPlan||report.horizonContext)report.targetReviewOf=globalArtifactReference(saved);
     if(report.discretionaryPlan){

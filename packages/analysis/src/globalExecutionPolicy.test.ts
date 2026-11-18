@@ -97,7 +97,7 @@ test("a target wick crossing future entry keeps its exact swing objective and ne
 test("family settings and asset/timeframe configuration remain explicit and tunable",()=>{
   const report=example({tf:"1Wutc",side:"long",family:"level_retest",source:[98,100],stop:90,stopBasis:98,target:120,current:103});
   const plan=report.discretionaryPlan!,{policy}=deriveGlobalExecutionPolicy(report,plan,{lower:98,upper:100},{timeToLiveBars:3,fillWindowBars:2,confirmationBars:2});
-  assert.equal(policy.configurationKey,"BTC-USDT:1Wutc:level_retest:source-edge-v2");assert.equal(policy.fillWindowBars,2);
+  assert.equal(policy.configurationKey,"BTC-USDT:1Wutc:level_retest:source-edge-v3");assert.equal(policy.id,"structural-edge-passive-v3");assert.equal(policy.fillWindowBars,2);
   assert.equal(policy.expiresAt,cutoff+3*86_400_000);assert.equal(policy.stopManagement,"structural_fixed");assert.deepEqual(policy.targetAllocations,[1]);
   assert.throws(()=>deriveGlobalExecutionPolicy(report,plan,{lower:98,upper:100},{timeToLiveBars:0}),RangeError);
 });

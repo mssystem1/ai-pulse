@@ -82,7 +82,7 @@ export function advanceGlobalScenario(
     if (!hadEntry) {
       const invalidation = priceEvents.find(e => e.kind === "invalidation" || e.kind === "failed_retest") ?? stopped;
       if (invalidation) { record(invalidation); state.state = "invalidated"; state.reason = invalidation.kind === "failed_retest" ? "failed_retest" : "premise_failed_before_entry"; break; }
-      if (targetEvents.length && !couldEnter && definition.policyId !== "structural-edge-passive-v2") { targetEvents.forEach(record); state.state = "invalidated"; state.reason = "target_before_entry"; break; }
+      if (targetEvents.length && !couldEnter && !["structural-edge-passive-v2","structural-edge-passive-v3"].includes(definition.policyId)) { targetEvents.forEach(record); state.state = "invalidated"; state.reason = "target_before_entry"; break; }
       for (const e of group) {
         if (e.kind === "location_test" || e.kind === "acceptance") { record(e); if (state.confirmationAt === undefined && definition.mode === "confirmed_retest") state.state = "awaiting_event"; }
         if (e.kind === "confirmation" && e.at >= definition.eventKnownAt && definition.mode === "confirmed_retest" && (e.at >= state.startedAt || state.startedAt - e.at <= definition.confirmationMaxAgeMs)) {

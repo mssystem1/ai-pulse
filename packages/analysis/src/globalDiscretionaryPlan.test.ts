@@ -17,19 +17,30 @@ test("saved v8 reports from before the source-limit revision receive a free revi
  const archived=make("1Wutc");delete archived.setupPolicyVersion;
  const before=structuredClone(archived),review=reviewGlobalTargetReport(archived);
  assert.notEqual(review,archived);assert.deepEqual(archived,before);
- assert.equal(review.setupPolicyVersion,"source-limits-v2");assert.ok(review.targetReviewOf);
+ assert.equal(review.setupPolicyVersion,"source-limits-v3");assert.ok(review.targetReviewOf);
  assert.deepEqual(review.candles,archived.candles);assert.deepEqual(review.snapshot,archived.snapshot);
+ assert.equal(reviewGlobalTargetReport(review),review);
+});
+
+test("a saved source-limits-v2 one-target plan upgrades on free review without mutating its archive",()=>{
+ const saved=make("1Wutc");saved.setupPolicyVersion="source-limits-v2";
+ for(const p of [saved.discretionaryPlan,saved.alternatePlan])if(p){p.executionPolicy!.id="structural-edge-passive-v2";p.executionPolicy!.configurationKey=p.executionPolicy!.configurationKey.replace("source-edge-v3","source-edge-v2");p.executionPolicy!.targetAllocations=[1];p.targets=p.targets.slice(0,1);p.priceZones!.targets=p.priceZones!.targets.slice(0,1);}
+ const before=structuredClone(saved),review=reviewGlobalTargetReport(saved);
+ assert.deepEqual(saved,before);assert.equal(review.setupPolicyVersion,"source-limits-v3");
+ assert.equal(review.discretionaryPlan!.executionPolicy!.id,"structural-edge-passive-v3");
+ assert.ok(review.discretionaryPlan!.targets.length>=1&&review.discretionaryPlan!.targets.length<=3);
  assert.equal(reviewGlobalTargetReport(review),review);
 });
 
 test("opposing structural limits retain independent causal prices and reject forged alternate evidence",()=>{
  const report=make("1Wutc"),main=report.discretionaryPlan!,alternate=report.alternatePlan!;
  assert.ok(alternate);assert.notEqual(main.side,alternate.side);
- assert.equal(main.executionPolicy?.id,"structural-edge-passive-v2");
+ assert.equal(main.executionPolicy?.id,"structural-edge-passive-v3");
  for(const p of [main,alternate]){
   const edge=p.side==="long"?p.priceZones!.entry.sourceLower:p.priceZones!.entry.sourceUpper;
   assert.equal(p.entry,edge);assert.equal(p.executionPolicy!.sourceBoundary,edge);
-  assert.equal(p.targets.length,1);assert.equal(p.objectiveTimeframe,"1Wutc");
+  assert.ok(p.targets.length>=1&&p.targets.length<=3);assert.equal(p.objectiveTimeframe,"1Wutc");
+  assert.ok(p.targets.every((t,i)=>i===0||(p.side==="long"?1:-1)*(t.price-p.targets[i-1].price)>0));
  }
  const cards=globalTradeCards(report);assert.equal(cards.length,2);assert.equal(cards[1].selected,false);
  const mutations:Array<(r:typeof report)=>void>=[

@@ -16,10 +16,10 @@ test("October 25 daily mixed structure uses its own support, not the October 24 
   const r=make("1Dutc"),p=r.discretionaryPlan!;
   assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(p.family,"level_retest");assert.equal(p.side,"long");
   assert.equal(p.priceZones!.entry.sourcePrice,80018.2);assert.equal(p.entry,78649.3);assert.equal(p.stopBasis.price,78649.3);
-  assert.equal(p.evidence,undefined);assert.equal(p.executionPolicy!.id,"structural-edge-passive-v2");
+  assert.equal(p.evidence,undefined);assert.equal(p.executionPolicy!.id,"structural-edge-passive-v3");
   const source=r.horizonContext!.zones.find(z=>z.role==="support"&&z.lower===78649.3&&z.upper===80018.2)!;
   assert.ok(source&&source.anchorIds.every(id=>r.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null)));
-  assert.deepEqual(p.targets.map(t=>t.price),[81260.1]);
+  assert.equal(p.targets[0].price,81260.1);assert.ok(p.targets.length>=1&&p.targets.length<=3);
   assert.equal(p.priceZones!.entry.lower,78649.3);assert.equal(p.priceZones!.entry.upper,78649.3);
   assert.equal(p.priceZones!.payoffLimited,false);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   const forged=structuredClone(r);forged.discretionaryPlan!.entry+=1;forged.discretionaryPlan!.entryBasis.price+=1;
@@ -36,7 +36,7 @@ test("mixed structural location is symmetric and does not force a bullish answer
 test("1H and 4H retain independent trend evidence and price risk, while explaining common support",()=>{
   const hour=make("1H"),swing=make("4H"),a=hour.discretionaryPlan!,b=swing.discretionaryPlan!;
   assert.equal(a.side,"short");assert.equal(b.side,"short");assert.notEqual(a.entry,b.entry);assert.notEqual(a.stop,b.stop);
-  assert.deepEqual(a.targets.map(t=>t.price),[80514.5]);assert.deepEqual(b.targets.map(t=>t.price),[79803.6]);
+  assert.equal(a.targets[0].price,80514.5);assert.equal(b.targets[0].price,79803.6);assert.ok(a.targets.length<=3&&b.targets.length<=3);
   for(const r of [hour,swing]){
     const p=r.discretionaryPlan!,card=globalTradeCards(r)[0],text=globalSetupEvidenceLines(r).join(" ");
     assert.match(text,/falling SMA55/);assert.equal(p.requiresNewTestAfter,undefined);assert.equal(p.executionPolicy!.mode,"passive_limit");

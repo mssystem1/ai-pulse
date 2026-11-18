@@ -18,6 +18,7 @@ import {globalDecision,globalContextLine,globalChannelLines,globalEntryStudySvg,
 const terminalPriceForIndicator=(value:number)=>value.toLocaleString(undefined,{maximumFractionDigits:4});
 const stamp = (ts: number) => Math.floor(ts / 1000) as UTCTimestamp;
 const palette = ["#ffcb76", "#b790ff", "#59c2ee", "#e593c2", "#71969b"];
+const noTerminalIndicators:TerminalChartIndicator[]=[];
 const chartOptions = { layout: { background: { type: ColorType.Solid, color: "#0d1420" }, textColor: "#8d9cb3", fontSize: 11 }, grid: { vertLines: { visible: false }, horzLines: { color: "#263142", style: 2 } }, rightPriceScale: { borderVisible: false, scaleMargins: { top: .1, bottom: .08 } }, timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false }, autoSize: true };
 
 function ContextChart({ report }: { report: GlobalReport }) {
@@ -36,7 +37,7 @@ function ContextChart({ report }: { report: GlobalReport }) {
   return <div className="global-context"><strong>{globalFrameReference(report.context.timeframe??"—")} {globalLabel("context", report.lang)}</strong>{report.context.candles.length>=2 ? <><div ref={ref} style={{ height: 112 }} /><small>{report.context.sma55.length?`SMA55 ${globalPrice(report,report.context.sma55.at(-1)?.value)}`:`${report.context.candles.length} ${report.lang==="zh"?"根完整 K 线":"completed candles"}`} · {agreement}</small></> : <p>{globalLabel("unavailable", report.lang)}</p>}</div>;
 }
 
-export function GlobalMarketChart({ report, selectedPathId, access, viewportIdentity, currentQuote, currentCandle, terminalIndicators: appliedIndicators = [] }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess; viewportIdentity?:string; currentQuote?:GlobalChartCurrentQuote;currentCandle?:GlobalLiveCandle; terminalIndicators?: TerminalChartIndicator[] }) {
+export function GlobalMarketChart({ report, selectedPathId, access, viewportIdentity, currentQuote, currentCandle, terminalIndicators: appliedIndicators = noTerminalIndicators }: { report: GlobalReport; selectedPathId: string | null; access?:ReportExportAccess; viewportIdentity?:string; currentQuote?:GlobalChartCurrentQuote;currentCandle?:GlobalLiveCandle; terminalIndicators?: TerminalChartIndicator[] }) {
   const terminalIndicators=useMemo(()=>appliedIndicators.filter(item=>item.sourceKind!=="executed-flow"),[appliedIndicators]);
   const executionIndicators=useMemo(()=>appliedIndicators.filter(item=>item.sourceKind==="executed-flow"),[appliedIndicators]);
   const appearance=useGlobalChartAppearance(),paint=(color:string)=>globalChartColor(color,appearance);
@@ -86,13 +87,13 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
   useEffect(() => {
     const report=chartReport;
     if (!ref.current || report.candles.length < 2) return;
-    const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.snapshot.observedAt,report.tier]);
+    const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.tier]);
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
-    const chart = createChart(ref.current, { ...options, handleScale:{axisDoubleClickReset:{time:false,price:false}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, timeVisible: unit === "minute" || unit === "hour" || indicatorState.current.length > 0, tickMarkFormatter: (time: Time) => {
+    const chart = createChart(ref.current, { ...options, handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true},handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:true},axisDoubleClickReset:{time:true,price:true}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, shiftVisibleRangeOnNewBar:false, timeVisible: unit === "minute" || unit === "hour" || indicatorState.current.length > 0, tickMarkFormatter: (time: Time) => {
       const latest=indicatorState.current.reduce<number>((end,item)=>item.points.reduce<number>((value,point)=>Math.max(value,Number(stamp(point.ts))),end),Number(stamp(formingState.current?.ts??report.candles.at(-1)!.ts)));
       return typeof time === "number" && time > latest ? "" : null;
     } } });
-    const plan=globalTradePlan(report),qualified=report.decisionVersion==="decision-v5"||globalDecision(report).planningValid,values = [...(report.decisionVersion==="decision-v5"?globalTradeCards(report).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop?[c.plan.referenceStop]:[]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]):[]),...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(qualified?plan.referenceEntry??[]:[]),...(qualified&&plan.referenceStop!==null?[plan.referenceStop]:[])];
+    const plan=globalTradePlan(report),qualified=report.decisionVersion==="decision-v5"||globalDecision(report).planningValid,values = [...(report.decisionVersion==="decision-v5"?globalTradeCards(report).filter(c=>c.selected).flatMap(c=>[...(c.plan.referenceEntry??[]),...(c.plan.referenceStop?[c.plan.referenceStop]:[]),...c.targets.map(t=>t.price),...(report.discretionaryPlan?.priceZones?.targets.flatMap(z=>[z.lower,z.upper])??[])]):[]),...globalSetupMap(report).view.levelIds.flatMap(id => report.levels.find(l => l.id === id)?.price ?? []),...(qualified?plan.referenceEntry??[]:[]),...(qualified&&plan.referenceStop!==null?[plan.referenceStop]:[])];
     const candles = chart.addSeries(CandlestickSeries, { upColor: paint("#35d0aa"), downColor: paint("#ef6b85"), wickUpColor: paint("#35d0aa"), wickDownColor: paint("#ef6b85"), borderVisible: false, priceLineVisible:false,lastValueVisible:false, priceFormat: { type: "price", precision: report.snapshot.pricePrecision, minMove: 10 ** -report.snapshot.pricePrecision }, autoscaleInfoProvider: (base: () => AutoscaleInfo | null) => {
       let info=base();
       const visible=chart.timeScale().getVisibleRange(),extrema=globalVisibleTimeCandleExtrema(formingState.current?[...report.candles,formingState.current]:report.candles,visible);
@@ -120,13 +121,20 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     const volume = chart.addSeries(HistogramSeries, { priceScaleId: "volume", priceFormat: { type: "volume" }, priceLineVisible: false, lastValueVisible: false });
     volume.priceScale().applyOptions({ scaleMargins: { top: .82, bottom: 0 }, visible: false });
     volume.setData(data.map(c => ({ time: stamp(c.ts), value: c.volume, color: paint(c.close >= c.open ? (appearance==="light"?"#35d0aa99":"#35d0aa40") : (appearance==="light"?"#ef6b8599":"#ef6b8540")) })));
+    let previousForming:GlobalLiveCandle["candle"]|null=null;
     updateForming.current=value=>{
-      const time=chart.timeScale().getVisibleRange(),logical=chart.timeScale().getVisibleLogicalRange(),scale=chart.priceScale("right"),auto=scale.options().autoScale,priceRange=scale.getVisibleRange();
-      const complete=data.map(c=>({time:stamp(c.ts),open:c.open,high:c.high,low:c.low,close:c.close}));
-      const future=Array.from({length:300},(_,i)=>({time:stamp(last.ts+interval*(i+1))})).filter(c=>c.time!==stamp(value?.ts??-1));
-      candles.setData([...complete,...(value?[{time:stamp(value.ts),open:value.open,high:value.high,low:value.low,close:value.close}]:[]),...future].sort((a,b)=>Number(a.time)-Number(b.time)));
-      volume.setData([...data,...(value?[value]:[])].map(c=>({time:stamp(c.ts),value:c.volume,color:paint(c.close>=c.open?"#35d0aa80":"#ef6b8580")})));
-      if(time)chart.timeScale().setVisibleRange(time);else if(logical)chart.timeScale().setVisibleLogicalRange(logical);if(!auto&&priceRange)scale.setVisibleRange(priceRange);
+      // Future whitespace already reserves these primary-frame timestamps.
+      // Update one bar without refitting the time scale: restoring visible time
+      // rounds fractional zoom and interrupts a drag when a quote arrives.
+      if(previousForming&&previousForming.ts!==value?.ts){
+        candles.update({time:stamp(previousForming.ts)},true);
+        volume.update({time:stamp(previousForming.ts)},true);
+      }
+      if(value){
+        candles.update({time:stamp(value.ts),open:value.open,high:value.high,low:value.low,close:value.close},true);
+        volume.update({time:stamp(value.ts),value:value.volume,color:paint(value.close>=value.open?"#35d0aa80":"#ef6b8580")});
+      }
+      previousForming=value;
       setCandleDetail(previous=>!previous||previous.live?(value?{...value,live:true}:{...last,live:false}):previous);
     };
     updateForming.current(formingState.current);
@@ -167,7 +175,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     chart.panes().forEach((pane,index)=>pane.setStretchFactor((index===0?(pro?490:540):170)/chartHeight));
     focusTerminalIndicators.current=()=>{const studies=indicatorState.current,flow=studies.filter(item=>item.priceContext?.points.length);const points=(flow.length?flow:studies).flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
     updateTerminalIndicators.current=studies=>{
-      const time=chart.timeScale().getVisibleRange();
+      const logical=chart.timeScale().getVisibleLogicalRange();
       const plots:Record<string,TerminalIndicatorPlotInfo>={};
       const price=studies.find(item=>item.priceContext?.points.length)?.priceContext;
       executionPrice?.setData(price?terminalIndicatorSeries(displayStudy({id:"execution-price",title:"Captured Spot execution price",units:report.snapshot.instId.split("-")[1]??"USDT",status:"partial",source:price.source,windowStart:0,windowEnd:0,bucketMs:price.bucketMs,points:price.points})).map(point=>({...point,time:point.time as UTCTimestamp})):[]);
@@ -182,7 +190,8 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
         entry.markers.setMarkers(item?terminalIndicatorEvents(displayStudy(item)).map(point=>({time:stamp(point.ts),position:"aboveBar" as const,shape:"circle" as const,color:paint(item.color??"#ffcb76"),text:""})):[]);
         if(item)plots[entry.id]=terminalIndicatorPlotInfo(item.units,entry.series.data());
       }
-      if(time)chart.timeScale().setVisibleRange(time);
+      const nextLogical=chart.timeScale().getVisibleLogicalRange();
+      if(logical&&(!nextLogical||Math.abs(nextLogical.from-logical.from)>1e-6||Math.abs(nextLogical.to-logical.to)>1e-6))chart.timeScale().setVisibleLogicalRange(logical);
       setIndicatorPlots(plots);setIndicatorReadings({});
     };
     if(microMode)requestAnimationFrame(()=>focusTerminalIndicators.current());
@@ -216,7 +225,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       // zero-width ResizeObserver pass must not overwrite the user's viewport.
       if(width<=0||height<=0){hiddenSincePaint=true;frame=requestAnimationFrame(render);return;}
       if(hiddenSincePaint&&!firstFrame&&previousRange){
-        if(previousTime)chart.timeScale().setVisibleRange(previousTime);else chart.timeScale().setVisibleLogicalRange(previousRange);
+        chart.timeScale().setVisibleLogicalRange(previousRange);
         const saved=viewport.current;if(saved?.key===viewportKey&&!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
         previousWidth=width;
       }
@@ -224,7 +233,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       if(firstFrame&&width>0){
         const saved=viewport.current;
         if(saved?.key===viewportKey&&saved.logical){
-          if(saved.time)chart.timeScale().setVisibleRange(saved.time);else chart.timeScale().setVisibleLogicalRange(saved.logical);
+          chart.timeScale().setVisibleLogicalRange(saved.logical);
           if(!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
         }else resetView();
         firstFrame=false;previousWidth=width;previousRange=chart.timeScale().getVisibleLogicalRange();previousTime=chart.timeScale().getVisibleRange();

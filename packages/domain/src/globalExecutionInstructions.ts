@@ -56,7 +56,7 @@ export function globalExecutionInstructions(report: GlobalReport): string | null
     ...(globalOpposingEntryZones(report).length ? [zh ? "入场区域与反向结构区域重叠；已观察到的回测不能单独解决该障碍，入场前须重新评估。" : "Entry overlaps opposing structure. The observed retest does not resolve that obstacle; reassess before entry."] : []),
     zh ? `固定硬止损 ${price(p.stop)}；入场截止 ${executionTime(deadline)}。` : `Fixed hard SL ${price(p.stop)}; Entry deadline ${executionTime(deadline)}.`,
     ...(deadline < setupExpiry ? [zh ? `整体计划到期 ${executionTime(setupExpiry)}，不能延长本次已确认入场窗口。` : `Overall setup expiry ${executionTime(setupExpiry)} does not extend this confirmed entry window.`] : []),
-    policy.id === "structural-edge-passive-v2"
+    ["structural-edge-passive-v2","structural-edge-passive-v3"].includes(policy.id)
       ? zh ? "结构失效或入场期限结束时取消限价计划。首次目标仅在入场后作为退出价；入场前曾触及该价位不会取消此结构回测计划。" : "Cancel the limit plan if its structure fails or its entry deadline expires. The first active opposing level is the exit objective after entry; a pre-entry touch of that level does not cancel this structural retest plan."
       : policy.mode === "passive_limit"
       ? zh ? "目标在入场前被触及或结构失效时取消本次机会。" : "Cancel this opportunity if its first objective is reached before entry or its structure fails."

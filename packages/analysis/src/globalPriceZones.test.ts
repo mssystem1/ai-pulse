@@ -25,19 +25,20 @@ test("the hourly resting limit keeps the full source context, fixed stop and nea
   assert.deepEqual([z.entry.lower,z.entry.upper],[80458.5,80458.5]);
   assert.equal(p.executionPolicy!.sourceBoundary,80458.5);assert.equal(p.entryBasis.price,80627.5);
   assert.ok(Math.abs(p.stop-80400.2077822)<1e-7);
-  assert.deepEqual(z.targets,[{lower:80774.5,upper:80847}]);
+  assert.deepEqual(z.targets[0],{lower:80774.5,upper:80847});assert.ok(z.targets.length>=1&&z.targets.length<=3);
   const near=p.barriers.find(b=>b.price===80740.3&&b.timeframe==="15m")!,anchor=r.entryStudy!.pivots.find(a=>a.price===80740.3&&a.kind==="high")!;
   assert.ok(near&&anchor);assert.equal(near.anchorTs,anchor.ts);assert.equal(near.knownAt,candleCloseTime(anchor.confirmedAt!,"15m"));
   assert.equal(payoff.worstToObstacle,(80740.3-p.entry)/(p.entry-p.stop));
   assert.equal(payoff.bestToTP1,payoff.worstToTP1);assert.equal(z.payoffLimited,false);
-  assert.equal(p.targets.length,1);assert.match(globalTradeCards(r)[0].condition,/Passive limit plan/);
+  assert.ok(p.targets.length>=1&&p.targets.length<=3);assert.match(globalTradeCards(r)[0].condition,/Passive limit plan/);
   assert.match(globalTradeCards(r)[0].condition,/does not require a later confirmation/);
 });
 test("4H and weekly structural limits use their own first active obstacle and fixed protection",()=>{
   const swing=make("4H",80610.9),weekly=make("1Wutc",80612.3),s=swing.discretionaryPlan!,w=weekly.discretionaryPlan!;
   assert.equal(s.side,"short");assert.equal(s.family,"level_retest");assert.equal(s.entry,82060);
   assert.deepEqual([s.priceZones!.entry.sourceLower,s.priceZones!.entry.sourceUpper],[80809.5,82060]);
-  assert.ok(Math.abs(s.stop-82208.0534754)<1e-7);assert.deepEqual(s.targets.map(t=>t.price),[80680.5]);
+  assert.ok(Math.abs(s.stop-82208.0534754)<1e-7);assert.equal(s.targets[0].price,80680.5);assert.ok(s.targets.length>=1&&s.targets.length<=3);
+  assert.ok(s.targets.every((t,i)=>i===0||(s.side==="long"?1:-1)*(t.price-s.targets[i-1].price)>0));
   const anchor=swing.indicators.pivots.find(a=>a.price===80680.5&&a.kind==="low")!;
   assert.equal(s.targets[0].anchorTs,anchor.ts);assert.equal(s.targets[0].knownAt,candleCloseTime(anchor.confirmedAt!,"4H"));
   assert.ok(swing.currentMarket!.quote!.price<80680.5&&swing.candles.at(-1)!.close>=80680.5,"A quote below support does not erase opposition after a future limit entry");

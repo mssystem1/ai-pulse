@@ -10,7 +10,7 @@ import {globalRouteObstacles} from "./globalRouteObstacles.js";
  * It does not change the canonical signal, history or execution permission. */
 export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false,forcedChoice?:Pick<NonNullable<GlobalReport["discretionaryPlan"]>,"side"|"family"|"entryBasis"|"evidence">){
   if(report.decisionVersion!=="decision-v5"||report.strategy?.targetPolicy!=="active-zones-v1")return;
-  report.setupPolicyVersion="source-limits-v2";
+  report.setupPolicyVersion="source-limits-v3";
   delete report.discretionaryPlan;
   delete report.scenario;
   delete report.alternatePlan;
@@ -125,7 +125,29 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     if(!first)return;
     if(first){
       const pivot=report.indicators.pivots.find(a=>a.ts===first.anchorTs&&a.price===first.price&&a.kind===(side==="long"?"high":"low")&&a.confirmedAt!==null&&candleCloseTime(a.confirmedAt,primaryTimeframe)===first.knownAt);
-      targets.splice(0,targets.length,{...first,basis:pivot?"confirmed_swing":"structure_zone"});
+      const structural=[...globalRouteObstacles(report,side)]
+        .filter(a=>a.timeframe===primaryTimeframe&&sign*(a.price-edge)>tick)
+        .sort((a,b)=>sign*(a.price-b.price))
+        .map(a=>({...a,basis:report.horizonContext?.zones.some(z=>z.startTs===a.anchorTs&&z.knownAt===a.knownAt&&(z.lower===a.price||z.upper===a.price))?"structure_zone" as const:"confirmed_swing" as const}));
+      const distinct:typeof targets=[],targetBands:Array<{lower:number;upper:number}>=[];
+      for(const obstacle of structural){
+        const sourceZone=obstacle.basis==="structure_zone"?report.horizonContext?.zones.find(z=>z.startTs===obstacle.anchorTs&&z.knownAt===obstacle.knownAt&&(z.lower===obstacle.price||z.upper===obstacle.price)):undefined;
+        const duplicates=distinct.some(t=>{
+          if(t.price===obstacle.price)return true;
+          const priorZone=report.horizonContext?.zones.find(z=>z.startTs===t.anchorTs&&z.knownAt===t.knownAt&&(z.lower===t.price||z.upper===t.price));
+          return !!sourceZone&&!!priorZone&&sourceZone.lower<=priorZone.upper&&sourceZone.upper>=priorZone.lower;
+        });
+        if(duplicates)continue;
+        const targetZone=report.horizonContext?.zones.find(z=>z.role===(side==="long"?"resistance":"support")&&z.startTs===obstacle.anchorTs&&z.knownAt===obstacle.knownAt&&(side==="long"?z.lower:z.upper)===obstacle.price);
+        const candle=report.candles.find(c=>c.ts===obstacle.anchorTs);
+        let targetBand=targetZone?{lower:targetZone.lower,upper:targetZone.upper}:candle?(side==="long"?{lower:Math.max(candle.open,candle.close),upper:candle.high}:{lower:candle.low,upper:Math.min(candle.open,candle.close)}):{lower:obstacle.price,upper:obstacle.price};
+        if(candle&&(side==="long"?targetBand.lower<=entryBasis.price:targetBand.upper>=entryBasis.price))targetBand={lower:obstacle.price,upper:obstacle.price};
+        if(targetBands.some(b=>targetBand.lower<=b.upper&&targetBand.upper>=b.lower))continue;
+        distinct.push(obstacle);targetBands.push(targetBand);
+        if(distinct.length===3)break;
+      }
+      if(distinct.length)distinct[0]={...distinct[0],basis:pivot?"confirmed_swing":"structure_zone"};
+      targets.splice(0,targets.length,...distinct);
     }
   }
   if(!targets.length)return;
