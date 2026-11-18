@@ -19,36 +19,35 @@ test("a quote crossing 80,639 does not flip a mixed daily thesis without new pri
   const last=a.candles.at(-1)!,support=a.horizonContext!.zones.find(z=>z.role==="support"&&z.upper===80018.2)!;
   assert.ok(last.low<=support.upper&&last.close>support.upper,"The completed daily candle actually tested and recovered the source support");
 });
-test("the supplied hourly support band retains its full source and discloses weak clearance",()=>{
+test("the hourly resting limit keeps the full source context, fixed stop and nearest route obstacle",()=>{
   const r=make("1H",80628.4),p=r.discretionaryPlan!,z=p.priceZones!,payoff=globalPriceZonePayoff(r)!;
-  assert.equal(z.entry.sourceLower,80458.5);assert.equal(z.entry.sourceUpper,80627.5);assert.equal(z.entry.lower,80458.5);assert.equal(z.entry.upper,80627.5);
-  assert.ok(Math.abs(p.stop-80400.2077822)<1e-7);assert.deepEqual(z.targets,[{lower:80774.5,upper:80847},{lower:80913.6,upper:81279.7}]);
+  assert.deepEqual([z.entry.sourceLower,z.entry.sourceUpper],[80458.5,80627.5]);
+  assert.deepEqual([z.entry.lower,z.entry.upper],[80458.5,80458.5]);
+  assert.equal(p.executionPolicy!.sourceBoundary,80458.5);assert.equal(p.entryBasis.price,80627.5);
+  assert.ok(Math.abs(p.stop-80400.2077822)<1e-7);
+  assert.deepEqual(z.targets,[{lower:80774.5,upper:80847}]);
   const near=p.barriers.find(b=>b.price===80740.3&&b.timeframe==="15m")!,anchor=r.entryStudy!.pivots.find(a=>a.price===80740.3&&a.kind==="high")!;
   assert.ok(near&&anchor);assert.equal(near.anchorTs,anchor.ts);assert.equal(near.knownAt,candleCloseTime(anchor.confirmedAt!,"15m"));
-  assert.ok(r.entryStudy!.candles.at(-1)!.close<=near.price&&near.price<z.targets[0].lower);
-  assert.equal(p.entryBasis.price,80627.5);assert.equal(z.entry.sourcePrice,p.entryBasis.price);assert.equal(p.entry,p.entryBasis.price);
-  assert.ok((near.price-z.entry.upper)/(z.entry.upper-p.stop)<1);
-  assert.ok(payoff.worstToObstacle<1);assert.equal(z.payoffLimited,true);assert.ok(payoff.bestToTP1>payoff.worstToTP1);assert.equal(p.targets.length,2,"The overlapping third point must not pretend to be a distinct target zone");
-  assert.equal(p.executionPolicy!.mode,"passive_limit");
-  assert.match(globalTradeCards(r)[0].condition,/Passive limit plan/);
+  assert.equal(payoff.worstToObstacle,(80740.3-p.entry)/(p.entry-p.stop));
+  assert.equal(payoff.bestToTP1,payoff.worstToTP1);assert.equal(z.payoffLimited,false);
+  assert.equal(p.targets.length,1);assert.match(globalTradeCards(r)[0].condition,/Passive limit plan/);
   assert.match(globalTradeCards(r)[0].condition,/does not require a later confirmation/);
-  assert.doesNotMatch(globalTradeCards(r)[0].condition,/new test formed after this snapshot/);
 });
-test("4H and weekly payoff use their true stop and nearest obstacle rather than distant target references",()=>{
+test("4H and weekly structural limits use their own first active obstacle and fixed protection",()=>{
   const swing=make("4H",80610.9),weekly=make("1Wutc",80612.3),s=swing.discretionaryPlan!,w=weekly.discretionaryPlan!;
-  const ribbon=swing.indicators.ema!.filter(e=>e.period===12||e.period===25).map(e=>e.points.at(-1)!.value);
-  assert.equal(s.side,"short");assert.equal(s.priceZones!.entry.lower,Number(Math.min(...ribbon).toPrecision(12)));assert.deepEqual(s.priceZones!.targets,[{lower:79220.1,upper:79803.6}]);
-  assert.ok(Math.abs(s.stop-82208.0534754)<1e-7);assert.deepEqual(s.targets.map(t=>t.price),[79803.6]);
-  const near=s.barriers.find(b=>b.price===80680.5&&b.timeframe==="4H")!,anchor=swing.indicators.pivots.find(a=>a.price===80680.5&&a.kind==="low")!;
-  assert.ok(near&&anchor);assert.equal(near.anchorTs,anchor.ts);assert.equal(near.knownAt,candleCloseTime(anchor.confirmedAt!,"4H"));
-  assert.ok(swing.currentMarket!.quote!.price<near.price&&swing.candles.at(-1)!.close>=near.price,"A quote below support cannot erase opposition for a future overhead entry");
-  assert.deepEqual([s.priceZones!.entry.sourceLower,s.priceZones!.entry.sourceUpper],[Math.min(...ribbon),Math.max(...ribbon)]);assert.equal(s.entryBasis.price,Math.min(...ribbon));
-  assert.ok((s.priceZones!.entry.lower-near.price)/(s.stop-s.priceZones!.entry.lower)<1);
-  assert.equal(w.side,"long","A countertrend daily reaction does not replace intact weekly recovery");
-  assert.equal(w.barriers[0].price,82213.9);assert.equal(w.priceZones!.entry.upper,w.priceZones!.entry.sourceUpper);
-  const payoff=globalPriceZonePayoff(weekly)!,sign=w.side==="long"?1:-1,target=w.side==="long"?w.priceZones!.targets[0].lower:w.priceZones!.targets[0].upper;
-  assert.ok(payoff.worstToObstacle<1);assert.equal(payoff.worstToTP1,sign*(target-w.entry)/Math.abs(w.entry-w.stop));
-  assert.equal(w.stopBasis.timeframe,"1Wutc");assert.ok(sign*(w.stopBasis.price-w.stop)>0);assert.ok(Math.abs(w.entry-w.stop)>Math.abs(s.entry-s.stop),"Macro protection must not inherit an intraday stop distance");
+  assert.equal(s.side,"short");assert.equal(s.family,"level_retest");assert.equal(s.entry,82060);
+  assert.deepEqual([s.priceZones!.entry.sourceLower,s.priceZones!.entry.sourceUpper],[80809.5,82060]);
+  assert.ok(Math.abs(s.stop-82208.0534754)<1e-7);assert.deepEqual(s.targets.map(t=>t.price),[80680.5]);
+  const anchor=swing.indicators.pivots.find(a=>a.price===80680.5&&a.kind==="low")!;
+  assert.equal(s.targets[0].anchorTs,anchor.ts);assert.equal(s.targets[0].knownAt,candleCloseTime(anchor.confirmedAt!,"4H"));
+  assert.ok(swing.currentMarket!.quote!.price<80680.5&&swing.candles.at(-1)!.close>=80680.5,"A quote below support does not erase opposition after a future limit entry");
+  assert.equal(w.side,"long");assert.equal(w.entry,74501.6);assert.equal(w.priceZones!.entry.sourceUpper,78427.1);
+  assert.equal(w.targets[0].price,82213.9);assert.equal(w.targets[0].timeframe,"1Wutc");
+  assert.equal(w.priceZones!.payoffLimited,false);
+  const payoff=globalPriceZonePayoff(weekly)!;
+  assert.equal(payoff.worstToTP1,(w.priceZones!.targets[0].lower-w.entry)/(w.entry-w.stop));
+  assert.equal(w.stopBasis.timeframe,"1Wutc");assert.ok(w.stopBasis.price>w.stop);
+  assert.ok(Math.abs(w.entry-w.stop)>Math.abs(s.entry-s.stop),"Macro protection does not inherit an intraday stop distance");
 });
 test("forged intervals, favorable-fill-only payoff, overlapping targets and altered hard stops are rejected",()=>{
   const r=make("1H",80628.4);
@@ -56,7 +55,7 @@ test("forged intervals, favorable-fill-only payoff, overlapping targets and alte
     (p:NonNullable<typeof r.discretionaryPlan>)=>{p.priceZones!.entry.upper-=10;p.entry=p.priceZones!.entry.upper;},
     (p:NonNullable<typeof r.discretionaryPlan>)=>{p.priceZones!.entry.sourceLower-=100;},
     (p:NonNullable<typeof r.discretionaryPlan>)=>{p.priceZones!.targets[0].lower+=1;},
-    (p:NonNullable<typeof r.discretionaryPlan>)=>{p.priceZones!.targets[1].lower=p.priceZones!.targets[0].upper;},
+    (p:NonNullable<typeof r.discretionaryPlan>)=>{p.targets.push({...p.targets[0]});p.priceZones!.targets.push({...p.priceZones!.targets[0]});p.executionPolicy!.targetAllocations=[.5,.5];},
     (p:NonNullable<typeof r.discretionaryPlan>)=>{p.priceZones!.stop.lower+=1;},
   ]){const forged=structuredClone(r);change(forged.discretionaryPlan!);assert.equal(GlobalReportSchema.safeParse(forged).success,false);}
 });

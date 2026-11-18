@@ -2,16 +2,19 @@ import {globalSetupAdmission} from "@pulse/domain";
 import type {GlobalExecutionSettings} from "./globalExecutionPolicy.js";
 import {applyGlobalStrategyMix,globalStrategyMixObjectives} from "./globalStrategyMix.js";
 import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
-import {selectGlobalSetupContext} from "./globalSetupContext.js";
+import {globalTwoSidedStructureChoices,selectGlobalSetupContext} from "./globalSetupContext.js";
 import {applyGlobalPriceZones} from "./globalPriceZones.js";
 import {globalRouteObstacles} from "./globalRouteObstacles.js";
 
 /** A complete conditional scenario when an observed signal is not established.
  * It does not change the canonical signal, history or execution permission. */
-export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false){
+export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false,forcedChoice?:Pick<NonNullable<GlobalReport["discretionaryPlan"]>,"side"|"family"|"entryBasis"|"evidence">){
   if(report.decisionVersion!=="decision-v5"||report.strategy?.targetPolicy!=="active-zones-v1")return;
+  report.setupPolicyVersion="source-limits-v2";
   delete report.discretionaryPlan;
   delete report.scenario;
+  delete report.alternatePlan;
+  delete report.alternatePlanReason;
   const canonical=report.tradePlan;
   if(canonical?.state==="confirmed"&&canonical.referenceEntry&&canonical.referenceStop!==null)return;
   const study=report.entryStudy?.status==="available"?report.entryStudy:null,bars=study?.candles??report.candles,timeframe=study?.timeframe??report.snapshot.timeframe,last=bars.at(-1),prior=bars.at(-2);
@@ -32,9 +35,14 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     return [{price:a.price,anchorTs:a.ts,knownAt,timeframe:source.timeframe,kind:a.kind,basis:"confirmed_swing" as const}];
   }));
   const primaryAtr=report.indicators.atr.points.at(-1)?.value??atr;
-  const coreChoice=selectGlobalSetupContext(report,{bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff});
+  const coreChoice=forcedChoice??selectGlobalSetupContext(report,{bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff});
+  if(!coreChoice)return;
+  let twoSided=!forcedChoice?globalTwoSidedStructureChoices(report,coreChoice,false):null;
   const mixed=applyGlobalStrategyMix(report,report.marketEvidence);
   if(coreOnly){mixed.choice=undefined;mixed.candidate=undefined;delete mixed.mix.selectedVariant;}
+  // An admitted observed event retains its own source and defended region.
+  // Neighboring passive zones must not erase an actual held reclaim.
+  if(mixed.choice)twoSided=null;
   mixed.mix.primary={family:coreChoice.family,side:coreChoice.side,variant:"core",reason:"Core source selection retained alongside separately admitted complementary price events."};
   report.strategyMix=mixed.mix;
   const {side,family,entryBasis,evidence}=mixed.choice??coreChoice;
@@ -69,9 +77,9 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   if(family==="vwap_reversion"){const outer=band(3,side==="long"?"lower":"upper");if(outer!==undefined&&outer>tick){stop=round(side==="long"?Math.max(tick,Math.min(outer,primaryLast.low)-primaryAtr*.2):Math.max(outer,primaryLast.high)+primaryAtr*.2);stopBasis={price:outer,timeframe:primaryTimeframe,anchorTs:vwap?.anchorTs??report.candles[0].ts,knownAt:primaryClosed};}}
   if(!(stop>0)||sign*(entry-stop)<=0)return;
   const targetSources=[...sources,...(!study&&lower?[{bars:lower.candles,timeframe:lower.timeframe}]:[]),...(report.currentMarket?.frames.map(f=>({bars:f.candles,timeframe:f.timeframe}))??[])];
-  // A future return to Entry has its own route. A live quote crossing a real
-  // first objective must not promote an archive target; admission/lifecycle
-  // marks that opportunity unavailable. Completed consumed levels stay spent.
+  // Legacy event policies retain unconsumed objectives. Structural passive
+  // limits below use the first active primary obstacle after their future entry;
+  // a prior touch must not send that exit to a distant archive objective.
   const forward=(price:number)=>sign*(price-entry)>tick;
   const unplayed=(price:number,knownAt:number)=>!targetSources.some(source=>candleLevelTouchedAfter(source.bars,source.timeframe,price,side,knownAt,cutoff));
   const horizonStart=report.candles.at(-Math.min(report.strategy.lookbackBars,report.candles.length))!.ts;
@@ -107,6 +115,19 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     const measured=Math.max(primaryAtr,Math.max(...report.candles.slice(-20).map(c=>c.high))-Math.min(...report.candles.slice(-20).map(c=>c.low))),price=round(entry+sign*measured);
     if(price>0)targets.push({price,anchorTs:report.candles.at(-Math.min(20,report.candles.length))!.ts,knownAt:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,timeframe:report.snapshot.timeframe,basis:"measured_projection"});
   }
+  // A resting structural order exits at the first active PRIMARY obstacle.
+  // Previously touched but still active structure is a valid future retouch
+  // objective after entry; skipping it produced distant archive targets.
+  if(family==="level_retest"&&entryBasis.kind==="structure_zone"&&!evidence){
+    const source=report.horizonContext!.zones.find(z=>z.role===(side==="long"?"support":"resistance")&&(side==="long"?z.upper:z.lower)===entry)!;
+    const edge=side==="long"?source.lower:source.upper;
+    const first=globalRouteObstacles(report,side).filter(a=>a.timeframe===primaryTimeframe&&sign*(a.price-edge)>tick).sort((a,b)=>sign*(a.price-b.price))[0];
+    if(!first)return;
+    if(first){
+      const pivot=report.indicators.pivots.find(a=>a.ts===first.anchorTs&&a.price===first.price&&a.kind===(side==="long"?"high":"low")&&a.confirmedAt!==null&&candleCloseTime(a.confirmedAt,primaryTimeframe)===first.knownAt);
+      targets.splice(0,targets.length,{...first,basis:pivot?"confirmed_swing":"structure_zone"});
+    }
+  }
   if(!targets.length)return;
   const barriers=globalRouteObstacles(report,side).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5);
   report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
@@ -117,5 +138,11 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   if(!coreOnly&&mixed.choice&&!globalSetupAdmission(report).geometryEligible){
     const alternate=structuredClone(report);applyGlobalDiscretionaryPlan(alternate,settings,true);
     if(alternate.discretionaryPlan&&globalSetupAdmission(alternate).geometryEligible){report.discretionaryPlan=alternate.discretionaryPlan;report.strategyMix=alternate.strategyMix;}
+  }
+  if(!coreOnly&&twoSided&&report.discretionaryPlan){
+    const alternate=structuredClone(report);
+    delete alternate.scenario;delete alternate.alternatePlan;delete alternate.alternatePlanReason;
+    applyGlobalDiscretionaryPlan(alternate,settings,true,twoSided.alternate);
+    if(alternate.discretionaryPlan){report.alternatePlan=alternate.discretionaryPlan;report.alternatePlanReason=twoSided.reason;}
   }
 }

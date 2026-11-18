@@ -4,13 +4,19 @@ import type { IndicatorManifest, IndicatorResult, TerminalFlowTool } from "@puls
 /** Executed-volume indicators use their own pane and units, never the asset-price scale. */
 export type TerminalChartIndicator = {
   id: string; title: string; units: string; status: string; source: string; instId?:string; timeframe?:string; sourceKind?:"completed-ohlcv"|"executed-flow";
-  calculation?:"nand"|"hybrid"|"host"; publisher?:string; pane?:"price"|"indicator"; group?:string; color?:string; parentId?:string;
+  calculation?:"nand"|"hybrid"|"host"; publisher?:string; pane?:"price"|"indicator"; group?:string; color?:string; parentId?:string;sourceNote?:string;
   windowStart: number; windowEnd: number; bucketMs?: number; plot?: "line"|"histogram";
   condition?: { kind:string; threshold:number; label:string };
   priceContext?: {source:string;bucketMs?:number;points:Array<{ts:number;value:number}>};
   points: Array<{ ts: number; value?: number; signal?:boolean; partial?:boolean; reset?:boolean }>;
 };
 export type TerminalIndicatorPlotInfo = { units: string; points: number; firstTs?: number; lastTs?: number };
+/** A short live capture and retained history may contain the same studies.
+ * Their different clocks need a fresh fit instead of inheriting a minute-wide
+ * viewport on a month of hourly bars. Polling the same source preserves zoom. */
+export function terminalExecutionViewportKey(instId:string,timeframe:string,studies:readonly TerminalChartIndicator[]){
+  return JSON.stringify([instId,timeframe,studies.map(item=>[item.id,item.source,item.bucketMs??null])]);
+}
 export function terminalIndicatorPriceFormat(units: string) {
   return { type: "custom" as const, formatter: (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 4 }) + " " + units, minMove: .0001 };
 }
@@ -55,7 +61,7 @@ export function indicatorConditionText(kind:string,threshold:number,units:string
 export function terminalIndicatorSpotPriceContext(flow:TerminalFlowTool):TerminalChartIndicator["priceContext"]{
   const {windowStart,windowEnd}=flow;
   if(typeof windowStart!=="number"||typeof windowEnd!=="number"||!Number.isFinite(windowStart)||!Number.isFinite(windowEnd)||windowEnd<=windowStart)return;
-  const candidates=(flow.displayPoints??[]).filter(point=>point.ts<windowEnd&&point.end>windowStart&&point.ts<=flow.knownAt&&Number.isFinite(point.priceClose)&&point.priceClose>0&&!(flow.missingIntervals??[]).some(gap=>gap.start<point.end&&gap.end>point.ts)).map(point=>({ts:Math.max(point.ts,windowStart),value:point.priceClose}));
+  const candidates=(flow.displayPoints??[]).filter(point=>point.tradeCount>0&&point.ts<windowEnd&&point.end>windowStart&&point.ts<=flow.knownAt&&Number.isFinite(point.priceClose)&&point.priceClose>0&&!(flow.missingIntervals??[]).some(gap=>gap.start<point.end&&gap.end>point.ts)).map(point=>({ts:Math.max(point.ts,windowStart),value:point.priceClose}));
   const points=[...new Map(candidates.map(point=>[point.ts,point])).values()].sort((a,b)=>a.ts-b.ts);
   return points.length?{source:flow.source,bucketMs:flow.displayBucketMs,points}:undefined;
 }

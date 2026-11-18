@@ -15,11 +15,11 @@ function make(frame:string,tier:"base"|"premium"="premium",lang:"en"|"zh"="en"){
   return prepareGlobalReport({market:frames.find(m=>m.bar===frame)!,contextMarket:frames.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:frames,tier,lang});
 }
 
-test("Oct 20 1H: current primary extreme supplies the first objective; older resistance remains context",()=>{
+test("Oct 20 1H: structural passive limit exits at the first active primary resistance",()=>{
   const r=make("1H"),card=globalTradeCards(r)[0];
   assert.equal(r.snapshot.price,82770.1);assert.equal(r.setupSelection!.assessment,"long");
-  assert.equal(card.side,"long");assert.equal(card.targets[0].price,83272);assert.equal(r.discretionaryPlan!.targets[0].price,83439.9);
-  assert.equal(r.discretionaryPlan!.targets[0].basis,"observed_extreme");
+  assert.equal(card.side,"long");assert.equal(card.targets[0].price,82840.6);assert.equal(r.discretionaryPlan!.targets[0].price,82840.6);
+  assert.equal(r.discretionaryPlan!.targets[0].basis,"structure_zone");assert.equal(r.discretionaryPlan!.entry,82148.1);
   assert.ok(card.plan.referenceEntry);assert.ok(card.plan.referenceStop);
   assert.equal(card.confirmed,false);assert.equal(globalDecision(r).currentAction,"WAIT");
   const oldest=r.candles.at(-r.strategy!.lookbackBars)!.ts;
@@ -99,5 +99,5 @@ test("a v3 saved report gets a free v4 technical review from the same candles, w
   const before=JSON.stringify(original),review=reviewGlobalTargetReport(original);
   assert.equal(JSON.stringify(original),before);assert.deepEqual(review.candles,original.candles);
   assert.deepEqual(review.snapshot,original.snapshot);assert.equal(review.setupSelection!.version,"single-setup-v4");
-  assert.equal(reviewGlobalTargetReport(review),review);assert.equal(globalTradeCards(review).length,1);
+  assert.equal(reviewGlobalTargetReport(review),review);assert.equal(globalTradeCards(review).filter(c=>c.selected).length,1);
 });

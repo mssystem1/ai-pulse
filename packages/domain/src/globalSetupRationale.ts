@@ -42,6 +42,7 @@ export function globalSetupRationale(report:GlobalReport,current:number|null):st
   if(barrier)lines.push(zh?`${opposingZones.length?"更远的已标注障碍":"最近障碍"} ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)}：${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R；TP1 ${rr.toFixed(2)}R。`:`${opposingZones.length?"Further plotted obstacle":"Nearest obstacle"}: ${globalFrameReference(barrier.timeframe)} ${price(barrier.price)} offers ${(sign*(barrier.price-d.entry)/risk).toFixed(2)}R; TP1 offers ${rr.toFixed(2)}R.`);
   if(rr<1)lines.push(zh?`TP1 仅提供 ${rr.toFixed(2)}R，低于完整止损风险；这些价位不构成具备收益优势的结论。`:`TP1 offers ${rr.toFixed(2)}R, less than the full stop risk; these levels do not establish a favorable payoff.`);
   if(d.executionPolicy)return lines.map(line=>line
+    .replace("entry still needs its own reaction.",d.executionPolicy!.mode==="passive_limit"?"the saved passive limit defines entry separately from this trend assessment.":"entry follows its saved reaction policy.")
     .replace("a new retest reaction is still required.",d.executionPolicy!.mode==="passive_limit"?"the saved limit policy applies to this sourced region.":"use the saved event and entry policy.")
     .replace("await a new held or rejected retest.",d.executionPolicy!.mode==="passive_limit"?"the sourced region defines the passive limit plan.":"use the saved defended-retest policy.")
     .replace("this plan applies only if price returns to the entry area and reacts.","this plan applies only within its saved Entry area and execution policy; it does not predict a required return.")

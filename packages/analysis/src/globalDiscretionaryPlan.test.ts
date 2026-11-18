@@ -13,6 +13,44 @@ const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
 const make=(frame:string)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium"});
 
+test("saved v8 reports from before the source-limit revision receive a free review once",()=>{
+ const archived=make("1Wutc");delete archived.setupPolicyVersion;
+ const before=structuredClone(archived),review=reviewGlobalTargetReport(archived);
+ assert.notEqual(review,archived);assert.deepEqual(archived,before);
+ assert.equal(review.setupPolicyVersion,"source-limits-v2");assert.ok(review.targetReviewOf);
+ assert.deepEqual(review.candles,archived.candles);assert.deepEqual(review.snapshot,archived.snapshot);
+ assert.equal(reviewGlobalTargetReport(review),review);
+});
+
+test("opposing structural limits retain independent causal prices and reject forged alternate evidence",()=>{
+ const report=make("1Wutc"),main=report.discretionaryPlan!,alternate=report.alternatePlan!;
+ assert.ok(alternate);assert.notEqual(main.side,alternate.side);
+ assert.equal(main.executionPolicy?.id,"structural-edge-passive-v2");
+ for(const p of [main,alternate]){
+  const edge=p.side==="long"?p.priceZones!.entry.sourceLower:p.priceZones!.entry.sourceUpper;
+  assert.equal(p.entry,edge);assert.equal(p.executionPolicy!.sourceBoundary,edge);
+  assert.equal(p.targets.length,1);assert.equal(p.objectiveTimeframe,"1Wutc");
+ }
+ const cards=globalTradeCards(report);assert.equal(cards.length,2);assert.equal(cards[1].selected,false);
+ const mutations:Array<(r:typeof report)=>void>=[
+  r=>{r.alternatePlan!.side=r.discretionaryPlan!.side;},
+  r=>{r.alternatePlan!.executionPolicy!.sourceBoundary+=1;},
+  r=>{r.alternatePlan!.entry+=1;r.alternatePlan!.priceZones!.entry.lower+=1;r.alternatePlan!.priceZones!.entry.upper+=1;},
+  r=>{r.alternatePlan!.targets[0].knownAt=Date.parse(r.snapshot.observedAt)+1;},
+  r=>{r.alternatePlan!.priceZones!.targets[0].lower+=1;},
+  r=>{r.alternatePlan!.priceZones!.stop.lower+=1;},
+  r=>{r.alternatePlan!.reference.price+=1;},
+  r=>{r.discretionaryPlan!.executionPolicy!.sourceBoundary+=1;},
+ ];
+ for(const mutate of mutations){const changed=structuredClone(report);mutate(changed);assert.equal(GlobalReportSchema.safeParse(changed).success,false);}
+ const before=structuredClone(report),quote=main.targets[0].price+(main.side==="long"?1:-1);
+ report.currentMarket={...(report.currentMarket??{source:report.snapshot.source,frames:[]}),quote:{price:quote,ts:Date.parse(report.snapshot.observedAt)}};
+ assert.ok(!globalSetupAdmission(report).blockers.includes("objective_already_reached"),"The first active level is an exit after a future structural-limit entry, not a spent current trade");
+ assert.deepEqual(report.discretionaryPlan,before.discretionaryPlan);assert.deepEqual(report.alternatePlan,before.alternatePlan);
+ report.currentMarket.quote={price:main.stop+(main.side==="long"?-1:1),ts:Date.parse(report.snapshot.observedAt)};
+ assert.ok(globalSetupAdmission(report).blockers.includes("stop_already_breached"));
+});
+
 test("a live quote beyond TP1 blocks the same future-entry setup instead of promoting a farther objective",()=>{
  const report=make("1Dutc"),original=structuredClone(report.discretionaryPlan!),cutoff=Date.parse(report.snapshot.observedAt);
  report.currentMarket={...(report.currentMarket??{source:report.snapshot.source,frames:[]}),quote:{price:original.targets[0].price+1,ts:cutoff}};
@@ -125,7 +163,8 @@ function balanced(){
 }
 function choose(report:ReturnType<typeof make>){
   const study=report.entryStudy!,bars=study.candles;
-  return selectGlobalSetupContext(report,{bars,timeframe:study.timeframe,completedAt:candleCloseTime(bars.at(-1)!.ts,study.timeframe)!,primaryClosed:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,primaryAtr:report.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(report.snapshot.observedAt)});
+  const choice=selectGlobalSetupContext(report,{bars,timeframe:study.timeframe,completedAt:candleCloseTime(bars.at(-1)!.ts,study.timeframe)!,primaryClosed:candleCloseTime(report.candles.at(-1)!.ts,report.snapshot.timeframe)!,primaryAtr:report.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(report.snapshot.observedAt)});
+  assert.ok(choice);return choice;
 }
 
 test("range location and structural reclaim do not change with the last candle color",()=>{

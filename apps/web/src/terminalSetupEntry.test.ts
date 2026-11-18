@@ -39,6 +39,8 @@ test("qualified passive entry remains conditional and discloses its distinct tim
   const view=terminalSetupEntryNotice(report({entry:[100,101],stop:110,target:[80,90],quote:99,mode:"passive_limit"}),{now})!;
   assert.equal(view.state,"qualified");assert.equal(view.executionMode,"passive_limit");assert.equal(view.objectiveTimeframe,"1Wutc");
   assert.ok(view.lines.some(line=>line.includes("1Wutc objectives")));assert.ok(view.lines.some(line=>line.includes("passive limit")));
+  assert.equal(view.title,"Passive limit ready for preparation");
+  assert.ok(view.lines.some(line=>line.includes("No extra candle confirmation is required")));
   assert.ok(view.lines.at(-1)!.includes("not an immediate order instruction"));
 });
 

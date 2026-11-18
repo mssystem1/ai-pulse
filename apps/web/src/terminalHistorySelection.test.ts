@@ -1,7 +1,18 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type {TerminalSessionHistory} from "@pulse/domain";
+import type {TerminalFlowTool,TerminalSessionHistory} from "@pulse/domain";
+import {terminalFlowWarmupBars} from "./useTerminalIndicatorHistory.js";
 import {terminalCustomHistoryRange,terminalHistoryDefaults,terminalHistoryPreferences,terminalHistorySelection,terminalSessionEvidenceMatches} from "./terminalHistorySelection.js";
+
+test("indicator history warm-up counts complete contiguous bars, excluding gaps and partial edges",()=>{
+ const points=Array.from({length:40},(_,i)=>({ts:i*1000,end:(i+1)*1000}));
+ const flow={displayBucketMs:1000,knownAt:40_000,displayPoints:points,missingIntervals:[]} as unknown as TerminalFlowTool;
+ assert.equal(terminalFlowWarmupBars(flow),40);
+ assert.equal(terminalFlowWarmupBars({...flow,knownAt:39_999}),39);
+ assert.equal(terminalFlowWarmupBars({...flow,missingIntervals:[{start:19_000,end:21_000}]}),19);
+ assert.equal(terminalFlowWarmupBars({...flow,displayPoints:flow.displayPoints!.map((p,i)=>i===0?{...p,ts:500}:p)}),39);
+ assert.equal(terminalFlowWarmupBars(undefined),0);
+});
 
 test("window preferences restore manual choices across a chart remount and reject malformed stored ranges",()=>{
  const chosen={sessionSelection:"custom",liquiditySelection:24,custom:{start:"2026-11-01T00:00",end:"2026-11-02T00:00"},applied:{start:Date.UTC(2026,10,1),end:Date.UTC(2026,10,2)}};

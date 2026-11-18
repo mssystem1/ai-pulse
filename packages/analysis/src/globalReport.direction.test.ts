@@ -4,6 +4,7 @@ import {readFileSync} from "node:fs";
 import {candleCloseTime,GlobalReportSchema} from "@pulse/schemas";
 import {globalDecision,globalTradeCards,globalCurrentMarketLines,globalSetupEvidenceLines} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe,globalPromptEvidence} from "./globalReport.js";
+import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {selectGlobalSetupContext} from "./globalSetupContext.js";
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.direction-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const make=(tf:string,quote?:{last:number;ts:string})=>{const markets=Object.entries(fixture.frames).map(([bar,rows])=>({instId:"BTC-USDT",source:"okx-public-spot",bar,fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT",...quote},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium"});};
@@ -51,12 +52,62 @@ test("reclaim selection is symmetric rather than hard-coded long",()=>{
   r.indicators.pivots=r.indicators.pivots.map(a=>({...a,price:mirror(a.price),kind:a.kind==="high"?"low":"high"}));r.entryStudy!.pivots=r.entryStudy!.pivots.map(a=>({...a,price:mirror(a.price),kind:a.kind==="high"?"low":"high"}));
   r.indicators.ema?.forEach(e=>e.points=e.points.map(p=>({...p,value:mirror(p.value)})));r.indicators.vwap=null;r.range=null;r.setupSelection!.assessment="long";
   const bars=r.entryStudy!.candles,choice=selectGlobalSetupContext(r,{bars,timeframe:r.entryStudy!.timeframe,completedAt:candleCloseTime(bars.at(-1)!.ts,r.entryStudy!.timeframe)!,primaryClosed:candleCloseTime(r.candles.at(-1)!.ts,"1H")!,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(fixture.observedAt)});
-  assert.equal(choice.side,"short");assert.ok(choice.evidence);assert.ok(Math.abs(choice.entryBasis.price-mirror(original.discretionaryPlan!.evidence!.level))<1e-8);
+  assert.ok(choice);assert.equal(choice.side,"short");assert.ok(choice.evidence);assert.ok(Math.abs(choice.entryBasis.price-mirror(original.discretionaryPlan!.evidence!.level))<1e-8);
+});
+
+test("a trending primary candle that sweeps known support and rejects known resistance gets no distant EMA plan",()=>{
+  const r=make("1Dutc");delete r.entryStudy;r.currentMarket!.frames=[];r.indicators.vwap=null;r.range=null;
+  r.setupSelection!.assessment="short";r.setupSelection!.regime="trend";
+  const last=r.candles.at(-1)!,previous=r.candles.at(-2)!,close=last.close;
+  last.high=close+2;last.low=close-2;
+  const support={lower:close-2,upper:close-1},resistance={lower:close+1,upper:close+2};
+  const knownAt=candleCloseTime(previous.ts,"1Dutc")!,anchorTs=previous.ts-10*86400000;
+  r.indicators.pivots=[
+    {id:"prior-support",ts:anchorTs,price:support.upper,kind:"high",confirmedAt:anchorTs+2*86400000},
+    {id:"prior-resistance",ts:anchorTs+86400000,price:resistance.upper,kind:"high",confirmedAt:anchorTs+3*86400000},
+  ];
+  r.horizonContext={version:"horizon-context-v1",timeframe:"1Dutc",reading:"position",knownAt:candleCloseTime(last.ts,"1Dutc")!,ranges:[],zones:[
+    {id:"support",role:"support",...support,startTs:anchorTs,knownAt:candleCloseTime(last.ts,"1Dutc")!,anchorIds:["prior-support"],basis:"confirmed_pivot_wicks"},
+    {id:"resistance",role:"resistance",...resistance,startTs:anchorTs+86400000,knownAt:candleCloseTime(last.ts,"1Dutc")!,anchorIds:["prior-resistance"],basis:"confirmed_pivot_wicks"},
+  ]};
+  const cutoff=Date.parse(r.snapshot.observedAt),completedAt=candleCloseTime(last.ts,"1Dutc")!;
+  const choice=selectGlobalSetupContext(r,{bars:r.candles,timeframe:"1Dutc",completedAt,primaryClosed:completedAt,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff});
+  assert.equal(choice?.family,"level_retest");assert.equal(choice?.side,"short");
+  assert.equal(choice?.entryBasis.price,resistance.lower,"The trend selects the resistance source, before evaluating payoff");
+  applyGlobalDiscretionaryPlan(r);
+  assert.equal(r.discretionaryPlan?.entry,resistance.upper);assert.equal(r.discretionaryPlan?.executionPolicy?.mode,"passive_limit");
+  assert.equal(r.alternatePlan?.side,"long");assert.equal(r.alternatePlan?.entry,support.lower);
+  assert.equal(r.alternatePlan?.executionPolicy?.mode,"passive_limit");
+  assert.equal(globalTradeCards(r).length,2);
+
+  // A source confirmed on the reaction candle is not prior evidence and must
+  // not suppress the ordinary trend choice.
+  r.indicators.pivots[0]!.confirmedAt=last.ts;
+  const late=selectGlobalSetupContext(r,{bars:r.candles,timeframe:"1Dutc",completedAt,primaryClosed:completedAt,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff});
+  assert.ok(late);assert.equal(late.family,"ema_pullback");
+});
+
+test("the two-sided suppression is limited to aligned trend selections",()=>{
+  const r=make("1Wutc");r.setupSelection!.assessment="sideways";r.setupSelection!.regime="transition";
+  r.indicators.vwap=null;r.range=null;r.entryStudy!.pivots=[];r.currentMarket!.frames=[];
+  const last=r.candles.at(-1)!,previous=r.candles.at(-2)!,close=last.close;last.high=close+2;last.low=close-2;
+  const anchorTs=previous.ts-10*7*86400000,knownAt=candleCloseTime(previous.ts,"1Wutc")!;
+  r.indicators.pivots=[
+    {id:"weekly-support",ts:anchorTs,price:close-1,kind:"high",confirmedAt:anchorTs+2*7*86400000},
+    {id:"weekly-resistance",ts:anchorTs+7*86400000,price:close+2,kind:"high",confirmedAt:anchorTs+3*7*86400000},
+  ];
+  r.horizonContext={version:"horizon-context-v1",timeframe:"1Wutc",reading:"macro",knownAt:candleCloseTime(last.ts,"1Wutc")!,ranges:[],zones:[
+    {id:"weekly-support-zone",role:"support",lower:close-2,upper:close-1,startTs:anchorTs,knownAt:candleCloseTime(last.ts,"1Wutc")!,anchorIds:["weekly-support"],basis:"confirmed_pivot_wicks"},
+    {id:"weekly-resistance-zone",role:"resistance",lower:close+1,upper:close+2,startTs:anchorTs+7*86400000,knownAt:candleCloseTime(last.ts,"1Wutc")!,anchorIds:["weekly-resistance"],basis:"confirmed_pivot_wicks"},
+  ]};
+  const choice=selectGlobalSetupContext(r,{bars:r.candles,timeframe:"1Wutc",completedAt:candleCloseTime(last.ts,"1Wutc")!,primaryClosed:candleCloseTime(last.ts,"1Wutc")!,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(r.snapshot.observedAt)});
+  assert.equal(choice!.family,"level_retest");assert.equal(choice!.entryBasis.kind,"structure_zone");
+  assert.ok(knownAt<=Date.parse(r.snapshot.observedAt));
 });
 
 test("a newer fast completed candle can invalidate an older held reclaim",()=>{
   const r=make("1H"),fast=r.currentMarket!.frames.find(f=>f.timeframe==="5m")!,c=fast.candles.at(-1)!;
   c.close=79000;c.low=78900;const bars=r.entryStudy!.candles;
   const choice=selectGlobalSetupContext(r,{bars,timeframe:"15m",completedAt:candleCloseTime(bars.at(-1)!.ts,"15m")!,primaryClosed:candleCloseTime(r.candles.at(-1)!.ts,"1H")!,primaryAtr:r.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(fixture.observedAt)});
-  assert.ok(!choice.evidence||choice.side!=="long","An older 15m hold cannot override the newer completed loss of that support");
+  assert.ok(!choice||!choice.evidence||choice.side!=="long","An older 15m hold cannot override the newer completed loss of that support");
 });

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {terminalFrameProfile,type TerminalRadarDefinition,type TerminalPriceObservation,type TerminalTapeoutComponent} from "@pulse/domain";
+import {terminalFrameProfile,evaluateIndicator,indicatorStudyTemplates,createStudyIndicatorPackage,type TerminalRadarDefinition,type TerminalPriceObservation,type TerminalTapeoutComponent} from "@pulse/domain";
 import {advanceTerminalRadar,newTerminalRadar,replayTerminalRadar} from "./terminalRadar.js";
 import {terminalToolsFromParticipation,terminalValueWindowStart,createTerminalMarketSnapshot} from "./terminalMarket.js";
 import {candleTimeframeMs} from "@pulse/schemas";
@@ -71,16 +71,25 @@ test("recent tape exposes exact coverage and time-aligned price/delta without in
   const requestedStart=Date.UTC(2022,0,1),tools=terminalToolsFromParticipation({capture,derivatives:{instId:"BTC-USDT-SWAP",knownAt:0},liquidity:{knownAt:0}},{timeframe:"1Wutc",start:requestedStart,asOf});
   assert.deepEqual(tools.value.coverage,{requestedStart,requestedEnd:asOf,capturedStart:start,capturedEnd:asOf,firstTradeAt:start+1000,lastTradeAt:start+59000,tradeCount:4,completeRequestedWindow:false,completeCapturedInterval:true,horizon:"cycle"});
   assert.deepEqual(tools.flow.coverage,tools.value.coverage);assert.equal(tools.value.status,"partial");
-  assert.equal(tools.flow.points.length,1);assert.equal(tools.flow.displayBucketMs,5000);assert.equal(tools.flow.displayPoints?.length,3);
-  const [first,second,last]=tools.flow.displayPoints!;
-  assert.deepEqual(first,{ts:start,end:start+5000,buy:2,sell:1,delta:1,cvd:1,priceOpen:100,priceHigh:102,priceLow:100,priceClose:102,tradeCount:2});
-  assert.equal(second.ts,start+15000);assert.equal(second.priceClose,99);assert.equal(second.delta,-3);assert.equal(second.cvd,-2);
-  assert.equal(last.ts,start+55000);assert.equal(last.end,asOf);assert.equal(last.priceClose,101);assert.equal(last.cvd,2);
+  assert.equal(tools.flow.points.length,1);assert.equal(tools.flow.displayBucketMs,1000);assert.equal(tools.flow.displayPoints?.length,59);
+  const printed=tools.flow.displayPoints!.filter(point=>point.tradeCount>0),first=printed[0],second=printed[1],last=printed.at(-1)!;
+  assert.deepEqual(first,{ts:start+1000,end:start+2000,buy:2,sell:0,delta:2,cvd:2,priceOpen:100,priceHigh:100,priceLow:100,priceClose:100,tradeCount:1});
+  assert.equal(second.ts,start+2000);assert.equal(second.priceClose,102);assert.equal(second.delta,-1);assert.equal(second.cvd,1);
+  assert.equal(last.ts,start+59000);assert.equal(last.end,asOf);assert.equal(last.priceClose,101);assert.equal(last.cvd,2);
   assert.equal(tools.flow.displayPoints!.reduce((n,p)=>n+p.tradeCount,0),4);
   assert.equal(tools.flow.displayPoints!.reduce((n,p)=>n+p.buy+p.sell,0),10);
-  // The display leaves the missing 5s/10s/etc buckets absent: no made-up
-  // zero-volume price candles or repeated prices are inserted across gaps.
-  assert.equal(tools.flow.displayPoints!.some(p=>p.ts===start+5000),false);
+  // The complete source chain proves these seconds had no executions. Their
+  // quantity is zero; tradeCount keeps them distinct from real price prints.
+  const empty=tools.flow.displayPoints!.find(p=>p.ts===start+5000)!;
+  assert.equal(empty.tradeCount,0);assert.equal(empty.buy+empty.sell,0);
+  // The old ten-bin tape could not warm up a twenty-bar calculation at all.
+  const template=indicatorStudyTemplates().find(item=>item.id==="rolling-delta")!;
+  const manifest=createStudyIndicatorPackage({id:"test.rolling",title:template.title,description:template.description,author:"Test",version:"1.0.0",expression:template.expression,output:template.output,study:template.study});
+  const result=evaluateIndicator(manifest,{instId:"BTC-USDT",timeframe:"1Wutc",source:tools.flow.source,status:"partial",units:"base",knownAt:asOf,now:asOf,windowStart:start,windowEnd:asOf,intervalMs:tools.flow.displayBucketMs,points:tools.flow.displayPoints!});
+  assert.equal(result.points.filter(p=>p.value!==undefined).length,40);
+  assert.ok(Math.abs(result.points.at(-1)!.value!-4)<.001,"last twenty seconds include the actual final buy and proved zero-trade seconds");
+  const unverified=terminalToolsFromParticipation({capture:{...capture,coverage:{...capture.coverage,complete:false}},derivatives:{instId:"BTC-USDT-SWAP",knownAt:0},liquidity:{knownAt:0}},{timeframe:"1Wutc",start:requestedStart,asOf});
+  assert.equal(unverified.flow.displayPoints!.some(point=>point.tradeCount===0),false,"an incomplete chain cannot prove empty seconds");
 });
 
 test("sample coverage and price/delta stay isolated for spot and contract streams",()=>{

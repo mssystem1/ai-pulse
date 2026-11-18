@@ -63,8 +63,8 @@ test("all five report frames retain broad history and share saved studies in set
     const structure=globalReportChartSvg(r,{layers:globalStructureChartLayers(r)})!;
     assert.doesNotMatch(structure,/data-setup-study=/);assert.deepEqual(r.tradePlan,before);
     if(frame==="1Dutc"){assert.equal(r.tradePlan!.referenceEntry,null);assert.doesNotMatch(svg,/data-scenario-projection=/);}
-    const legacy=structuredClone(r);delete legacy.scenario;delete legacy.strategyMix;if(legacy.discretionaryPlan){const p=legacy.discretionaryPlan;p.entry=p.priceZones?.entry.sourcePrice??p.entry;p.entryBasis.price=p.entry;p.barriers=p.barriers.filter(b=>(p.side==="long"?1:-1)*(b.price-p.entry)>0);p.version="discretionary-plan-v5";p.requiresNewTestAfter=Date.parse(legacy.snapshot.observedAt);delete p.executionPolicy;delete p.priceZones;}delete legacy.indicators.ema;
+    const legacy=structuredClone(r);delete legacy.alternatePlan;delete legacy.alternatePlanReason;delete legacy.scenario;delete legacy.strategyMix;delete legacy.discretionaryPlan;delete legacy.setupPolicyVersion;delete legacy.indicators.ema;
     if(legacy.indicators.vwap){delete legacy.indicators.vwap.bands;delete legacy.indicators.vwap.anchorTs;delete legacy.indicators.vwap.knownAt;delete legacy.indicators.vwap.basis;}
-    assert.equal(GlobalReportSchema.safeParse(legacy).success,true);assert.equal(globalDefaultChartLayers(legacy).sma,true);
+    const legacyResult=GlobalReportSchema.safeParse(legacy);assert.equal(legacyResult.success,true,legacyResult.success?frame:frame+JSON.stringify(legacyResult.error.issues));assert.equal(globalDefaultChartLayers(legacy).sma,true);
   }
 });

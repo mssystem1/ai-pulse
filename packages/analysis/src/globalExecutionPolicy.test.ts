@@ -33,10 +33,12 @@ for(const [name,input] of [
 ] as const)test(`${name}: source entry cannot borrow later confirmation or move to satisfy R`,()=>{
   const report=example({...input,source:[...input.source]}),original=structuredClone(report.discretionaryPlan!);
   applyGlobalPriceZones(report);const plan=report.discretionaryPlan!,zones=plan.priceZones!,policy=plan.executionPolicy!;
-  assert.equal(plan.version,"discretionary-plan-v8");assert.deepEqual([zones.entry.lower,zones.entry.upper],input.source);
+  const structural=input.family==="level_retest",edge=input.side==="long"?input.source[0]:input.source[1];
+  assert.equal(plan.version,"discretionary-plan-v8");assert.deepEqual([zones.entry.lower,zones.entry.upper],structural?[edge,edge]:input.source);
+  assert.deepEqual([zones.entry.sourceLower,zones.entry.sourceUpper],input.source);
   assert.equal(plan.stop,original.stop);assert.deepEqual(plan.stopBasis,original.stopBasis);assert.deepEqual(plan.targets,original.targets);
-  assert.equal(policy.mode,"passive_limit");assert.equal(policy.entryRegion,"source_zone");assert.equal(plan.requiresNewTestAfter,undefined);
-  assert.equal(policy.sourceBoundary,original.entryBasis.price);assert.ok(policy.eventAfter<cutoff);assert.ok(policy.expiresAt>cutoff);
+  assert.equal(policy.mode,"passive_limit");assert.equal(policy.entryRegion,structural?"source_edge":"source_zone");assert.equal(plan.requiresNewTestAfter,undefined);
+  assert.equal(policy.sourceBoundary,structural?edge:original.entryBasis.price);assert.ok(policy.eventAfter<cutoff);assert.ok(policy.expiresAt>cutoff);
 });
 
 test("a poor payoff is disclosed without rewriting source, family, stop or route",()=>{
@@ -44,7 +46,7 @@ test("a poor payoff is disclosed without rewriting source, family, stop or route
   const source=report.horizonContext!.zones[0];report.horizonContext!.zones.push({...source,id:"distant",lower:91,upper:92});
   report.horizonContext!.zones.push({...source,id:"nearer-opposition",role:"resistance",lower:102,upper:103});
   const original=structuredClone(report.discretionaryPlan!);applyGlobalPriceZones(report);const plan=report.discretionaryPlan!;
-  assert.deepEqual([plan.priceZones!.entry.lower,plan.priceZones!.entry.upper],[98,100]);assert.equal(plan.family,original.family);
+  assert.deepEqual([plan.priceZones!.entry.lower,plan.priceZones!.entry.upper],[98,98]);assert.equal(plan.family,original.family);
   assert.equal(plan.stop,90);assert.deepEqual(plan.stopBasis,original.stopBasis);assert.equal(plan.priceZones!.payoffLimited,true);
   assert.deepEqual(plan.barriers.map(b=>b.price),[102,103]);assert.equal(plan.targets[0].price,104);
 });
@@ -89,13 +91,13 @@ test("a target wick crossing future entry keeps its exact swing objective and ne
   report.horizonContext!.zones.push({...report.horizonContext!.zones[0],id:"near-opposition",role:"resistance",lower:102,upper:103});
   applyGlobalPriceZones(report);const priced=report.discretionaryPlan!;
   assert.equal(priced.version,"discretionary-plan-v8");assert.deepEqual(priced.priceZones!.targets,[{lower:110,upper:110}]);
-  assert.equal(priced.targets[0].price,110);assert.deepEqual(priced.barriers.map(b=>b.price),[102,103]);assert.equal(priced.entry,100);
+  assert.equal(priced.targets[0].price,110);assert.deepEqual(priced.barriers.map(b=>b.price),[102,103]);assert.equal(priced.entry,97);
 });
 
 test("family settings and asset/timeframe configuration remain explicit and tunable",()=>{
   const report=example({tf:"1Wutc",side:"long",family:"level_retest",source:[98,100],stop:90,stopBasis:98,target:120,current:103});
   const plan=report.discretionaryPlan!,{policy}=deriveGlobalExecutionPolicy(report,plan,{lower:98,upper:100},{timeToLiveBars:3,fillWindowBars:2,confirmationBars:2});
-  assert.equal(policy.configurationKey,"BTC-USDT:1Wutc:level_retest:v1");assert.equal(policy.fillWindowBars,2);
+  assert.equal(policy.configurationKey,"BTC-USDT:1Wutc:level_retest:source-edge-v2");assert.equal(policy.fillWindowBars,2);
   assert.equal(policy.expiresAt,cutoff+3*86_400_000);assert.equal(policy.stopManagement,"structural_fixed");assert.deepEqual(policy.targetAllocations,[1]);
   assert.throws(()=>deriveGlobalExecutionPolicy(report,plan,{lower:98,upper:100},{timeToLiveBars:0}),RangeError);
 });

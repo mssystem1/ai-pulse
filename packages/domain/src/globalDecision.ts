@@ -8,6 +8,7 @@ import {globalFrameReference} from "./globalContext.js";
 import {globalSetupLanguage} from "./globalSetupLanguage.js";
 import {globalRangeSummary} from "./globalRange.js";
 import {globalScenarioEntryDeadline} from "./globalExecutionInstructions.js";
+import {globalSetupAdmission} from "./globalSetupAdmission.js";
 
 export type GlobalDecision = ReturnType<typeof globalDecision>;
 /** Human decisions are derived from evidence, never from a provider headline.
@@ -20,6 +21,8 @@ export function globalDecision(report:GlobalReport) {
   const eligibility=globalEligibility(report),relation=globalContextRelation(report,side),contextBlocks=globalContextRequired(report)&&["opposing","unavailable"].includes(relation);
   const qualified=eligibility==="technical_valid"&&!p.blockers.includes("entry_price")&&!contextBlocks;
   const currentAction=qualified?side==="long"?"BUY":"SELL":"WAIT";
+  const limitPolicy=report.discretionaryPlan?.executionPolicy;
+  const limitPlanReady=Boolean(limitPolicy?.mode==="passive_limit"&&!contextBlocks&&limitPolicy.expiresAt>Date.parse(report.snapshot.observedAt)&&globalSetupAdmission(report).geometryEligible);
   const row=globalPrimaryFrame(report),path=report.paths.find(path=>path.id===(report.setupSelection?.pathId??p.pathId))??report.paths.find(path=>path.role==="main"),last=report.snapshot.price;
   const marketTrigger=report.levels.find(l=>l.id===path?.triggerLevelId)?.price,marketTargets=path?.targetIds.flatMap(id=>report.levels.find(l=>l.id===id)??[])??[];
   let marketView=zh?"方向混合":"Mixed market";
@@ -57,7 +60,7 @@ export function globalDecision(report:GlobalReport) {
     :relationship;
   const expiresAt=report.scenario?.expiresAt??canonicalPolicy?.expiresAt??(p.method?.startsWith("structure-")?p.signalExpiresAt??null:timing?.expiresAt??null);
   const retestDeadline=canonicalPolicy?(canonicalPolicy.mode==="confirmed_retest"?entryDeadline:null):timing?.retestDeadline??null;
-  return {...language,marketView,currentAction,reason:language.entryInstruction,side,nextSetup,nextCondition:language.entryInstruction,checklist:conditions,changeView,route,relationship:relationshipText,contextRelation:relation,contextLine,previousAttempts:history,rewardLine,qualified,risk:globalRiskMeasurement(report),hierarchy:globalHierarchyLines(report),snapshotAt:report.snapshot.observedAt,retestDeadline,entryDeadline,expiresAt,entryPolicyStatus:report.scenario?.state??null};
+  return {...language,marketView,currentAction,limitPlanReady,reason:language.entryInstruction,side,nextSetup,nextCondition:language.entryInstruction,checklist:conditions,changeView,route,relationship:relationshipText,contextRelation:relation,contextLine,previousAttempts:history,rewardLine,qualified,risk:globalRiskMeasurement(report),hierarchy:globalHierarchyLines(report),snapshotAt:report.snapshot.observedAt,retestDeadline,entryDeadline,expiresAt,entryPolicyStatus:report.scenario?.state??null};
 }
 export function globalDecisionTitle(report:GlobalReport):string {return globalDecision(report).heading;}
 export function globalDecisionLines(report:GlobalReport):string[] {const d=globalDecision(report),zh=report.lang==="zh";return [globalDecisionTitle(report),`${zh?"市场观点":"Market view"}: ${d.marketView}`,d.route,d.nextCondition,...(d.rewardLine&&d.direction!=="BUY / SELL"?[d.rewardLine]:[]),...(d.contextRelation==="unavailable"&&!globalContextRequired(report)?[]:[d.contextLine,d.relationship]),d.changeView].filter(Boolean);}

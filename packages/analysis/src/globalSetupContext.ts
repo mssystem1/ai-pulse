@@ -4,9 +4,30 @@ import {globalSetupStrategyProfile} from "@pulse/domain";
 type PricedPlan=NonNullable<GlobalReport["discretionaryPlan"]>;
 type Choice=Pick<PricedPlan,"side"|"family"|"entryBasis"|"evidence">;
 
+export function globalTwoSidedStructureChoices(report:GlobalReport,selected?:Choice,requireReaction=true):{primary:Choice;alternate:Choice;reason:string}|null{
+  const tf=report.snapshot.timeframe,primary=report.candles.at(-1),previous=report.candles.at(-2),cutoff=Date.parse(report.snapshot.observedAt),close=primary&&candleCloseTime(primary.ts,tf);
+  const context=report.horizonContext;
+  if(!primary||!previous||close===null||close===undefined||!context||context.timeframe!==tf)return null;
+  const before=candleCloseTime(previous.ts,tf);
+  if(before===null)return null;
+  const supported=(role:"support"|"resistance")=>context.zones.filter(zone=>zone.role===role&&zone.knownAt<=cutoff&&zone.anchorIds.length>0&&zone.anchorIds.every(id=>{
+    const anchor=report.indicators.pivots.find(p=>p.id===id),known=anchor?.confirmedAt===null||anchor?.confirmedAt===undefined?null:candleCloseTime(anchor.confirmedAt,tf);
+    return known!==null&&known<=before;
+  }));
+  const support=supported("support").filter(z=>z.upper<primary.close).sort((a,b)=>b.upper-a.upper)[0];
+  const resistance=supported("resistance").filter(z=>z.lower>primary.close).sort((a,b)=>a.lower-b.lower)[0];
+  if(!support||!resistance||support.upper>=resistance.lower||requireReaction&&(primary.low>support.upper||primary.high<resistance.lower))return null;
+  if(selected&&(selected.family!=="level_retest"||selected.entryBasis.kind!=="structure_zone"||selected.entryBasis.price!==(selected.side==="long"?support.upper:resistance.lower)))return null;
+  const assessment=report.setupSelection?.assessment;
+  const side:Choice["side"]=selected?.side??(assessment==="long"||assessment==="short"?assessment:primary.close-support.upper<=resistance.lower-primary.close?"long":"short");
+  const make=(direction:Choice["side"],zone:NonNullable<typeof support>):Choice=>({side:direction,family:"level_retest",entryBasis:{kind:"structure_zone",price:direction==="long"?zone.upper:zone.lower,timeframe:tf,knownAt:zone.knownAt}});
+  const aligned=side==="long"?support:resistance,opposing=side==="long"?resistance:support;
+  return {primary:selected??make(side,aligned),alternate:make(side==="long"?"short":"long",opposing),reason:`Price is between the neighboring ${tf} support and resistance zones. The selected ${side} plan follows ${assessment==="long"||assessment==="short"?"the primary trend assessment":"the completed primary reaction and zone location"}; the opposing source-backed limit is a separate alternate, not a forecast of a price sequence.`};
+}
+
 /** Select a current conditional setup from location and retained structure.
  * These numerical conventions implement public methods, not private XO rules. */
-export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalCandle[];timeframe:string;completedAt:number;primaryClosed:number;primaryAtr:number;cutoff:number}):Choice{
+export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalCandle[];timeframe:string;completedAt:number;primaryClosed:number;primaryAtr:number;cutoff:number}):Choice|null{
   const {bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff}=input;
   const last=bars.at(-1)!,primary=report.candles.at(-1)!,tf=report.snapshot.timeframe;
   const latest=[{timeframe,candles:bars},...(report.currentMarket?.frames??[])].flatMap(f=>{const c=f.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,f.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]!.price;
@@ -92,6 +113,7 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   }).sort((a,b)=>b.completedAt-a.completedAt||Math.abs(current.close-a.price)-Math.abs(current.close-b.price));
   const reclaim=reclaims[0];
   if(reclaim&&(!localChoice||reclaim.completedAt>localChoice.evidence.completedAt))return {...pick(reclaim.side,"breakout_retest","reclaimed_level",reclaim.price,tf,reclaim.knownAt),evidence:{kind:"primary_reclaim",timeframe:recentSource.timeframe,level:reclaim.price,testTs:reclaim.test.ts,completedAt:reclaim.completedAt,extreme:reclaim.extreme}};
+
   if(localChoice)return localChoice;
 
   if(range&&rangeMid!==undefined){
@@ -116,6 +138,11 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   }
   const recent=report.candles.slice(-20),mid=(Math.max(...recent.map(c=>c.high))+Math.min(...recent.map(c=>c.low)))/2;
   const side=assessment==="long"||assessment==="short"?assessment:fast!==undefined&&slow!==undefined&&fast!==slow?fast>slow?"long":"short":primary.close<=mid?"long":"short";
+  // Passive orders can be prepared at existing primary structure without a
+  // fresh candle trigger. Do this before falling back to lagging EMAs; an
+  // active nearby zone must not be ignored merely because the trend is down.
+  const structural=globalTwoSidedStructureChoices(report,undefined,false);
+  if(structural)return structural.primary;
   if(fast!==undefined&&slow!==undefined)return pick(side,"ema_pullback","ema_ribbon",side==="long"?Math.max(fast,slow):Math.min(fast,slow),tf,primaryClosed);
   return pick(side,"ema_pullback","completed_close",last.close,timeframe,completedAt);
 }

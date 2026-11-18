@@ -63,10 +63,19 @@ export function terminalToolsFromParticipation(p:TerminalParticipation,input:{ti
       // Show its exact tape in smaller UTC buckets while keeping the actual
       // execution-frame points separate. Price and flow share the same prints;
       // no OHLC candle is substituted for missing executed history.
-      const displayBucketMs=[1000,5000,15000,30000,60000,300000,900000,3600000,14400000,86400000].find(ms=>ms>=Math.max(1000,(capturedEnd-capturedStart)/24))??86400000;
+      // Keep enough genuine source bars for rolling studies. A 24-bin display
+      // (rounded up to the next interval) often yielded only ten bars, so a
+      // twenty-bar study could never warm up. This bound permits at most 514
+      // buckets, including captured edges, without requesting more trades.
+      const displayBucketMs=[1000,5000,15000,30000,60000,300000,900000,3600000,14400000,86400000].find(ms=>ms>=Math.max(1000,(capturedEnd-capturedStart)/512))??86400000;
       const display=new Map<number,TerminalFlowDisplayPoint>();
       for(const t of trades){const ts=Math.floor(t.ts/displayBucketMs)*displayBucketMs,row=display.get(ts)??{ts,end:Math.min(ts+displayBucketMs,capturedEnd),buy:0,sell:0,delta:0,cvd:0,priceOpen:t.price,priceHigh:t.price,priceLow:t.price,priceClose:t.price,tradeCount:0};row[t.side]+=t.size;row.priceHigh=Math.max(row.priceHigh,t.price);row.priceLow=Math.min(row.priceLow,t.price);row.priceClose=t.price;row.tradeCount++;display.set(ts,row);}
-      let displayCvd=0;const displayPoints=[...display.values()].map(row=>({...row,buy:round(row.buy),sell:round(row.sell),delta:round(row.buy-row.sell),cvd:round(displayCvd+=row.buy-row.sell)}));
+      // A verified continuous trade capture also proves zero executed quantity
+      // in empty interior buckets. Omitting those buckets used to manufacture
+      // gaps and reset every rolling study. Never fill an unverified interval;
+      // carried last-trade prices on these zero-trade buckets are not prints.
+      if(capture.coverage.complete){let previousPrice=trades[0].price;for(let ts=Math.floor(trades[0].ts/displayBucketMs)*displayBucketMs;ts<capturedEnd;ts+=displayBucketMs){const row=display.get(ts);if(row)previousPrice=row.priceClose;else display.set(ts,{ts,end:Math.min(ts+displayBucketMs,capturedEnd),buy:0,sell:0,delta:0,cvd:0,priceOpen:previousPrice,priceHigh:previousPrice,priceLow:previousPrice,priceClose:previousPrice,tradeCount:0});}}
+      let displayCvd=0;const displayPoints=[...display.values()].sort((a,b)=>a.ts-b.ts).map(row=>({...row,buy:round(row.buy),sell:round(row.sell),delta:round(row.buy-row.sell),cvd:round(displayCvd+=row.buy-row.sell)}));
       tools.flow={...meta,id:"flow",label:"Buy/sell flow",marketType:capture.marketType,buy:round(buy),sell:round(sell),delta:round(buy-sell),points,displayPoints,displayBucketMs};
     }
   }}catch{

@@ -15,6 +15,19 @@ import {deriveGlobalTradePlan,globalDecision} from "@pulse/domain";
 import { withSetupAccess } from "./globalSetupClient";
 import {globalWilderIndicators} from "../../../packages/analysis/src/globalReport.js";
 import {applyGlobalHorizonContext} from "../../../packages/analysis/src/globalHorizonContext.js";
+import {GlobalTradePlans} from "./GlobalTradePlans";
+
+test("alternate report cards show their own target band and fixed stop",()=>{
+  const report=globalDesignFixture("pro");
+  report.decisionVersion="decision-v5";
+  report.discretionaryPlan={version:"discretionary-plan-v8",family:"level_retest",side:"short",objectiveTimeframe:"1H",entry:150,stop:160,entryBasis:{kind:"structure_zone",timeframe:"1H",knownAt:1,price:145},stopBasis:{price:155,timeframe:"1H",anchorTs:0,knownAt:1},reference:{timeframe:"15m",candleTs:0,completedAt:1,price:130},targets:[{price:120,timeframe:"1H",anchorTs:0,knownAt:1,basis:"confirmed_swing"}],barriers:[],priceZones:{version:"price-zones-v1",entry:{lower:150,upper:150,sourceLower:145,sourceUpper:150,sourcePrice:145},stop:{lower:155,upper:160},targets:[{lower:110,upper:120}],payoffFloor:1,payoffLimited:false}};
+  report.alternatePlan={...structuredClone(report.discretionaryPlan),side:"long",entry:90,stop:80,targets:[{price:135,timeframe:"1H",anchorTs:0,knownAt:1,basis:"confirmed_swing"}],priceZones:{version:"price-zones-v1",entry:{lower:90,upper:90,sourceLower:90,sourceUpper:95,sourcePrice:95},stop:{lower:80,upper:85},targets:[{lower:135,upper:140}],payoffFloor:1,payoffLimited:false}};
+  report.alternatePlanReason="Separate source-backed alternatives";
+  const html=renderToStaticMarkup(createElement(GlobalTradePlans,{report,onSelect:()=>{}}));
+  const alternate=html.split('data-trade-card="alternate-priced-setup"')[1];
+  assert.ok(alternate);assert.match(alternate,/135\.00–140\.00/);assert.match(alternate,/Hard SL: 80\.00/);
+  assert.doesNotMatch(alternate,/Hard SL: 160\.00|110\.00–120\.00|Show this plan on chart/);
+});
 
 test("saved v3 reports offer the free correction while current v4 reports show the entry location",()=>{
   const {report}=tradePlanFixture("4H");
@@ -22,6 +35,7 @@ test("saved v3 reports offer the free correction while current v4 reports show t
   const missingContext=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(missingContext.includes('class="global-target-review"'));
   applyGlobalHorizonContext(report);
+  report.setupPolicyVersion="source-limits-v2";
   const current=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(!current.includes('class="global-target-review"'));assert.ok(current.includes("planned entry is"));
   report.setupSelection!.version="single-setup-v3";

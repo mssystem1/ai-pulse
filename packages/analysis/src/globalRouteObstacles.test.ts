@@ -102,7 +102,8 @@ test("daily and weekly future-entry routes keep nearer resistance without payoff
     assert.ok(side==="long"?report.currentMarket!.quote!.price>opposing.upper:report.currentMarket!.quote!.price<opposing.lower);
     applyGlobalPriceZones(report);const p=report.discretionaryPlan!,z=p.priceZones!,worst=side==="long"?z.entry.upper:z.entry.lower;
     assert.equal(p.version,"discretionary-plan-v8");
-    assert.deepEqual([z.entry.lower,z.entry.upper],[source.lower,source.upper]);assert.equal(worst,original.entry);
+    const edge=side==="long"?source.lower:source.upper;
+    assert.deepEqual([z.entry.lower,z.entry.upper],tf==="1Dutc"?[edge,edge]:[source.lower,source.upper]);assert.equal(worst,tf==="1Dutc"?edge:original.entry);
     assert.equal(z.entry.sourceLower,source.lower);assert.equal(z.entry.sourceUpper,source.upper);assert.equal(z.entry.sourcePrice,original.entryBasis.price);
     assert.deepEqual(p.entryBasis,original.entryBasis);assert.equal(p.stop,original.stop);assert.deepEqual(p.targets,original.targets);
     assert.ok(p.barriers.some(b=>b.price===near&&b.timeframe===tf));

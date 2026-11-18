@@ -22,7 +22,7 @@ export type GlobalExecutionPolicy={
   fillWindowBars:number;
   stopManagement:"structural_fixed";
   targetAllocations:number[];
-  entryRegion:"source_zone"|"defended_retest";
+  entryRegion:"source_zone"|"source_edge"|"defended_retest";
 };
 
 const families:Record<Plan["family"],{id:string;mode:GlobalExecutionPolicy["mode"];ttl:number;fill:number;confirmation:1|2}>={
@@ -54,21 +54,22 @@ export function deriveGlobalExecutionPolicy(
   if(!Number.isInteger(settings.timeToLiveBars)||settings.timeToLiveBars<1||!Number.isInteger(settings.fillWindowBars)||settings.fillWindowBars<1||![1,2].includes(settings.confirmationBars))throw new RangeError("Execution settings require positive bar counts and one or two confirmation bars");
   const observed=plan.evidence!==undefined;
   const mode=observed||overrides.boundaryRetest?"confirmed_retest":spec.mode;
-  const sourceBoundary=observed?plan.evidence!.level:plan.entryBasis.price;
+  const sourceEdge=plan.entryBasis.kind==="structure_zone"&&plan.family==="level_retest"&&!observed&&!overrides.boundaryRetest;
+  const sourceBoundary=observed?plan.evidence!.level:sourceEdge?(plan.side==="long"?source.lower:source.upper):plan.entryBasis.price;
   // Existing reclaimed-level sources retain the causal level-to-test-close
   // interval. Pending breakouts quote the boundary they actually must defend.
-  const entry=overrides.boundaryRetest||mode==="confirmed_retest"&&!observed?{lower:sourceBoundary,upper:sourceBoundary}:{...source};
+  const entry=sourceEdge||overrides.boundaryRetest||mode==="confirmed_retest"&&!observed?{lower:sourceBoundary,upper:sourceBoundary}:{...source};
   const eventKnownAt=plan.evidence?.completedAt??plan.entryBasis.knownAt;
   const eventAfter=Math.max(plan.entryBasis.knownAt,plan.reference.completedAt-duration*settings.timeToLiveBars);
   const targetAllocations=plan.targets.length===1?[1]:plan.targets.length===2?[.5,.5]:[.5,.3,.2];
   return {entry,policy:{
     version:"execution-policy-v1",
-    id:overrides.boundaryRetest?`${plan.family}-boundary-retest-v1`:observed?"observed-reclaim-retest-v1":spec.id,
-    configurationKey:`${report.snapshot.instId}:${report.snapshot.timeframe}:${plan.family}:v1`,
+    id:overrides.boundaryRetest?`${plan.family}-boundary-retest-v1`:observed?"observed-reclaim-retest-v1":sourceEdge?"structural-edge-passive-v2":spec.id,
+    configurationKey:`${report.snapshot.instId}:${report.snapshot.timeframe}:${plan.family}:${sourceEdge?"source-edge-v2":"v1"}`,
     family:plan.family,mode,sourceBoundary,eventTimeframe:frame,eventKnownAt,eventAfter,
     expiresAt:cutoff+duration*settings.timeToLiveBars,
     confirmationBars:observed?1:settings.confirmationBars,fillWindowBars:settings.fillWindowBars,
     stopManagement:"structural_fixed",targetAllocations,
-    entryRegion:mode==="passive_limit"?"source_zone":"defended_retest",
+    entryRegion:sourceEdge?"source_edge":mode==="passive_limit"?"source_zone":"defended_retest",
   }};
 }

@@ -34,6 +34,23 @@ function pricedReport(firstTarget = 110, nearestObstacle = 105): GlobalReport {
 
 const marketSnapshot = (report: GlobalReport) => ({ observedAt: Date.parse(report.snapshot.observedAt), report, sources: [], tools: { value: {}, flow: {}, derivatives: {}, liquidity: {} } } as unknown as TerminalMarketSnapshot);
 
+test("a passive limit is ready for preparation separately from immediate entry confirmation", () => {
+  const report = pricedReport();
+  delete report.scenario;
+  report.context.status = "available"; report.context.agreement = "neutral";
+  report.hierarchy = report.hierarchy?.filter(row => row.timeframe !== report.context.timeframe);
+  const policy = report.discretionaryPlan!.executionPolicy!;
+  policy.mode = "passive_limit"; policy.id = "structural-edge-passive-v2";
+  const context = terminalAiContext({ snapshot: marketSnapshot(report), report, selected: {}, exposure: [] });
+  assert.equal(context.selectedSetupEligibility.limitPlanReady, true);
+  assert.deepEqual(context.selectedSetupEligibility.preparationBlockers, []);
+  assert.match(context.selectedSetupEligibility.interpretation, /without candle confirmation/);
+  policy.expiresAt = Date.parse(report.snapshot.observedAt);
+  const expired = terminalAiContext({ snapshot: marketSnapshot(report), report, selected: {}, exposure: [] });
+  assert.equal(expired.selectedSetupEligibility.limitPlanReady, false);
+  assert.ok(expired.selectedSetupEligibility.preparationBlockers.includes("entry_deadline"));
+});
+
 test("large source histories cannot push selected positions or fixed prices out of AI context", () => {
   const candles = Array.from({ length: 10_000 }, (_, ts) => ({ ts, open: 100, high: 103, low: 99, close: 101, volume: 1, confirmed: true }));
   const report = pricedReport(); report.context.candles = candles; report.context.sma55 = candles.map(candle => ({ ts: candle.ts, value: 100 }));

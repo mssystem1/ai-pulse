@@ -47,10 +47,13 @@ export function globalTradeCandidateCards(report:GlobalReport,only?:{pathId:stri
   });
 }
 
-/** Every visible report has one setup. Archived maps retain their stored
- * candidates, but their saved selected entry is the only published setup. */
+/** The selected setup owns chart/lifecycle state. A separately priced opposing
+ * plan is shown alongside it without creating a second tracked scenario. */
 export function globalTradeCards(report:GlobalReport){
-  const priced=globalDiscretionaryCard(report);if(priced)return [priced];
+  const priced=globalDiscretionaryCard(report);if(priced){
+    const alternate=report.alternatePlan?globalDiscretionaryCard({...report,discretionaryPlan:report.alternatePlan,alternatePlan:undefined,alternatePlanReason:undefined,scenario:undefined,strategyMix:undefined}):null;
+    return alternate?[priced,{...alternate,key:"alternate-priced-setup",pathId:"alternate-priced-setup",selected:false,lines:[report.lang==="zh"?"备选计划":"Alternate plan",...alternate.lines]}]:[priced];
+  }
   const p=globalTradePlan(report),selection=report.setupSelection,pathId=selection?.pathId??p.pathId,side=selection?.side??p.side;
   return pathId&&side!=="none"?globalTradeCandidateCards(report,{pathId,side}).slice(0,1):[];
 }

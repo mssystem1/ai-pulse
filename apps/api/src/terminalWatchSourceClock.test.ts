@@ -11,7 +11,7 @@ import { recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
 import { MemoryTerminalStorage, TerminalStore, grantTerminalPass } from "./terminalStore.js";
 
 function fixture() {
-  const raw = JSON.parse(readFileSync(new URL("../../../packages/analysis/src/globalTargets.oct18-fixture.json", import.meta.url), "utf8")) as { observedAt: string; frames: Record<string, number[][]> };
+  const raw = JSON.parse(readFileSync(new URL("../../../packages/analysis/src/globalReport.oct20-fixture.json", import.meta.url), "utf8")) as { observedAt: string; frames: Record<string, number[][]> };
   const at = Date.parse(raw.observedAt);
   const markets = Object.entries(raw.frames).map(([bar, rows]): SpotMarketContext => {
     const candles = rows.map(([ts, open, high, low, close, volume]) => ({ ts, open, high, low, close, volume, volumeCcy: 0, confirmed: true }));

@@ -31,6 +31,17 @@ test("retained history requires owner authentication and an active pass, pins ev
   const response=await get(`history/session?instId=BTC-USDT&timeframe=1H&session=day&evidenceSnapshotId=${capture}`,token);assert.equal(response.status,200);const body=await response.json() as any;
   assert.equal(body.session.quantityUnit,"base");assert.equal(body.perpetualSession.quantityUnit,"contracts");assert.equal(body.session.complete,false);assert.equal(body.setupVersionId,setupVersionId);assert.match(body.evidenceSnapshotId,/^tes_[a-f0-9]{32}$/);assert.equal(reads,2);
   const retained=await storage.read<TerminalInspectionEvidence>(store.key("evidence",`${owner}:${body.evidenceSnapshotId}`));assert.equal(retained?.setupVersionId,setupVersionId);assert.equal(retained?.tools.value.source,"okx-retained-executions");assert.deepEqual(await storage.read(key),evidence);assert.deepEqual(await store.get(owner),before,"Tool history must not modify setups, journal or entitlement");
+  const flowOnly=await get(`history/session?instId=BTC-USDT&timeframe=1H&session=week&purpose=indicators&evidenceSnapshotId=${capture}`,token);
+  assert.equal(flowOnly.status,200);const flowBody=await flowOnly.json() as any;
+  const flowEvidence=await storage.read<TerminalInspectionEvidence>(store.key("evidence",`${owner}:${flowBody.evidenceSnapshotId}`));
+  assert.deepEqual(flowEvidence?.tools.value,evidence.tools.value,"Indicator reads do not duplicate monthly footprint rows into Redis evidence");
+  assert.equal(flowEvidence?.tools.flow.source,"okx-retained-executions");assert.equal(flowBody.tools.value,undefined);
+  for(const [timeframe,barMs]of [["1Dutc",3600000],["1Wutc",14400000]] as const){
+   const response=await get(`history/session?instId=BTC-USDT&timeframe=${timeframe}&session=month&purpose=indicators`,token);assert.equal(response.status,200);const study=await response.json() as any;
+   assert.equal(study.session.barMs,barMs);assert.equal(study.perpetualSession.barMs,barMs);
+   assert.equal(study.session.bars,undefined,"indicator reads do not retransmit all per-bar price rows");
+   assert.equal(study.tools.value,undefined);assert.equal(study.tools.flow.displayBucketMs,undefined,"an empty history must not invent bars");
+  }
   assert.equal((await get(`history/session?instId=BTC-USDT&timeframe=1H&evidenceSnapshotId=${capture}`,otherToken)).status,409);
   assert.equal(await storage.read(store.key("evidence",`${other.address.toLowerCase()}:${body.evidenceSnapshotId}`)),null);
   for(const query of ["instId=ETH-USD-SWAP&timeframe=1H","instId=BTC-USDT&timeframe=5m","instId=BTC-USDT&timeframe=1H&session=custom&start=1&end=2","instId=BTC-USDT&timeframe=1H&session=day&unknown=1"]){assert.equal((await get("history/session?"+query,token)).status,400);}

@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createStudyIndicatorPackage, createGraphIndicatorPackage, parseIndicatorScript, evaluateIndicator, indicatorMarketCatalog, indicatorStudyTemplates, type IndicatorInput } from "@pulse/domain";
-import { terminalChartIndicator, terminalChartIndicators, terminalIndicatorPrimaryClock, terminalIndicatorEvents, terminalIndicatorSpotPriceContext, terminalIndicatorPlotInfo, terminalIndicatorPriceFormat, terminalIndicatorSeries, type TerminalChartIndicator } from "./terminalIndicatorChart";
+import { terminalExecutionViewportKey, terminalChartIndicator, terminalChartIndicators, terminalIndicatorPrimaryClock, terminalIndicatorEvents, terminalIndicatorSpotPriceContext, terminalIndicatorPlotInfo, terminalIndicatorPriceFormat, terminalIndicatorSeries, type TerminalChartIndicator } from "./terminalIndicatorChart";
 
 const input = (units: "base" | "contracts" = "base"): IndicatorInput => ({
   instId: "BTC-USDT", timeframe: "1Dutc", source: "retained-executions", status: "available",
@@ -15,6 +15,15 @@ const study = (id: string, plot?: "line" | "histogram") => {
 test("chart indicators retain execution timestamps and break gaps on their own scalar series", () => {
   const series = terminalIndicatorSeries({id:"test",title:"Flow",units:"BTC",status:"partial",source:"captured",windowStart:1000,windowEnd:10000,bucketMs:1000,points:[{ts:1000,value:2},{ts:2000,value:3},{ts:6000,value:7},{ts:7000}]});
   assert.deepEqual(series,[{time:1,value:2},{time:2,value:3},{time:3},{time:6,value:7},{time:7}]);
+});
+
+test("loading retained history resets a capture viewport, while polling the same source preserves zoom", () => {
+  const captured:TerminalChartIndicator={id:"rolling20",title:"Rolling delta",units:"BTC",status:"partial",source:"captured-trades",windowStart:1000,windowEnd:61000,bucketMs:1000,points:[{ts:21000,value:2}]};
+  const captureKey=terminalExecutionViewportKey("BTC-USDT","1Dutc",[captured]);
+  const retained={...captured,source:"retained-trades",bucketMs:3_600_000,windowStart:0,windowEnd:31*86_400_000};
+  assert.notEqual(terminalExecutionViewportKey("BTC-USDT","1Dutc",[retained]),captureKey);
+  assert.equal(terminalExecutionViewportKey("BTC-USDT","1Dutc",[{...retained,windowEnd:retained.windowEnd+60_000}]),terminalExecutionViewportKey("BTC-USDT","1Dutc",[retained]));
+  assert.notEqual(terminalExecutionViewportKey("BTC-USDT","1Wutc",[retained]),terminalExecutionViewportKey("BTC-USDT","1Dutc",[retained]));
 });
 
 test("v3 participation converts exact basis-point output into a percent pane without changing its calculation", () => {

@@ -23,11 +23,11 @@ for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])test(`${frame}: Quick, Pro 
   for(const r of reports){
     const selection=r.setupSelection!,cards=globalTradeCards(r),d=globalDecision(r),svg=globalReportChartSvg(r)!;
     assert.deepEqual([selection.assessment,selection.rule,selection.pathId,selection.side],[expected.assessment,expected.rule,expected.pathId,expected.side]);
-    assert.ok(["LONG","SHORT","SIDEWAYS"].includes(d.direction));assert.equal(r.paths.length,r.strategy!.routes.length);assert.equal(cards.length,1);assert.equal(GlobalReportSchema.safeParse(r).success,true);
-    const drawable=cards.filter(c=>c.plan.referenceEntry&&c.plan.referenceStop);
+    assert.ok(["LONG","SHORT","SIDEWAYS"].includes(d.direction));assert.equal(r.paths.length,r.strategy!.routes.length);assert.equal(cards.filter(c=>c.selected).length,1);assert.equal(cards.length,r.alternatePlan?2:1);assert.equal(GlobalReportSchema.safeParse(r).success,true);
+    const drawable=cards.filter(c=>c.selected&&c.plan.referenceEntry&&c.plan.referenceStop);
     assert.equal((svg.match(/data-trade-price-ledger=/g)??[]).length,drawable.length);
     assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,cards.filter(c=>c.confirmed).length);
-    for(const card of cards){
+    for(const card of cards.filter(c=>c.selected)){
       assert.ok(r.tradePlan!.side==="none"||card.side===r.tradePlan!.side);assert.equal(card.pathId,r.discretionaryPlan?"priced-setup":selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
       if(!card.plan.referenceEntry||!card.plan.referenceStop)continue;
       const inset=globalEntryStudySvg(r)!;
@@ -42,11 +42,11 @@ test("reported weekly bars select a recovery LONG; historical C is not an opposi
   const r=make("1Wutc");assert.equal(r.snapshot.price,83760.4);assert.equal(r.setupSelection!.side,"long");assert.equal(r.setupSelection!.rule,"structural_reversal");assert.equal(globalWavePhase(r).recovered,true);
   assert.ok(r.setupSelection!.evidence.some(l=>l.includes("82,842")));assert.ok(r.setupSelection!.limitations.some(l=>l.includes("SMA55 has not turned")));
   assert.match(globalWaveExplanationLines(r).join("\n"),/current hypothesis is post-C recovery/);assert.ok(!globalWaveExplanationLines(r).some(l=>l.includes("current candidate C? leg: down")));
-  assert.equal(globalTradeCards(r).length,1);assert.equal(globalTradeCards(r)[0].side,"long");assert.equal(globalTradeCards(r)[0].confirmed,false);
+  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assert.equal(globalTradeCards(r)[0].side,"long");assert.equal(globalTradeCards(r)[0].confirmed,false);
 });
 test("reported daily bars select a downward reversal before comparing any candidate reward",()=>{
   const r=make("1Dutc");assert.equal(r.snapshot.price,81489.4);assert.equal(r.setupSelection!.side,"short");assert.equal(r.setupSelection!.rule,"structural_reversal");
-  assert.equal(globalTradeCards(r).length,1);assert.equal(globalTradeCards(r)[0].side,"short");assert.ok(!globalTradeCards(r)[0].targets.some(t=>t.price===82473.6));
+  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assert.equal(globalTradeCards(r)[0].side,"short");assert.ok(!globalTradeCards(r)[0].targets.some(t=>t.price===82473.6));
 });
 test("trend direction cannot switch merely because the opposite candidate offers better reward",()=>{
   const r=make("1H","premium","en",true);delete r.range;
@@ -77,7 +77,7 @@ test("a legacy canonical recheck blocks a changed strategy without replacing the
   // A saved pre-v8 single-setup report has canonical selection and active
   // targets but no priced lifecycle. legacy-pivots-v1 predates that selector
   // too, so it cannot exercise the strategy-change guard.
-  const r=make("1Wutc");delete r.discretionaryPlan;delete r.scenario;delete r.strategyMix;
+  const r=make("1Wutc");delete r.discretionaryPlan;delete r.scenario;delete r.strategyMix;delete r.alternatePlan;delete r.alternatePlanReason;
   assert.equal(r.strategy!.targetPolicy,"active-zones-v1");assert.equal(r.setupSelection!.side,"long");
   assert.equal(GlobalReportSchema.safeParse(r).success,true);
   const before=JSON.stringify(r),market=structuredClone(current.find(m=>m.bar==="1Wutc")!),last=market.candles.at(-1)!;
@@ -94,7 +94,7 @@ function breakReport(mirror=false){
   return prepareGlobalReport({market:frames.find(m=>m.bar==="1H")!,contextMarket:frames.find(m=>m.bar==="4H"),hierarchyMarkets:frames,tier:"premium"});
 }
 for(const mirror of [false,true])test(`${mirror?"bullish":"bearish"} break: confirmed close overrides the stale opposite pivot sequence, with MA55 and RSI evidence`,()=>{
-  const r=breakReport(mirror);assert.equal(r.setupSelection!.rule,"structure_break");assert.equal(r.setupSelection!.side,mirror?"long":"short");assert.equal(globalTradeCards(r).length,1);
+  const r=breakReport(mirror);assert.equal(r.setupSelection!.rule,"structure_break");assert.equal(r.setupSelection!.side,mirror?"long":"short");assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);
   assert.equal(r.levels.find(l=>l.id===r.tradePlan!.targetIds[0])!.price,mirror?160000-80809.5:80809.5,"The original observed-signal map retains the genuine swing even when used by Fibonacci");
   assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe===r.snapshot.timeframe));
   assert.ok(r.setupSelection!.limitations.some(l=>l.includes("SMA21 has not turned")));assert.equal(GlobalReportSchema.safeParse(r).success,true);

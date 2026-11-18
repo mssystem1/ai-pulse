@@ -52,7 +52,7 @@ export function terminalCustomHistoryRange(input:{start:string;end:string}):{sta
  return{start,end};
 }
 
-export function terminalSessionEvidenceMatches(response:{session:TerminalSessionHistory;perpetualSession:TerminalSessionHistory;setupVersionId?:string},source:{instId:string;setupVersionId?:string},custom?:{start:number;end:number}):boolean{
+export function terminalSessionEvidenceMatches(response:{session:Pick<TerminalSessionHistory,"instId"|"marketType"|"requestedStart"|"requestedEnd">;perpetualSession:Pick<TerminalSessionHistory,"instId"|"marketType"|"requestedStart"|"requestedEnd">;setupVersionId?:string},source:{instId:string;setupVersionId?:string},custom?:{start:number;end:number}):boolean{
  const spot=response.session,futures=response.perpetualSession;
  return spot.instId===source.instId&&spot.marketType==="spot"&&futures.instId===source.instId&&futures.marketType==="perpetual"&&spot.requestedStart===futures.requestedStart&&spot.requestedEnd===futures.requestedEnd&&(!custom||spot.requestedStart===custom.start&&spot.requestedEnd===custom.end)&&(!response.setupVersionId||!source.setupVersionId||response.setupVersionId===source.setupVersionId);
 }

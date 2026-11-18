@@ -40,7 +40,7 @@ test("reported daily BTC: consumed May swing is excluded; October resistance bec
 test("a free technical review preserves its original and is stable on repeat review",()=>{
   const original=make(true),before=JSON.stringify(original),review=reviewGlobalTargetReport(original);
   assert.equal(JSON.stringify(original),before);assert.equal(reviewGlobalTargetReport(review),review);
-  assert.equal(globalTradeCards(review).length,1);assert.equal(review.setupSelection?.side,"short");assert.equal(review.paths.length,1);assert.equal(review.strategy?.routes.length,1);
+  assert.equal(globalTradeCards(review).filter(c=>c.selected).length,1);assert.equal(review.setupSelection?.side,"short");assert.equal(review.paths.length,1);assert.equal(review.strategy?.routes.length,1);
   assert.match(review.narrative.limitations[0],/same saved candles and no new AI analysis/);
 });
 test("the schema rejects inserting a consumed pivot back into a current target map",()=>{
@@ -53,7 +53,7 @@ test("a legacy canonical recheck cannot reuse a target crossed after the saved s
   const saved=reviewGlobalTargetReport(make(true)),primary=structuredClone(markets.find(m=>m.bar==="1Dutc")!);
   // Keep the pre-v8 canonical contract under test. Current priced scenarios
   // have a separate target-before-entry lifecycle instead of this flag.
-  delete saved.discretionaryPlan;delete saved.scenario;delete saved.strategyMix;
+  delete saved.discretionaryPlan;delete saved.scenario;delete saved.strategyMix;delete saved.alternatePlan;delete saved.alternatePlanReason;
   assert.equal(saved.strategy!.targetPolicy,"active-zones-v1");assert.equal(GlobalReportSchema.safeParse(saved).success,true);
   const before=JSON.stringify(saved);
   const selected=saved.tradePlan!,target=saved.levels.find(l=>l.id===selected.targetIds[0])!.price,sign=selected.side==="long"?1:-1,last=primary.candles.at(-1)!;

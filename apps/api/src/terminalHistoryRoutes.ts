@@ -12,7 +12,7 @@ const market=z.string().regex(/^[A-Z0-9]{2,20}-(USDT|USDC|USD)$/),stamp=z.coerce
 export function createTerminalHistoryRoutes(runtime:TerminalRuntime,getHistory:()=>TerminalMarketHistory=()=>createTerminalMarketHistory(runtime.cfg)){
  const router=Router();
  router.get("/v1/terminal/history/session",wrap(async(req,res)=>{
-  const parsed=z.object({instId:market,timeframe:z.enum(["15m","1H","4H","1Dutc","1Wutc"]),session:z.enum(["day","previous-day","week","month","custom"]).default("day"),start:stamp.optional(),end:stamp.optional(),evidenceSnapshotId:z.string().regex(/^tes_[\da-f]{32}$/).optional()}).strict().safeParse(req.query);
+  const parsed=z.object({instId:market,timeframe:z.enum(["15m","1H","4H","1Dutc","1Wutc"]),session:z.enum(["day","previous-day","week","month","custom"]).default("day"),purpose:z.enum(["tools","indicators"]).default("tools"),start:stamp.optional(),end:stamp.optional(),evidenceSnapshotId:z.string().regex(/^tes_[\da-f]{32}$/).optional()}).strict().safeParse(req.query);
   if(!parsed.success)return res.status(400).json({error:"Choose an exact market and a UTC session of at most 31 days",code:"terminal_history_window"});
   const input=parsed.data,now=runtime.now(),owner=res.locals.terminalOwner;let window;
   if((input.session==="custom")!==(input.start!==undefined&&input.end!==undefined)||input.session!=="custom"&&(input.start!==undefined||input.end!==undefined))return res.status(400).json({error:"Custom UTC ranges require both start and end; presets choose their own range"});
@@ -24,12 +24,25 @@ export function createTerminalHistoryRoutes(runtime:TerminalRuntime,getHistory:(
   let history:TerminalMarketHistory;try{history=getHistory();}catch{return res.status(503).json({error:"Durable market-history storage is unavailable",code:"terminal_history_storage"});}
   try{
    await history.ensure({instId:input.instId,start:window.start,end:window.end});
-   const frame=terminalFrameProfile(input.timeframe),request={instId:input.instId,start:window.start,end:window.end,barMs:candleTimeframeMs(frame.execution)};
+   // Indicator warm-up needs more than the 17 daily bars in a mid-month
+   // weekly execution view. These are separately labelled, real execution
+   // bars, not primary OHLCV candles or inferred buy/sell quantities.
+   const indicatorBarMs={"15m":60_000,"1H":300_000,"4H":900_000,"1Dutc":3_600_000,"1Wutc":14_400_000}[input.timeframe];
+   const frame=terminalFrameProfile(input.timeframe),request={instId:input.instId,start:window.start,end:window.end,barMs:input.purpose==="indicators"?indicatorBarMs:candleTimeframeMs(frame.execution),...(input.purpose==="indicators"?{maxBars:1024}:{})};
    const [session,perpetualSession]=await Promise.all([history.readSession({...request,marketType:"spot"}),history.readSession({...request,marketType:"perpetual"})]);
    const spot=terminalToolsFromSession(session,input.timeframe),perpetual=terminalToolsFromSession(perpetualSession,input.timeframe),tools={...spot,perpetualFlow:{...perpetual.flow,id:"perpetual-flow",label:"Futures session flow"}};
    let evidenceSnapshotId:string|undefined,setupVersionId:string|undefined;
    if(base){
-    const evidence:TerminalInspectionEvidence={...base,observedAt:now,tools:{...base.tools,...tools} as TerminalMarketTools};setupVersionId=base.setupVersionId;evidenceSnapshotId="tes_"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex").slice(0,32);await runtime.store.storage.write(runtime.store.key("evidence",`${owner}:${evidenceSnapshotId}`),evidence,3600);
+    // Flow-only reads must not retain another copy of every monthly footprint
+    // price row in Redis. Preserve the pinned non-flow tools as supplied.
+    const evidenceTools=input.purpose==="indicators"?{...base.tools,flow:tools.flow,perpetualFlow:tools.perpetualFlow}:{...base.tools,...tools};
+    const evidence:TerminalInspectionEvidence={...base,observedAt:now,tools:evidenceTools as TerminalMarketTools};setupVersionId=base.setupVersionId;evidenceSnapshotId="tes_"+createHash("sha256").update(JSON.stringify(evidence)).digest("hex").slice(0,32);await runtime.store.storage.write(runtime.store.key("evidence",`${owner}:${evidenceSnapshotId}`),evidence,3600);
+   }
+   if(input.purpose==="indicators"){
+    // Indicator clients need source identity/coverage and time series, not
+    // every retained price row repeated inside every historical bar.
+    const identity=(session:typeof perpetualSession)=>({instId:session.instId,marketType:session.marketType,requestedStart:session.requestedStart,requestedEnd:session.requestedEnd,barMs:session.barMs,complete:session.complete,status:session.status,backfill:session.backfill});
+    return res.json({window,session:identity(session),perpetualSession:identity(perpetualSession),tools:{flow:tools.flow,perpetualFlow:tools.perpetualFlow},evidenceSnapshotId,setupVersionId,observedAt:now});
    }
    return res.json({window,session,perpetualSession,tools,evidenceSnapshotId,setupVersionId,observedAt:now});
   }catch{return res.status(503).json({error:"Retained session history could not be verified. Existing report prices are unchanged.",code:"terminal_history_unavailable"});}

@@ -1,21 +1,47 @@
-# Trading Terminal screenshot audit — 17 November 2026
+# Trading Terminal corrective audit — verified locally 18 November 2026
 
-The current request contains nine issues. The earlier recovery incident and older backlog are documented separately.
+The earlier completion claim was premature. The user's deployed screenshots reproduced empty indicator panes, duplicate navigation in Ask PULSE and a displaced Studio preview. This audit supersedes that claim. These results describe the corrected local implementation; production deployment has not been verified.
 
-1. [x] **BTC timeframe setups:** reproduced the daily and weekly source geometry. Their entries are conditional return areas, not a forecast of a rally or immediate short instructions. The daily plan offers 0.6809R to TP1 and 0.5313R to the nearest obstacle; the weekly plan offers 0.6778R and 0.1211R respectively. Both fail the existing 1R admission floor. Chart headings now say `NO ENTRY` for blocked plans; eligible discretionary plans say `CONDITIONAL LONG/SHORT`. The chart notice explains qualification, distance from the quote, execution policy, timeframes and expiry. Headline card risk/reward now uses the least favorable allowed fill. No entry/stop/target was moved merely to improve displayed reward.
-2. [x] **Timeframe changes:** cancel obsolete market requests, clear retained source selection, reload on return to the tab and match applied chart outputs to both instrument and timeframe. Memoized chart selection avoids resetting study readouts on each countdown tick.
-3. [x] **Missing newly created indicators:** separate the saved package library (64 packages) from chart visibility (eight active packages). Applying a ninth package hides the oldest visible package and explains the change; its saved package is retained. Sparse line series have visible point markers, and adding studies opens the interactive chart on narrow screens.
-4. [x] **Tapeout identity and more templates:** show runtime information beside indicators and previews. Executed-flow kernels use Tapeout NAND; pure price graphs accurately state host calculation. New publications retain runtime classification without extra catalog package reads. Both builders now offer nine templates. Studio adds MACD, Donchian and normalized true range; Simple Indicators adds seller participation, delta SMA and a short rolling delta.
-5. [x] **Ask PULSE:** an eight-section support navigator provides page-specific guidance, prompts and conversation history. Requests retain the section and any explicitly pinned source evidence. Changing sections clears the previous question/context. Static navigation remains available without active AI access.
-6. [x] **Indicators Studio and AI:** renamed and highlighted Indicators Studio and Simple Indicators. The Studio copilot returns a strictly validated graph draft, with explicit preview/application. It cannot publish, place orders or authorize payments. It shares the existing authenticated daily AI allowance and uses a bounded response and timeout.
-7. [x] **My indicators:** distinct highlighted creation and purchase panels, counts and jump links, plus direct application of saved creations. Purchased versions retain their original restore flow.
-8. [x] **Clarity layout:** graph nodes have readable labels; the block list and preview no longer create clipped vertical scroll containers. Builder actions remain in document flow. Theme-aware surfaces replace dark fallbacks under light text styles. Ask PULSE has an opaque surface. Candle details keep their numbers in readable columns instead of inheriting the workspace definition-list layout.
-9. [x] **Publishing:** both builders expose the publish description, terms and `Publish indicator` button in the main document. Removed the separate Publish tab and the publish disclosure. Disabled actions explain their prerequisites.
+| Issue | Correction and acceptance evidence | Result |
+|---|---|---|
+| 1. BTC daily/weekly | Primary structural sources precede distant EMA fallback. Exact source-edge passive limits retain fixed protection and exit at the first active primary obstacle. One selected plan and an independently priced opposing alternate are shown. No extra confirmation candle for passive limits. Saved-candle replay, schema mutation, lifecycle and browser alternate-card checks pass. | Passed locally; trading performance is not established. |
+| 2. Timeframe loading/empty indicators | History loads independently of Market tools. Flow keeps its execution clock; price studies keep candle time. Loading retained history resets the minute-wide capture viewport. Eight actual studies render multiple values on 1H, daily and weekly, including rolling-20 and SMA-20. Injected history failure retains the captured sample with a coverage notice. | Passed locally. |
+| 3. Maxim application | Created an AI RSI draft, explicitly applied it, saved it and added it with eight occupied slots. The exact new package/version shows publisher Maxim and 513 actual plotted candle readings. The oldest active study is hidden; all nine saved packages remain. | Passed locally. |
+| 4. Tapeout/templates | Visible execution/portability/identity information sits above each editor workspace. Badges distinguish NAND, hybrid and host calculations. The right preview remains a preview. All nine Studio and nine Simple templates produce previews. | Passed locally. |
+| 5. Ask PULSE | Removed its navigation grid. One sidebar remains. Titles, descriptions, prompts and requests differ for Terminal, tools, Radar, creation, market, library, positions and activity. The launcher stays highlighted. | Passed locally across eight contexts. |
+| 6. Modes/copilot | Highlighted Indicators Studio and Simple Indicators. Copilot returns a reviewable graph with explicit application. Browser verification uses a stub, without a paid provider call. | Workflow passed locally; production provider availability unverified. |
+| 7. My indicators | My creations and Purchased indicators have separate highlighted headings, jump links and accented borders. The new Maxim creation is retained. Restore receipts remain separate from chart slots. | Local collection and API receipt checks pass. No purchase was made. |
+| 8. Clarity layout | Right preview restored; preview works before publisher identity. Readable graph text, no nested preview scrolling, normal-flow action row. Nine Studio previews have no internal vertical overflow; 390px viewport has no document horizontal overflow. | Passed locally; screenshots inspected. |
+| 9. Publishing | Main-area Publish indicator form/button in both builders, without a Publish settings tab or disclosure. Both buttons submit the correct Maxim manifest to the local POST stub. | Passed locally; no external listing was published. |
 
-## Validation
+## BTC findings
 
-Public BTC snapshots were captured locally for 1H, 1D UTC and 1W UTC. Private fixture files and temporary browser harnesses are excluded from the commit. Domain calculations, source-clock handling, indicator library slots, graph parsing, AI response validation, authentication/pass/quota checks and catalog immutability have regression coverage. Browser verification uses those captured candles and local stub responses for AI and wallet access; it makes no paid model calls, payments or trades.
+The distant daily EMA pullback was treated as the available setup while closer primary structure existed. Separately, the objective search discarded previously touched active levels and reached farther into historical targets. These rules explain the scenario involving a return to roughly 70k before a larger decline. A conditional scenario did not establish that the return would happen, and its entry location was poor for the requested workflow.
 
-Completed checks: 133 domain tests; focused API/web regression suites; production builds and TypeScript checks. Browser checks at 1440px and 390px verified nine templates per builder, direct publishing controls, readable graph labels, unclipped previews, nine saved/eight visible packages, all eight Ask sections, and explicit copilot application. Maxim’s RSI output matched the captured hourly, daily and weekly inputs exactly. A delayed daily response could not overwrite weekly selection. The weekly flow pane retained one genuine overview reading and exposed eleven original execution readings when inspected. No browser exceptions occurred.
+See [the revised source-limit policy](GLOBAL_SOURCE_LIMIT_POLICY_2026-11-18.md). On the **saved 17 November snapshot**, deterministic replay gives:
 
-The configured live AI provider must be available after deployment for real copilot generation. Correct qualification and clearer execution policies do not establish a profitable trading strategy or promise that a conditional entry will be reached.
+| Horizon | Selected sell limit | Fixed hard SL | First exit area | Opposing buy limit | Alternate hard SL |
+|---|---:|---:|---:|---:|---:|
+| Daily | 67,300.00 | 67,832.88 | 64,049.00–64,706.30 | 64,049.00 | 63,374.10 |
+| Weekly | 66,955.00 | 68,769.64 | 65,000.00 | 56,555.00 | 55,209.98 |
+
+These are replay results, not current orders or a current price prediction. The weekly opposing support is broader and farther away, not an imminent-move forecast. Each horizon retains its own sources, protection, objectives and execution clock.
+
+Passive limits can be prepared without another confirmation candle and may remain unfilled. Specific invalidation, hard-stop and expiry rules remain visible. Internal compatibility codes do not add a generic WAIT requirement to a ready passive limit. `setupPolicyVersion` enables a free technical review of earlier v8 reports from their saved candles, preserving the original.
+
+## Verification record
+
+- Full analysis regression: 348 checks passed; the subsequently added old-v8 free-review regression also passed.
+- Domain regression: 78 checks passed.
+- Terminal/API/scenario/assessment regression: 163 checks passed.
+- Frontend report, chart, history, Ask, Studio portability and client checks: 75 passed.
+- API TypeScript check and final frontend production build passed.
+- Browser: no uncaught exceptions; correct plotted series/visible ranges, nine templates per builder, exact new indicator identity, publish payloads, eight Ask contexts, library highlights and mobile overflow checks.
+
+Local evidence is in `../.tmp/terminal-nine-qa/`: `corrective-flow-1D.png`, `corrective-flow-1W.png`, `corrective-studio-preview.png`, `corrective-studio-eighth-slot.png`, `corrective-alternate-1D.png`, `corrective-alternate-1W.png`, `corrective-ask.png`, `corrective-library.png`, `corrective-mobile.png` and `corrective-browser-results.json`.
+
+Fixtures contain captured public prices and retained execution coverage. Missing intervals stay unknown. Empty execution buckets are zero quantity only when a verified continuous capture proves that no trades were omitted; they are not observed price prints. Browser account, publication and AI endpoints are local stubs: no payment, venue order, external publication or paid model call occurred.
+
+Flow-only history reads return compact series and retain only those flow additions with the pinned tools, avoiding another copy of monthly footprint price rows in Redis. The authenticated route regression checks that separation.
+
+Both API and frontend must receive these changes before production acceptance can be claimed. Live provider operation and the deployed wallet workflow remain the final verification boundary.

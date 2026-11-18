@@ -20,6 +20,15 @@ test("portable graph host carries OHLCV, overlays, oscillators, stateflow and re
     assert.equal(portable.sourceKind, application.provenance.graph!.sourceKind);
   }
 });
+test("all nine Studio templates preview without publisher identity and match the authored calculation", () => {
+  const data = source(), templates = indicatorGraphTemplates();
+  assert.equal(templates.length, 9);
+  for (const template of templates) {
+    const preview = createGraphIndicatorPackage({ ...template, id: `preview.${template.id}`, author: "Preview author" });
+    const authored = createGraphIndicatorPackage({ ...template, id: `preview.${template.id}`, author: "Actual publisher" });
+    assert.deepEqual(evaluateIndicator(preview, data).outputs, evaluateIndicator(authored, data).outputs, template.id);
+  }
+});
 test("portable graph host leaves gaps unknown and preserves source timestamps with complete-window warm-up", async () => {
   const { evaluatePortableGraph } = await import(hostUrl.href);
   const data = source(); data.price!.candles = data.price!.candles.filter((_, i) => i !== 60);

@@ -46,6 +46,26 @@ function observedSwingSweep(): GlobalReport {
 }
 
 describe("persistent research scenario lifecycle", () => {
+  it("keeps the new structural limit available before entry, then tracks its actual price path without candle confirmation", () => {
+    for (const side of ["long", "short"] as const) {
+      const d = definition({ policyId: "structural-edge-passive-v2", side,
+        entryZone: side === "long" ? [99, 99] : [101, 101], hardStop: side === "long" ? 95 : 105,
+        targets: [{ id: "tp1", lower: side === "long" ? 110 : 90, upper: side === "long" ? 110 : 90, allocation: 1 }] });
+      const before = advanceGlobalScenario(d, null, [event("target_touch", 5, "tp1")], BORN + 6 * MIN);
+      assert.equal(before.state, "awaiting_location"); assert.equal(before.exits.length, 0);
+      const entered = advanceGlobalScenario(d, before, [event("entry_touch", 10)], BORN + 10 * MIN);
+      assert.equal(entered.state, "entry_observed"); assert.equal(entered.confirmationAt, undefined);
+      assert.equal(entered.observationOnly, true);
+      const exited = advanceGlobalScenario(d, entered, [event("target_touch", 15, "tp1")], BORN + 15 * MIN);
+      assert.equal(exited.outcome?.kind, "target_observed"); assert.equal(exited.remainingFraction, 0);
+      const cancelled = advanceGlobalScenario(d, null, [event("invalidation", 5)], BORN + 6 * MIN);
+      assert.equal(cancelled.state, "invalidated");
+      assert.equal(advanceGlobalScenario(d, null, [], d.expiresAt + 1).state, "expired");
+      const ambiguous = advanceGlobalScenario(d, null, [event("entry_touch", 10), event("target_touch", 10, "tp1")], BORN + 10 * MIN);
+      assert.equal(ambiguous.outcome?.kind, "ambiguous_bar");
+    }
+    assert.equal(advanceGlobalScenario(definition(), null, [event("target_touch", 5, "tp1")], BORN + 6 * MIN).reason, "target_before_entry", "Saved v1 opportunities retain their original cancellation rule");
+  });
   it("separates stable source identity from priced revisions and render time", () => {
     const d = definition(), later = definition({ createdAt: BORN + 5 * MIN, expiresAt: BORN + 180 * MIN });
     assert.equal(d.scenarioId, later.scenarioId); assert.equal(d.revisionId, later.revisionId);

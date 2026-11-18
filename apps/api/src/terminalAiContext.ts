@@ -1,4 +1,4 @@
-import { globalDecision, globalEligibility, globalPriceZonePayoff, globalTargetReference, globalTradePlan, type TerminalMarketSnapshot } from "@pulse/domain";
+import { globalDecision, globalEligibility, globalPriceZonePayoff, globalSetupAdmission, globalTargetReference, globalTradePlan, type TerminalMarketSnapshot } from "@pulse/domain";
 import type { GlobalReport } from "@pulse/schemas";
 import type { TerminalPosition, TerminalRadar, TerminalWatch } from "./terminalStore.js";
 
@@ -71,6 +71,8 @@ export function terminalSetupEligibility(report: GlobalReport) {
   return {
     assessedAt: report.snapshot.observedAt, setupVersionId: report.scenario?.revisionId,
     qualified: decision.qualified, currentAction: decision.currentAction, globalEligibility: globalEligibility(report),
+    limitPlanReady: decision.limitPlanReady,
+    preparationBlockers: decision.limitPlanReady ? [] : [...new Set([...globalSetupAdmission(report).blockers, ...(decision.contextRelation === "opposing" || decision.contextRelation === "unavailable" ? ["review_higher_context"] : []), ...(plan?.executionPolicy && plan.executionPolicy.expiresAt <= Date.parse(report.snapshot.observedAt) ? ["entry_deadline"] : [])])],
     blockers: [...new Set(blockers)], risk: decision.risk,
     entryPolicyStatus: decision.entryPolicyStatus, entryDeadline: decision.entryDeadline,
     retestDeadline: decision.retestDeadline, overallSetupExpiry: decision.expiresAt,
@@ -81,7 +83,7 @@ export function terminalSetupEligibility(report: GlobalReport) {
       hardStop: plan.stop, firstTargetBoundary: globalTargetReference(report, 0), nearestObstacle: plan.barriers[0]?.price ?? globalTargetReference(report, 0),
       requiredNearestObstacleR, ...payoff,
     } : null,
-    interpretation: "Scenario confirmation describes event progress only. qualified=false or currentAction=WAIT is not an eligible entry, even when the scenario is confirmed_awaiting_fill. No field establishes a venue fill or order authorization.",
+    interpretation: "limitPlanReady=true permits preparing the stated passive limit without candle confirmation. qualified/currentAction describe immediate observed entry eligibility, separately from order preparation. A legacy WAIT action must not be presented as a requirement to wait for extra candles on a ready passive limit. No field establishes a venue fill or order authorization.",
   };
 }
 /** Summarize before serialization: full candle arrays must not push the
@@ -95,6 +97,7 @@ export function terminalAiContext(input: { snapshot: TerminalMarketSnapshot; rep
     observedAt: snapshot.observedAt, setupObservedAt: report.snapshot.observedAt, setupVersionId: input.setupVersionId ?? report.scenario?.revisionId,
     market: pick(report.snapshot, ["source", "instId", "timeframe", "priceCurrency", "price", "lastCandleTs"]), currentQuote: snapshot.report.currentMarket?.quote,
     setup: plan ? pick(plan, ["family", "side", "entry", "stop", "priceZones", "executionPolicy", "evidence", "entryBasis", "stopBasis", "targets", "barriers", "reference"]) : null,
+    alternatePlan: report.alternatePlan ? { reason: report.alternatePlanReason, ...pick(report.alternatePlan, ["family", "side", "entry", "stop", "priceZones", "executionPolicy", "entryBasis", "stopBasis", "targets", "reference"]), eligibility: terminalSetupEligibility({...report, discretionaryPlan: report.alternatePlan, alternatePlan: undefined, alternatePlanReason: undefined, scenario: undefined, strategyMix: undefined}) } : null,
     selectedSetupEligibility, currentEligibility,
     selectedInspection: input.inspection ? terminalSelectedInspection(input.inspectionEvidence ?? snapshot, input.inspection) : undefined,
     selectedSetupMatchesCurrentSnapshot: report.snapshot.observedAt === snapshot.report.snapshot.observedAt && report.scenario?.revisionId === snapshot.report.scenario?.revisionId,
