@@ -12,6 +12,7 @@ import { createIndicatorCommerceRoutes, indicatorOffer, indicatorPaymentNetworks
 
 const REGISTRY_OWNER = "0x" + "0".repeat(40), PACKAGE_TTL = 3650 * 86400;
 const calculation=(manifest:IndicatorManifest):"nand"|"hybrid"|"host"=>manifest.format==="pulse-indicator-v4"?manifest.graph.nodes.some(node=>node.kind==="kernel")?"hybrid":"host":"nand";
+const CALCULATION_KINDS=new Set(["nand","hybrid","host"]);
 const digest = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
 /** Shared catalog holds only intentionally published packages, never journals,
  * report evidence, authentication tokens or private workspace records. */
@@ -23,6 +24,24 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
   const seeds = indicatorMarketCatalog();
   const checkout = createIndicatorCommerceRoutes(runtime, dependencies);
   const summary = (item: TerminalIndicatorPublication, owner: string, owned = false) => ({ ...Object.fromEntries(Object.entries(item).filter(([key]) => key !== "packageRef")), publisherName: item.author, canDelete: item.publisher === owner, entitled: !item.offer || item.publisher === owner || owned, hosted: true, publication: item.registration ? { ...item.registration, registered: true } : { chainId: 196, registered: false } });
+  const catalogSummary = async (item: TerminalIndicatorPublication, owner: string, owned = false) => {
+    const result = summary(item, owner, owned) as Record<string, unknown>;
+    if (CALCULATION_KINDS.has(String(item.calculation))) return result;
+    // Legacy publications may predate the stored calculation field. Derive it
+    // only from the exact package bytes after checksum and manifest identity
+    // validation; listing titles/kernel labels are not runtime evidence.
+    delete result.calculation;
+    try {
+      const stored = await registry.storage.read<{ bytes: string }>(registry.key("package", item.packageRef));
+      if (typeof stored?.bytes !== "string" || digest(stored.bytes) !== item.sha256) return result;
+      const manifest = parseIndicatorPackage(stored.bytes);
+      if (manifest.id !== item.manifestId || manifest.version !== item.version) return result;
+      result.calculation = calculation(manifest);
+    } catch {
+      // One unavailable or malformed legacy package must not fail the catalog.
+    }
+    return result;
+  };
   const seedSummary = (m: typeof seeds[number]) => {
     const candidate=BUILTIN_INDICATOR_DEPLOYMENTS[m.id],registration=candidate?.netlistHash===`sha256:${digest(Buffer.from(m.runtime.netlist.slice(2),"hex"))}`?candidate:undefined;
     return { calculation:calculation(m), id: m.id, manifestId: m.id, version: m.version, title: m.title, description: m.description, author: m.author, publisherName: m.author, kernel: m.kernel, publisher: null, createdAt: null, canDelete: false, hosted: false, entitled:true, ...(registration?{registration}:{}), publication: registration?{...registration,registered:true}:m.publication };
@@ -32,7 +51,14 @@ export function createTerminalIndicatorRoutes(runtime: Pick<TerminalRuntime, "st
   router.get("/v1/terminal/indicators", asyncRoute(async (_req, res) => {
     const items = (await registry.get(REGISTRY_OWNER)).indicatorPublications ?? [];
     const purchased = new Set(((await checkout.commerce.get(res.locals.terminalOwner)).indicatorPurchases ?? []).filter(p => p.state === "granted").map(p => p.listingId));
-    res.json({ version: "pulse-indicator-catalog-v2", items: [...seeds.map(seedSummary), ...items.map(item => summary(item, res.locals.terminalOwner, purchased.has(item.id)))], limits: { total: 100, perPublisher: 20, minPriceUsdc: runtime.cfg?.INDICATOR_MARKET_MIN_PRICE_USDC ?? 0.001, maxPriceUsdc: runtime.cfg?.INDICATOR_MARKET_MAX_PRICE_USDC ?? 1000 }, hosting: "PULSE discovery; deployment identity is independently checked for registered X Layer circuits", commerce: { paymentNetworks: indicatorPaymentNetworks(runtime.cfg), creatorReceivesPercent: 100, platformFeePercent: 0, formulasPublic: true } });
+    const hosted: unknown[] = [];
+    // Limit fallback reads to the published catalog maximum and small batches.
+    // Any unexpected over-limit legacy rows remain visible without extra I/O.
+    for (let start = 0; start < Math.min(items.length, 100); start += 8) {
+      hosted.push(...await Promise.all(items.slice(start, Math.min(start + 8, 100)).map(item => catalogSummary(item, res.locals.terminalOwner, purchased.has(item.id)))));
+    }
+    hosted.push(...items.slice(100).map(item => summary(item, res.locals.terminalOwner, purchased.has(item.id))));
+    res.json({ version: "pulse-indicator-catalog-v2", items: [...seeds.map(seedSummary), ...hosted], limits: { total: 100, perPublisher: 20, minPriceUsdc: runtime.cfg?.INDICATOR_MARKET_MIN_PRICE_USDC ?? 0.001, maxPriceUsdc: runtime.cfg?.INDICATOR_MARKET_MAX_PRICE_USDC ?? 1000 }, hosting: "PULSE discovery; deployment identity is independently checked for registered X Layer circuits", commerce: { paymentNetworks: indicatorPaymentNetworks(runtime.cfg), creatorReceivesPercent: 100, platformFeePercent: 0, formulasPublic: true } });
   }));
   router.get("/v1/terminal/indicators/:id", asyncRoute(async (req, res) => {
     const id = String(req.params.id), seed = seeds.find(m => m.id === id);

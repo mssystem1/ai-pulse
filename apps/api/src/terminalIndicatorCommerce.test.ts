@@ -228,6 +228,92 @@ test("a purchased receipt restores its exact bytes even if a legacy catalog vers
   } finally { await f.close(); }
 });
 
+test("purchase and sale receipt runtime uses immutable purchased bytes after the current catalog changes", async () => {
+  const f = await fixture();
+  try {
+    const quote = await f.quote();
+    assert.equal((await f.request(`/purchases/${quote.id}`, "POST", { requestId: quote.requestId }, buyer, "proof")).status, 201);
+    const { registry, commerce } = indicatorCommerceStores(f.store);
+    const hostManifest = createGraphIndicatorPackage({
+      id: "creator.legacy-host",
+      title: "Host only graph",
+      description: "Host-only graph used to verify a receipt runtime label.",
+      author: "Creator",
+      graph: {
+        nodes: [{ id: "close", kind: "source", field: "close" }],
+        plots: [{ id: "closePlot", node: "close", label: "Close", pane: "price", style: "line", unit: "price", color: "#42a5f5" }],
+        gapPolicy: "reset", warmup: "full-window",
+      },
+    });
+    const hybridManifest = createGraphIndicatorPackage({
+      id: "creator.legacy-hybrid",
+      title: "Hybrid graph",
+      description: "Hybrid graph used to verify a receipt runtime label.",
+      author: "Creator",
+      graph: {
+        nodes: [
+          { id: "buy", kind: "source", field: "buy" },
+          { id: "sell", kind: "source", field: "sell" },
+          { id: "delta", kind: "kernel", buy: "buy", sell: "sell" },
+        ],
+        plots: [{ id: "flow", node: "delta", label: "Flow", pane: "indicator", style: "line", unit: "volume", color: "#42a5f5" }],
+        gapPolicy: "reset", warmup: "full-window",
+      },
+    });
+    const bytesFor = (manifest: typeof hostManifest) => {
+      const bytes = exportIndicatorPackage(manifest);
+      return { bytes, sha256: createHash("sha256").update(bytes).digest("hex") };
+    };
+    const hostPackage = bytesFor(hostManifest), hybridPackage = bytesFor(hybridManifest);
+    await registry.storage.write(registry.key("package", hostPackage.sha256), { bytes: hostPackage.bytes }, 3650 * 86400);
+    await registry.storage.write(registry.key("package", hybridPackage.sha256), { bytes: hybridPackage.bytes }, 3650 * 86400);
+
+    const seededPurchases = [
+      { manifest: hybridManifest, pkg: hybridPackage, id: "iqu_legacy_hybrid", listingId: "pmi_" + "b".repeat(32) },
+      { manifest: hostManifest, pkg: hostPackage, id: "iqu_legacy_host", listingId: "pmi_" + "c".repeat(32) },
+    ];
+    const seededSales = seededPurchases.map(({ manifest, pkg, id, listingId }) => ({
+      id, listingId, publisher: seller, buyer, title: manifest.title, version: manifest.version,
+      sha256: pkg.sha256, amountAtomic: "250000", priceUsdc: "0.25", asset: getNetwork("base").paymentAsset.address!,
+      network: "base" as const, settlementTx: "0x" + "55".repeat(32), at: new Date().toISOString(), simulated: false,
+    }));
+    await commerce.mutate(buyer, value => {
+      value.indicatorPurchases = [...(value.indicatorPurchases ?? []), ...seededPurchases.map(({ manifest, pkg, id, listingId }) => ({
+        id, requestId: `request_${id}`, owner: buyer, listingId, publisher: seller, title: manifest.title,
+        version: manifest.version, sha256: pkg.sha256, packageRef: pkg.sha256,
+        offer: { kind: "version-service" as const, priceUsdc: "0.25", description: "Legacy receipt fixture." },
+        priceUsdc: "0.25", amountAtomic: "250000", network: "base" as const, asset: getNetwork("base").paymentAsset.address!,
+        payee: seller, createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        grantedAt: new Date().toISOString(), state: "granted" as const, simulated: false,
+      })) as any];
+    });
+    await registry.mutate("0x" + "0".repeat(40), value => { value.indicatorSales = [...(value.indicatorSales ?? []), ...seededSales]; });
+
+    // Replace the current listing package with a valid host-only version. The
+    // original paid receipt must still report the NAND runtime of its own bytes.
+    await registry.storage.write(registry.key("package", hostPackage.sha256), { bytes: hostPackage.bytes }, 3650 * 86400);
+    await registry.mutate("0x" + "0".repeat(40), value => {
+      const current = value.indicatorPublications!.find(item => item.id === f.item.id)!;
+      current.manifestId = hostManifest.id; current.title = "Changed current catalog version";
+      current.sha256 = hostPackage.sha256; current.packageRef = hostPackage.sha256;
+    });
+
+    const history = await (await f.request("/purchases", "GET", undefined, buyer)).json();
+    const purchasesByTitle = new Map(history.purchases.map((item: any) => [item.title, item]));
+    assert.equal(purchasesByTitle.get(f.manifest.title).calculation, "nand");
+    assert.equal(purchasesByTitle.get(hybridManifest.title).calculation, "hybrid");
+    assert.equal(purchasesByTitle.get(hostManifest.title).calculation, "host");
+    assert.equal(purchasesByTitle.get(f.manifest.title).sha256, f.item.sha256);
+    const salesHistory = await (await f.request("/purchases", "GET", undefined, seller)).json();
+    const salesByTitle = new Map(salesHistory.sales.map((item: any) => [item.title, item]));
+    assert.equal(salesByTitle.get(f.manifest.title).calculation, "nand");
+    assert.equal(salesByTitle.get(hybridManifest.title).calculation, "hybrid");
+    assert.equal(salesByTitle.get(hostManifest.title).calculation, "host");
+    const stored = await commerce.get(buyer);
+    assert(stored.indicatorPurchases!.every(purchase => !("calculation" in purchase)), "runtime labels are response-only, not persisted receipt fields");
+  } finally { await f.close(); }
+});
+
 test("publishing identical public bytes cannot shorten a purchased package's recovery retention", async () => {
   const f = await fixture();
   try {

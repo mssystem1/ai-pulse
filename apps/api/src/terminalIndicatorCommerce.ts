@@ -2,6 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { Router, type RequestHandler } from "express";
 import { z } from "zod";
 import { getNetwork, type AppConfig } from "@pulse/config";
+import { parseIndicatorPackage, type IndicatorManifest } from "@pulse/domain";
 import { createPaymentGate, validateSignedPayment, type SettlementRequest } from "@pulse/payments";
 import { paymentPayer } from "./arcBudget.js";
 import { asyncRoute } from "./httpResilience.js";
@@ -13,6 +14,10 @@ import type { IndicatorOffer, IndicatorPurchase, IndicatorSale, IndicatorPayment
 export const INDICATOR_REGISTRY_OWNER = "0x" + "0".repeat(40);
 const requestId = z.string().min(16).max(128).regex(/^[a-zA-Z\d_-]+$/);
 const digest = (text: string) => createHash("sha256").update(text).digest("hex");
+type IndicatorCalculation = "nand" | "hybrid" | "host";
+const calculation = (manifest: IndicatorManifest): IndicatorCalculation => manifest.format === "pulse-indicator-v4"
+  ? manifest.graph.nodes.some(node => node.kind === "kernel") ? "hybrid" : "host"
+  : "nand";
 export function indicatorOffer(raw: unknown, maxPrice = 1000, minPrice = 0.001): IndicatorOffer | undefined {
   if (raw === undefined) return undefined;
   const input = z.object({ priceUsdc: z.string().regex(/^(0|[1-9]\d{0,5})(\.\d{1,6})?$/), kind: z.literal("version-service").optional(), description: z.string().min(10).max(500).optional() }).strict().parse(raw);
@@ -22,10 +27,10 @@ export function indicatorOffer(raw: unknown, maxPrice = 1000, minPrice = 0.001):
   return { kind: "version-service", priceUsdc: Number(input.priceUsdc).toFixed(6).replace(/0+$/, "").replace(/\.$/, ""), description: input.description ?? "Managed installation of this exact open-formula version in Trading Terminal. Terminal access is separate. No automatic renewal, private formula or guaranteed return." };
 }
 export const indicatorAtomic = (price: string) => { const [whole, decimal = ""] = price.split("."); return (BigInt(whole) * 1_000_000n + BigInt(decimal.padEnd(6, "0"))).toString(); };
-export function publicIndicatorPurchase(value: IndicatorPurchase, baseUrl: string) {
+export function publicIndicatorPurchase(value: IndicatorPurchase, baseUrl: string, runtimeCalculation?: IndicatorCalculation) {
   const { nonce: _nonce, paymentId: _paymentId, preparedBlock: _preparedBlock, packageRef: _packageRef, ...safe } = value;
   const path = `/v1/terminal/indicators/purchases/${value.id}`;
-  return { ...safe, priceUsd: value.priceUsdc, assetSymbol: getNetwork(value.network).paymentAsset.symbol, path, resource: `${baseUrl.replace(/\/$/, "")}/${value.network}${path}`, platformFeeAtomic: "0", creatorReceivesAtomic: value.amountAtomic };
+  return { ...safe, ...(runtimeCalculation ? { calculation: runtimeCalculation } : {}), priceUsd: value.priceUsdc, assetSymbol: getNetwork(value.network).paymentAsset.symbol, path, resource: `${baseUrl.replace(/\/$/, "")}/${value.network}${path}`, platformFeeAtomic: "0", creatorReceivesAtomic: value.amountAtomic };
 }
 type CommerceRuntime = { store: TerminalStore; now: () => number; cfg?: AppConfig };
 export function indicatorPaymentNetworks(cfg?: AppConfig) {
@@ -44,18 +49,44 @@ export function indicatorCommerceStores(store: TerminalStore) {
 /** Per-version, direct-to-creator service purchases. Formula bytes stay public. */
 export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: IndicatorCommerceDependencies = {}) {
   const router = Router(), { registry, commerce } = indicatorCommerceStores(runtime.store), cfg = runtime.cfg;
-  const originalPublisherName = async (value: { publisherName?: string; sha256: string; packageRef?: string }) => {
-    if (value.publisherName?.trim()) return value.publisherName;
-    // These bytes were strictly validated when published. A receipt's immutable
-    // hash, never today's catalog entry, determines the legacy display author.
-    // A missing optional display name must not hide an otherwise intact receipt
-    // or turn its history into an opaque server error during a blob outage.
+  const originalReceiptDetails = async (value: { publisherName?: string; sha256: string; packageRef?: string; version: string }) => {
+    const details: { publisherName?: string; calculation?: IndicatorCalculation } = {};
     try {
       const original = await registry.storage.read<{ bytes: string }>(registry.key("package", value.packageRef ?? value.sha256));
-      if (!original?.bytes || digest(original.bytes) !== value.sha256) return undefined;
-      const author = JSON.parse(original.bytes).author;
-      return typeof author === "string" && author.trim() && author.length <= 160 ? author : undefined;
-    } catch { return undefined; }
+      if (!original?.bytes || digest(original.bytes) !== value.sha256) return details;
+      const manifest = parseIndicatorPackage(original.bytes);
+      if (manifest.version !== value.version) return details;
+      const author = manifest.author;
+      if (!value.publisherName?.trim() && author.trim() && author.length <= 160) details.publisherName = author;
+      details.calculation = calculation(manifest);
+      return details;
+    } catch { return details; }
+  };
+  const originalPublisherName = async (value: { publisherName?: string; sha256: string; packageRef?: string; version: string }) =>
+    value.publisherName?.trim() || (await originalReceiptDetails(value)).publisherName;
+  const enrichReceiptHistory = async (purchases: IndicatorPurchase[], sales: IndicatorSale[], baseUrl: string) => {
+    const publicPurchases: Array<ReturnType<typeof publicIndicatorPurchase> & { calculation?: IndicatorCalculation }> = purchases.map(value => publicIndicatorPurchase(value, baseUrl));
+    const publicSales: Array<IndicatorSale & { calculation?: IndicatorCalculation }> = sales.map(value => ({ ...value }));
+    const targets = [
+      ...purchases.map((value, index) => ({ kind: "purchase" as const, value, index })),
+      ...sales.map((value, index) => ({ kind: "sale" as const, value, index })),
+    ];
+    // Purchase history is capped at 500 per wallet; also cap combined purchase
+    // and sales package reads at 100 and eight concurrent reads per request.
+    for (let start = 0; start < Math.min(targets.length, 100); start += 8) {
+      await Promise.all(targets.slice(start, Math.min(start + 8, 100)).map(async target => {
+        const details = await originalReceiptDetails(target.value);
+        if (details.publisherName) {
+          if (target.kind === "purchase") publicPurchases[target.index].publisherName = details.publisherName;
+          else publicSales[target.index].publisherName = details.publisherName;
+        }
+        if (details.calculation) {
+          if (target.kind === "purchase") publicPurchases[target.index].calculation = details.calculation;
+          else publicSales[target.index].calculation = details.calculation;
+        }
+      }));
+    }
+    return { purchases: publicPurchases, sales: publicSales };
   };
   const owned = async (owner: string, listingId: string) => (await commerce.get(owner)).indicatorPurchases?.find(p => p.listingId === listingId && p.state === "granted");
   const finish = async (owner: string, quoteId: string, receipt: { settlementTx?: string; settledAt: string }) => {
@@ -63,6 +94,8 @@ export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: In
     if(!original)throw Error("Original service purchase is unavailable");
     const packageObject=await registry.storage.read<{bytes:string}>(registry.key("package",original.packageRef));
     if(!packageObject?.bytes||digest(packageObject.bytes)!==original.sha256)throw Error("Purchased package bytes need recovery; preserve the receipt");
+    let runtimeCalculation: IndicatorCalculation | undefined;
+    try { const manifest = parseIndicatorPackage(packageObject.bytes); if (manifest.version === original.version) runtimeCalculation = calculation(manifest); } catch { /* Preserve recovery response if legacy package parsing is unavailable. */ }
     const publisherName = await originalPublisherName(original);
     await registry.storage.write(registry.key("package",original.packageRef),packageObject,3650*86400);
     const updated = await commerce.mutate(owner, value => {
@@ -76,15 +109,14 @@ export function createIndicatorCommerceRoutes(runtime: CommerceRuntime, deps: In
     const sale: IndicatorSale = { id: quoteId, listingId: purchase.listingId, publisher: purchase.publisher, ...(purchase.publisherName ? { publisherName: purchase.publisherName } : {}), buyer: owner, title: purchase.title, version: purchase.version, sha256: purchase.sha256, amountAtomic: purchase.amountAtomic, priceUsdc: purchase.priceUsdc, asset: purchase.asset, network: purchase.network, settlementTx: purchase.settlementTx, at: purchase.grantedAt!, simulated: purchase.simulated };
     // Receipt is the source of truth. A retry repairs the creator index after a crash.
     await registry.mutate(INDICATOR_REGISTRY_OWNER, value => { if (value.indicatorSales?.some(s => s.id === quoteId)) return false; value.indicatorSales = [...(value.indicatorSales ?? []), sale]; });
-    return { entitled: true, purchase: publicIndicatorPurchase(purchase, cfg!.BASE_URL), recovered: true };
+    return { entitled: true, purchase: publicIndicatorPurchase(purchase, cfg!.BASE_URL, runtimeCalculation), recovered: true };
   };
   router.get("/v1/terminal/indicators/purchases", asyncRoute(async (_req, res) => {
     const owner = String(res.locals.terminalOwner).toLowerCase();
     const purchases = (await commerce.get(owner)).indicatorPurchases ?? [];
     const sales = ((await registry.get(INDICATOR_REGISTRY_OWNER)).indicatorSales ?? []).filter(s => s.publisher === owner);
-    const namedPurchases = await Promise.all(purchases.map(async p => publicIndicatorPurchase({ ...p, publisherName: await originalPublisherName(p) }, cfg?.BASE_URL ?? "")));
-    const namedSales = await Promise.all(sales.map(async sale => ({ ...sale, publisherName: await originalPublisherName(sale) })));
-    return res.json({ purchases: namedPurchases, sales: namedSales, creatorReceivesPercent: 100, platformFeePercent: 0 });
+    const history = await enrichReceiptHistory(purchases, sales, cfg?.BASE_URL ?? "");
+    return res.json({ ...history, creatorReceivesPercent: 100, platformFeePercent: 0 });
   }));
   router.post("/v1/terminal/indicators/:id/quote", asyncRoute(async (req, res) => {
     if (!cfg) return res.status(503).json({ error: "Creator checkout is not configured; no payment requested" });
