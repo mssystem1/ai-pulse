@@ -164,6 +164,18 @@
     {
       "file": ".tmp/pass-expiry-renewal-production-evidence.json",
       "sha256": "59299bd126794f40870361be25d90a699fa799f3a28cb95c6f4977381d62643e"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/deployment-current.json",
+      "sha256": "3967015004644e6d203c329302cf40d224a4d43a8f18171ff4f3b5fe9af59900"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/runtime-deployed-validation.json",
+      "sha256": "74a5ad19d39e3d4e2f8694673fe7922f7f6d3a46c04b16f08835ca7514fa7e48"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/final-deployed-state.json",
+      "sha256": "bc970f090b69894e4acdbd5ceec3ebffcb9bf0534f67faae5fb233d77abfcc33"
     }
   ],
   "limits": [
@@ -171,6 +183,103 @@
     "Manual journals are explicitly synthetic and do not execute exchange orders.",
     "The initial Telegram send remains uncertain; it was not retried.",
     "Expiry evidence combines retained production UI with a fresh ledger read; no active monitor was observed crossing expiry this turn.",
-    "Original issues 1 and 4 and complete historical coverage retain the limitations in the issue checklist."
-  ]
+    "Original issue 1 remains a BTC setup-quality finding. The audit and reconciliation are complete for their stated evidence, not a profitability or lifetime-history guarantee."
+  ],
+  "postDeployVerification": {
+    "deployment": {
+      "checkedAt": "2026-11-18T18:25:07.400Z",
+      "deploymentId": "86f1cdec-8740-44fc-be3d-2df2591ae2ce",
+      "status": "SUCCESS",
+      "createdAt": "2026-11-18T18:20:16.058Z",
+      "commit": "b344c6b93f390408f8979906e649ce3774447066"
+    },
+    "ui": {
+      "at": "2026-11-18T18:32:01.122Z",
+      "checks": [
+        {
+          "name": "legacy-listing-runtime-derived-and-rendered",
+          "pass": true,
+          "listingId": "pmi_72ec597cc06a99ca0e807df2ee8d1ec0",
+          "calculation": "hybrid",
+          "title": "Tapeout executed delta & EMA 8",
+          "badge": "Host + Tapeout NANDThe delta kernel executes through Tapeout NAND; graph calculations and state run in the compatible host.",
+          "badgeClass": "indicator-runtime-badge indicator-runtime-hybrid",
+          "detail": "Host + Tapeout NAND. The delta kernel executes through Tapeout NAND; graph calculations and state run in the compatible host."
+        },
+        {
+          "name": "original-paid-receipt-runtime-derived-and-rendered",
+          "pass": true,
+          "listingId": "pmi_e11cdad208b28c2e35d1c6d86b4cd6ca",
+          "purchaseId": "iqu_f5329e65ec5e49f586b7603681fc45de",
+          "calculation": "host",
+          "sha256": "bceb9acef5e6cc383f5cd7f3d42dfa66577850da9f7ea0fbbad7fc18dd0798d6",
+          "version": "1.0.0",
+          "settlementTx": "0x0022ef6f73c98e8dc6b6d94607dac50bf2a8032d761b500f501ff1ccd8bdd184",
+          "badge": "Tapeout portable · host calculated",
+          "badgeClass": "indicator-runtime-badge indicator-runtime-host is-compact",
+          "detail": "Tapeout portable · host calculated. This portable graph runs in the compatible host. Its Tapeout NAND kernel is not executed."
+        }
+      ],
+      "payments": 0,
+      "messages": 0,
+      "scripts": [
+        "https://app.ai-pulse.tech/assets/index-GNJ6hFLo.js"
+      ],
+      "requests": [
+        {
+          "path": "/v1/terminal/indicators",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/indicators",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/history/session",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/history/session",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/indicators",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/indicators/purchases",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/indicators",
+          "method": "GET",
+          "status": 200
+        },
+        {
+          "path": "/v1/terminal/indicators/purchases",
+          "method": "GET",
+          "status": 200
+        }
+      ],
+      "pass": true
+    },
+    "cleanup": {
+      "at": "2026-11-18T18:35:37.652Z",
+      "owner": "0xda64eefe238283717d8ef0e2b8876b3a7643142f",
+      "allPositionsClosedAndPaused": true,
+      "positions": 3,
+      "telegramPaused": true,
+      "eventPreferencesEmpty": true,
+      "allRadarsAndWatchesPaused": true,
+      "paidPassActive": true,
+      "grants": 1,
+      "workspaceLocked": true
+    }
+  }
 }
