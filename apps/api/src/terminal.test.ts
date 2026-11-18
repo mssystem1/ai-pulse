@@ -11,7 +11,7 @@ import { createTerminalRoutes } from "./terminalRoutes.js";
 import { TerminalAuth } from "./terminalAuth.js";
 import { TerminalPayments } from "./terminalPayments.js";
 import { PublicActivityStore } from "./publicActivity.js";
-import { TerminalRuntime } from "./terminalRuntime.js";
+import { TerminalRuntime, telegramDeliveryFailureReason } from "./terminalRuntime.js";
 import { applyTerminalPositionEvent, emptyTerminalWorkspace, grantTerminalPass, MemoryTerminalStorage, TerminalStore, terminalAccess, type TerminalPosition, type TerminalPurchase, type TerminalWorkspace } from "./terminalStore.js";
 
 const account = privateKeyToAccount(`0x${"11".repeat(32)}`), other = privateKeyToAccount(`0x${"22".repeat(32)}`);
@@ -130,12 +130,43 @@ test("perpetual mark uses derivative source; Telegram transition dedup and expir
 test("notification consent is checked again before delivery; ambiguous send is never blindly retried", async () => {
   let now = BORN; const state = store(); let sends = 0;
   await state.mutate(OWNER, value => { grant(value); const p = position(); p.quantity = 1; p.averageEntry = 100; value.positions.push(p); value.telegram = { enabled: true, events: ["target_touched"] }; });
-  const runtime = new TerminalRuntime(cfg(), { store: state, now: () => now, snapshot: async () => fixture(now), telegramRecipient: async () => 123, telegramSend: async () => { sends++; throw new Error("timeout after possible acceptance"); } });
+  const runtime = new TerminalRuntime(cfg(), { store: state, now: () => now, snapshot: async () => fixture(now), telegramRecipient: async () => 123, telegramSend: async () => { sends++; throw Object.assign(new Error("https://api.telegram.org/botSECRET/sendMessage chat_id=123"), { cause: Object.assign(new Error("private socket details"), { code: "ECONNRESET" }) }); } });
   await runtime.cycleOwner(OWNER); assert.equal(sends, 1);
-  assert.equal((await state.get(OWNER)).deliveries[0]?.state, "uncertain");
+  const uncertain = (await state.get(OWNER)).deliveries[0];
+  assert.equal(uncertain?.state, "uncertain");
+  assert.equal(uncertain?.error, "Telegram transport failed (ECONNRESET); acknowledgement is uncertain and automatic resend is suppressed.");
+  assert.doesNotMatch(uncertain?.error ?? "", /SECRET|api\.telegram|chat_id|private socket/);
   now += MINUTE; await runtime.cycleOwner(OWNER); assert.equal(sends, 1);
   await state.mutate(OWNER, value => { value.deliveries.push({ id: "queued", eventId: value.activity.find(e => e.kind === "target_touched")!.id, subjectId: "position-1", recipientId: 123, state: "queued", createdAt: new Date(now).toISOString() }); value.positions[0].paused = true; });
   await runtime.deliver(OWNER); assert.equal(sends, 1); assert.equal((await state.get(OWNER)).deliveries.at(-1)?.state, "cancelled");
+});
+
+test("Telegram delivery diagnostics retain only safe timeout, HTTP and transport classifications", () => {
+  assert.equal(telegramDeliveryFailureReason(Object.assign(new Error("secret url"), { name: "TimeoutError" })), "Telegram delivery timed out; acknowledgement is uncertain and automatic resend is suppressed.");
+  assert.equal(telegramDeliveryFailureReason(Object.assign(new Error("raw response"), { status: 503, telegramCode: 503 })), "Telegram returned HTTP 503 (API code 503); acknowledgement is uncertain and automatic resend is suppressed.");
+  assert.equal(telegramDeliveryFailureReason(Object.assign(new Error("fetch failed"), { cause: Object.assign(new Error("private"), { code: "ECONNRESET" }) })), "Telegram transport failed (ECONNRESET); acknowledgement is uncertain and automatic resend is suppressed.");
+  assert.equal(telegramDeliveryFailureReason(Object.assign(new Error("unknown secret payload"), { cause: Object.assign(new Error("private"), { code: "SECRET_TOKEN_VALUE" }) })), "Telegram delivery failed; acknowledgement is uncertain and automatic resend is suppressed.");
+});
+
+test("Telegram successful HTTP response with a failed acknowledgement-body read stays uncertain, reports transport code and is never resent", async () => {
+  let sends = 0; const state = store();
+  await state.mutate(OWNER, value => { grant(value); const p = position(); p.quantity = 1; p.averageEntry = 100; value.positions.push(p); value.telegram = { enabled: true, events: ["target_touched"] }; });
+  const oldFetch = globalThis.fetch, oldToken = process.env.TELEGRAM_BOT_TOKEN; let fetchCalls = 0;
+  const bodyReadError = Object.assign(new TypeError("https://api.telegram.org/botSECRET failed"), { cause: Object.assign(new Error("private socket text"), { code: "ECONNRESET" }) });
+  globalThis.fetch = (async () => { fetchCalls++; return { ok: true, status: 200, json: async () => { throw bodyReadError; } } as Response; }) as typeof fetch;
+  process.env.TELEGRAM_BOT_TOKEN = "test-only-not-a-real-token";
+  try {
+    const runtime = new TerminalRuntime(cfg(), { store: state, now: () => BORN, snapshot: async () => fixture(BORN), telegramRecipient: async () => 123 });
+    await runtime.cycleOwner(OWNER);
+    const delivery = (await state.get(OWNER)).deliveries[0];
+    assert.equal(delivery?.state, "uncertain");
+    assert.equal(delivery?.error, "Telegram transport failed (ECONNRESET); acknowledgement is uncertain and automatic resend is suppressed.");
+    assert.doesNotMatch(delivery?.error ?? "", /SECRET|api\.telegram|private socket/);
+    assert.equal(fetchCalls, 1); await runtime.deliver(OWNER); assert.equal(fetchCalls, 1); assert.equal(sends, 0);
+  } finally {
+    globalThis.fetch = oldFetch;
+    if (oldToken === undefined) delete process.env.TELEGRAM_BOT_TOKEN; else process.env.TELEGRAM_BOT_TOKEN = oldToken;
+  }
 });
 
 test("fresh OI/funding metadata cannot refresh an old perpetual mark", async () => {

@@ -15,6 +15,27 @@ import { createTerminalLiveCandles } from "./terminalLiveCandle.js";
 import type { TerminalMarketHistory } from "./terminalMarketHistory.js";
 import { coalesceTerminalIncident, formatTerminalNotification, terminalDependencyIssue, terminalNotificationConsent, terminalRadarNotification, terminalRadarSourceIssue, type TerminalNotificationActivity, type TerminalNotificationIssue } from "./terminalNotifications.js";
 
+/** Safe delivery diagnostics deliberately expose only a small allowlist of
+ * transport codes and numeric HTTP statuses. Never persist raw fetch errors,
+ * response bodies, bot URLs, tokens, or recipient details in workspace state. */
+export function telegramDeliveryFailureReason(error: unknown): string {
+  const outer = error && typeof error === "object" ? error as { name?: unknown; status?: unknown; telegramCode?: unknown; code?: unknown; cause?: unknown } : {};
+  const cause = outer.cause && typeof outer.cause === "object" ? outer.cause as { code?: unknown; name?: unknown } : {};
+  const name = String(outer.name ?? cause.name ?? "");
+  if (name === "TimeoutError" || name === "AbortError") return "Telegram delivery timed out; acknowledgement is uncertain and automatic resend is suppressed.";
+  const status = Number(outer.status);
+  if (Number.isInteger(status) && status >= 100 && status <= 599) {
+    const telegramCode = Number(outer.telegramCode);
+    return Number.isInteger(telegramCode) && telegramCode >= 100 && telegramCode <= 599
+      ? `Telegram returned HTTP ${status} (API code ${telegramCode}); acknowledgement is uncertain and automatic resend is suppressed.`
+      : `Telegram returned HTTP ${status}; acknowledgement is uncertain and automatic resend is suppressed.`;
+  }
+  const code = String(cause.code ?? outer.code ?? "").toUpperCase();
+  const safeCodes = new Set(["ECONNRESET", "ETIMEDOUT", "EAI_AGAIN", "ENOTFOUND", "ECONNREFUSED", "EHOSTUNREACH", "ENETUNREACH", "UND_ERR_CONNECT_TIMEOUT", "UND_ERR_SOCKET", "UND_ERR_HEADERS_TIMEOUT", "UND_ERR_BODY_TIMEOUT"]);
+  if (safeCodes.has(code)) return `Telegram transport failed (${code}); acknowledgement is uncertain and automatic resend is suppressed.`;
+  return "Telegram delivery failed; acknowledgement is uncertain and automatic resend is suppressed.";
+}
+
 export type TerminalDependencies = {
   store?: TerminalStore;
   snapshot?: typeof createTerminalMarketSnapshot;
@@ -394,11 +415,17 @@ export class TerminalRuntime {
       else {
         const token = process.env.TELEGRAM_BOT_TOKEN; if (!token) throw new Error("Telegram bot delivery is not configured");
         const response = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ chat_id: recipient, text, disable_web_page_preview: true }), signal: AbortSignal.timeout(15_000) });
-        const body = await response.json() as { ok?: boolean; result?: { message_id?: number } };
-        if (!response.ok || !body.ok || !Number.isSafeInteger(body.result?.message_id)) throw new Error("Telegram did not acknowledge this notification");
-        messageId = body.result!.message_id;
+        let body: { ok?: boolean; result?: { message_id?: number }; error_code?: number } | undefined;
+        try { body = await response.json() as typeof body; }
+        catch (error) { if (response.ok) throw error; }
+        if (!response.ok || !body?.ok || !Number.isSafeInteger(body?.result?.message_id)) {
+          const failure = new Error();
+          Object.assign(failure, { name: "TelegramHttpError", status: response.status, telegramCode: Number.isSafeInteger(body?.error_code) ? body?.error_code : undefined });
+          throw failure;
+        }
+        messageId = body!.result!.message_id!;
       }
-    } catch (error) { failure = error instanceof Error ? error.message : "Notification delivery is uncertain"; }
+    } catch (error) { failure = telegramDeliveryFailureReason(error); }
     await this.store.mutate(owner, value => { const saved = value.deliveries.find(d => d.id === item.id); if (!saved || saved.state !== "sending") return false; saved.state = messageId !== undefined ? "acknowledged" : "uncertain"; if (messageId !== undefined) saved.messageId = messageId; if (failure) saved.error = failure; });
   }
 }

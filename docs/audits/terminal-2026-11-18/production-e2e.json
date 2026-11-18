@@ -1,0 +1,176 @@
+{
+  "capturedAt": "2026-11-18T18:02:00.054Z",
+  "app": "https://app.ai-pulse.tech/trading-terminal",
+  "owner": "0xda64eefe238283717d8ef0e2b8876b3a7643142f",
+  "paidIndicator": {
+    "listingId": "pmi_e11cdad208b28c2e35d1c6d86b4cd6ca",
+    "version": "1.0.0",
+    "sha256": "bceb9acef5e6cc383f5cd7f3d42dfa66577850da9f7ea0fbbad7fc18dd0798d6",
+    "priceUsdc": "1",
+    "network": "base",
+    "purchaseId": "iqu_f5329e65ec5e49f586b7603681fc45de",
+    "simulated": false,
+    "settlement": {
+      "at": "2026-11-18T17:50:24.323Z",
+      "chainId": 8453,
+      "hash": "0x0022ef6f73c98e8dc6b6d94607dac50bf2a8032d761b500f501ff1ccd8bdd184",
+      "status": "success",
+      "blockNumber": "59167974",
+      "transfers": [
+        {
+          "from": "0xda64eefe238283717d8ef0e2b8876b3a7643142f",
+          "to": "0xa7d827622c4f9c884ca8f751b2060dd767f18683",
+          "value": "1000000"
+        }
+      ]
+    },
+    "applied": [
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot1",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      },
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot2",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      },
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot3",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      }
+    ],
+    "restored": [
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot1",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      },
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot2",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      },
+      {
+        "chartIndicator": "trader.00d6d151d28743abb0e2ad22ae0d8236@1.0.0:plot3",
+        "plottedSeriesPoints": 507,
+        "sourceTimeframe": "1H",
+        "units": "USDT"
+      }
+    ],
+    "previousIndicatorsPreserved": 3,
+    "additionalRestorePayment": false
+  },
+  "telegram": {
+    "consentedEvents": [
+      "protection_touched",
+      "target_touched"
+    ],
+    "event": {
+      "id": "position:tpos_9067748e-234a-49cd-af46-d42a67c8b7b9:protection_touched:1795024302573",
+      "kind": "protection_touched",
+      "at": "2026-11-18T17:51:42.759Z",
+      "message": "protection touched. This is a price observation; no protective order or exit fill is verified."
+    },
+    "delivery": {
+      "id": "td_6a46ea6ecfdd7e339f65b151ce2b7e7b",
+      "state": "acknowledged",
+      "messageId": 98
+    },
+    "cleanup": {
+      "telegram": {
+        "linked": true,
+        "enabled": false
+      },
+      "position": {
+        "status": "closed",
+        "paused": true,
+        "telegram": false,
+        "quantity": 0,
+        "realizedPnl": -7.275957614183426e-17
+      },
+      "radars": [
+        {
+          "id": "tr_aebb3622-6e28-444e-8583-ee34abbdfeb3",
+          "paused": true
+        }
+      ]
+    },
+    "earlierAttempt": {
+      "state": "uncertain",
+      "error": "fetch failed",
+      "retried": false
+    },
+    "remoteReadOnlyCheck": {
+      "botIdentityVerified": true,
+      "ipv4Verified": true,
+      "ipv6Error": "ENETUNREACH",
+      "temporaryKeyRemoved": true
+    }
+  },
+  "expiryRenewal": {
+    "scope": "Previous TEST wallet; current configured TEST wallet is separate",
+    "proof": {
+      "expiredAccessRenderedBeforeRenewal": true,
+      "priorActualGrantExpiredAt": "2026-11-18T07:59:43.721Z",
+      "newActualSettledPurchaseAt": "2026-11-18T09:09:16.630Z",
+      "newDuration": "24h",
+      "paidGrantStartsAtPurchase": true,
+      "actualDurationHours": 24,
+      "newExpiry": "2026-11-19T09:09:16.630Z",
+      "activeAccessRenderedAfterRenewal": true,
+      "productionLedgerReverified": true,
+      "telegramStillOff": true,
+      "radarsAndWatchesStillPaused": true
+    },
+    "limits": [
+      "Uses retained production checkout/UI evidence plus a fresh production ledger read; no accelerated production clock",
+      "Does not claim that an active monitor was observed crossing expiry during this turn",
+      "Continuous pre-expiry stacking is covered by isolated tests; this real renewal occurred after expiry"
+    ],
+    "newPayments": 0
+  },
+  "sourceArtifacts": [
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/paid-indicator-live-result.json",
+      "sha256": "c62512921d6e079d3f37e2c224fbd6f288fd0f9c314a8de3d027a969b45c1898"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/paid-chain-validation.json",
+      "sha256": "50d3697a4f57b9f227d2a5d51fe7438bc713bcb21ca98a9e16cc1fd1f6d9bbda"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/paid-receipt-check.json",
+      "sha256": "6ad596a255be3bd132f1268c82ef5f18250237895f63f285db47f7fef1f49a4a"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/telegram-live-results.json",
+      "sha256": "49641ac5e39d1bb59ea9869922dabf830a89ae42e91154c011c41713f2fc4338"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/telegram-uncertain-attempt.json",
+      "sha256": "03d34a9a05676b430ba3dcb8e88989dd905b1be9f0c7eef14fd633b6048eec5a"
+    },
+    {
+      "file": ".tmp/deployed-terminal-retest-20261118/telegram-remote-egress.json",
+      "sha256": "39dc8708174945c877bd3b17ede85620e68ee6fe524827f5eaddb3630995267d"
+    },
+    {
+      "file": ".tmp/pass-expiry-renewal-production-evidence.json",
+      "sha256": "59299bd126794f40870361be25d90a699fa799f3a28cb95c6f4977381d62643e"
+    }
+  ],
+  "limits": [
+    "Telegram acknowledged delivery means API acceptance, not proof the user read it.",
+    "Manual journals are explicitly synthetic and do not execute exchange orders.",
+    "The initial Telegram send remains uncertain; it was not retried.",
+    "Expiry evidence combines retained production UI with a fresh ledger read; no active monitor was observed crossing expiry this turn.",
+    "Original issues 1 and 4 and complete historical coverage retain the limitations in the issue checklist."
+  ]
+}
