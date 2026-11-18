@@ -66,6 +66,41 @@ describe("persistent research scenario lifecycle", () => {
     }
     assert.equal(advanceGlobalScenario(definition(), null, [event("target_touch", 5, "tp1")], BORN + 6 * MIN).reason, "target_before_entry", "Saved v1 opportunities retain their original cancellation rule");
   });
+  it("treats the setup deadline as exclusive while allowing a touch just before it", () => {
+    const d = definition({ expiresAt: BORN + 120 * MIN });
+    const before = advanceGlobalScenario(d, null, [event("entry_touch", 119)], BORN + 119 * MIN);
+    assert.equal(before.state, "entry_observed");
+
+    const atDeadline = advanceGlobalScenario(d, null, [event("entry_touch", 120)], d.expiresAt);
+    assert.equal(atDeadline.state, "expired");
+    assert.equal(atDeadline.reason, "setup_deadline");
+    assert.equal(atDeadline.entryObservedAt, undefined);
+  });
+  it("expires a confirmed fill at its exclusive fill deadline but accepts one just before", () => {
+    const d = definition({ mode: "confirmed_retest", policyId: "accepted-breakout-retest-v1", fillWindowMs: 15 * MIN });
+    const confirmed = advanceGlobalScenario(d, null, [event("confirmation", 10)], BORN + 10 * MIN);
+    assert.equal(confirmed.state, "confirmed_awaiting_fill");
+
+    const before = advanceGlobalScenario(d, confirmed, [event("entry_touch", 24)], BORN + 24 * MIN);
+    assert.equal(before.state, "entry_observed");
+
+    const atDeadline = advanceGlobalScenario(d, confirmed, [event("entry_touch", 25)], BORN + 25 * MIN);
+    assert.equal(atDeadline.state, "expired");
+    assert.equal(atDeadline.reason, "confirmation_fill_deadline");
+    assert.equal(atDeadline.entryObservedAt, undefined);
+  });
+  it("keeps an entered scenario live for exits at and after the setup deadline", () => {
+    const d = definition({ expiresAt: BORN + 12 * MIN });
+    const entered = advanceGlobalScenario(d, null, [event("entry_touch", 10)], BORN + 10 * MIN);
+    const atDeadline = advanceGlobalScenario(d, entered, [event("target_touch", 12, "tp1")], d.expiresAt);
+    assert.equal(atDeadline.state, "entry_observed");
+    assert.equal(atDeadline.exits.length, 1);
+    assert.equal(atDeadline.exits[0].at, d.expiresAt);
+
+    const afterDeadline = advanceGlobalScenario(d, atDeadline, [event("target_touch", 13, "tp2")], d.expiresAt + MIN);
+    assert.equal(afterDeadline.outcome?.kind, "target_observed");
+    assert.equal(afterDeadline.remainingFraction, 0);
+  });
   it("separates stable source identity from priced revisions and render time", () => {
     const d = definition(), later = definition({ createdAt: BORN + 5 * MIN, expiresAt: BORN + 180 * MIN });
     assert.equal(d.scenarioId, later.scenarioId); assert.equal(d.revisionId, later.revisionId);

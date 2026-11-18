@@ -57,8 +57,8 @@ export function advanceGlobalScenario(
   };
   const expireBefore = (at: number) => {
     if (state.state === "entry_observed") return false;
-    if (at > state.expiresAt) { state.state = "expired"; state.reason = "setup_deadline"; return true; }
-    if (state.confirmationAt !== undefined && at > state.confirmationAt + definition.fillWindowMs) {
+    if (at >= state.expiresAt) { state.state = "expired"; state.reason = "setup_deadline"; return true; }
+    if (state.confirmationAt !== undefined && at >= state.confirmationAt + definition.fillWindowMs) {
       state.state = "expired"; state.reason = "confirmation_fill_deadline"; return true;
     }
     return false;
