@@ -2,7 +2,8 @@ import {createHash} from "node:crypto";
 
 export const TERMINAL_TAPEOUT_XLAYER={chainId:196 as const,factory:"0x1f09daefa827f02cbb40967cc91b259763760761",processor:"0x839bdd6fa7a66416a609a735e11de5411b98574e",circuitId:"2" as const};
 export type TerminalTapeoutRead={version:"tapeout-xlayer-nand-v1";chainId:196;processor:string;circuitId:"2";factory:string;blockNumber:string;blockHash:string;observedAt:number;netlist:string;codeHash:string;truthTable:readonly number[];verified:true;endpoints:string[]};
-const ENDPOINTS=["https://rpc.xlayer.tech","https://tapeout.net/rpc-xlayer"];
+// Official X Layer RPC pair. Agreement does not establish upstream independence.
+const ENDPOINTS=["https://rpc.xlayer.tech","https://xlayerrpc.okx.com"];
 const expectedNetlist="0x000000020000030000000400000400000005000005";
 const word=(n:number)=>n.toString(16).padStart(64,"0");
 class TapeoutTransientReadError extends Error {}

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import type { TerminalMarketSnapshot } from "@pulse/domain";
 import type { GlobalReport } from "@pulse/schemas";
 import type { TerminalPosition, TerminalRadar } from "./terminalStore.js";
-import { terminalAiContext, terminalSelectedInspection, TerminalInspectionUnavailableError } from "./terminalAiContext.js";
+import { terminalAiAskMessages, terminalAiContext, terminalAiQuestionRequestsSetup, terminalSelectedInspection, TerminalInspectionUnavailableError } from "./terminalAiContext.js";
 import { globalDesignFixture } from "../../../packages/domain/src/globalReport.fixtures.js";
 import { advanceGlobalScenario, createGlobalScenarioDefinition } from "@pulse/analysis";
 
@@ -33,6 +33,31 @@ function pricedReport(firstTarget = 110, nearestObstacle = 105): GlobalReport {
 }
 
 const marketSnapshot = (report: GlobalReport) => ({ observedAt: Date.parse(report.snapshot.observedAt), report, sources: [], tools: { value: {}, flow: {}, derivatives: {}, liquidity: {} } } as unknown as TerminalMarketSnapshot);
+
+test("indicator sections answer the product workflow first and omit unrelated setup context unless requested", () => {
+  const report = pricedReport(), snapshot = marketSnapshot(report);
+  const context = terminalAiContext({ snapshot, report, section: "create-indicator", question: "Explain Indicators Studio versus Simple Indicators, and how to preview before publishing.", selected: {}, exposure: [] });
+  assert.equal(context.setupAnalysisIncluded, false); assert.equal(context.setup, undefined); assert.equal(context.market, undefined);
+  const messages = terminalAiAskMessages({ question: "Explain Indicators Studio versus Simple Indicators, and how to preview before publishing.", section: "create-indicator", context });
+  assert.match(messages[0].content, /lead with the requested product workflow/i);
+  assert.match(messages[0].content, /Indicators Studio is the visual\/script graph editor/);
+  assert.match(messages[0].content, /Simple Indicators is the simpler executed-flow formula and rolling-series builder/);
+  assert.match(messages[0].content, /Only discuss setup\/market analysis when the user explicitly asks/);
+  assert.doesNotMatch(messages[1].content, /BTC-USDT|setupAnalysisIncluded.*true/);
+  const asked = terminalAiContext({ snapshot, report, section: "create-indicator", question: "Explain how this saved BTC setup is qualified.", selected: {}, exposure: [] });
+  assert.equal(asked.setup.side, "long"); assert.equal(asked.setupAnalysisIncluded, undefined);
+  snapshot.instId = "BTC-USDT"; snapshot.timeframe = "1H";
+  snapshot.tools.flow = { id: "spot-flow", source: "pinned-indicator-preview", status: "partial", knownAt: 500, marketType: "spot", units: "BTC", buy: 4, sell: 3, delta: 1, points: [] };
+  const inspected = terminalAiContext({ snapshot, report, section: "my-indicators", question: "Explain this indicator reading.", inspection: { tool: "flow", stream: "spot" }, inspectionEvidence: snapshot, selected: {}, exposure: [] });
+  assert.equal(inspected.setup, undefined); assert.equal(inspected.setupAnalysisIncluded, false);
+  assert.equal(inspected.selectedInspection.source.source, "pinned-indicator-preview"); assert.equal(inspected.selectedInspection.values.delta, 1);
+  assert.equal(terminalAiQuestionRequestsSetup("分析当前行情"), true);
+  for (const section of ["market", "my-indicators"] as const) {
+    const messages = terminalAiAskMessages({ question: "How do I find my indicators?", section, context: terminalAiContext({ snapshot, report, section, question: "How do I find my indicators?", selected: {}, exposure: [] }) });
+    assert.match(messages[0].content, /lead with the requested product workflow/i);
+    assert.doesNotMatch(messages[1].content, /BTC-USDT|selectedSetupEligibility/);
+  }
+});
 
 test("a passive limit is ready for preparation separately from immediate entry confirmation", () => {
   const report = pricedReport();

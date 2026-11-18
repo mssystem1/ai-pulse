@@ -37,6 +37,7 @@ function fixture(manifest: IndicatorManifest, mode = "valid") {
 }
 const options = {rpcUrls:["https://first.example","https://second.example"],now:1234};
 test("registered numerical package verifies exact ports, bytes, implementation and six outputs on both pinned RPCs",async()=>{
+  assert.deepEqual(INDICATOR_TAPEOUT_XLAYER.rpcUrls,["https://rpc.xlayer.tech","https://xlayerrpc.okx.com"]);
   for(const manifest of [cvd,createFormulaIndicatorPackage({id:"test.weighted",title:"Weighted flow",description:"An actual custom numerical formula.",author:"Tester",expression:"buy*2-sell",output:{label:"Weighted delta",unit:"volume",accumulation:"bar"}})]){
     const f=fixture(manifest),result=await verifyIndicatorDeployment(manifest,{processor,circuitId:"71"},{...options,fetchImpl:f.fetchImpl});
     assert.equal(result.verified,true);assert.equal(result.chainId,196);assert.equal(result.circuitId,"71");assert.equal(result.blockNumber,"256");assert.equal(result.beacon,beacon);assert.equal(result.implementation,implementation);assert.equal(result.vectorCount,6);assert.equal(result.observedAt,1234);assert.match(result.netlistHash,/^sha256:[a-f0-9]{64}$/);

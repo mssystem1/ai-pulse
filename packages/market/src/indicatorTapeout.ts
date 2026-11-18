@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 /** Official TapeOut X Layer deployment, not the separate Fab X factory. */
-export const INDICATOR_TAPEOUT_XLAYER = { chainId: 196 as const, factory: "0x1f09daefa827f02cbb40967cc91b259763760761", defaultProcessor: "0x839bdd6fa7a66416a609a735e11de5411b98574e", rpcUrls: ["https://rpc.xlayer.tech", "https://tapeout.net/rpc-xlayer"] as const };
+export const INDICATOR_TAPEOUT_XLAYER = { chainId: 196 as const, factory: "0x1f09daefa827f02cbb40967cc91b259763760761", defaultProcessor: "0x839bdd6fa7a66416a609a735e11de5411b98574e", rpcUrls: ["https://rpc.xlayer.tech", "https://xlayerrpc.okx.com"] as const };
 export type IndicatorDeploymentPackage = { runtime: { inputBits: number; outputBits: number; netlist: string } };
 export type IndicatorDeploymentReference = { processor: string; circuitId: string; transactionHash?: string };
 export type VerifiedIndicatorDeployment = {

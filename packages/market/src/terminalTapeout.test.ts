@@ -18,6 +18,7 @@ function source(change=false){const calls:{method:string;params:any[]}[]=[];cons
 test("registered XLayer netlist is imported at one agreed block and actually evaluated",async()=>{
   const s=source(),component=await fetchTerminalTapeoutComponent({fetchImpl:s.fetchImpl,now:100});
   assert.equal(component.chainId,196);assert.equal(component.circuitId,"2");assert.equal(component.blockNumber,"254");assert.equal(component.verified,true);
+  assert.deepEqual(component.endpoints,["https://rpc.xlayer.tech","https://xlayerrpc.okx.com"]);
   for(let n=0;n<4;n++)assert.equal(evaluateTerminalTapeoutNand(component,Boolean(n&1),Boolean(n&2)),n!==3);
   assert.ok(s.calls.every(c=>["eth_chainId","eth_blockNumber","eth_getBlockByNumber","eth_getCode","eth_call"].includes(c.method)));
   assert.ok(s.calls.filter(c=>c.method==="eth_call").every(c=>c.params[1]==="0xfe"));
@@ -37,4 +38,15 @@ test("persistent transport failure stays unavailable after at most one retry per
 test("semantic RPC rejection is not retried",async()=>{
   const counts=new Map<string,number>(),fetchImpl:typeof fetch=async url=>{counts.set(String(url),(counts.get(String(url))??0)+1);return new Response(JSON.stringify({jsonrpc:"2.0",error:{code:-32602,message:"invalid parameters"}}),{status:200});};
   await assert.rejects(fetchTerminalTapeoutComponent({fetchImpl}),/public view failed/);assert.ok([...counts.values()].every(count=>count===1));
+});
+test("an endpoint HTTP rejection remains fail closed without trusting the responding source",async()=>{
+  const fixture=source(),counts=new Map<string,number>();
+  const fetchImpl:typeof fetch=async(url,init)=>{
+    const endpoint=String(url);counts.set(endpoint,(counts.get(endpoint)??0)+1);
+    if(endpoint==="https://xlayerrpc.okx.com")return new Response("forbidden",{status:403});
+    return fixture.fetchImpl(url,init);
+  };
+  await assert.rejects(fetchTerminalTapeoutComponent({fetchImpl}),/HTTP 403/);
+  assert.deepEqual([...counts.keys()].sort(),["https://rpc.xlayer.tech","https://xlayerrpc.okx.com"]);
+  assert.equal(counts.get("https://xlayerrpc.okx.com"),1);
 });
