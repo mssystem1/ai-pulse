@@ -171,7 +171,10 @@ export function createApp(cfg: AppConfig, dependencies: {
   robinhoodPayment?: express.RequestHandler;
 } = {}) {
   const app = express();
-  const terminal = createTerminalRoutes(cfg, dependencies.terminal);
+  const publicActivity = createPublicActivityStore(cfg);
+  const terminal = createTerminalRoutes(cfg, { ...dependencies.terminal, observePassGrant: async grant => {
+    await publicActivity.recordTerminalPass({ grantId: grant.id, paymentId: grant.paymentId, network: grant.network, duration: grant.duration, purchasedAt: grant.purchasedAt, simulated: grant.simulated });
+  } });
   const polymarket = dependencies.polymarket || new PolymarketClient({
     gammaUrl: cfg.POLYMARKET_GAMMA_URL,
     clobUrl: cfg.POLYMARKET_CLOB_URL,
@@ -180,15 +183,36 @@ export function createApp(cfg: AppConfig, dependencies: {
   });
   const persistence = dependencies.persistence || createPersistence(cfg);
   const globalScenarios = createGlobalScenarioStore(cfg);
-  const publicActivity = createPublicActivityStore(cfg);
+  const shouldRunDurableWorker = dependencies.startDurableWorker !== false;
   const observeDelivery = (delivery: ReturnType<typeof researchDelivery>) => {
     // Marketing telemetry must never fail or repeat a successfully paid delivery.
     void publicActivity.record(delivery).catch(() => console.warn("[public-activity] delivery projection unavailable; historical job backfill remains separate"));
   };
+  // Backfill old owner-scoped grants in small background batches. Public reads
+  // only touch the aggregate; this worker emits no wallet or private workspace data.
+  if (shouldRunDurableWorker && cfg.QUEUE_PROVIDER !== "memory" && terminal.runtime) {
+    let offset = 0, running = false, nextSweepAt = 0;
+    const scan = async () => {
+      if (running) return;
+      running = true;
+      try {
+        if (Date.now() < nextSweepAt) return;
+        const [next, owners] = await terminal.runtime!.store.ownerPage(offset, 100);
+        for (const owner of owners) {
+          const workspace = await terminal.runtime!.store.get(owner);
+          for (const grant of workspace.grants) await publicActivity.recordTerminalPass({ grantId: grant.id, paymentId: grant.paymentId, network: grant.network, duration: grant.duration, purchasedAt: grant.purchasedAt, simulated: grant.simulated });
+        }
+        if (next === "") { offset = 0; nextSweepAt = Date.now() + 30 * 60_000; }
+        else offset = Number(next);
+      } catch { /* transient persistence failures retry on the next background pass */ }
+      finally { running = false; }
+    };
+    const timer = setInterval(() => { void scan(); }, 15_000); timer.unref();
+    const initial = setTimeout(() => { void scan(); }, 1_000); initial.unref();
+  }
   const passTargetExists = dependencies.passTargetExists || autopilotPassTargetExists;
   const spotInstrumentExists = dependencies.spotInstrumentExists || (async (instId: string) =>
     (await searchSpotInstruments(instId, 100)).some(instrument => instrument.instId === instId));
-  const shouldRunDurableWorker = dependencies.startDurableWorker !== false;
   let durableWorker: DurableJobWorker | undefined;
   const wakeWorker = () => {
     if (shouldRunDurableWorker) void durableWorker?.notify();

@@ -48,7 +48,7 @@ export function createTerminalRoutes(cfg: AppConfig, dependencies: TerminalDepen
   let runtime: TerminalRuntime | null = null, reason: string | undefined;
   if (cfg.FEATURE_TRADING_TERMINAL) { try { runtime = new TerminalRuntime(cfg, dependencies); registerTerminalRuntime(runtime); } catch { reason = "Durable Terminal storage is not ready. Purchases are unavailable."; } }
   const publicRouter = Router(), beforePayment = Router(), afterPayment = Router();
-  const payments = runtime ? new TerminalPayments(runtime.store, runtime.now) : null;
+  const payments = runtime ? new TerminalPayments(runtime.store, runtime.now, undefined, dependencies.observePassGrant) : null;
   publicRouter.get("/v1/terminal/catalog", (_req, res) => {
     // Read the existing connection circuit; never probe Redis for a public catalog.
     const storage = runtime?.store.storage.availability?.();

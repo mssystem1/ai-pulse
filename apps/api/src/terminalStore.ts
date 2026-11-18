@@ -27,6 +27,7 @@ export interface TerminalStorage {
   take<T>(key: string): Promise<T | null>;
   compareAndSet(key: string, expectedRevision: number, value: TerminalWorkspace, ttlSeconds: number, ownerIndex: string): Promise<boolean>;
   owners(key: string, limit: number, dueBefore?: number): Promise<string[]>;
+  ownerPage(key: string, offset: number, count: number): Promise<[string, string[]]>;
 }
 export class MemoryTerminalStorage implements TerminalStorage {
   private values = new Map<string, { value: unknown; expiresAt: number }>();
@@ -42,6 +43,7 @@ export class MemoryTerminalStorage implements TerminalStorage {
     const owners = this.indexes.get(index) ?? new Map<string, number>(); owners.set(value.owner, terminalMonitoringDueAt(value)); this.indexes.set(index, owners); return true;
   }
   async owners(key: string, limit: number, dueBefore = Date.now()) { return [...(this.indexes.get(key) ?? [])].filter(([,due]) => due <= dueBefore).sort((a,b) => a[1] - b[1]).slice(0, limit).map(([owner]) => owner); }
+  async ownerPage(key: string, offset: number, count: number): Promise<[string, string[]]> { const values=[...(this.indexes.get(key)?.keys()??[])],owners=values.slice(offset,offset+count);return [owners.length<count?"":String(offset+count),owners]; }
 }
 const CAS = `local old=redis.call('GET',KEYS[1]);local rev=0;if old then rev=cjson.decode(old).revision end;if rev~=tonumber(ARGV[1]) then return 0 end;redis.call('SET',KEYS[1],ARGV[2],'EX',ARGV[3]);redis.call('ZADD',KEYS[2],ARGV[4],ARGV[5]);return 1`;
 export class RedisTerminalStorage implements TerminalStorage {
@@ -52,6 +54,7 @@ export class RedisTerminalStorage implements TerminalStorage {
   async take<T>(key: string): Promise<T | null> { const raw = await this.redis.eval(`local v=redis.call('GET',KEYS[1]);if v then redis.call('DEL',KEYS[1]) end;return v`, [key], []); return typeof raw === "string" ? JSON.parse(raw) as T : null; }
   async compareAndSet(key: string, revision: number, value: TerminalWorkspace, ttl: number, index: string) { return Number(await this.redis.eval(CAS, [key, index], [revision, JSON.stringify(value), ttl, terminalMonitoringDueAt(value), value.owner])) === 1; }
   async owners(key: string, limit: number, dueBefore = Date.now()) { const result = await this.redis.eval("return redis.call('ZRANGEBYSCORE',KEYS[1],'-inf',ARGV[1],'LIMIT',0,ARGV[2])", [key], [dueBefore, limit]); return Array.isArray(result) ? result.map(String) : []; }
+  async ownerPage(key: string, offset: number, count: number): Promise<[string, string[]]> { const owners=await this.redis.zrange<string[]>(key,offset,offset+count-1);return [owners.length<count?"":String(offset+count),owners.map(String)]; }
 }
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export function terminalOwner(value: string) { if (!/^0x[\da-f]{40}$/i.test(value)) throw new Error("Valid wallet owner required"); return value.toLowerCase(); }
@@ -132,6 +135,7 @@ export class TerminalStore {
     throw new Error("Terminal workspace changed concurrently. Refresh and retry.");
   }
   async owners(limit = 25, dueBefore = Date.now()) { return this.storage.owners(`${this.namespace}:terminal:owners`, limit, dueBefore); }
+  async ownerPage(offset: number, count = 100) { return this.storage.ownerPage(`${this.namespace}:terminal:owners`, offset, count); }
   async ready() { await this.storage.write(this.key("ready", "probe"), { ready: true }, 60); }
 }
 export function createTerminalStore(cfg: AppConfig) {

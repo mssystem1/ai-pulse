@@ -1,5 +1,5 @@
 import { decodeEventLog, parseAbi } from "viem";
-import type { TerminalPurchase, TerminalStore } from "./terminalStore.js";
+import type { TerminalPassGrant, TerminalPurchase, TerminalStore } from "./terminalStore.js";
 import { grantTerminalPass, terminalAccess } from "./terminalStore.js";
 import { executionPublicClient } from "./onchainDiscovery.js";
 import type { ExecutionNetwork } from "./executionContracts.js";
@@ -26,7 +26,7 @@ export async function verifyTerminalPurchaseReceipt(owner: string, purchase: Ter
   return { settlementTx: txHash.toLowerCase(), settledAt: new Date(Number(block.timestamp) * 1000).toISOString() };
 }
 export class TerminalPayments {
-  constructor(private store: TerminalStore, private now: () => number = Date.now, private verifyReceipt = verifyTerminalPurchaseReceipt) {}
+  constructor(private store: TerminalStore, private now: () => number = Date.now, private verifyReceipt = verifyTerminalPurchaseReceipt, private observeGrant?: (grant: TerminalPassGrant) => Promise<void>) {}
   async prepare(owner: string, purchase: TerminalPurchase) {
     let claimed = false;
     await this.store.mutate(owner, value => {
@@ -58,7 +58,9 @@ export class TerminalPayments {
       grantTerminalPass(value, { requestId, duration: purchase.duration, priceUsd: purchase.priceUsd, amountAtomic: purchase.amountAtomic, network: purchase.network, asset: purchase.asset, paymentId: purchase.paymentId, purchasedAt: new Date(this.now()).toISOString(), simulated: purchase.simulated });
       purchase.state = "granted";
     });
-    return { recovered: true, grant: value.grants.find(item => item.requestId === requestId), access: terminalAccess(value, this.now()) };
+    const grant=value.grants.find(item => item.requestId === requestId);
+    if(grant&&this.observeGrant)try{await this.observeGrant(grant)}catch{/* Public aggregate projection is retried by bounded grant backfill. */}
+    return { recovered: true, grant, access: terminalAccess(value, this.now()) };
   }
   async recover(owner: string, requestId: string, txHash?: string) {
     const value = await this.store.get(owner), purchase = value.pendingPurchases?.find(item => item.requestId === requestId);

@@ -6,7 +6,7 @@ import { globalSetupAdmission, terminalFrameProfile, type TerminalMarketSnapshot
 import { GlobalReportSchema, GlobalScenarioSchema, type GlobalAssessment, type GlobalReport, type GlobalScenario } from "@pulse/schemas";
 import { recheckSavedGlobalReport } from "./globalAssessmentRoutes.js";
 import { TerminalAuth } from "./terminalAuth.js";
-import { appendTerminalActivity, createTerminalStore, terminalAccess, suspendExpiredTerminal, terminalMonitoringDueAt, type TerminalActivity, type TerminalPosition, type TerminalRadar, type TerminalSourceIssue, type TerminalStore, type TerminalWatch, type TerminalWorkspace } from "./terminalStore.js";
+import { appendTerminalActivity, createTerminalStore, terminalAccess, suspendExpiredTerminal, terminalMonitoringDueAt, type TerminalActivity, type TerminalPassGrant, type TerminalPosition, type TerminalRadar, type TerminalSourceIssue, type TerminalStore, type TerminalWatch, type TerminalWorkspace } from "./terminalStore.js";
 import { inspectTelegramConfiguration } from "./telegram.js";
 import { StoreRedis } from "./storeRedis.js";
 import { createGlobalScenarioStore, GlobalScenarioHistoryUnavailableError, reconcileGlobalScenarioAssessment, type GlobalScenarioStore } from "./globalScenarioStore.js";
@@ -28,6 +28,7 @@ export type TerminalDependencies = {
   telegramRecipient?: (owner: string) => Promise<number | null>;
   telegramSend?: (recipient: number, text: string) => Promise<number>;
   scenarios?: GlobalScenarioStore;
+  observePassGrant?: (grant: TerminalPassGrant) => Promise<void>;
 };
 const hash = (s: string) => createHash("sha256").update(s).digest("hex").slice(0, 32);
 export class TerminalRadarRequestConflictError extends Error { readonly code = "terminal_radar_request_conflict"; }

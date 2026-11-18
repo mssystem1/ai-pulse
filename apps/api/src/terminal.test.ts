@@ -10,6 +10,7 @@ import type { TerminalMarketSnapshot, TerminalTapeoutComponent } from "@pulse/do
 import { createTerminalRoutes } from "./terminalRoutes.js";
 import { TerminalAuth } from "./terminalAuth.js";
 import { TerminalPayments } from "./terminalPayments.js";
+import { PublicActivityStore } from "./publicActivity.js";
 import { TerminalRuntime } from "./terminalRuntime.js";
 import { applyTerminalPositionEvent, emptyTerminalWorkspace, grantTerminalPass, MemoryTerminalStorage, TerminalStore, terminalAccess, type TerminalPosition, type TerminalPurchase, type TerminalWorkspace } from "./terminalStore.js";
 
@@ -58,6 +59,34 @@ test("settled receipt survives grant-write outage, recovers original terms exact
   const another = purchase("purchase_request_002"); await payments.prepare(OWNER, another);
   await assert.rejects(payments.recover(OWNER, another.requestId), /reconciliation/);
   assert.equal((await state.get(OWNER)).grants.length, 1);
+});
+
+test("pass aggregate outage preserves paid access and recovery counts the purchase only once", async () => {
+  const state = store(), activity = new PublicActivityStore();
+  let unavailable = true;
+  const payments = new TerminalPayments(state, () => BORN, undefined, async grant => {
+    assert.equal((await state.get(OWNER)).grants[0]?.id, grant.id);
+    if (unavailable) throw new Error("aggregate temporarily unavailable");
+    await activity.recordTerminalPass({ grantId:grant.id, ...grant });
+  });
+  const paid = { ...purchase(), simulated:false, paymentId:`base:${"a".repeat(64)}` };
+  await payments.prepare(OWNER, paid);
+  assert.equal((await payments.settled(OWNER, paid.requestId, { settledAt:new Date(BORN).toISOString() })).access.active, true);
+  assert.equal((await activity.snapshot()).terminalPasses, null);
+  unavailable = false;
+  await payments.recover(OWNER, paid.requestId);
+  await payments.recover(OWNER, paid.requestId);
+  assert.equal((await state.get(OWNER)).grants.length, 1);
+  const projection = (await activity.snapshot()).terminalPasses!;
+  assert.equal(projection.count, 1);
+  assert.deepEqual(projection.byChain[0].byDuration, { "24h":1, "7d":0, "30d":0 });
+});
+
+test("historical Terminal grant backfill reads owner indexes in bounded pages", async () => {
+  const state=store();
+  for(const [index,owner] of [OWNER,OTHER,`0x${"44".repeat(20)}`].entries()) await state.mutate(owner,value=>{value.activity.push({id:`seed-${index}`,at:new Date(BORN).toISOString(),kind:"seed",subjectId:"seed",message:"seed"});});
+  const [next,first]=await state.ownerPage(0,2),[end,last]=await state.ownerPage(Number(next),2);
+  assert.equal(first.length,2);assert.equal(last.length,1);assert.equal(end,"");
 });
 
 test("ambiguous settlement can recover only from its original verified authorization receipt", async () => {

@@ -58,6 +58,26 @@ test("execution projection counts a confirmed transaction once and keeps exact s
   assert.equal(snapshot.execution.autopilot,null);
 });
 
+test("Terminal pass projection counts each paid mainnet grant once by duration without exposing owners", async () => {
+  const store = new PublicActivityStore();
+  const pass = { grantId:`tp_${"a".repeat(32)}`, paymentId:`base:${"b".repeat(64)}`, network:"base", duration:"24h" as const, purchasedAt:"2026-11-18T09:00:00Z", simulated:false };
+  assert.equal(await store.recordTerminalPass(pass), true);
+  assert.equal(await store.recordTerminalPass({...pass, purchasedAt:"2026-11-18T10:00:00Z"}), false);
+  assert.equal(await store.recordTerminalPass({...pass, paymentId:pass.paymentId.toUpperCase()}), false);
+  assert.equal(await store.recordTerminalPass({...pass, network:"arbitrum"}), false);
+  assert.equal(await store.recordTerminalPass({...pass, grantId:`tp_${"c".repeat(32)}`, paymentId:`base:${"d".repeat(64)}`, simulated:true}), false);
+  assert.equal(await store.recordTerminalPass({...pass, grantId:`tp_${"e".repeat(32)}`, paymentId:`arc:${"f".repeat(64)}`, network:"arc-testnet"}), false);
+  assert.equal(await store.recordTerminalPass({...pass, grantId:`tp_${"1".repeat(32)}`, paymentId:`base:${"2".repeat(64)}`, duration:"7d"}), true);
+  assert.equal(await store.recordTerminalPass({...pass, simulated:undefined}), false);
+  const result=await store.snapshot();
+  assert.equal(result.terminalPasses.count,2);
+  assert.deepEqual(result.terminalPasses.byChain[0].byDuration,{"24h":1,"7d":1,"30d":0});
+  assert.equal(result.terminalPassHistoryComplete,false);
+  assert.doesNotMatch(JSON.stringify(result),/wallet|owner/i);
+  assert.ok(!JSON.stringify(result).includes(pass.paymentId));
+  assert.ok(!JSON.stringify(result).includes(pass.grantId));
+});
+
 test("historical projection requires the original owned live report and excludes fixtures", async () => {
   const paid = receipt("base");
   const job = { id:"job", payer:"0xabc", reportId:"report", stage:"completed_partial", mode:"spot", receipt:paid, updatedAt:paid.settledAt } as AnalysisJob;

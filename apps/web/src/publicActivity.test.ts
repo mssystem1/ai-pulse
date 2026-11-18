@@ -61,3 +61,42 @@ test("activity cannot claim Arc testnet reports are mainnet or mark mainnet 5042
   data.networks[1].label = "Arc Mainnet";
   assert.equal(publicActivityNetworks(data).retired[0].label, "Arc Testnet");
 });
+
+test("Terminal purchases are the fourth mainnet chart series and table column; unknown counts stay unavailable", () => {
+  const unknown = renderToStaticMarkup(createElement(PublicActivityBreakdown,{data:snapshot(),loading:false,retry(){}}));
+  const unknownChart = unknown.match(/<figure\b.*?<\/figure>/s)![0];
+  assert.match(unknownChart,/Trading Terminal/);
+  assert.match(unknownChart,/Trading Terminal purchases: unavailable/);
+  assert.match(unknown,/Observed mainnet total<\/th><td>3<\/td><td>—<\/td>/);
+  assert.doesNotMatch(unknown,/landing-terminal-pass-stats|24h<\/th>|7d<\/th>|30d<\/th>/);
+
+  const data = snapshot(true);
+  data.networks.push({chain:"eip155:196",label:"X Layer",environment:"mainnet",research:{global:null,prediction:null,risk:null}});
+  data.terminalPasses={count:6,byChain:[
+    {count:2,byDuration:{"24h":1,"7d":1,"30d":0},firstAt:"2026-10-01T00:00:00Z",lastAt:"2026-10-04T00:00:00Z",chain:"eip155:8453",label:"Base"},
+    {count:4,byDuration:{"24h":2,"7d":1,"30d":1},firstAt:"2026-10-01T00:00:00Z",lastAt:"2026-10-04T00:00:00Z",chain:"eip155:196",label:"X Layer"},
+  ]};
+  assert.ok(parsePublicActivity(data));
+  const html=renderToStaticMarkup(createElement(PublicActivityBreakdown,{data,loading:false,retry(){}}));
+  const chart=html.match(/<figure\b.*?<\/figure>/s)![0];
+  assert.match(chart,/Risk Guard[\s\S]*Trading Terminal/);
+  assert.match(chart,/class="activity-series-terminal"[^>]+title="Trading Terminal purchases: 4"/);
+  assert.match(chart,/X Layer\. Global: unavailable; Prediction: unavailable; Risk Guard: unavailable; Trading Terminal purchases: 4/);
+  assert.match(chart,/X Layer[\s\S]*?<div class="landing-chart-total">4<small>Partial coverage<\/small><\/div>/);
+  assert.match(html,/Observed mainnet total<\/th><td>5<\/td><td>—<\/td><td>—<\/td><td>6<\/td>/);
+  assert.match(html,/<th scope="col">Risk Guard<\/th><th scope="col">Trading Terminal<\/th>/);
+  assert.match(html,/<th scope="row">X Layer<small>Mainnet<\/small><\/th><td>—<\/td><td>—<\/td><td>—<\/td><td>4<\/td>/);
+  assert.doesNotMatch(html,/landing-terminal-pass-stats|<th scope="col">24h<\/th>|<th scope="col">7d<\/th>|<th scope="col">30d<\/th>/);
+  assert.match(html,/each completed paid pass purchase once across all durations, including renewals/i);
+});
+
+test("Terminal purchase data rejects inconsistent totals, unknown durations and testnet attribution", () => {
+  const data=snapshot();
+  data.terminalPasses={count:3,byChain:[{count:3,byDuration:{"24h":1,"7d":1,"30d":1},firstAt:"2026-10-01T00:00:00Z",lastAt:"2026-10-04T00:00:00Z",chain:"eip155:8453",label:"Base"}]};
+  const invalid:unknown[]=[];
+  const total=structuredClone(data);total.terminalPasses!.count=4;invalid.push(total);
+  const duration=structuredClone(data);duration.terminalPasses!.byChain[0].byDuration={"24h":1,"7d":2,"year":0} as never;invalid.push(duration);
+  const duplicate=structuredClone(data);duplicate.terminalPasses!.byChain.push(structuredClone(duplicate.terminalPasses!.byChain[0]));duplicate.terminalPasses!.count=6;invalid.push(duplicate);
+  const testnet=structuredClone(data);testnet.terminalPasses!.byChain[0].chain="eip155:5042002";invalid.push(testnet);
+  for(const candidate of invalid)assert.equal(parsePublicActivity(candidate),null);
+});
