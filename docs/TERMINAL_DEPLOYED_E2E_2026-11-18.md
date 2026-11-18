@@ -1,6 +1,6 @@
 # Deployed Trading Terminal audit — 2026-11-18
 
-Target: https://app.ai-pulse.tech/trading-terminal; API: https://pulse-api-production-7aae.up.railway.app. The production retest verified commits 98e6197 and d467264. The landing pass-count feature below is a subsequent local change and still requires deployment.
+Target: https://app.ai-pulse.tech/trading-terminal; API: https://pulse-api-production-7aae.up.railway.app. The production retest verified commits 98e6197 and d467264. The landing pass-count feature in f08abaa was also deployed and verified on the live landing page.
 
 ## Production retest after deployment
 
@@ -54,9 +54,17 @@ Trading Terminal is the fourth series after Risk Guard in the existing Research 
 
 After durable activation, the API projects the grant into a persistent aggregate with atomic Redis deduplication by normalized payment identity and network. Projection failure does not fail paid access. A background sweep reads at most 100 indexed owners per page to add retained historical grants and retry missing projections; public activity requests read only aggregates. Full sweeps repeat after 30 minutes. Owners can move during index pagination, so history stays explicitly incomplete; the sweep cannot prove that all lifetime purchases survived.
 
-Local checks cover recovery deduplication, mismatched network rejection, simulated/testnet exclusion, duration totals, private-data exclusion, bounded owner pages, strict browser parsing and unavailable coverage. A localhost browser fixture uses clearly synthetic counts to check Clarity and Horizon at 1440px and 390px. The validation.json and screenshots in .tmp/landing-terminal-activity-20261118/ record zero page overflow and zero runtime exceptions. Fixture counts are not production totals. Both API and web deployment are needed before this section and the historical projection become live.
+Local checks cover recovery deduplication, mismatched network rejection, simulated/testnet exclusion, duration totals, private-data exclusion, bounded owner pages, strict browser parsing and unavailable coverage. A localhost browser fixture uses clearly synthetic counts to check Clarity and Horizon at 1440px and 390px. The validation.json and screenshots in .tmp/landing-terminal-activity-20261118/ record zero page overflow and zero runtime exceptions. Fixture counts are not production totals; the separate live deployment retest below uses actual responses.
 
 Final checks passed: 24 focused API tests, six landing component/parser tests, the public cross-chain aggregate endpoint regression, and API and production web builds. A separate isolated projection of the actual approved deployed grant also counted one Base purchase and ignored its replay; pass-projection-validation.json records that check without writing production data. The final chart fixture verifies the four legend entries and five table headers in order, the two Terminal bar segments, unavailable network coverage, and removal of the separate card.
+
+## Live landing deployment verification
+
+At 2026-11-18 14:33 UTC, the production page at https://www.ai-pulse.tech received a fresh, durable public activity response containing three paid Terminal pass purchases on Base. All three were 24-hour purchases, with purchase timestamps from November 17 through November 18. Other networks had no verified Terminal purchase coverage; their table cells remained dashes. Historical completeness remained false.
+
+An isolated Chrome run verified the live page in Clarity and Horizon at 1440px and 390px. It checked the exact legend order (Global, Prediction, Risk Guard, Trading Terminal), the matching table columns, each network's pass count against the response, each stacked row total, and the Terminal footer total. Base correctly totaled 46 observed records: 36 Global deliveries, five Prediction deliveries, two Risk Guard deliveries, and three Terminal purchases. There was no separate Terminal card or duration-column breakdown. The four browser cases had no horizontal page overflow and no runtime exceptions. A further public API read left the purchase aggregate unchanged. These are real production counts, not the earlier local fixture.
+
+The connected browser initially timed out navigating to the site; the successful checks used the isolated repeatable browser runner. No wallet, signatures or payments were needed for this public retest. The runner closed its temporary browser afterward. Evidence is in .tmp/deployed-landing-activity-20261118/: validation.json, public-activity.json, and desktop/mobile chart and table screenshots. The test script is .tmp/deployed-terminal-retest-20261118/landing-production.mjs.
 
 ## Limits
 
