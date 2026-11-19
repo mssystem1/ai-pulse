@@ -23,7 +23,7 @@ test("attached hourly setup drops the wick-consumed target while retaining the c
 test("daily objectives stay ahead of newer context and retain the observed recovery evidence",()=>{
   const r=make("1Dutc"),p=r.discretionaryPlan!;assert.equal(p.reference.price,79803.6);
   const latest=r.currentMarket!.frames.find(f=>f.timeframe==="1H")!.candles.at(-1)!.close,sign=p.side==="long"?1:-1;
-  assert.ok(p.targets.every(t=>sign*(t.price-latest)>0));assert.ok(p.evidence);assert.equal(p.side,"long");
+  assert.ok(p.targets.every(t=>sign*(t.price-latest)>0));assert.equal(p.entryReaction?.timeframe,"4H");assert.equal(p.entryReaction?.kind,"completed_break");assert.equal(p.side,"short");
   const invalid=structuredClone(r);invalid.discretionaryPlan!.targets[0]={...p.targets[0],price:80400};assert.equal(GlobalReportSchema.safeParse(invalid).success,false);
 });
 
@@ -35,7 +35,7 @@ test("4H keeps the latest primary low before distant old objectives",()=>{
 test("all attached horizons retain their distinct source clocks and explicit causal execution policy",()=>{
   for(const frame of Object.keys(cutoffs)){
     const r=make(frame),p=r.discretionaryPlan!,policy=p.executionPolicy!;assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.requiresNewTestAfter,undefined);
-    assert.ok(p.reference.completedAt<=Date.parse(cutoffs[frame]));assert.ok(policy.eventKnownAt<=Date.parse(cutoffs[frame]));assert.ok(policy.expiresAt>Date.parse(cutoffs[frame]));assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.reference.price)>0));
+    assert.ok(p.reference.completedAt<=Date.parse(cutoffs[frame]));assert.ok(policy.eventKnownAt<=Date.parse(cutoffs[frame]));assert.ok(policy.expiresAt>Date.parse(cutoffs[frame]));assert.ok(p.targets.every(t=>(p.side==="long"?1:-1)*(t.price-p.entry)>0));
     const scenario=r.scenario!,deadline=policy.mode==="confirmed_retest"&&scenario.confirmationAt!==undefined?Math.min(policy.expiresAt,scenario.confirmationAt+scenario.definition.fillWindowMs):policy.expiresAt;
     assert.equal(globalScenarioEntryDeadline(r),deadline);
     const condition=globalTradeCards(r)[0].condition;

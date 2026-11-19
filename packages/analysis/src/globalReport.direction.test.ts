@@ -10,15 +10,23 @@ const fixture=JSON.parse(readFileSync(new URL("./globalReport.direction-fixture.
 const make=(tf:string,quote?:{last:number;ts:string})=>{const markets=Object.entries(fixture.frames).map(([bar,rows])=>({instId:"BTC-USDT",source:"okx-public-spot",bar,fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT",...quote},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium"});};
 
 for(const tf of ["1H","4H","1Dutc"])test(`${tf} evaluates the October 24 support recovery separately from the older bearish trend`,()=>{
-  const r=make(tf),p=r.discretionaryPlan!;assert.equal(r.setupSelection!.assessment,"short");assert.equal(p.side,"long");assert.ok(p.evidence);assert.equal(globalDecision(r).direction,"LONG");
-  assert.equal(p.stopBasis.timeframe,tf);assert.equal(p.objectiveTimeframe,tf);assert.ok(p.stop<p.entry&&p.targets.every(t=>t.price>p.entry));
-  assert.ok(globalSetupEvidenceLines(r).some(line=>/reclaim and hold/.test(line)));assert.ok(globalTradeCards(r)[0].lines.some(l=>/reclaim and hold/.test(l)));
+  const r=make(tf),p=r.discretionaryPlan!;assert.equal(r.setupSelection!.assessment,"short");
+  if(tf==="1Dutc"){
+    assert.equal(p.side,"short");assert.equal(globalDecision(r).direction,"SHORT");assert.equal(p.entryReaction?.kind,"completed_break");assert.equal(p.entryReaction?.timeframe,"4H");
+    const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;
+    assert.ok(source.close<prior.close);assert.equal(p.entry,p.entryReaction!.level!.price);assert.equal(p.stopBasis.timeframe,"4H");
+  } else {
+    assert.equal(p.side,"long");assert.ok(p.evidence);assert.equal(globalDecision(r).direction,"LONG");
+    assert.equal(p.stopBasis.timeframe,tf);assert.equal(p.objectiveTimeframe,tf);assert.ok(p.stop<p.entry&&p.targets.every(t=>t.price>p.entry));
+    assert.ok(globalSetupEvidenceLines(r).some(line=>/reclaim and hold/.test(line)));assert.ok(globalTradeCards(r)[0].lines.some(l=>/reclaim and hold/.test(l)));
+  }
   assert.equal(GlobalReportSchema.safeParse(r).success,true);
 });
 test("the daily report retains newer completed hourly context without inventing a completed daily close",()=>{
   const r=make("1Dutc");assert.equal(r.snapshot.price,81188.2);assert.equal(r.entryStudy!.candles.at(-1)!.close,79803.6);
   assert.equal(r.currentMarket!.frames.find(f=>f.timeframe==="1H")!.candles.at(-1)!.close,80539.7);
-  assert.equal(r.discretionaryPlan!.evidence!.timeframe,"1H");assert.ok(r.discretionaryPlan!.stop<79220.1);
+  const p=r.discretionaryPlan!;assert.equal(p.entryReaction!.timeframe,"4H");assert.equal(p.entryReaction!.kind,"completed_break");
+  assert.equal(p.stopBasis.timeframe,"4H");assert.ok(p.stop>p.entry);assert.ok(p.executionPolicy!.eventKnownAt<=Date.parse(r.snapshot.observedAt));
 });
 test("15m fast protection retains its own reaction or structural zone rather than the distant session low",()=>{
   const r=make("15m"),p=r.discretionaryPlan!,basis=r.candles.find(c=>c.ts===p.stopBasis.anchorTs)!;

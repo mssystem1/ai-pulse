@@ -4,7 +4,7 @@
   "inputs": {
     "fixture": {
       "file": "packages/analysis/src/globalEntryReaction.fixture.json.gz",
-      "sha256": "54626df6b06b1f4a5afbc4a20e7a5280d62a6d5d7b7fac2962538e59fc168dbb"
+      "sha256": "292b288df53ab63a044197504c1f9e9dbca5df5e32f18d6960c204fe5a4768b8"
     },
     "path": {
       "file": "docs/evidence/btc-entry-reactions-2026-11-19/nov6-15m.json.gz",

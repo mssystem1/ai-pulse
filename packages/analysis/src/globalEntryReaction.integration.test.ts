@@ -6,6 +6,7 @@ import {GlobalReportSchema,candleCloseTime,type GlobalReport} from "@pulse/schem
 import {globalRiskMeasurement,globalSetupAdmission,globalTradeCards,globalEntryStudySvg,globalReportChartSvg} from "@pulse/domain";
 import {applyGlobalDiscretionaryPlan} from "./globalDiscretionaryPlan.js";
 import {globalEntryReactions} from "./globalEntryReaction.js";
+import {selectGlobalSetupContext} from "./globalSetupContext.js";
 import {globalScenarioDefinitionForReport} from "./globalScenarioLifecycle.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
 
@@ -17,7 +18,7 @@ function revised(name:string,frame:string){const r=structuredClone(fixtures.find
 test("disputed daily and weekly snapshots use their own completed execution source before payoff is measured",()=>{
   for(const frame of ["1Dutc","1Wutc"]){
     const original=fixtures.find(c=>c.name==="nov17"&&c.frame===frame)!.report,before=structuredClone(original),r=revised("nov17",frame),p=r.discretionaryPlan!,a=r.alternatePlan!;
-    assert.equal(r.setupPolicyVersion,"source-limits-v4");assert.equal(p.side,"short");
+    assert.equal(r.setupPolicyVersion,"source-limits-v5");assert.equal(p.side,"short");
     assert.equal(p.entry,frame==="1Dutc"?65057.4:65000);
     assert.equal(p.entry,globalEntryReactions(r).find(c=>c.side===p.side)!.entry,"No older, farther source may replace the latest one to clear a reward floor");
     assert.equal(p.stopBasis.timeframe,frame==="1Dutc"?"4H":"1Dutc");
@@ -66,10 +67,58 @@ test("the earlier weekly recovery cannot force a long after the completed daily 
   assert.equal(globalSetupAdmission(r).allowed,false,"A poor weighted payoff or overlapping primary support remains an explicit risk failure; no guaranteed trade is invented");
 });
 
+test("a newer hourly bounce cannot override the declared daily plan's 4H source",()=>{
+  const archived=fixtures.find(c=>c.name==="nov19")!.report,before=structuredClone(archived);
+  assert.equal(archived.discretionaryPlan!.side,"long");assert.equal(archived.discretionaryPlan!.evidence!.timeframe,"1H");
+  assert.equal(archived.entryStudy!.timeframe,"4H");assert.equal(GlobalReportSchema.safeParse(archived).success,true,"The earlier deployed artifact remains readable");
+  const current=revised("nov19","1Dutc"),p=current.discretionaryPlan!;
+  assert.equal(current.setupPolicyVersion,"source-limits-v5");assert.equal(p.side,"short");assert.equal(p.entry,63123.6);
+  assert.equal(p.entryReaction!.timeframe,"4H");assert.equal(p.executionPolicy!.eventTimeframe,"4H");assert.equal(p.stopBasis.timeframe,"4H");
+  assert.equal(globalSetupAdmission(current).allowed,true);assert.equal(GlobalReportSchema.safeParse(current).success,true);
+  const reviewed=reviewGlobalTargetReport(archived);assert.notEqual(reviewed,archived);assert.equal(reviewed.discretionaryPlan!.side,"short");
+  assert.deepEqual(archived,before);assert.deepEqual(reviewed.snapshot,archived.snapshot);
+  const forged=structuredClone(archived);forged.setupPolicyVersion="source-limits-v5";
+  assert.equal(GlobalReportSchema.safeParse(forged).success,false,"A new policy cannot label hourly evidence as a 4H execution event");
+});
+
+test("execution timing overrides retain strict daily source selection unless legacy research is explicit",()=>{
+  const archived=fixtures.find(c=>c.name==="nov19"&&c.frame==="1Dutc")!.report,before=structuredClone(archived);
+  const strict=structuredClone(archived);applyGlobalDiscretionaryPlan(strict,{fillWindowBars:4});
+  assert.equal(strict.setupPolicyVersion,"source-limits-v5");
+  assert.equal(strict.discretionaryPlan!.side,"short");assert.equal(strict.discretionaryPlan!.entry,63123.6);
+  for(const p of [strict.discretionaryPlan,strict.alternatePlan])if(p){
+    assert.equal(p.reference.timeframe,"4H");assert.equal(p.executionPolicy!.eventTimeframe,"4H");
+    if(p.evidence)assert.equal(p.evidence.timeframe,"4H");
+  }
+  assert.equal(GlobalReportSchema.safeParse(strict).success,true);
+  const legacy=structuredClone(archived);applyGlobalDiscretionaryPlan(legacy,{fillWindowBars:4,sourceSelection:"legacy-v4"});
+  assert.equal(legacy.setupPolicyVersion,"source-limits-v4");assert.equal(legacy.discretionaryPlan!.side,"long");
+  assert.equal(legacy.discretionaryPlan!.evidence!.timeframe,"1H");
+  assert.equal(GlobalReportSchema.safeParse(legacy).success,true);
+  assert.deepEqual(archived,before);
+});
+
+test("strict setup context ignores newer hourly closes outside its declared 4H source",()=>{
+  const archived=fixtures.find(c=>c.name==="nov19"&&c.frame==="1Dutc")!.report,before=structuredClone(archived);
+  const study=archived.entryStudy!,last=study.candles.at(-1)!;
+  const input={bars:study.candles,timeframe:study.timeframe,completedAt:candleCloseTime(last.ts,study.timeframe)!,primaryClosed:candleCloseTime(archived.candles.at(-1)!.ts,archived.snapshot.timeframe)!,primaryAtr:archived.indicators.atr.points.at(-1)!.value,cutoff:Date.parse(archived.snapshot.observedAt),strictExecutionFrame:true};
+  const baseline=structuredClone(archived);baseline.currentMarket!.frames=[];
+  const expected=selectGlobalSetupContext(baseline,input);
+  for(const close of [1,1_000_000_000]){
+    const changed=structuredClone(archived),hourly=changed.currentMarket!.frames.find(f=>f.timeframe==="1H")!,bar=hourly.candles.at(-1)!;
+    assert.ok(candleCloseTime(bar.ts,"1H")!>input.completedAt,"The hourly observation is newer than the declared source");
+    assert.ok(candleCloseTime(bar.ts,"1H")!<=input.cutoff,"The competing hourly close was available at publication");
+    bar.close=close;bar.low=Math.min(bar.low,close);bar.high=Math.max(bar.high,close);
+    changed.currentMarket!.frames=[hourly];
+    assert.deepEqual(selectGlobalSetupContext(changed,input),expected,"An unrelated hourly close cannot change strict source context");
+  }
+  assert.deepEqual(archived,before);
+});
+
 test("a free review upgrades original reports once without rewriting their source or snapshot",()=>{
   for(const {report:original} of fixtures){
     const before=structuredClone(original),r=reviewGlobalTargetReport(original);
-    assert.notEqual(r,original);assert.equal(r.setupPolicyVersion,"source-limits-v4");assert.ok(r.targetReviewOf);
+    assert.notEqual(r,original);assert.equal(r.setupPolicyVersion,"source-limits-v5");assert.ok(r.targetReviewOf);
     assert.deepEqual(original,before);assert.deepEqual(r.snapshot,original.snapshot);assert.deepEqual(r.candles,original.candles);
     assert.equal(reviewGlobalTargetReport(r),r);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   }

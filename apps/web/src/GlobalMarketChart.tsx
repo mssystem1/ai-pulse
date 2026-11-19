@@ -202,7 +202,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       // Preserve the history count while allowing exact setup prices to fit
       // beside the candles on a narrow inspection chart as well as desktop.
       const scale=chart.timeScale(),logicalAt=(ts:number)=>{const coordinate=scale.timeToCoordinate(stamp(ts));return coordinate===null?null:scale.coordinateToLogical(coordinate);};
-      const first=data[Math.max(0,data.length-count)],lastTs=indicatorState.current.reduce((latest,item)=>item.points.reduce((end,point)=>Math.max(end,point.ts),latest),formingState.current?.ts??last.ts);
+      const first=data[Math.max(0,data.length-count)],lastTs=indicatorState.current.reduce((latest,item)=>displayStudy(item).points.reduce((end,point)=>Math.max(end,point.ts),latest),formingState.current?.ts??last.ts);
       const from=logicalAt(first.ts),to=logicalAt(lastTs);
       if(from!==null&&to!==null)scale.setVisibleLogicalRange(globalLogicalSetupWindow(from,to,scale.width(),full));
     };

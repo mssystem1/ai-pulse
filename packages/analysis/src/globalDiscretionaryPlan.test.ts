@@ -11,13 +11,13 @@ import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles
 
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
-const make=(frame:string,legacy=false)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",...(legacy?{executionSettings:{fillWindowBars:4}}:{})});
+const make=(frame:string,legacy=false)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",...(legacy?{executionSettings:{fillWindowBars:4,sourceSelection:"legacy-v4" as const}}:{})});
 
 test("saved v8 reports from before the source-limit revision receive a free review once",()=>{
  const archived=make("1Wutc");delete archived.setupPolicyVersion;
  const before=structuredClone(archived),review=reviewGlobalTargetReport(archived);
  assert.notEqual(review,archived);assert.deepEqual(archived,before);
- assert.equal(review.setupPolicyVersion,"source-limits-v4");assert.ok(review.targetReviewOf);
+ assert.equal(review.setupPolicyVersion,"source-limits-v5");assert.ok(review.targetReviewOf);
  assert.deepEqual(review.candles,archived.candles);assert.deepEqual(review.snapshot,archived.snapshot);
  assert.equal(reviewGlobalTargetReport(review),review);
 });
@@ -26,7 +26,7 @@ test("a saved source-limits-v2 one-target plan upgrades on free review without m
  const saved=make("1Wutc");saved.setupPolicyVersion="source-limits-v2";
  for(const p of [saved.discretionaryPlan,saved.alternatePlan])if(p){p.executionPolicy!.id="structural-edge-passive-v2";p.executionPolicy!.configurationKey=p.executionPolicy!.configurationKey.replace("source-edge-v3","source-edge-v2");p.executionPolicy!.targetAllocations=[1];p.targets=p.targets.slice(0,1);p.priceZones!.targets=p.priceZones!.targets.slice(0,1);}
  const before=structuredClone(saved),review=reviewGlobalTargetReport(saved);
- assert.deepEqual(saved,before);assert.equal(review.setupPolicyVersion,"source-limits-v4");
+ assert.deepEqual(saved,before);assert.equal(review.setupPolicyVersion,"source-limits-v5");
  assert.equal(review.discretionaryPlan!.executionPolicy!.id,"entry-reaction-passive-v1");
  assert.ok(review.discretionaryPlan!.targets.length>=1&&review.discretionaryPlan!.targets.length<=3);
  assert.equal(reviewGlobalTargetReport(review),review);
@@ -101,7 +101,7 @@ test("a distant weekly SL cannot flatten the daily entry detail or change any pl
   const stretched=structuredClone(report),p=stretched.discretionaryPlan!;p.stop=Math.max(1,p.entry*.15);p.stopBasis.price=p.stop+1;
   const far=globalEntryStudySvg(stretched)!;
   assert.ok(far.includes('data-entry-offscale-levels="SL"')||/data-entry-offscale-levels="[^"]*SL/.test(far));
-  assert.doesNotMatch(far,/data-entry-price-role="SL"/);assert.match(far,/Full Entry, SL and targets remain on the main chart/);
+  assert.doesNotMatch(far,/data-entry-price-role="SL"/);assert.match(far,/full Entry, SL and targets remain on the main chart/);
   const main=globalReportChartSvg(stretched)!;assert.ok(main.includes(`data-trade-role="SL" data-price="${p.stop}"`));
   const firstCandle=/<rect x="[^\"]+" y="[^\"]+" width="[^\"]+" height="([^\"]+)" fill="#(?:35d0aa|ef6b85)"\/>/;
   assert.equal(far.match(firstCandle)?.[1],detail.match(firstCandle)?.[1],'Moving only off-scale primary protection must not shrink entry candles');

@@ -10,7 +10,7 @@ const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
 // Explicit settings retain the registered structural-edge policy so these
 // archive-compatibility regressions do not silently change strategy versions.
-const make=(frame="1Wutc")=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",executionSettings:{fillWindowBars:4}});
+const make=(frame="1Wutc")=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",executionSettings:{fillWindowBars:4,sourceSelection:"legacy-v4"}});
 
 test("alternate source-edge plans retain the first primary obstacle and distinct later targets",()=>{
   const report=make(),alternate=report.alternatePlan!;

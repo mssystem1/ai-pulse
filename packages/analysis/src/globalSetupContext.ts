@@ -27,10 +27,10 @@ export function globalTwoSidedStructureChoices(report:GlobalReport,selected?:Cho
 
 /** Select a current conditional setup from location and retained structure.
  * These numerical conventions implement public methods, not private XO rules. */
-export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalCandle[];timeframe:string;completedAt:number;primaryClosed:number;primaryAtr:number;cutoff:number}):Choice|null{
+export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalCandle[];timeframe:string;completedAt:number;primaryClosed:number;primaryAtr:number;cutoff:number;strictExecutionFrame?:boolean}):Choice|null{
   const {bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff}=input;
   const last=bars.at(-1)!,primary=report.candles.at(-1)!,tf=report.snapshot.timeframe;
-  const latest=[{timeframe,candles:bars},...(report.currentMarket?.frames??[])].flatMap(f=>{const c=f.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,f.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]!.price;
+  const latest=input.strictExecutionFrame?last.close:[{timeframe,candles:bars},...(report.currentMarket?.frames??[])].flatMap(f=>{const c=f.candles.at(-1);return c?[{price:c.close,at:candleCloseTime(c.ts,f.timeframe)??0}]:[];}).sort((a,b)=>b.at-a.at)[0]!.price;
   const assessment=report.setupSelection?.assessment,regime=report.setupSelection?.regime;
   const macro=["week","month"].includes(parseCandleTimeframe(tf)?.unit??"");
   const fast=report.indicators.ema?.find(e=>e.period===12)?.points.at(-1)?.value;
@@ -88,10 +88,10 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
   const cross=crosses[0];
   const localChoice=cross?{...pick(cross.side,"breakout_retest","reclaimed_level",cross.price,timeframe,cross.knownAt),evidence:{kind:"local_reclaim" as const,timeframe,level:cross.price,testTs:cross.at,completedAt:candleCloseTime(cross.at,timeframe)!,extreme:cross.extreme}}:undefined;
 
-  // A sweep/reclaim of a known primary level is a different opportunity from
-  // continuing the older trend. Daily/weekly reports retain the newer hourly
-  // recovery separately; it never becomes an invented completed daily candle.
-  const recentSource=[{timeframe,candles:bars},...(report.currentMarket?.frames.filter(f=>f.timeframe==="1H")??[])].sort((a,b)=>(candleCloseTime(b.candles.at(-1)!.ts,b.timeframe)??0)-(candleCloseTime(a.candles.at(-1)!.ts,a.timeframe)??0))[0];
+  // A primary-level reclaim uses the declared execution frame in the current
+  // daily/weekly policy. A faster bounce cannot replace that entry evidence.
+  // Explicit legacy research settings retain their registered source search.
+  const recentSource=[{timeframe,candles:bars},...(!input.strictExecutionFrame?report.currentMarket?.frames.filter(f=>f.timeframe==="1H")??[]:[])].sort((a,b)=>(candleCloseTime(b.candles.at(-1)!.ts,b.timeframe)??0)-(candleCloseTime(a.candles.at(-1)!.ts,a.timeframe)??0))[0];
   const current=recentSource.candles.at(-1)!,horizonStart=report.candles.at(-Math.min(report.strategy?.lookbackBars??120,report.candles.length))!.ts;
   const reclaims=report.indicators.pivots.filter(a=>a.ts>=horizonStart&&a.confirmedAt!==null).flatMap(anchor=>{
     if(macro||regime==="range"||assessment==="sideways")return [];
@@ -107,7 +107,7 @@ export function selectGlobalSetupContext(report:GlobalReport,input:{bars:GlobalC
     // A same-bar wick alone cannot oppose the trend: retain a later completed
     // hold, or a subsequent close through the rejection bar's directional edge.
     const recoveredAt=candleCloseTime(recent[recovery].ts,recentSource.timeframe)!;
-    const later=(report.currentMarket?.frames??[]).flatMap(f=>f.candles.filter(c=>c.ts>=recoveredAt));
+    const later=(report.currentMarket?.frames??[]).filter(f=>!input.strictExecutionFrame||f.timeframe===timeframe).flatMap(f=>f.candles.filter(c=>c.ts>=recoveredAt));
     if(recovery===recent.length-1&&assessment!==side&&(!later.length||later.some(c=>sign*(c.close-anchor.price)<0)))return [];
     return [{side,price:anchor.price,knownAt,test:recent[tested],completedAt:candleCloseTime(recent[recovery].ts,recentSource.timeframe)!,extreme:side==="long"?Math.min(...recent.slice(tested,recovery+1).map(c=>c.low)):Math.max(...recent.slice(tested,recovery+1).map(c=>c.high))}];
   }).sort((a,b)=>b.completedAt-a.completedAt||Math.abs(current.close-a.price)-Math.abs(current.close-b.price));

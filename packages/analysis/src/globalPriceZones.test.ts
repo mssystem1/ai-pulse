@@ -10,7 +10,7 @@ const cutoffs:Record<string,string>={"1H":"2026-10-25T08:12:13.313Z","4H":"2026-
 function make(tf:string,quote?:number,lang:"en"|"zh"="en",legacy=false){
   const observedAt=cutoffs[tf]??fixture.observedAt;
   const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:observedAt,ticker:{priceCurrency:"USDT",...(quote===undefined?{}:{last:quote,ts:String(Date.parse(observedAt)-1000)})},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true})).filter(c=>candleCloseTime(c.ts,bar)!<=Date.parse(observedAt)).slice(-520)}));
-  return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium",lang,...(legacy?{executionSettings:{fillWindowBars:4}}:{})});
+  return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium",lang,...(legacy?{executionSettings:{fillWindowBars:4,sourceSelection:"legacy-v4" as const}}:{})});
 }
 test("a quote crossing 80,639 does not flip a mixed daily thesis without new primary evidence",()=>{
   const a=make("1Dutc",80617.5),b=make("1Dutc",80650.7);

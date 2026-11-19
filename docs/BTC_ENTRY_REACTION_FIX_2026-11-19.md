@@ -8,7 +8,11 @@ The earlier audit is retained in `BTC_SETUP_QUALITY_AUDIT_2026-11-18.md`. Its ar
 
 The disputed daily short used the distant daily EMA ribbon as its entry and a primary swing for protection. It required a large recovery to reach the entry. The weekly assessment could keep its slower recovery direction after daily support had broken. The first-obstacle 1R gate also rejected partial exits even when later sourced targets supported the requested staged plan. These were construction and selection problems; the chart did not establish that BTC would rally to the old entry and then fall to its targets.
 
-`source-limits-v4` uses completed evidence on the declared execution timeframe: 4H for daily plans and daily candles for weekly plans. A completed rejection or sweep supplies its body edge; a completed break supplies the previously known broken boundary. A surviving newer break can change execution direction independently of the slower primary assessment. The selected plan and opposing alternative retain separate sources, prices and risk checks.
+`source-limits-v5` uses completed evidence on the declared execution timeframe: 4H for daily plans and daily candles for weekly plans. A completed rejection or sweep supplies its body edge; a completed break supplies the previously known broken boundary. A surviving newer break can change execution direction independently of the slower primary assessment. The selected plan and opposing alternative retain separate sources, prices and risk checks.
+
+The first live verification of `663d7a5` found a remaining source-selection defect: a newer 1H reclaim could override the daily report's available 4H entry study. That long failed admission while a valid 4H short remained the alternate. V5 pins reclaim selection and eligibility prices to the actual execution frame and validates the selected and alternate event/reference clocks. Execution timing overrides retain V5; archived research selection requires the explicit `sourceSelection: "legacy-v4"` setting. Earlier V4 reports remain readable and receive a free correction. The exact November 19 production report is now an additional frozen regression: the corrected selected short uses entry 63,123.60, fixed 4H SL 63,772.70 and three sourced targets; its planned allocated payoff is 2.40R before costs.
+
+The live check also found that raw installed-study timestamps could suppress the chart's initial plan padding when those studies were plotted on primary-candle timestamps. Initial view and Reset now use the plotted clock. Saved user zoom/pan restoration remains unchanged. This fix must pass the final live chart check before issue 1 closes.
 
 Protection is fixed using ATR from that source candle: 0.2 ATR beyond the wick, with at least 0.5 ATR between entry and stop. A broken-boundary retest uses that boundary with the same minimum ATR distance. Refreshing a source cannot change its stop or renew its 16-source-bar deadline. Passive limits require no extra confirmation candle. A price touch remains an observation; exchange execution is separate.
 
@@ -27,7 +31,7 @@ Daily entry and protection use a completed 4H rejection. Weekly entry uses a com
 
 ## Replay scope and limits
 
-Six original daily/weekly reports from November 6, 17 and 18 are frozen with source-file hashes. The replay compares their original contracts with retrospective fixed-rule candidates at the same publication clocks. Later confirmed public OKX candles are independently checked against retained raw responses, with one-minute windows reconciled to their parent OHLC where available. Pre-publication bars cannot create entries. Same-bar uncertainty remains ambiguous.
+Six original daily/weekly reports from November 6, 17 and 18, plus the November 19 production regression, are frozen with source-file hashes. The historical replay compares the first six original contracts with retrospective fixed-rule candidates at the same publication clocks. Later confirmed public OKX candles are independently checked against retained raw responses, with one-minute windows reconciled to their parent OHLC where available. Pre-publication bars cannot create entries. Same-bar uncertainty remains ambiguous.
 
 The revised November 17 selected daily and weekly entry prices were later touched. Daily TP1 and weekly TP1/TP2 were later observed; their remaining portions were still open at the retained November 18 cutoff. The November 18 selected limits remained unfilled through that cutoff. An opposing daily candidate had a partial target followed by a stop. The earlier November 6 revised candidates remained risk-rejected under the approved weighted floor (approximately 0.75R daily and 0.69R weekly); the weekly entry also overlapped primary support. Those weak cases remain visible. No weights or targets were fitted retrospectively to admit them.
 
@@ -37,7 +41,7 @@ These selected incident snapshots are a causal regression sample. They do not qu
 
 ## Verification
 
-- Full analysis suite: 426/426 tests passed.
+- Full analysis suite: 429/429 tests passed, including unrelated hourly-price isolation and explicit legacy compatibility.
 - Web report, chart quote and Terminal client checks: 51/51 passed.
 - API assessment, price-path and scenario checks: 11/11 passed.
 - Full production build: all packages, API and web completed with npm exit code 0.

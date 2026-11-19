@@ -6,6 +6,7 @@ export type GlobalExecutionSettings={
   timeToLiveBars:number;
   fillWindowBars:number;
   confirmationBars:1|2;
+  sourceSelection?:"declared-frame-v5"|"legacy-v4";
 };
 export type GlobalExecutionPolicy={
   version:"execution-policy-v1";

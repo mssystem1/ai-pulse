@@ -14,7 +14,8 @@ const reactionChoice=(r:GlobalEntryReaction):Choice=>({side:r.side,family:"level
  * It does not change the canonical signal, history or execution permission. */
 export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false,forcedChoice?:Choice){
   if(report.decisionVersion!=="decision-v5"||report.strategy?.targetPolicy!=="active-zones-v1")return;
-  report.setupPolicyVersion="source-limits-v4";
+  const legacySourceSelection=settings.sourceSelection==="legacy-v4";
+  report.setupPolicyVersion=legacySourceSelection?"source-limits-v4":"source-limits-v5";
   delete report.discretionaryPlan;
   delete report.scenario;
   delete report.alternatePlan;
@@ -23,12 +24,13 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   if(canonical?.state==="confirmed"&&canonical.referenceEntry&&canonical.referenceStop!==null)return;
   const study=report.entryStudy?.status==="available"?report.entryStudy:null,bars=study?.candles??report.candles,timeframe=study?.timeframe??report.snapshot.timeframe,last=bars.at(-1),prior=bars.at(-2);
   const primaryLast=report.candles.at(-1),primaryTimeframe=report.snapshot.timeframe;
+  const strictExecutionFrame=!legacySourceSelection&&["1Dutc","1D","1Wutc","1W"].includes(primaryTimeframe);
   if(!last||!prior||!primaryLast)return;
   const completedAt=candleCloseTime(last.ts,timeframe),cutoff=Date.parse(report.snapshot.observedAt);
   const primaryClosed=candleCloseTime(primaryLast.ts,primaryTimeframe);
   if(completedAt===null||completedAt>cutoff||primaryClosed===null||primaryClosed>cutoff)return;
   const lower=report.entryStudy?.source===report.snapshot.source?report.entryStudy:null,lowerLast=lower?.candles.at(-1),lowerClosed=lowerLast?candleCloseTime(lowerLast.ts,lower!.timeframe):null;
-  const reference=lowerLast&&lowerClosed!==null&&lowerClosed>=completedAt&&lowerClosed<=cutoff?{timeframe:lower!.timeframe,candleTs:lowerLast.ts,completedAt:lowerClosed,price:lowerLast.close}:{timeframe,candleTs:last.ts,completedAt,price:last.close};
+  const reference=!strictExecutionFrame&&lowerLast&&lowerClosed!==null&&lowerClosed>=completedAt&&lowerClosed<=cutoff?{timeframe:lower!.timeframe,candleTs:lowerLast.ts,completedAt:lowerClosed,price:lowerLast.close}:{timeframe,candleTs:last.ts,completedAt,price:last.close};
   let entry=last.close;
   const atr=(study?.atr??report.indicators.atr.points).at(-1)?.value??Math.max(last.high-last.low,entry*.001),tick=10**-report.snapshot.pricePrecision;
   const round=(p:number)=>Number(p.toPrecision(12));
@@ -39,7 +41,7 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     return [{price:a.price,anchorTs:a.ts,knownAt,timeframe:source.timeframe,kind:a.kind,basis:"confirmed_swing" as const}];
   }));
   const primaryAtr=report.indicators.atr.points.at(-1)?.value??atr;
-  const coreChoice=forcedChoice??selectGlobalSetupContext(report,{bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff});
+  const coreChoice=forcedChoice??selectGlobalSetupContext(report,{bars,timeframe,completedAt,primaryClosed,primaryAtr,cutoff,strictExecutionFrame});
   if(!coreChoice)return;
   let twoSided=!forcedChoice?globalTwoSidedStructureChoices(report,coreChoice,false):null;
   const mixed=applyGlobalStrategyMix(report,report.marketEvidence);
@@ -186,8 +188,8 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   // Daily and weekly objectives retain their horizon, while execution can use
   // the declared 4H/daily reaction. Enumerate fixed causal sources newest first;
   // admission may reject them, but may never move their entry or stop for R.
-  // Explicit research overrides keep their registered legacy configuration.
-  if(!coreOnly&&!forcedChoice&&!Object.keys(settings).length&&["1Dutc","1D","1Wutc","1W"].includes(primaryTimeframe)&&report.discretionaryPlan){
+  // Legacy source selection requires an explicit research compatibility flag.
+  if(!coreOnly&&!forcedChoice&&strictExecutionFrame&&report.discretionaryPlan){
     const core=report.discretionaryPlan,reactions=globalEntryReactions(report);
     const latestBreak=reactions.find(c=>c.kind==="completed_break"&&c.knownAt>(core.evidence?.completedAt??0));
     const selectedSide=latestBreak?.side??core.side;
