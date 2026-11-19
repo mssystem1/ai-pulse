@@ -12,7 +12,7 @@ The disputed daily short used the distant daily EMA ribbon as its entry and a pr
 
 The first live verification of `663d7a5` found a remaining source-selection defect: a newer 1H reclaim could override the daily report's available 4H entry study. That long failed admission while a valid 4H short remained the alternate. V5 pins reclaim selection and eligibility prices to the actual execution frame and validates the selected and alternate event/reference clocks. Execution timing overrides retain V5; archived research selection requires the explicit `sourceSelection: "legacy-v4"` setting. Earlier V4 reports remain readable and receive a free correction. The exact November 19 production report is now an additional frozen regression: the corrected selected short uses entry 63,123.60, fixed 4H SL 63,772.70 and three sourced targets; its planned allocated payoff is 2.40R before costs.
 
-The live check also found that raw installed-study timestamps could suppress the chart's initial plan padding when those studies were plotted on primary-candle timestamps. Initial view and Reset now use the plotted clock. Saved user zoom/pan restoration remains unchanged. This fix must pass the final live chart check before issue 1 closes.
+The live checks also found that installed-study timestamps and native layout timing could suppress initial plan padding. Initial view and Reset now use the plotted clock, wait for native time-scale readiness and allow a queued range to paint before saving it. The untouched default view refits when its container narrows; real wheel, pointer and touch interaction switch to preserving the user's exact logical range through resize and refresh. This fix must pass the final live chart check before issue 1 closes.
 
 Protection is fixed using ATR from that source candle: 0.2 ATR beyond the wick, with at least 0.5 ATR between entry and stop. A broken-boundary retest uses that boundary with the same minimum ATR distance. Refreshing a source cannot change its stop or renew its 16-source-bar deadline. Passive limits require no extra confirmation candle. A price touch remains an observation; exchange execution is separate.
 
@@ -48,6 +48,7 @@ These selected incident snapshots are a causal regression sample. They do not qu
 - New frozen-source tests bind entry, source ATR, fixed stop, expiry, target count and allocations; forged sources, later ATR and altered weights fail validation.
 - Seven tampered replay inputs were rejected: wrong market, missing parent interval, future capture, altered parent OHLC, bad response hash, missing minute and altered minute OHLC.
 - Browser inspection used the real chart and setup components with frozen fixtures. Daily/weekly TP1–TP3 were present; weekly dark and Clarity displays were inspected; wheel zoom and mouse pan changed the chart; no horizontal page overflow was observed at the desktop viewport.
+- A native-browser regression adds an indicator after mounting and narrows the chart from 1,115 to 709 pixels. Daily and weekly TP1–TP3 remain visible without Reset; real wheel zoom and mouse drag change the range, and a report refresh and resize preserve its exact fractional coordinates.
 
 Immutable raw-response inputs and replay results are in `docs/evidence/btc-entry-reactions-2026-11-19/`. Reproduce without network access:
 

@@ -46,7 +46,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
   // Recreate series only when chart evidence changes, not narrative or identity.
   const evidenceKey=useMemo(()=>JSON.stringify({...report,narrative:undefined}),[report]);
   const chartReport=useMemo(()=>report,[evidenceKey]);
-  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;time:{from:Time;to:Time}|null;price:{from:number;to:number}|null;autoScale:boolean}|null>(null);
+  const viewport=useRef<{key:string;logical:{from:number;to:number}|null;time:{from:Time;to:Time}|null;price:{from:number;to:number}|null;autoScale:boolean;defaultWindow:boolean}|null>(null);
   const ref = useRef<HTMLDivElement>(null), reset = useRef<() => void>(() => {}),focus = useRef<() => void>(() => {}),history = useRef<() => void>(() => {}),fitFib=useRef<()=>void>(()=>{});
   const [microMode,setMicroMode]=useState(false);
   useEffect(()=>setMicroMode(false),[report.snapshot.instId,report.snapshot.timeframe]);
@@ -88,6 +88,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     const report=chartReport;
     if (!ref.current || report.candles.length < 2) return;
     const viewportKey=viewportIdentity??JSON.stringify([report.snapshot.source,report.snapshot.instId,report.snapshot.timeframe,report.tier]);
+    let defaultWindow=viewport.current?.key===viewportKey?viewport.current.defaultWindow:true;
     const lastTime = stamp(report.candles.at(-1)!.ts), unit = parseCandleTimeframe(report.snapshot.timeframe)?.unit;
     const chart = createChart(ref.current, { ...options, handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:true},handleScale:{mouseWheel:true,pinch:true,axisPressedMouseMove:{time:true,price:true},axisDoubleClickReset:{time:true,price:true}}, localization:{locale:report.lang==="zh"?"zh-CN":"en-US",timeFormatter:(time:Time)=>typeof time==="number"?new Date(time*1000).toISOString().slice(0,16).replace("T"," ")+" UTC":String(time)}, height: chartHeight, timeScale: { ...chartOptions.timeScale, shiftVisibleRangeOnNewBar:false, timeVisible: unit === "minute" || unit === "hour" || indicatorState.current.length > 0, tickMarkFormatter: (time: Time) => {
       const latest=indicatorState.current.reduce<number>((end,item)=>item.points.reduce<number>((value,point)=>Math.max(value,Number(stamp(point.ts))),end),Number(stamp(formingState.current?.ts??report.candles.at(-1)!.ts)));
@@ -173,7 +174,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     // Assign all proportions after all panes exist. Sequential pixel sizing
     // while adding panes otherwise compresses the earlier studies on resize.
     chart.panes().forEach((pane,index)=>pane.setStretchFactor((index===0?(pro?490:540):170)/chartHeight));
-    focusTerminalIndicators.current=()=>{const studies=indicatorState.current,flow=studies.filter(item=>item.priceContext?.points.length);const points=(flow.length?flow:studies).flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
+    focusTerminalIndicators.current=()=>{const studies=indicatorState.current,flow=studies.filter(item=>item.priceContext?.points.length);const points=(flow.length?flow:studies).flatMap(item=>item.points).filter(point=>Number.isFinite(point.value));if(points.length){defaultWindow=false;const start=Math.min(...points.map(point=>point.ts)),end=Math.max(...points.map(point=>point.ts));chart.priceScale("right").applyOptions({autoScale:true});chart.timeScale().setVisibleRange({from:stamp(start-60000),to:stamp(end+60000)});}};
     updateTerminalIndicators.current=studies=>{
       const logical=chart.timeScale().getVisibleLogicalRange();
       const plots:Record<string,TerminalIndicatorPlotInfo>={};
@@ -197,53 +198,77 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
     if(microMode)requestAnimationFrame(()=>focusTerminalIndicators.current());
     // fitContent excludes trailing whitespace in Quick. An explicit logical
     // range reserves the same future scenario space in both tiers.
-    const showWindow=(count:number,full=false)=>{
+    const showWindow=(count:number,full=false,automatic=false)=>{
       chart.priceScale("right").applyOptions({autoScale:true});
       // Preserve the history count while allowing exact setup prices to fit
       // beside the candles on a narrow inspection chart as well as desktop.
       const scale=chart.timeScale(),logicalAt=(ts:number)=>{const coordinate=scale.timeToCoordinate(stamp(ts));return coordinate===null?null:scale.coordinateToLogical(coordinate);};
       const first=data[Math.max(0,data.length-count)],lastTs=indicatorState.current.reduce((latest,item)=>displayStudy(item).points.reduce((end,point)=>Math.max(end,point.ts),latest),formingState.current?.ts??last.ts);
       const from=logicalAt(first.ts),to=logicalAt(lastTs);
-      if(from!==null&&to!==null)scale.setVisibleLogicalRange(globalLogicalSetupWindow(from,to,scale.width(),full));
+      if(scale.width()<=0||from===null||to===null)return false;
+      defaultWindow=automatic;
+      scale.setVisibleLogicalRange(globalLogicalSetupWindow(from,to,scale.width(),full));
+      return true;
     };
-    const resetView=()=>showWindow(globalSetupWindow(report));
-    reset.current = resetView;
+    const resetView=()=>showWindow(globalSetupWindow(report),false,true);
+    reset.current = ()=>{if(viewport.current?.key===viewportKey)viewport.current.defaultWindow=true;resetView();};
     history.current=()=>showWindow(data.length,true);
     fitFib.current=()=>showWindow(globalStructuralWindow(report,true));
     focus.current=()=>showWindow(Math.max(180,globalSetupWindow(report)));
+    const chartElement=chart.chartElement(),markUserViewport=()=>{defaultWindow=false;};
+    chartElement.addEventListener("pointerdown",markUserViewport,{passive:true});
+    chartElement.addEventListener("wheel",markUserViewport,{passive:true});
+    chartElement.addEventListener("touchstart",markUserViewport,{passive:true});
     chart.subscribeCrosshairMove(event=>{
       const readings:Record<string,string>={};for(const entry of indicatorSeries){const value=event.seriesData.get(entry.series);const item=indicatorState.current.find(study=>study.id===entry.id);if(value&&"value" in value&&item)readings[entry.id]=Number(value.value).toLocaleString(undefined,{maximumFractionDigits:5})+" "+item.units;}setIndicatorReadings(readings);
       const c=event.seriesData.get(candles);if(c&&"open" in c&&typeof event.time==="number"){
       const ts=event.time*1000,original=formingState.current?.ts===ts?formingState.current:data.find(item=>item.ts===ts);
       if(original)setCandleDetail({ts,open:c.open,high:c.high,low:c.low,close:c.close,volume:original.volume,live:formingState.current?.ts===ts});
     }});
-    let frame = 0, prior = "", firstFrame=true, hiddenSincePaint=false;
+    let frame = 0, prior = "", firstFrame=true, initialRangeRequested=false, hiddenSincePaint=false;
     let previousWidth = chart.chartElement().clientWidth, previousRange = chart.timeScale().getVisibleLogicalRange(),previousTime=chart.timeScale().getVisibleRange();
     const render = () => {
       const width = chart.chartElement().clientWidth, height = chart.panes()[0]?.getHeight() ?? 0;
       // Terminal keeps this pane mounted while another tab is shown. A hidden
       // zero-width ResizeObserver pass must not overwrite the user's viewport.
-      if(width<=0||height<=0){hiddenSincePaint=true;frame=requestAnimationFrame(render);return;}
+      if(width<=0||height<=0||chart.timeScale().width()<=0){hiddenSincePaint=true;frame=requestAnimationFrame(render);return;}
       if(hiddenSincePaint&&!firstFrame&&previousRange){
-        chart.timeScale().setVisibleLogicalRange(previousRange);
-        const saved=viewport.current;if(saved?.key===viewportKey&&!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
-        previousWidth=width;
+        if(defaultWindow)resetView();else{
+          chart.timeScale().setVisibleLogicalRange(previousRange);
+          const saved=viewport.current;if(saved?.key===viewportKey&&!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
+        }
+        previousWidth=width;hiddenSincePaint=false;
+        frame=requestAnimationFrame(render);return;
       }
       hiddenSincePaint=false;
       if(firstFrame&&width>0){
-        const saved=viewport.current;
-        if(saved?.key===viewportKey&&saved.logical){
-          chart.timeScale().setVisibleLogicalRange(saved.logical);
-          if(!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
-        }else resetView();
+        if(!initialRangeRequested){
+          const saved=viewport.current;
+          if(microMode){
+            focusTerminalIndicators.current();
+          }else if(saved?.key===viewportKey&&saved.logical&&!saved.defaultWindow){
+            chart.timeScale().setVisibleLogicalRange(saved.logical);
+            if(!saved.autoScale&&saved.price)chart.priceScale("right").setVisibleRange(saved.price);
+          }else if(!resetView()){
+            // Container layout can precede the native time scale's readiness.
+            frame=requestAnimationFrame(render);return;
+          }
+          // Native range application is queued. Let it paint before recording
+          // a viewport, so its old default cannot overwrite the requested fit.
+          initialRangeRequested=true;
+          frame=requestAnimationFrame(render);return;
+        }
         firstFrame=false;previousWidth=width;previousRange=chart.timeScale().getVisibleLogicalRange();previousTime=chart.timeScale().getVisibleRange();
       }
-      // Auto-size preserves bar spacing, which adds blank history on a wider
-      // viewport. Preserve the user's logical range, including a focused setup.
-      if(width > 0 && width !== previousWidth && previousRange) chart.timeScale().setVisibleLogicalRange(previousRange);
+      // The untouched starting view needs enough plan space at its final
+      // container width. Once the user zooms or pans, preserve that exact range.
+      if(width !== previousWidth && previousRange){
+        if(defaultWindow)resetView();else chart.timeScale().setVisibleLogicalRange(previousRange);
+        previousWidth=width;frame=requestAnimationFrame(render);return;
+      }
       previousWidth = width; previousRange = chart.timeScale().getVisibleLogicalRange();previousTime=chart.timeScale().getVisibleRange();
       const scale=chart.priceScale("right"),priceRange=scale.getVisibleRange();
-      viewport.current={key:viewportKey,logical:previousRange,time:previousTime,price:priceRange,autoScale:scale.options().autoScale};
+      viewport.current={key:viewportKey,logical:previousRange,time:previousTime,price:priceRange,autoScale:scale.options().autoScale,defaultWindow};
       if(ref.current){
         chart.panes().forEach((pane,index)=>{const element=pane.getHTMLElement();if(element){element.dataset.chartPane=index===0?"price":pro&&index===1?"rsi":"indicator";element.dataset.paneHeight=String(pane.getHeight());}});
         for(const entry of indicatorSeries){if(!entry.paneIndex)continue;const label=paneLabelRefs.current[entry.group],element=chart.panes()[entry.paneIndex]?.getHTMLElement();if(label&&element)label.style.top=String(element.getBoundingClientRect().top-ref.current.getBoundingClientRect().top+5)+"px";}
@@ -265,7 +290,7 @@ export function GlobalMarketChart({ report, selectedPathId, access, viewportIden
       }
       frame = requestAnimationFrame(render);
     }; frame = requestAnimationFrame(render);
-    return () => { cancelAnimationFrame(frame); chart.remove(); reset.current = () => {};focus.current=()=>{};history.current=()=>{};updateLayers.current=()=>{};updateQuote.current=()=>{};updateForming.current=()=>{};updateTerminalIndicators.current=()=>{}; };
+    return () => { cancelAnimationFrame(frame); chartElement.removeEventListener("pointerdown",markUserViewport);chartElement.removeEventListener("wheel",markUserViewport);chartElement.removeEventListener("touchstart",markUserViewport);chart.remove(); reset.current = () => {};focus.current=()=>{};history.current=()=>{};updateLayers.current=()=>{};updateQuote.current=()=>{};updateForming.current=()=>{};updateTerminalIndicators.current=()=>{}; };
   }, [chartReport, pro,appearance,viewportIdentity,indicatorIdentity,microMode]);
   useEffect(()=>{updateTerminalIndicators.current(terminalIndicators);},[terminalIndicators,microMode]);
   useEffect(()=>{updateLayers.current(layers);},[layers]);
