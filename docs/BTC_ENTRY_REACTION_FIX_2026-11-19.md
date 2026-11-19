@@ -1,6 +1,6 @@
 # BTC daily and weekly entry correction
 
-Status: implementation and historical regression verified locally; deployment and production verification are pending. Issue 1 remains open until those checks finish.
+Status: implementation, incident replay and production UI verification completed on November 19, 2026. Production code `cd22321` passed Railway and Vercel deployment checks. Both BTC horizons show all three sourced targets in their cards and native chart.
 
 The earlier audit is retained in `BTC_SETUP_QUALITY_AUDIT_2026-11-18.md`. Its archived prices and observations have not been rewritten.
 
@@ -12,9 +12,9 @@ The disputed daily short used the distant daily EMA ribbon as its entry and a pr
 
 The first live verification of `663d7a5` found a remaining source-selection defect: a newer 1H reclaim could override the daily report's available 4H entry study. That long failed admission while a valid 4H short remained the alternate. V5 pins reclaim selection and eligibility prices to the actual execution frame and validates the selected and alternate event/reference clocks. Execution timing overrides retain V5; archived research selection requires the explicit `sourceSelection: "legacy-v4"` setting. Earlier V4 reports remain readable and receive a free correction. The exact November 19 production report is now an additional frozen regression: the corrected selected short uses entry 63,123.60, fixed 4H SL 63,772.70 and three sourced targets; its planned allocated payoff is 2.40R before costs.
 
-The live checks also found that installed-study timestamps and native layout timing could suppress initial plan padding. Initial view and Reset now use the plotted clock, wait for native time-scale readiness and allow a queued range to paint before saving it. The untouched default view refits when its container narrows; real wheel, pointer and touch interaction switch to preserving the user's exact logical range through resize and refresh. This fix must pass the final live chart check before issue 1 closes.
+The live checks also found that installed-study timestamps and native layout timing could suppress initial plan padding. Initial view and Reset now use the plotted clock, wait for native time-scale readiness and allow a queued range to paint before saving it. The untouched default view refits when its container narrows; real wheel, pointer and touch interaction switch to preserving the user's exact logical range through resize and refresh. The final deployed chart passed both target and interaction checks.
 
-Protection is fixed using ATR from that source candle: 0.2 ATR beyond the wick, with at least 0.5 ATR between entry and stop. A broken-boundary retest uses that boundary with the same minimum ATR distance. Refreshing a source cannot change its stop or renew its 16-source-bar deadline. Passive limits require no extra confirmation candle. A price touch remains an observation; exchange execution is separate.
+Protection is fixed using ATR from that source candle: 0.2 ATR beyond the wick, with at least 0.5 ATR between entry and stop. A broken-boundary retest uses that boundary with the same minimum ATR distance. Refreshing a retained source cannot change its stop or renew its 16-source-bar deadline. A new assessment can select a different surviving source after the former source fails, expires or ceases to be a resting limit; that is a new plan, not a revision to a saved order contract. Passive limits require no extra confirmation candle. A price touch remains an observation; exchange execution is separate.
 
 The planner keeps up to three distinct sourced exits. A nearer execution-frame obstacle becomes TP1 when needed; remaining exits retain the primary timeframe. All three appear in the main chart and setup cards. The smaller entry chart draws targets inside its own scale and identifies off-scale targets.
 
@@ -58,4 +58,23 @@ node --import tsx scripts/audit-btc-entry-reactions.mjs --path=docs/evidence/btc
 node --test scripts/audit-btc-entry-reactions.test.mjs
 ```
 
-Production evidence will be recorded after deployment. The local browser preview is not production evidence.
+## Production verification
+
+The deployed app was checked with the existing TEST pass on Base at approximately 03:50 UTC on November 19. No payment or venue order was submitted. The app loaded `index-DvqHLnsR.js` and returned `source-limits-v5` reports. Schema validation, exact native-chart target prices, matching setup cards, absence of a passive-limit WAIT gate and desktop overflow checks all passed.
+
+| Primary horizon | Entry source | Entry | Fixed SL | TP1 first contact | TP2 first contact | TP3 first contact |
+| --- | --- | --- | --- | --- | --- | --- |
+| Daily | Completed 4H rejection | 64,239.90 | 64,832.13 | 63,042.80 | 61,055.50 | 58,628.10 |
+| Weekly | Completed daily rejection | 64,947.50 | 66,271.44 | 63,127.90 | 55,862.00 | 49,393.50 |
+
+These are captured conditional plans. They do not predict a return to entry. Both passed their saved risk rules at the captured assessment. The daily report retained a separately sourced long alternate. The current weekly report had no surviving opposing daily reaction. Its nearby structural buy edge had already been crossed in the inspected snapshot, and a farther support source failed the payoff floor; no substitute or tighter stop was manufactured to force an alternate.
+
+Real wheel zoom changed the deployed weekly native range from `202..575` to `205.01006036217302..575`; drag pan changed it to `168.88933601609654..538.8792756539235`. A successful Refresh evidence response preserved that exact fractional range. The repeated test passed without pressing Reset. The isolated TEST workspace was then locked and its browser/signer process exited.
+
+Recorded evidence:
+
+- [Deployment, report and interaction results](evidence/btc-entry-reactions-2026-11-19/production-verification.json)
+- [Daily chart with TP1–TP3](evidence/btc-entry-reactions-2026-11-19/production-1Dutc.png)
+- [Weekly chart with TP1–TP3](evidence/btc-entry-reactions-2026-11-19/production-1Wutc.png)
+
+The historical incident sample and these UI checks do not establish a general win rate or future profitability. Risk-rejected historical cases and ambiguous intrabar outcomes remain recorded above.

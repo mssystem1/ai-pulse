@@ -1,0 +1,197 @@
+{
+  "codeCommit": "cd223210b493a5d92b471c4249d4b12d3011cebc",
+  "checkedNetwork": "Base (8453)",
+  "at": "2026-11-19T03:50:17.517Z",
+  "scope": "Live deployed Terminal with existing TEST pass, no payments or venue orders",
+  "frames": [
+    {
+      "timeframe": "1Dutc",
+      "observedAt": "2026-11-19T03:50:28.902Z",
+      "policy": "source-limits-v5",
+      "side": "short",
+      "entry": 64239.9,
+      "stop": 64832.1262925,
+      "stopTimeframe": "4H",
+      "targets": [
+        {
+          "timeframe": "1Dutc",
+          "firstContact": 63042.8
+        },
+        {
+          "timeframe": "1Dutc",
+          "firstContact": 61055.5
+        },
+        {
+          "timeframe": "1Dutc",
+          "firstContact": 58628.1
+        }
+      ],
+      "source": {
+        "version": "entry-reaction-v1",
+        "kind": "completed_rejection",
+        "timeframe": "4H",
+        "anchorTs": 1795003200000,
+        "previousTs": 1794988800000,
+        "knownAt": 1795017600000,
+        "atrTs": 1795003200000,
+        "atrKnownAt": 1795017600000,
+        "atrValue": 1184.45258502,
+        "expiresAt": 1795248000000
+      },
+      "alternate": "long",
+      "admission": {
+        "geometryEligible": true,
+        "allowed": true,
+        "minimumRewardRisk": 1,
+        "minimumPolicy": "staged-weighted",
+        "firstObstacleRewardRisk": 2.0213557134496978,
+        "targetRewardRisk": 2.0213557134496978,
+        "plannedWeightedRewardRisk": 4.518931418432455,
+        "firstObstacleHasExit": true,
+        "nearestObstacle": {
+          "price": 63042.8,
+          "timeframe": "1Dutc"
+        },
+        "reasons": [
+          "The staged exits plan 4.52R of allocated payoff before costs. TP1 offers 2.02R; its 50% partial exit leaves the rest exposed to the fixed stop. Planned payoff does not establish expected profit or fills."
+        ],
+        "blockers": [],
+        "state": "waiting"
+      },
+      "displayedTargets": 3
+    },
+    {
+      "timeframe": "1Wutc",
+      "observedAt": "2026-11-19T03:50:33.204Z",
+      "policy": "source-limits-v5",
+      "side": "short",
+      "entry": 64947.5,
+      "stop": 66271.4385618,
+      "stopTimeframe": "1Dutc",
+      "targets": [
+        {
+          "timeframe": "1Wutc",
+          "firstContact": 63127.9
+        },
+        {
+          "timeframe": "1Wutc",
+          "firstContact": 55862
+        },
+        {
+          "timeframe": "1Wutc",
+          "firstContact": 49393.5
+        }
+      ],
+      "source": {
+        "version": "entry-reaction-v1",
+        "kind": "completed_rejection",
+        "timeframe": "1Dutc",
+        "anchorTs": 1794960000000,
+        "previousTs": 1794873600000,
+        "knownAt": 1795046400000,
+        "atrTs": 1794960000000,
+        "atrKnownAt": 1795046400000,
+        "atrValue": 2647.87712355,
+        "expiresAt": 1796428800000
+      },
+      "admission": {
+        "geometryEligible": true,
+        "allowed": true,
+        "minimumRewardRisk": 1,
+        "minimumPolicy": "staged-weighted",
+        "firstObstacleRewardRisk": 1.374384017885328,
+        "targetRewardRisk": 1.374384017885328,
+        "plannedWeightedRewardRisk": 5.0955914380407235,
+        "firstObstacleHasExit": true,
+        "nearestObstacle": {
+          "price": 63127.9,
+          "timeframe": "1Wutc"
+        },
+        "reasons": [
+          "The staged exits plan 5.10R of allocated payoff before costs. TP1 offers 1.37R; its 50% partial exit leaves the rest exposed to the fixed stop. Planned payoff does not establish expected profit or fills."
+        ],
+        "blockers": [],
+        "state": "waiting"
+      },
+      "displayedTargets": 3
+    }
+  ],
+  "gestures": {
+    "before": {
+      "from": 202,
+      "to": 575
+    },
+    "zoomed": {
+      "from": 205.01006036217302,
+      "to": 575
+    },
+    "panned": {
+      "from": 168.88933601609654,
+      "to": 538.8792756539235
+    },
+    "refreshed": {
+      "from": 168.88933601609654,
+      "to": 538.8792756539235
+    },
+    "pass": true
+  },
+  "errors": [],
+  "scripts": [
+    "https://app.ai-pulse.tech/assets/index-DvqHLnsR.js"
+  ],
+  "pass": true,
+  "deployments": [
+    {
+      "context": "ai-pulse - pulse-api",
+      "state": "success",
+      "target_url": "https://railway.com/project/b4db2c6c-b95e-4934-9490-e706de579d00/service/d7ebb1e5-e533-4322-bb2c-f11a123439ea?id=9e67bac9-e0cf-4bdd-866a-915a7022269a&environmentId=969bbb27-04f7-475d-821c-f4d1d5260def"
+    },
+    {
+      "context": "Vercel",
+      "state": "success",
+      "target_url": "https://vercel.com/maksims-projects-209202f7/ai-pulse/6WMPC9zcVChGKDatux4GXxjY9wGu"
+    }
+  ],
+  "images": {
+    "1Dutc": {
+      "file": "production-1Dutc.png",
+      "sha256": "d9f1952993bff5ed418abbafd9ce76f89a7c9f66555fcb8f6c1f551f6400714b"
+    },
+    "1Wutc": {
+      "file": "production-1Wutc.png",
+      "sha256": "a97d7c887f35a9c5b8740ca5dcdf11adf438fc7c21db93162cb4abc6fdb2afc2"
+    }
+  },
+  "localNativeRegression": {
+    "passed": true,
+    "cases": 2,
+    "checks": [
+      "Delayed indicator arrival",
+      "Untouched default resize",
+      "Hide, resize and return",
+      "Native wheel zoom and drag pan",
+      "Custom range preserved through hide, refresh and resize"
+    ]
+  },
+  "suites": {
+    "analysis": {
+      "passed": 429,
+      "failed": 0
+    },
+    "webReportAndClient": {
+      "passed": 51,
+      "failed": 0
+    },
+    "apiAssessmentAndPricePath": {
+      "passed": 11,
+      "failed": 0
+    },
+    "offlineReplayTampering": {
+      "rejectedCases": 7
+    }
+  },
+  "limitations": [
+    "This verifies source construction, target rendering and UI interaction, not future profitability or venue fills.",
+    "The current weekly snapshot has no surviving opposing daily reaction; no alternate is invented. Historical and daily snapshots retain their independently sourced alternates."
+  ]
+}
