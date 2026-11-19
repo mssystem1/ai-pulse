@@ -72,7 +72,7 @@ export function globalEligibility(report:GlobalReport):GlobalEligibility {
   return "technical_valid";
 }
 export function globalRiskMeasurement(report:GlobalReport) {
-  if(report.discretionaryPlan){const p=report.discretionaryPlan,source=p.stopBasis.timeframe===report.snapshot.timeframe?report.indicators.atr.points:report.entryStudy?.atr,atr=source?.at(-1)?.value,distance=Math.abs(p.entry-p.stop);return {entry:p.entry,distance,percent:distance/p.entry*100,atr:atr?distance/atr:null,timeframe:p.stopBasis.timeframe};}
+  if(report.discretionaryPlan){const p=report.discretionaryPlan,source=p.stopBasis.timeframe===report.snapshot.timeframe?report.indicators.atr.points:report.entryStudy?.atr,atr=p.entryReaction?.atrValue??source?.at(-1)?.value,distance=Math.abs(p.entry-p.stop);return {entry:p.entry,distance,percent:distance/p.entry*100,atr:atr?distance/atr:null,timeframe:p.stopBasis.timeframe};}
   const p=globalDiscretionaryCard(report)?.plan??globalTradePlan(report),atr=p.method==="structure-v4"?report.indicators.atr.points.at(-1)?.value:p.method?.startsWith("structure-")?report.entryStudy?.atr.at(-1)?.value:report.indicators.atr.points.at(-1)?.value;
   if(!p.referenceEntry||p.referenceStop===null)return null;
   const entry=p.side==="long"?p.referenceEntry[1]:p.referenceEntry[0],distance=Math.abs(entry-p.referenceStop);

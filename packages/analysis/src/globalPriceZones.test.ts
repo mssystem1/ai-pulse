@@ -7,15 +7,15 @@ import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
 import {reviewGlobalTargetReport} from "./globalTradeMap.js";
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.zones-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const cutoffs:Record<string,string>={"1H":"2026-10-25T08:12:13.313Z","4H":"2026-10-25T08:09:25.782Z","1Dutc":"2026-10-25T08:06:37.691Z","1Wutc":"2026-10-25T08:13:19.668Z"};
-function make(tf:string,quote?:number,lang:"en"|"zh"="en"){
+function make(tf:string,quote?:number,lang:"en"|"zh"="en",legacy=false){
   const observedAt=cutoffs[tf]??fixture.observedAt;
   const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:observedAt,ticker:{priceCurrency:"USDT",...(quote===undefined?{}:{last:quote,ts:String(Date.parse(observedAt)-1000)})},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true})).filter(c=>candleCloseTime(c.ts,bar)!<=Date.parse(observedAt)).slice(-520)}));
-  return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium",lang});
+  return prepareGlobalReport({market:markets.find(m=>m.bar===tf)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(tf)),hierarchyMarkets:markets,tier:"premium",lang,...(legacy?{executionSettings:{fillWindowBars:4}}:{})});
 }
 test("a quote crossing 80,639 does not flip a mixed daily thesis without new primary evidence",()=>{
   const a=make("1Dutc",80617.5),b=make("1Dutc",80650.7);
-  assert.deepEqual(a.candles,b.candles);assert.deepEqual(a.horizonContext,b.horizonContext);assert.equal(a.discretionaryPlan!.side,"long");assert.equal(b.discretionaryPlan!.side,"long");
-  assert.deepEqual(a.discretionaryPlan,b.discretionaryPlan);
+  assert.deepEqual(a.candles,b.candles);assert.deepEqual(a.horizonContext,b.horizonContext);assert.equal(a.setupSelection!.side,b.setupSelection!.side);
+  for(const r of [a,b]){const p=r.discretionaryPlan!;assert.equal(p.entryReaction?.kind,"completed_break");assert.ok(p.entryReaction.level);const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;assert.equal(p.entry,p.entryReaction.level.price);assert.ok(p.side==="long"?prior.close<=p.entry&&source.close>p.entry:prior.close>=p.entry&&source.close<p.entry);}
   const last=a.candles.at(-1)!,support=a.horizonContext!.zones.find(z=>z.role==="support"&&z.upper===80018.2)!;
   assert.ok(last.low<=support.upper&&last.close>support.upper,"The completed daily candle actually tested and recovered the source support");
 });
@@ -42,12 +42,11 @@ test("4H and weekly structural limits use their own first active obstacle and fi
   const anchor=swing.indicators.pivots.find(a=>a.price===80680.5&&a.kind==="low")!;
   assert.equal(s.targets[0].anchorTs,anchor.ts);assert.equal(s.targets[0].knownAt,candleCloseTime(anchor.confirmedAt!,"4H"));
   assert.ok(swing.currentMarket!.quote!.price<80680.5&&swing.candles.at(-1)!.close>=80680.5,"A quote below support does not erase opposition after a future limit entry");
-  assert.equal(w.side,"long");assert.equal(w.entry,74501.6);assert.equal(w.priceZones!.entry.sourceUpper,78427.1);
-  assert.equal(w.targets[0].price,82213.9);assert.equal(w.targets[0].timeframe,"1Wutc");
-  assert.equal(w.priceZones!.payoffLimited,false);
+  assert.equal(w.side,"short");assert.ok(w.entryReaction);const reactionSource=weekly.entryStudy!.candles.find(c=>c.ts===w.entryReaction!.anchorTs)!,reactionPrior=weekly.entryStudy!.candles.find(c=>c.ts===w.entryReaction!.previousTs)!;assert.equal(w.entryReaction.knownAt,candleCloseTime(reactionSource.ts,w.entryReaction.timeframe));if(w.entryReaction.kind==="completed_break"){assert.ok(w.entryReaction.level);assert.equal(w.entry,w.entryReaction.level.price);assert.ok(reactionPrior.close>=w.entry&&reactionSource.close<w.entry);}else{assert.equal(w.entryReaction.kind,"completed_rejection");assert.equal(w.entry,Math.max(reactionSource.open,reactionSource.close));assert.ok(reactionSource.close<reactionPrior.close);}
+  assert.equal(w.targets[0].timeframe,"1Wutc");assert.equal(w.priceZones!.payoffLimited,true);
   const payoff=globalPriceZonePayoff(weekly)!;
   assert.equal(payoff.worstToTP1,(w.priceZones!.targets[0].lower-w.entry)/(w.entry-w.stop));
-  assert.equal(w.stopBasis.timeframe,"1Wutc");assert.ok(w.stopBasis.price>w.stop);
+  assert.equal(w.stopBasis.timeframe,weekly.entryStudy!.timeframe);assert.ok(w.stopBasis.price<w.stop&&w.stop>w.entry);
   assert.ok(Math.abs(w.entry-w.stop)>Math.abs(s.entry-s.stop),"Macro protection does not inherit an intraday stop distance");
 });
 test("forged intervals, favorable-fill-only payoff, overlapping targets and altered hard stops are rejected",()=>{
@@ -70,7 +69,7 @@ for(const tf of ["15m","1H","4H","1Dutc","1Wutc"])test(`${tf} shows source-backe
   assert.ok(globalEntryStudySvg(r));assert.equal(JSON.stringify(r),before);assert.equal(card.confirmed,false);
 });
 test("free range review leaves the paid report and its captured market clocks intact",()=>{
-  const saved=make("1Dutc",80650.7);saved.discretionaryPlan!.version="discretionary-plan-v6";delete saved.scenario;delete saved.strategyMix;delete saved.discretionaryPlan!.executionPolicy;saved.discretionaryPlan!.requiresNewTestAfter=Date.parse(saved.snapshot.observedAt);saved.discretionaryPlan!.entryBasis.price=saved.discretionaryPlan!.entry;assert.equal(GlobalReportSchema.safeParse(saved).success,true,"A real v6 source remains readable before review");
+  const saved=make("1Dutc",80650.7,"en",true);saved.discretionaryPlan!.version="discretionary-plan-v6";delete saved.scenario;delete saved.strategyMix;delete saved.discretionaryPlan!.executionPolicy;saved.setupPolicyVersion="source-limits-v3";saved.discretionaryPlan!.requiresNewTestAfter=Date.parse(saved.snapshot.observedAt);saved.discretionaryPlan!.entryBasis.price=saved.discretionaryPlan!.entry;assert.equal(GlobalReportSchema.safeParse(saved).success,true,"A v6 archive predating reaction metadata remains readable before review");
   const before=structuredClone(saved),review=reviewGlobalTargetReport(saved);assert.deepEqual(saved,before);assert.deepEqual(review.candles,saved.candles);assert.deepEqual(review.currentMarket,saved.currentMarket);
   assert.equal(review.discretionaryPlan!.version,"discretionary-plan-v8");assert.equal(reviewGlobalTargetReport(review),review);
 });

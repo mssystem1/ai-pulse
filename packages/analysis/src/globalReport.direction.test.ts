@@ -41,7 +41,8 @@ test("entry instructions retain the actual defended source and event requirement
 });
 for(const tf of ["15m","1H","4H","1Dutc","1Wutc"])test(`${tf} preserves its own protection, objectives and available current-clock evidence`,()=>{
   const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r);assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.requiresNewTestAfter,undefined);assert.ok(p.executionPolicy!.eventKnownAt<=Date.parse(fixture.observedAt));assert.ok(p.executionPolicy!.eventAfter<=p.reference.completedAt);assert.ok(p.executionPolicy!.expiresAt>Date.parse(fixture.observedAt));assert.ok(r.scenario);
-  assert.equal(p.stopBasis.timeframe,tf);assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(r.currentMarket!.frames.length);
+  if(p.entryReaction){assert.equal(p.stopBasis.timeframe,r.entryStudy!.timeframe);assert.ok(p.targets.every((t,i)=>t.timeframe===tf||i===0&&t.timeframe===r.entryStudy!.timeframe));const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;assert.equal(p.entry,p.entryReaction.kind==="completed_break"?p.entryReaction.level!.price:p.side==="long"?Math.min(source.open,source.close):Math.max(source.open,source.close));assert.ok(p.side==="long"?source.close>prior.close:source.close<prior.close);}
+  else{assert.equal(p.stopBasis.timeframe,tf);assert.ok(p.targets.every(t=>t.timeframe===tf));}assert.ok(r.currentMarket!.frames.length);
   for(const f of r.currentMarket!.frames)assert.ok(f.candles.every(c=>c.confirmed&&candleCloseTime(c.ts,f.timeframe)!<=Date.parse(fixture.observedAt)));
   globalTradeCards(r);assert.equal(JSON.stringify(r),before);assert.equal(r.entryStudy!.timeframe,tf==="15m"?"5m":tf==="1H"?"15m":tf==="4H"?"1H":tf==="1Dutc"?"4H":"1Dutc");
 });

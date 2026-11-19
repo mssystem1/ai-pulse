@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {GlobalMarketEvidenceSchema,GlobalStrategyMixSchema,type GlobalCandle,type GlobalMarketEvidence,type GlobalReport} from "@pulse/schemas";
+import {candleCloseTime,GlobalMarketEvidenceSchema,GlobalStrategyMixSchema,type GlobalCandle,type GlobalMarketEvidence,type GlobalReport} from "@pulse/schemas";
 import {applyGlobalStrategyMix,evaluateGlobalStrategyMix,globalNativeMarketEvidence,globalStrategyMixObjectives,normalizeGlobalFunding} from "./globalStrategyMix.js";
 import {buildGlobalOrderFlow} from "./globalOrderFlow.js";
 import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
@@ -162,7 +162,7 @@ test("all five timeframe preparation paths preserve strategy mix and native asse
     for(const timeframe of ["15m","1H","4H","1Dutc","1Wutc"]){
       const prepared=prepareGlobalReport({market:markets.find(m=>m.bar===timeframe)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(timeframe)),hierarchyMarkets:markets,tier:"premium"});
       assert.ok(prepared.discretionaryPlan,`${asset} ${timeframe}`);assert.equal(prepared.discretionaryPlan.version,"discretionary-plan-v8");
-      assert.equal(prepared.discretionaryPlan.objectiveTimeframe,timeframe);assert.equal(prepared.discretionaryPlan.stopBasis.timeframe,timeframe);
+      assert.equal(prepared.discretionaryPlan.objectiveTimeframe,timeframe);assert.equal(prepared.discretionaryPlan.stopBasis.timeframe,prepared.discretionaryPlan.entryReaction?prepared.entryStudy!.timeframe:timeframe);if(prepared.discretionaryPlan.entryReaction){const source=prepared.entryStudy!.candles.find(c=>c.ts===prepared.discretionaryPlan!.entryReaction!.anchorTs)!,prior=prepared.entryStudy!.candles.find(c=>c.ts===prepared.discretionaryPlan!.entryReaction!.previousTs)!;assert.ok(source.confirmed&&prior.confirmed&&source.ts>prior.ts);assert.equal(prepared.discretionaryPlan.entryReaction.knownAt,candleCloseTime(source.ts,prepared.entryStudy!.timeframe));assert.ok(prepared.discretionaryPlan.targets.every((t,i)=>t.timeframe===timeframe||i===0&&t.timeframe===prepared.entryStudy!.timeframe));}
       assert.equal(prepared.discretionaryPlan.executionPolicy!.configurationKey.startsWith(`${asset}-USDT:${timeframe}:`),true);
       assert.equal(prepared.strategyMix!.candidates.length,3);assert.equal(prepared.strategyMix!.exposurePolicy,"one_primary_exposure");
       const value=prepared.strategyMix!.candidates.find(c=>c.id==="value_area_rotation")!;

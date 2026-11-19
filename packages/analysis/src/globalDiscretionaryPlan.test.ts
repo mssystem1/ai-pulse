@@ -11,13 +11,13 @@ import {globalEntryOpposition,globalRouteObstacles} from "./globalRouteObstacles
 
 const fixture=JSON.parse(readFileSync(new URL("./globalReport.oct20-fixture.json",import.meta.url),"utf8")) as {observedAt:string;frames:Record<string,number[][]>};
 const markets=Object.entries(fixture.frames).map(([bar,rows])=>({bar,instId:"BTC-USDT",source:"okx-public-spot",fetchedAt:fixture.observedAt,ticker:{priceCurrency:"USDT"},candles:rows.map(([ts,open,high,low,close,volume])=>({ts,open,high,low,close,volume,confirmed:true}))}));
-const make=(frame:string)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium"});
+const make=(frame:string,legacy=false)=>prepareGlobalReport({market:markets.find(m=>m.bar===frame)!,contextMarket:markets.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:markets,tier:"premium",...(legacy?{executionSettings:{fillWindowBars:4}}:{})});
 
 test("saved v8 reports from before the source-limit revision receive a free review once",()=>{
  const archived=make("1Wutc");delete archived.setupPolicyVersion;
  const before=structuredClone(archived),review=reviewGlobalTargetReport(archived);
  assert.notEqual(review,archived);assert.deepEqual(archived,before);
- assert.equal(review.setupPolicyVersion,"source-limits-v3");assert.ok(review.targetReviewOf);
+ assert.equal(review.setupPolicyVersion,"source-limits-v4");assert.ok(review.targetReviewOf);
  assert.deepEqual(review.candles,archived.candles);assert.deepEqual(review.snapshot,archived.snapshot);
  assert.equal(reviewGlobalTargetReport(review),review);
 });
@@ -26,14 +26,14 @@ test("a saved source-limits-v2 one-target plan upgrades on free review without m
  const saved=make("1Wutc");saved.setupPolicyVersion="source-limits-v2";
  for(const p of [saved.discretionaryPlan,saved.alternatePlan])if(p){p.executionPolicy!.id="structural-edge-passive-v2";p.executionPolicy!.configurationKey=p.executionPolicy!.configurationKey.replace("source-edge-v3","source-edge-v2");p.executionPolicy!.targetAllocations=[1];p.targets=p.targets.slice(0,1);p.priceZones!.targets=p.priceZones!.targets.slice(0,1);}
  const before=structuredClone(saved),review=reviewGlobalTargetReport(saved);
- assert.deepEqual(saved,before);assert.equal(review.setupPolicyVersion,"source-limits-v3");
- assert.equal(review.discretionaryPlan!.executionPolicy!.id,"structural-edge-passive-v3");
+ assert.deepEqual(saved,before);assert.equal(review.setupPolicyVersion,"source-limits-v4");
+ assert.equal(review.discretionaryPlan!.executionPolicy!.id,"entry-reaction-passive-v1");
  assert.ok(review.discretionaryPlan!.targets.length>=1&&review.discretionaryPlan!.targets.length<=3);
  assert.equal(reviewGlobalTargetReport(review),review);
 });
 
 test("opposing structural limits retain independent causal prices and reject forged alternate evidence",()=>{
- const report=make("1Wutc"),main=report.discretionaryPlan!,alternate=report.alternatePlan!;
+ const report=make("1Wutc",true),main=report.discretionaryPlan!,alternate=report.alternatePlan!;
  assert.ok(alternate);assert.notEqual(main.side,alternate.side);
  assert.equal(main.executionPolicy?.id,"structural-edge-passive-v3");
  for(const p of [main,alternate]){
@@ -77,13 +77,13 @@ test("all five horizons retain their own objective and protection frames with a 
   for(const [frame,entry] of [["15m","5m"],["1H","15m"],["4H","1H"],["1Dutc","4H"],["1Wutc","1D"]]){
     const report=make(frame),p=report.discretionaryPlan!,card=globalTradeCards(report)[0],risk=globalRiskMeasurement(report)!;
     assert.ok(p,frame);assert.equal(globalSetupStrategyProfile(frame)!.entry,entry);
-    assert.equal(p.objectiveTimeframe,frame);assert.equal(p.stopBasis.timeframe,frame);assert.equal(risk.timeframe,frame);
+    assert.equal(p.objectiveTimeframe,frame);assert.equal(p.stopBasis.timeframe,p.entryReaction?.timeframe??frame);assert.equal(risk.timeframe,p.stopBasis.timeframe);
     const decision=globalDecision(report);
     assert.equal(decision.nextSetup.trigger,p.entry);assert.equal(decision.nextSetup.planningStop,p.stop);
     assert.deepEqual(decision.nextSetup.targets.map(t=>t.price),p.targets.map((_t,i)=>globalTargetReference(report,i)));assert.equal(decision.currentAction,"WAIT");
     assert.ok(decision.changeView.includes(p.stopBasis.price.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:report.snapshot.pricePrecision})));
     assert.deepEqual(globalSections(report).find(s=>s.title==="Setup route")!.lines,[decision.route,decision.entryInstruction,decision.changeView]);
-    assert.ok(p.targets.every(t=>t.timeframe===frame));assert.equal(card.confirmed,false);
+    assert.ok(p.targets.every((t,i)=>t.timeframe===frame||Boolean(p.entryReaction)&&i===0&&t.timeframe===p.entryReaction!.timeframe));assert.equal(card.confirmed,false);
     const sign=p.side==="long"?1:-1;assert.ok(sign*(p.entry-p.stop)>0);assert.ok(sign*(p.stopBasis.price-p.stop)>0);
     assert.ok(p.targets.every((t,i)=>sign*(t.price-p.entry)>0&&(i===0||sign*(t.price-p.targets[i-1].price)>0)));
     assert.equal(GlobalReportSchema.safeParse(report).success,true);assert.ok(Number.isFinite(card.rr));

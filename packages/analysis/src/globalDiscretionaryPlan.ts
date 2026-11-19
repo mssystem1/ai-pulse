@@ -4,13 +4,17 @@ import {applyGlobalStrategyMix,globalStrategyMixObjectives} from "./globalStrate
 import {candleCloseTime,candleLevelTouchedAfter,type GlobalReport} from "@pulse/schemas";
 import {globalTwoSidedStructureChoices,selectGlobalSetupContext} from "./globalSetupContext.js";
 import {applyGlobalPriceZones} from "./globalPriceZones.js";
-import {globalRouteObstacles} from "./globalRouteObstacles.js";
+import {globalEntryStudyObstacles,globalRouteObstacles} from "./globalRouteObstacles.js";
+import {globalEntryReactions,type GlobalEntryReaction} from "./globalEntryReaction.js";
+
+type Choice=Pick<NonNullable<GlobalReport["discretionaryPlan"]>,"side"|"family"|"entryBasis"|"evidence"|"entryReaction">;
+const reactionChoice=(r:GlobalEntryReaction):Choice=>({side:r.side,family:"level_retest",entryBasis:{kind:"entry_reaction",timeframe:r.timeframe,knownAt:r.knownAt,price:r.entry},entryReaction:{version:"entry-reaction-v1",kind:r.kind,timeframe:r.timeframe,anchorTs:r.anchorTs,previousTs:r.previousTs,knownAt:r.knownAt,atrTs:r.atr.ts,atrKnownAt:r.atr.knownAt,atrValue:r.atr.value,expiresAt:r.expiresAt,...(r.level?{level:r.level}:{})}});
 
 /** A complete conditional scenario when an observed signal is not established.
  * It does not change the canonical signal, history or execution permission. */
-export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false,forcedChoice?:Pick<NonNullable<GlobalReport["discretionaryPlan"]>,"side"|"family"|"entryBasis"|"evidence">){
+export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partial<GlobalExecutionSettings>={},coreOnly=false,forcedChoice?:Choice){
   if(report.decisionVersion!=="decision-v5"||report.strategy?.targetPolicy!=="active-zones-v1")return;
-  report.setupPolicyVersion="source-limits-v3";
+  report.setupPolicyVersion="source-limits-v4";
   delete report.discretionaryPlan;
   delete report.scenario;
   delete report.alternatePlan;
@@ -45,7 +49,7 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   if(mixed.choice)twoSided=null;
   mixed.mix.primary={family:coreChoice.family,side:coreChoice.side,variant:"core",reason:"Core source selection retained alongside separately admitted complementary price events."};
   report.strategyMix=mixed.mix;
-  const {side,family,entryBasis,evidence}=mixed.choice??coreChoice;
+  const {side,family,entryBasis,evidence,entryReaction}=(mixed.choice??coreChoice) as Choice;
   const valueVariant=mixed.candidate?.id==="value_area_rotation";
   const sign=side==="long"?1:-1;entry=entryBasis.price;
   const vwap=report.indicators.vwap,band=(multiple:number,edge:"upper"|"lower")=>vwap?.bands?.find(b=>b.multiple===multiple)?.[edge].at(-1)?.value;
@@ -74,6 +78,12 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     if(reaction&&reaction.anchorTs>stopBasis.anchorTs)stopBasis=reaction;
   }
   let stop=round(side==="long"?Math.max(tick,Math.min(entry-primaryAtr*.5,stopBasis.price-primaryAtr*.2)):Math.max(entry+primaryAtr*.5,stopBasis.price+primaryAtr*.2));
+  if(entryReaction){
+    const source=study?.candles.find(c=>c.ts===entryReaction.anchorTs);
+    if(!source)return;
+    stopBasis={price:entryReaction.kind==="completed_break"?entryReaction.level!.price:side==="long"?source.low:source.high,timeframe:entryReaction.timeframe,anchorTs:source.ts,knownAt:entryReaction.knownAt};
+    stop=round(side==="long"?Math.min(stopBasis.price-entryReaction.atrValue*.2,entry-entryReaction.atrValue*.5):Math.max(stopBasis.price+entryReaction.atrValue*.2,entry+entryReaction.atrValue*.5));
+  }
   if(family==="vwap_reversion"){const outer=band(3,side==="long"?"lower":"upper");if(outer!==undefined&&outer>tick){stop=round(side==="long"?Math.max(tick,Math.min(outer,primaryLast.low)-primaryAtr*.2):Math.max(outer,primaryLast.high)+primaryAtr*.2);stopBasis={price:outer,timeframe:primaryTimeframe,anchorTs:vwap?.anchorTs??report.candles[0].ts,knownAt:primaryClosed};}}
   if(!(stop>0)||sign*(entry-stop)<=0)return;
   const targetSources=[...sources,...(!study&&lower?[{bars:lower.candles,timeframe:lower.timeframe}]:[]),...(report.currentMarket?.frames.map(f=>({bars:f.candles,timeframe:f.timeframe}))??[])];
@@ -118,9 +128,9 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
   // A resting structural order exits at the first active PRIMARY obstacle.
   // Previously touched but still active structure is a valid future retouch
   // objective after entry; skipping it produced distant archive targets.
-  if(family==="level_retest"&&entryBasis.kind==="structure_zone"&&!evidence){
-    const source=report.horizonContext!.zones.find(z=>z.role===(side==="long"?"support":"resistance")&&(side==="long"?z.upper:z.lower)===entry)!;
-    const edge=side==="long"?source.lower:source.upper;
+  if(family==="level_retest"&&(entryBasis.kind==="structure_zone"||entryReaction)&&!evidence){
+    const source=entryBasis.kind==="structure_zone"?report.horizonContext!.zones.find(z=>z.role===(side==="long"?"support":"resistance")&&(side==="long"?z.upper:z.lower)===entry):undefined;
+    const edge=source?(side==="long"?source.lower:source.upper):entry;
     const first=globalRouteObstacles(report,side).filter(a=>a.timeframe===primaryTimeframe&&sign*(a.price-edge)>tick).sort((a,b)=>sign*(a.price-b.price))[0];
     if(!first)return;
     if(first){
@@ -151,8 +161,14 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     }
   }
   if(!targets.length)return;
-  const barriers=globalRouteObstacles(report,side).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5);
-  report.discretionaryPlan={family,entryBasis,...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
+  if(entryReaction&&study){
+    const first=globalEntryStudyObstacles(report,side).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price))[0];
+    if(first){
+      targets.splice(0,targets.length,first,...targets.slice(0,2));
+    }
+  }
+  const barriers=globalRouteObstacles(report,side,Boolean(entryReaction)).filter(a=>sign*(a.price-entry)>tick&&sign*(targets[0].price-a.price)>tick).sort((a,b)=>sign*(a.price-b.price)).slice(0,5);
+  report.discretionaryPlan={family,entryBasis,...(entryReaction?{entryReaction}:{}),...(evidence?{evidence}:{}),objectiveTimeframe:primaryTimeframe,barriers,version:"discretionary-plan-v5",requiresNewTestAfter:cutoff,side,entry,stop,reference,stopBasis:{price:stopBasis.price,timeframe:stopBasis.timeframe,anchorTs:stopBasis.anchorTs,knownAt:stopBasis.knownAt},targets};
   applyGlobalPriceZones(report,settings);
   // A completed price event is not admission. A weak complementary event
   // cannot replace a supported core limit plan merely by being more recent.
@@ -166,5 +182,36 @@ export function applyGlobalDiscretionaryPlan(report:GlobalReport,settings:Partia
     delete alternate.scenario;delete alternate.alternatePlan;delete alternate.alternatePlanReason;
     applyGlobalDiscretionaryPlan(alternate,settings,true,twoSided.alternate);
     if(alternate.discretionaryPlan){report.alternatePlan=alternate.discretionaryPlan;report.alternatePlanReason=twoSided.reason;}
+  }
+  // Daily and weekly objectives retain their horizon, while execution can use
+  // the declared 4H/daily reaction. Enumerate fixed causal sources newest first;
+  // admission may reject them, but may never move their entry or stop for R.
+  // Explicit research overrides keep their registered legacy configuration.
+  if(!coreOnly&&!forcedChoice&&!Object.keys(settings).length&&["1Dutc","1D","1Wutc","1W"].includes(primaryTimeframe)&&report.discretionaryPlan){
+    const core=report.discretionaryPlan,reactions=globalEntryReactions(report);
+    const latestBreak=reactions.find(c=>c.kind==="completed_break"&&c.knownAt>(core.evidence?.completedAt??0));
+    const selectedSide=latestBreak?.side??core.side;
+    // Build only the newest source on each side. This also prevents a failed
+    // newer source from silently falling back to a more attractive older one.
+    const newest=(["long","short"] as const).flatMap(side=>reactions.find(c=>c.side===side)??[]);
+    const candidates=newest.flatMap(reaction=>{
+      const candidate=structuredClone(report);
+      applyGlobalDiscretionaryPlan(candidate,settings,true,reactionChoice(reaction));
+      return candidate.discretionaryPlan?.version==="discretionary-plan-v8"?[candidate.discretionaryPlan]:[];
+    });
+    // Pick the source before measuring reward. Searching older sources until
+    // one clears 1R recreates the distant, unfillable entries this fixes.
+    const replaceFallback=Boolean(latestBreak)||!core.evidence&&(core.family==="ema_pullback"||core.family==="level_retest"&&core.entryBasis.kind==="structure_zone");
+    const preferred=replaceFallback?candidates.find(c=>c.side===selectedSide):undefined;
+    if(preferred){
+      report.discretionaryPlan=preferred;
+      if(report.alternatePlan?.side===preferred.side){
+        if(core.side!==preferred.side){report.alternatePlan=core;report.alternatePlanReason="The primary-horizon plan is retained as the opposing alternative after a completed execution-frame break changed the selected execution direction. It retains its own source, entry and fixed stop.";}
+        else{delete report.alternatePlan;delete report.alternatePlanReason;}
+      }
+      if(report.strategyMix){delete report.strategyMix.selectedVariant;report.strategyMix.primary={family:preferred.family,side:preferred.side,variant:"core",reason:latestBreak?"A surviving completed execution-frame structure break selects the execution direction separately from the slower primary trend. Entry and fixed protection are chosen before payoff.":"Newest surviving completed execution-frame reaction in the selected market direction. Entry and fixed protection are chosen before measuring payoff; objectives retain the primary horizon."};}
+    }
+    const opposing=candidates.find(c=>c.side!==selectedSide);
+    if(opposing){report.alternatePlan=opposing;report.alternatePlanReason="Opposing completed execution-frame reaction, priced and assessed independently. It is an alternative if its own limit trades, not a second simultaneous recommendation.";}
   }
 }

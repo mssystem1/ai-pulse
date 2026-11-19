@@ -112,7 +112,7 @@ export function assessGlobalScenarioReport(saved: GlobalReport, market: SpotMark
   if(blockers.includes("objective_already_reached"))lines.push(zh?"当前报价已到达或越过原首目标区域；不能通过改用更远的目标来重新授权本次入场。":"The current quote has reached or passed the saved first target area. A farther target cannot make this a fresh entry opportunity.");
   if (blockers.includes("quote")) lines.push(zh ? "需要更新的同市场报价，不能用旧收盘替代当前报价。" : "A fresh quote from the same market is required; an old close does not replace the current quote.");
   if (next !== null && next > asOf) lines.push(zh ? `下一根 ${globalFrameReference(timeframe)} 收盘：${new Date(next).toISOString()}。` : `Next ${globalFrameReference(timeframe)} close: ${new Date(next).toISOString()}.`);
-  const atr = globalWilderIndicators(primaryBars).atr.at(-1)?.value;
+  const atr = plan.entryReaction?.atrValue??globalWilderIndicators(primaryBars).atr.at(-1)?.value;
   return GlobalAssessmentSchema.parse({
     version: "pulse-global-assessment-v1", sourceRef: globalArtifactReference(saved), sourceObservedAt: saved.snapshot.observedAt, assessedAt: at,
     instId: saved.snapshot.instId, priceCurrency: saved.snapshot.priceCurrency, timeframe: saved.snapshot.timeframe, analysisTimeframe: saved.snapshot.timeframe,

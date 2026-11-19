@@ -1,0 +1,499 @@
+{
+  "version": 1,
+  "scope": "Causal source/price-path regression; no optimization, order-fill, profitability or prospective validation claim",
+  "inputs": {
+    "fixture": {
+      "file": "packages/analysis/src/globalEntryReaction.fixture.json.gz",
+      "sha256": "54626df6b06b1f4a5afbc4a20e7a5280d62a6d5d7b7fac2962538e59fc168dbb"
+    },
+    "path": {
+      "file": "docs/evidence/btc-entry-reactions-2026-11-19/nov6-15m.json.gz",
+      "sha256": "7d092423ce546bab18458439ede3db5247dc4d6e5bc8f62946de7a4d347d8b29"
+    },
+    "minutes": {
+      "file": "docs/evidence/btc-entry-reactions-2026-11-19/nov6-1m.json.gz",
+      "sha256": "f1d4594e62103859753ee0dc74c9f63448e42ee0edafb6bb2e6f77e85b55e919",
+      "captureClock": "own"
+    }
+  },
+  "networkCalls": 0,
+  "orders": 0,
+  "payments": 0,
+  "results": [
+    {
+      "snapshot": "nov6",
+      "frame": "1Dutc",
+      "revision": "published",
+      "selection": "selected",
+      "interpretation": "Frozen published report",
+      "sourceObservedAt": "2026-11-06T05:56:43.838Z",
+      "policy": "range-edge-passive-v1",
+      "side": "long",
+      "entry": [
+        74955.5,
+        76265.2
+      ],
+      "stop": 74464.0879256,
+      "stopTimeframe": "1Dutc",
+      "stopDistancePercent": 2.3616434158698763,
+      "entryDistancePercent": 0.7123067699515762,
+      "targets": [
+        {
+          "id": "tp1",
+          "lower": 81751.75,
+          "upper": 81751.75,
+          "allocation": 0.5
+        },
+        {
+          "id": "tp2",
+          "lower": 84495.025,
+          "upper": 84495.025,
+          "allocation": 0.3
+        },
+        {
+          "id": "tp3",
+          "lower": 87238.3,
+          "upper": 87238.3,
+          "allocation": 0.2
+        }
+      ],
+      "admission": {
+        "eligible": false,
+        "blockers": [
+          "reward",
+          "opposing_zone_overlap"
+        ],
+        "nearestR": 0
+      },
+      "plannedWeightedR": 4.11237179811115,
+      "through": "2026-11-14T06:00:00.000Z",
+      "publicationWindows": [
+        {
+          "parentTs": 1793943900000,
+          "refined": true,
+          "parentIntersectsEntry": true,
+          "minuteStraddles": [
+            {
+              "ts": 1793944560000,
+              "intersectsEntry": true
+            }
+          ]
+        }
+      ],
+      "coverage": "A publication-straddling 1m interval intersects the entry and remains unresolved",
+      "firstEntryTouch": "2026-11-06T05:58:00.000Z",
+      "state": "completed",
+      "outcome": {
+        "kind": "stop_observed",
+        "at": 1794175200000
+      },
+      "exits": [],
+      "remainingFraction": 0,
+      "events": [
+        {
+          "id": "gse_92300cc84ba1677770ae34f23dba4ebd",
+          "kind": "location_test",
+          "at": 1793937600000,
+          "basis": "completed_candle",
+          "candleTs": 1793923200000,
+          "price": 75912.1
+        },
+        {
+          "id": "tgpe_1m_e1188d9b9751ecb35daee8847811464d",
+          "kind": "entry_touch",
+          "at": 1793944680000,
+          "candleTs": 1793944620000,
+          "price": 75727.6,
+          "basis": "completed_candle"
+        },
+        {
+          "id": "tgpe_15m_2e0ef9d7b7e4add97e2a6804aa845cda",
+          "kind": "stop_touch",
+          "at": 1794175200000,
+          "candleTs": 1794174300000,
+          "price": 74464.0879256,
+          "basis": "completed_candle"
+        }
+      ]
+    },
+    {
+      "snapshot": "nov6",
+      "frame": "1Dutc",
+      "revision": "reaction-v1",
+      "selection": "selected",
+      "interpretation": "Retrospective fixed-rule candidate, never published or traded",
+      "sourceObservedAt": "2026-11-06T05:56:43.838Z",
+      "policy": "entry-reaction-passive-v1",
+      "side": "short",
+      "entry": [
+        76087.4,
+        76087.4
+      ],
+      "stop": 76673.0508344,
+      "stopTimeframe": "4H",
+      "stopDistancePercent": 0.7697080389131487,
+      "entryDistancePercent": 0.47751228775396726,
+      "targets": [
+        {
+          "id": "tp1",
+          "lower": 76053,
+          "upper": 76053,
+          "allocation": 0.5
+        },
+        {
+          "id": "tp2",
+          "lower": 74258.6,
+          "upper": 76011.8,
+          "allocation": 0.3
+        },
+        {
+          "id": "tp3",
+          "lower": 72678.3,
+          "upper": 74096,
+          "allocation": 0.2
+        }
+      ],
+      "admission": {
+        "eligible": false,
+        "blockers": [
+          "reward"
+        ],
+        "nearestR": 0.05873807050106373
+      },
+      "plannedWeightedR": 0.7481590979869199,
+      "through": "2026-11-14T06:00:00.000Z",
+      "publicationWindows": [
+        {
+          "parentTs": 1793943900000,
+          "refined": true,
+          "parentIntersectsEntry": false,
+          "minuteStraddles": [
+            {
+              "ts": 1793944560000,
+              "intersectsEntry": false
+            }
+          ]
+        }
+      ],
+      "coverage": "The publication-straddling interval is refined to 1m and excludes entry; later path uses reconciled 15m and 1m windows",
+      "firstEntryTouch": "2026-11-06T09:09:00.000Z",
+      "state": "completed",
+      "outcome": {
+        "kind": "ambiguous_bar",
+        "at": 1793956140000
+      },
+      "exits": [],
+      "remainingFraction": 1,
+      "events": [
+        {
+          "id": "tgpe_1m_3c22191a5f4b1f1d7d6f2bd1b1353d9d",
+          "kind": "entry_touch",
+          "at": 1793956140000,
+          "candleTs": 1793956080000,
+          "price": 76087.4,
+          "basis": "completed_candle"
+        },
+        {
+          "id": "tgpe_1m_1b6d8bf54f2adf3e4ecef702af4922b5",
+          "kind": "target_touch",
+          "at": 1793956140000,
+          "candleTs": 1793956080000,
+          "price": 76053,
+          "basis": "completed_candle",
+          "targetId": "tp1"
+        }
+      ]
+    },
+    {
+      "snapshot": "nov6",
+      "frame": "1Wutc",
+      "revision": "published",
+      "selection": "selected",
+      "interpretation": "Frozen published report",
+      "sourceObservedAt": "2026-11-06T05:56:44.613Z",
+      "policy": "ema-ribbon-passive-v1",
+      "side": "long",
+      "entry": [
+        76577.2764419,
+        78675.2841677
+      ],
+      "stop": 73739.3535554,
+      "stopTimeframe": "1Wutc",
+      "stopDistancePercent": 6.273800806081406,
+      "entryDistancePercent": 3.89495280036658,
+      "targets": [
+        {
+          "id": "tp1",
+          "lower": 84479,
+          "upper": 87399,
+          "allocation": 0.5
+        },
+        {
+          "id": "tp2",
+          "lower": 93674.1,
+          "upper": 97925.4,
+          "allocation": 0.5
+        }
+      ],
+      "admission": {
+        "eligible": false,
+        "blockers": [
+          "reward"
+        ],
+        "nearestR": 0.16465300996630142
+      },
+      "plannedWeightedR": 2.1072552775318134,
+      "through": "2026-11-14T06:00:00.000Z",
+      "publicationWindows": [
+        {
+          "parentTs": 1793943900000,
+          "refined": true,
+          "parentIntersectsEntry": false,
+          "minuteStraddles": [
+            {
+              "ts": 1793944560000,
+              "intersectsEntry": false
+            }
+          ]
+        }
+      ],
+      "coverage": "The publication-straddling interval is refined to 1m and excludes entry; later path uses reconciled 15m and 1m windows",
+      "firstEntryTouch": null,
+      "state": "invalidated",
+      "outcome": null,
+      "exits": [],
+      "remainingFraction": 1,
+      "events": [
+        {
+          "id": "gse_1f14c8c8e345d050a1007f477a68ef47",
+          "kind": "location_test",
+          "at": 1793664000000,
+          "basis": "completed_candle",
+          "candleTs": 1793577600000,
+          "price": 76809
+        },
+        {
+          "id": "gse_0ba3e6f8548276ee10be5d87b2721eaa",
+          "kind": "location_test",
+          "at": 1793750400000,
+          "basis": "completed_candle",
+          "candleTs": 1793664000000,
+          "price": 77454.2
+        },
+        {
+          "id": "gse_5f5df0452f253fc643171d7be2a260fa",
+          "kind": "location_test",
+          "at": 1793836800000,
+          "basis": "completed_candle",
+          "candleTs": 1793750400000,
+          "price": 80508
+        },
+        {
+          "id": "gse_1a45a7d7d5cf67067833a08324c52704",
+          "kind": "location_test",
+          "at": 1793923200000,
+          "basis": "completed_candle",
+          "candleTs": 1793836800000,
+          "price": 76087.4
+        },
+        {
+          "id": "tgpe_15m_d14715909841b919e70b37490b29c1d9",
+          "kind": "stop_touch",
+          "at": 1794175200000,
+          "candleTs": 1794174300000,
+          "price": 73739.3535554,
+          "basis": "completed_candle"
+        }
+      ]
+    },
+    {
+      "snapshot": "nov6",
+      "frame": "1Wutc",
+      "revision": "reaction-v1",
+      "selection": "selected",
+      "interpretation": "Retrospective fixed-rule candidate, never published or traded",
+      "sourceObservedAt": "2026-11-06T05:56:44.613Z",
+      "policy": "entry-reaction-passive-v1",
+      "side": "short",
+      "entry": [
+        76265.2,
+        76265.2
+      ],
+      "stop": 77493.730186,
+      "stopTimeframe": "1Dutc",
+      "stopDistancePercent": 1.6108660122834577,
+      "entryDistancePercent": 0.7123067699515762,
+      "targets": [
+        {
+          "id": "tp1",
+          "lower": 76053,
+          "upper": 76053,
+          "allocation": 0.5
+        },
+        {
+          "id": "tp2",
+          "lower": 74955.5,
+          "upper": 74955.5,
+          "allocation": 0.3
+        },
+        {
+          "id": "tp3",
+          "lower": 74501.6,
+          "upper": 74501.6,
+          "allocation": 0.2
+        }
+      ],
+      "admission": {
+        "eligible": false,
+        "blockers": [
+          "reward",
+          "opposing_zone_overlap"
+        ],
+        "nearestR": 0
+      },
+      "plannedWeightedR": 0.6932918781370452,
+      "through": "2026-11-14T06:00:00.000Z",
+      "publicationWindows": [
+        {
+          "parentTs": 1793943900000,
+          "refined": true,
+          "parentIntersectsEntry": false,
+          "minuteStraddles": [
+            {
+              "ts": 1793944560000,
+              "intersectsEntry": false
+            }
+          ]
+        }
+      ],
+      "coverage": "The publication-straddling interval is refined to 1m and excludes entry; later path uses reconciled 15m and 1m windows",
+      "firstEntryTouch": "2026-11-06T09:30:00.000Z",
+      "state": "completed",
+      "outcome": {
+        "kind": "target_observed",
+        "at": 1794175200000,
+        "targetId": "tp3"
+      },
+      "exits": [
+        {
+          "targetId": "tp1",
+          "at": 1793959200000,
+          "allocation": 0.5
+        },
+        {
+          "targetId": "tp2",
+          "at": 1793978100000,
+          "allocation": 0.3
+        },
+        {
+          "targetId": "tp3",
+          "at": 1794175200000,
+          "allocation": 0.2
+        }
+      ],
+      "remainingFraction": 0,
+      "events": [
+        {
+          "id": "tgpe_15m_f74e8fb0aa76be69737a3665c8eea732",
+          "kind": "entry_touch",
+          "at": 1793957400000,
+          "candleTs": 1793956500000,
+          "price": 76265.2,
+          "basis": "completed_candle"
+        },
+        {
+          "id": "tgpe_15m_d793b2b7c8a2472e8fb5fca67899c418",
+          "kind": "target_touch",
+          "at": 1793959200000,
+          "candleTs": 1793958300000,
+          "price": 76053,
+          "basis": "completed_candle",
+          "targetId": "tp1"
+        },
+        {
+          "id": "tgpe_15m_4cc47966e169bcbcd04e2fdd19c10d57",
+          "kind": "target_touch",
+          "at": 1793978100000,
+          "candleTs": 1793977200000,
+          "price": 74955.5,
+          "basis": "completed_candle",
+          "targetId": "tp2"
+        },
+        {
+          "id": "tgpe_15m_48bce21c1b0e0f19b10d190ba8fa410c",
+          "kind": "target_touch",
+          "at": 1794175200000,
+          "candleTs": 1794174300000,
+          "price": 74501.6,
+          "basis": "completed_candle",
+          "targetId": "tp3"
+        }
+      ]
+    },
+    {
+      "snapshot": "nov6",
+      "frame": "1Wutc",
+      "revision": "reaction-v1",
+      "selection": "alternate",
+      "interpretation": "Retrospective fixed-rule candidate, never published or traded",
+      "sourceObservedAt": "2026-11-06T05:56:44.613Z",
+      "policy": "structural-edge-passive-v3",
+      "side": "long",
+      "entry": [
+        65000,
+        65000
+      ],
+      "stop": 63783.8535554,
+      "stopTimeframe": "1Wutc",
+      "stopDistancePercent": 1.8709945301538504,
+      "entryDistancePercent": 14.163996946879397,
+      "targets": [
+        {
+          "id": "tp1",
+          "lower": 80636.3,
+          "upper": 87399,
+          "allocation": 0.5
+        },
+        {
+          "id": "tp2",
+          "lower": 89111,
+          "upper": 97925.4,
+          "allocation": 0.3
+        },
+        {
+          "id": "tp3",
+          "lower": 104477.5,
+          "upper": 108365,
+          "allocation": 0.2
+        }
+      ],
+      "admission": {
+        "eligible": true,
+        "blockers": [],
+        "nearestR": 10.75898388561549
+      },
+      "plannedWeightedR": 18.868574670336994,
+      "through": "2026-11-14T06:00:00.000Z",
+      "publicationWindows": [
+        {
+          "parentTs": 1793943900000,
+          "refined": true,
+          "parentIntersectsEntry": false,
+          "minuteStraddles": [
+            {
+              "ts": 1793944560000,
+              "intersectsEntry": false
+            }
+          ]
+        }
+      ],
+      "coverage": "The publication-straddling interval is refined to 1m and excludes entry; later path uses reconciled 15m and 1m windows",
+      "firstEntryTouch": null,
+      "state": "awaiting_location",
+      "outcome": null,
+      "exits": [],
+      "remainingFraction": 1,
+      "events": []
+    }
+  ]
+}

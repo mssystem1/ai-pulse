@@ -62,6 +62,19 @@ export function deriveGlobalExecutionPolicy(
   const eventKnownAt=plan.evidence?.completedAt??plan.entryBasis.knownAt;
   const eventAfter=Math.max(plan.entryBasis.knownAt,plan.reference.completedAt-duration*settings.timeToLiveBars);
   const targetAllocations=plan.targets.length===1?[1]:plan.targets.length===2?[.5,.5]:[.5,.3,.2];
+  if(plan.entryReaction){
+    // The completed execution-frame source fixes the limit, volatility and
+    // lifetime together. A refresh is not a new order or a renewed deadline.
+    const reaction=plan.entryReaction;
+    return {entry:{lower:plan.entryBasis.price,upper:plan.entryBasis.price},policy:{
+      version:"execution-policy-v1",id:"entry-reaction-passive-v1",
+      configurationKey:`${report.snapshot.instId}:${report.snapshot.timeframe}:${plan.family}:entry-reaction-v1`,
+      family:plan.family,mode:"passive_limit",sourceBoundary:plan.entryBasis.price,
+      eventTimeframe:reaction.timeframe,eventKnownAt:reaction.knownAt,eventAfter:reaction.knownAt,
+      expiresAt:reaction.expiresAt,confirmationBars:1,fillWindowBars:4,
+      stopManagement:"structural_fixed",targetAllocations,entryRegion:"source_zone",
+    }};
+  }
   return {entry,policy:{
     version:"execution-policy-v1",
     id:overrides.boundaryRetest?`${plan.family}-boundary-retest-v1`:observed?"observed-reclaim-retest-v1":sourceEdge?"structural-edge-passive-v3":spec.id,

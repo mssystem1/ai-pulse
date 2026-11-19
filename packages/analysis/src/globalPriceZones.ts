@@ -32,6 +32,7 @@ export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<Globa
   };
   const targetBand=(p:Plan,t:Plan["targets"][number]):Band=>{
     let result=band(t.price,t.price);
+    if(p.entryReaction&&t.timeframe===report.entryStudy?.timeframe)return result;
     if(t.basis==="structure_zone"){
       const z=report.horizonContext?.zones.find(z=>z.startTs===t.anchorTs&&z.knownAt===t.knownAt&&z.role===(p.side==="long"?"resistance":"support")&&(p.side==="long"?z.lower:z.upper)===t.price);
       if(z)result={lower:z.lower,upper:z.upper};
@@ -62,7 +63,7 @@ export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<Globa
       // at the genuine source price; no reward/risk threshold selects it.
       ({entry,policy}=deriveGlobalExecutionPolicy(report,p,source,{...settings,boundaryRetest:true}));
     }
-    const rawBarriers=globalRouteObstacles(report,p.side);
+    const rawBarriers=globalRouteObstacles(report,p.side,Boolean(p.entryReaction));
     const obstacles=rawBarriers.filter(b=>sign*(near-b.price)>tick&&sign*(b.price-(p.side==="long"?source.lower:source.upper))>tick).sort((a,b)=>sign*(a.price-b.price));
     const worst=p.side==="long"?entry.upper:entry.lower;
     if(entry.lower>entry.upper||sign*((p.side==="long"?entry.lower:entry.upper)-p.stop)<=0||sign*(worst-p.stop)<=tick||sign*(near-worst)<=tick)return null;
@@ -73,7 +74,7 @@ export function applyGlobalPriceZones(report:GlobalReport,settings:Partial<Globa
     p.version="discretionary-plan-v8";
     p.executionPolicy=policy;
     delete p.requiresNewTestAfter;
-    p.priceZones={version:"price-zones-v1",entry:{lower:Number(entry.lower.toPrecision(12)),upper:Number(entry.upper.toPrecision(12)),sourceLower:source.lower,sourceUpper:source.upper,sourcePrice},stop:band(p.stop,p.stopBasis.price),targets,payoffFloor:1,payoffLimited:rr<1-1e-9};
+    p.priceZones={version:"price-zones-v1",entry:{lower:Number(entry.lower.toPrecision(12)),upper:Number(entry.upper.toPrecision(12)),sourceLower:source.lower,sourceUpper:source.upper,sourcePrice},stop:band(p.stop,p.stopBasis.price),targets,payoffFloor:1,payoffLimited:rr<1-1e-9,...(p.entryReaction&&targets.length>=2?{payoffPolicy:"staged-weighted-v1" as const}:{})};
     return {p,rr};
   }
   // Poor clearance remains visible. It cannot move a bid/offer to a deeper

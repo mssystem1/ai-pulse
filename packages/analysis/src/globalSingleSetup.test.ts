@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {candleCloseTime,GlobalReportSchema,type GlobalReport} from "@pulse/schemas";
+import {candleCloseTime,candleTimeframeMs,GlobalReportSchema,type GlobalReport} from "@pulse/schemas";
 import {summarizeCandles,type SpotMarketContext} from "@pulse/market";
 import {globalTradeCards,globalDecision,globalWavePhase,globalWaveExplanationLines,globalReportChartSvg,globalEntryStudySvg,globalTradeCardLines,selectSingleGlobalSetup} from "@pulse/domain";
 import {prepareGlobalReport,globalContextTimeframe} from "./globalReport.js";
@@ -16,6 +16,7 @@ function markets(rows:Record<string,number[][]>,at:string):SpotMarketContext[]{r
 });}
 const current=markets(publicData.frames,publicData.observedAt),old=markets(historic.byFrame,"2026-10-17T21:16:00Z");
 function make(frame:string,tier:"base"|"premium"="premium",lang:"en"|"zh"="en",legacy=false){const data=["1Dutc","1Wutc"].includes(frame)?current:old;return prepareGlobalReport({market:data.find(m=>m.bar===frame)!,contextMarket:data.find(m=>m.bar===globalContextTimeframe(frame)),hierarchyMarkets:data,tier,lang,...(legacy?{targetPolicy:"legacy-pivots-v1" as const}:{})});}
+function assertReactionSource(r:GlobalReport){const p=r.discretionaryPlan!,reaction=p.entryReaction;assert.ok(reaction,"a changed execution side requires a saved completed reaction source");const source=r.entryStudy!.candles.find(c=>c.ts===reaction.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===reaction.previousTs)!;assert.ok(source.confirmed&&prior.confirmed);assert.equal(source.ts,prior.ts+candleTimeframeMs(reaction.timeframe));if(reaction.kind==="completed_break"){assert.ok(reaction.level);assert.equal(p.entry,reaction.level.price);assert.ok(p.side==="long"?prior.close<=p.entry&&source.close>p.entry:prior.close>=p.entry&&source.close<p.entry);}else{assert.equal(reaction.level,undefined);assert.equal(p.entry,p.side==="long"?Math.min(source.open,source.close):Math.max(source.open,source.close));assert.ok(p.side==="long"?source.close>prior.close:source.close<prior.close);}assert.equal(reaction.knownAt,candleCloseTime(source.ts,reaction.timeframe));}
 
 for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])test(`${frame}: Quick, Pro and both languages publish the same single strategy`,()=>{
   const reports=(["base","premium"] as const).flatMap(tier=>(["en","zh"] as const).map(lang=>make(frame,tier,lang)));
@@ -28,7 +29,7 @@ for(const frame of ["15m","1H","4H","1Dutc","1Wutc"])test(`${frame}: Quick, Pro 
     assert.equal((svg.match(/data-trade-price-ledger=/g)??[]).length,drawable.length);
     assert.equal((svg.match(/data-scenario-projection=/g)??[]).length,cards.filter(c=>c.confirmed).length);
     for(const card of cards.filter(c=>c.selected)){
-      assert.ok(r.tradePlan!.side==="none"||card.side===r.tradePlan!.side);assert.equal(card.pathId,r.discretionaryPlan?"priced-setup":selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
+      if(r.tradePlan!.side!=="none"&&card.side!==r.tradePlan!.side)assertReactionSource(r);assert.equal(card.pathId,r.discretionaryPlan?"priced-setup":selection.pathId);assert.ok(globalTradeCardLines(r).includes(card.lines[0]));
       if(!card.plan.referenceEntry||!card.plan.referenceStop)continue;
       const inset=globalEntryStudySvg(r)!;
       if(r.entryStudy?.status==="available")assert.ok(inset.includes(`data-entry-price-role="SL" data-price="${card.plan.referenceStop}"`));
@@ -42,11 +43,11 @@ test("reported weekly bars select a recovery LONG; historical C is not an opposi
   const r=make("1Wutc");assert.equal(r.snapshot.price,83760.4);assert.equal(r.setupSelection!.side,"long");assert.equal(r.setupSelection!.rule,"structural_reversal");assert.equal(globalWavePhase(r).recovered,true);
   assert.ok(r.setupSelection!.evidence.some(l=>l.includes("82,842")));assert.ok(r.setupSelection!.limitations.some(l=>l.includes("SMA55 has not turned")));
   assert.match(globalWaveExplanationLines(r).join("\n"),/current hypothesis is post-C recovery/);assert.ok(!globalWaveExplanationLines(r).some(l=>l.includes("current candidate C? leg: down")));
-  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assert.equal(globalTradeCards(r)[0].side,"long");assert.equal(globalTradeCards(r)[0].confirmed,false);
+  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assertReactionSource(r);assert.equal(globalTradeCards(r)[0].side,r.discretionaryPlan!.side);assert.equal(globalTradeCards(r)[0].confirmed,false);
 });
 test("reported daily bars select a downward reversal before comparing any candidate reward",()=>{
   const r=make("1Dutc");assert.equal(r.snapshot.price,81489.4);assert.equal(r.setupSelection!.side,"short");assert.equal(r.setupSelection!.rule,"structural_reversal");
-  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assert.equal(globalTradeCards(r)[0].side,"short");assert.ok(!globalTradeCards(r)[0].targets.some(t=>t.price===82473.6));
+  assert.equal(globalTradeCards(r).filter(c=>c.selected).length,1);assertReactionSource(r);assert.equal(globalTradeCards(r)[0].side,r.discretionaryPlan!.side);assert.ok(!globalTradeCards(r)[0].targets.some(t=>t.price===82473.6));
 });
 test("trend direction cannot switch merely because the opposite candidate offers better reward",()=>{
   const r=make("1H","premium","en",true);delete r.range;

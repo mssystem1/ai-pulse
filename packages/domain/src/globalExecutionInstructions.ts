@@ -1,6 +1,7 @@
 import type { GlobalReport } from "@pulse/schemas";
 import { globalFrameReference } from "./globalContext.js";
-import { globalPriceBandText, globalOpposingEntryZones } from "./globalPriceZones.js";
+import { globalPriceBandText, globalOpposingEntryZones, globalTargetReference } from "./globalPriceZones.js";
+import { globalSetupAdmission } from "./globalSetupAdmission.js";
 
 const executionTime = (at: number) => new Date(at).toISOString().slice(0, 19).replace("T", " ") + " UTC";
 
@@ -53,10 +54,12 @@ export function globalExecutionInstructions(report: GlobalReport): string | null
       ? `${frame} 必须先在 ${price(policy.sourceBoundary)} 的${family}完成${p.side === "long" ? "收复和守住回测" : "跌破和受阻回测"}，再仅在所示 ${zone} 回测区域考虑入场。确认收盘价不视为成交。`
       : `${frame} must establish ${p.side === "long" ? "acceptance above and a defended retest of" : "acceptance below and a rejected retest of"} the ${family} at ${price(policy.sourceBoundary)}. Entry is limited to its ${zone} retest region; a confirmation close is not an assumed fill.`;
   return [instruction,
+    ...(p.entryReaction?.kind==="completed_break"?[zh?`入场研究周期 ${globalFrameReference(p.entryReaction.timeframe)} 已收盘突破已确认摆动${p.entryReaction.level?.kind==="low"?"低点":"高点"} ${price(p.entryReaction.level?.price??p.entry)}；限价单等待该边界回测，止损至少距边界 0.5×该周期 ATR。`:`A completed ${globalFrameReference(p.entryReaction.timeframe)} close broke confirmed swing ${p.entryReaction.level?.kind??(p.side==="short"?"low":"high")} ${price(p.entryReaction.level?.price??p.entry)}. The passive limit retests that boundary; the fixed SL is at least 0.5× entry-study ATR beyond it.`]:[]),
     ...(globalOpposingEntryZones(report).length ? [zh ? "入场区域与反向结构区域重叠；已观察到的回测不能单独解决该障碍，入场前须重新评估。" : "Entry overlaps opposing structure. The observed retest does not resolve that obstacle; reassess before entry."] : []),
-    zh ? `固定硬止损 ${price(p.stop)}；入场截止 ${executionTime(deadline)}。` : `Fixed hard SL ${price(p.stop)}; Entry deadline ${executionTime(deadline)}.`,
+    zh ? `固定硬止损 ${price(p.stop)}${policy.id === "entry-reaction-passive-v1" ? `（入场研究周期 ${globalFrameReference(p.stopBasis.timeframe)}）` : ""}；入场截止 ${executionTime(deadline)}。` : `Fixed hard SL ${price(p.stop)}${policy.id === "entry-reaction-passive-v1" ? ` on the ${globalFrameReference(p.stopBasis.timeframe)} entry-study timeframe` : ""}; Entry deadline ${executionTime(deadline)}.`,
+    ...(policy.id==="entry-reaction-passive-v1"&&p.priceZones?.payoffPolicy==="staged-weighted-v1"&&policy.targetAllocations.length===p.targets.length?(()=>{const admission=globalSetupAdmission(report),exits=p.targets.map((target,i)=>`${zh?`TP${i+1} (${globalFrameReference(target.timeframe)}) ${Math.round(policy.targetAllocations[i]*100)}% ${price(globalTargetReference(report,i)!)}`:`TP${i+1} (${globalFrameReference(target.timeframe)}) ${Math.round(policy.targetAllocations[i]*100)}% at ${price(globalTargetReference(report,i)!)}`}`).join(zh?"；":"; ");return [zh?`分段退出：${exits}。TP1 为 ${admission.targetRewardRisk?.toFixed(2)??"—"}R；按已保存比例加权计划收益为 ${admission.plannedWeightedRewardRisk?.toFixed(2)??"—"}R（未计成本）。未退出仓位仍暴露于固定硬止损 ${price(p.stop)}；这是计划收益风险比，不是预期利润。`:`Staged exits: ${exits}. TP1 is ${admission.targetRewardRisk?.toFixed(2)??"—"}R; planned weighted payoff is ${admission.plannedWeightedRewardRisk?.toFixed(2)??"—"}R before costs. Any unclosed position remains exposed to the fixed hard SL ${price(p.stop)}. This is planned payoff, not expected profit.`];})():[]),
     ...(deadline < setupExpiry ? [zh ? `整体计划到期 ${executionTime(setupExpiry)}，不能延长本次已确认入场窗口。` : `Overall setup expiry ${executionTime(setupExpiry)} does not extend this confirmed entry window.`] : []),
-    ["structural-edge-passive-v2","structural-edge-passive-v3"].includes(policy.id)
+    ["structural-edge-passive-v2","structural-edge-passive-v3","entry-reaction-passive-v1"].includes(policy.id)
       ? zh ? "结构失效或入场期限结束时取消限价计划。首次目标仅在入场后作为退出价；入场前曾触及该价位不会取消此结构回测计划。" : "Cancel the limit plan if its structure fails or its entry deadline expires. The first active opposing level is the exit objective after entry; a pre-entry touch of that level does not cancel this structural retest plan."
       : policy.mode === "passive_limit"
       ? zh ? "目标在入场前被触及或结构失效时取消本次机会。" : "Cancel this opportunity if its first objective is reached before entry or its structure fails."

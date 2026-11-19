@@ -73,7 +73,9 @@ test("Oct 20 weekly: a recovery bias without confirmation cannot claim an entry,
   const r=make("1Wutc"),card=globalTradeCards(r)[0];
   assert.equal(r.snapshot.price,82109.3);assert.equal(r.tradePlan!.watchOnly,true);
   assert.equal(r.tradePlan!.referenceEntry,null);assert.equal(r.tradePlan!.referenceStop,null);assert.equal(card.confirmed,false);
-  assert.ok(card.plan.referenceEntry&&card.plan.referenceStop&&card.rr);assert.ok(r.discretionaryPlan!.targets.every(t=>t.timeframe==="1Wutc"));
+  const p=r.discretionaryPlan!;
+  if(p.entryReaction){const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;assert.equal(p.stopBasis.timeframe,r.entryStudy!.timeframe);assert.ok(p.targets.every((t,i)=>t.timeframe==="1Wutc"||i===0&&t.timeframe===r.entryStudy!.timeframe));assert.ok(p.side==="long"?source.close>prior.close:source.close<prior.close);assert.equal(card.confirmed,false);}
+  else{assert.ok(card.plan.referenceEntry&&card.plan.referenceStop&&card.rr);assert.ok(p.targets.every(t=>t.timeframe==="1Wutc"));}
   assert.doesNotMatch(globalReportChartSvg(r)!,/data-scenario-projection=/);
   assert.equal(globalDecision(r).currentAction,"WAIT");
   const invented=structuredClone(r);invented.tradePlan!.referenceEntry=[82842,83049.14];

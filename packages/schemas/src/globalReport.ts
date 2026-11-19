@@ -1,5 +1,5 @@
 import { z } from "zod";
-import {candleCloseTime,candleLevelTouchedAfter} from "./candleTimeframe.js";
+import {candleCloseTime,candleLevelTouchedAfter,candleTimeframeMs} from "./candleTimeframe.js";
 import {GlobalOrderFlowSchema} from "./globalOrderFlow.js";
 import {GlobalExecutionPolicySchema} from "./globalExecution.js";
 import {GlobalScenarioSchema} from "./globalScenario.js";
@@ -91,11 +91,12 @@ export const GlobalHorizonContextSchema=z.object({
  * and order authorization. Every price retains its saved candle provenance. */
 export const GlobalDiscretionaryPlanSchema=z.object({
   version:z.enum(["discretionary-plan-v1","discretionary-plan-v2","discretionary-plan-v3","discretionary-plan-v4","discretionary-plan-v5","discretionary-plan-v6","discretionary-plan-v7","discretionary-plan-v8"]),executionPolicy:GlobalExecutionPolicySchema.optional(),side:z.enum(["long","short"]),requiresNewTestAfter:time.optional(),
-  priceZones:z.object({version:z.literal("price-zones-v1"),entry:z.object({lower:price,upper:price,sourceLower:price,sourceUpper:price,sourcePrice:price}),stop:z.object({lower:price,upper:price}),targets:z.array(z.object({lower:price,upper:price})).min(1).max(3),payoffFloor:z.literal(1),payoffLimited:z.boolean()}).optional(),
+  priceZones:z.object({version:z.literal("price-zones-v1"),entry:z.object({lower:price,upper:price,sourceLower:price,sourceUpper:price,sourcePrice:price}),stop:z.object({lower:price,upper:price}),targets:z.array(z.object({lower:price,upper:price})).min(1).max(3),payoffFloor:z.literal(1),payoffLimited:z.boolean(),payoffPolicy:z.literal("staged-weighted-v1").optional()}).optional(),
   evidence:z.object({kind:z.enum(["local_reclaim","primary_reclaim"]),timeframe:z.string(),level:price,testTs:time,completedAt:time,extreme:price}).optional(),
   family:z.enum(["range_rotation","ema_pullback","vwap_reversion","breakout_retest","level_retest"]),objectiveTimeframe:z.string(),
   entry:price,stop:price,
-  entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band","structure_zone"]),timeframe:z.string(),knownAt:time,price}),
+  entryReaction:z.object({version:z.literal("entry-reaction-v1"),kind:z.enum(["completed_rejection","completed_sweep","completed_break"]),timeframe:z.string(),anchorTs:time,previousTs:time,knownAt:time,atrTs:time,atrKnownAt:time,atrValue:price,expiresAt:time,level:z.object({id:z.string(),kind:z.enum(["high","low"]),anchorTs:time,confirmedAt:time,knownAt:time,price}).optional()}).optional(),
+  entryBasis:z.object({kind:z.enum(["completed_close","reclaimed_level","ema_ribbon","range_edge","vwap_band","structure_zone","entry_reaction"]),timeframe:z.string(),knownAt:time,price}),
   reference:z.object({timeframe:z.string(),candleTs:time,completedAt:time,price}),
   stopBasis:z.object({timeframe:z.string(),anchorTs:time,knownAt:time,price}),
   targets:z.array(z.object({price,timeframe:z.string(),anchorTs:time,knownAt:time,basis:z.enum(["confirmed_swing","observed_extreme","structure_zone","measured_projection","vwap_band","range_boundary","range_midpoint","range_quartile","executed_profile"]),bandMultiple:z.number().int().min(-3).max(3).optional()})).min(1).max(3),
@@ -113,7 +114,7 @@ export const GlobalReportSchema = z.object({
   snapshot: z.object({ instId: z.string(), timeframe: z.string(), source: z.string(), venue: z.string(), priceCurrency: z.string(),
     observedAt: z.string(), lastCandleTs: time.nullable(), price: price.nullable(), pricePrecision: z.number().int().min(0).max(10), completedOnly: z.literal(true) }),
   candles: z.array(GlobalCandleSchema), levels: z.array(GlobalLevelSchema), waveCount: GlobalWaveSchema, paths: z.array(GlobalPathSchema).max(3),
-  setup: GlobalSetupSchema, setupPolicyVersion:z.enum(["source-limits-v2","source-limits-v3"]).optional(), tradePlan: GlobalTradePlanSchema.optional(), discretionaryPlan:GlobalDiscretionaryPlanSchema.optional(), alternatePlan:GlobalDiscretionaryPlanSchema.optional(), alternatePlanReason:z.string().optional(), scenario:GlobalScenarioSchema.optional(), strategyMix:GlobalStrategyMixSchema.optional(), marketEvidence:z.array(GlobalMarketEvidenceSchema).max(24).optional(), orderFlow:GlobalOrderFlowSchema.optional(), indicators: GlobalIndicatorsSchema,
+  setup: GlobalSetupSchema, setupPolicyVersion:z.enum(["source-limits-v2","source-limits-v3","source-limits-v4"]).optional(), tradePlan: GlobalTradePlanSchema.optional(), discretionaryPlan:GlobalDiscretionaryPlanSchema.optional(), alternatePlan:GlobalDiscretionaryPlanSchema.optional(), alternatePlanReason:z.string().optional(), scenario:GlobalScenarioSchema.optional(), strategyMix:GlobalStrategyMixSchema.optional(), marketEvidence:z.array(GlobalMarketEvidenceSchema).max(24).optional(), orderFlow:GlobalOrderFlowSchema.optional(), indicators: GlobalIndicatorsSchema,
   context: z.object({ timeframe: z.string().nullable(), status: z.enum(["available", "unavailable", "not_requested"]), source: z.string().nullable(),
     candles: z.array(GlobalCandleSchema), sma55: z.array(seriesPoint), agreement: z.enum(["supports", "conflicts", "neutral", "unknown"]) }),
   narrative: z.object({ headline: z.string(), summary: z.string(), reasons: z.array(z.string()), riskNotes: z.array(z.string()), limitations: z.array(z.string()), disclaimer: z.string() }),
@@ -168,9 +169,84 @@ export const GlobalReportSchema = z.object({
     }
     return expected;
   };
-  const discretionary=report.discretionaryPlan;
-  if(discretionary){
-    const definition=report.scenario?.definition,retained=discretionary.version==="discretionary-plan-v8"&&definition!==undefined&&definition.createdAt<Date.parse(report.snapshot.observedAt);
+  const isReaction=(p:NonNullable<GlobalReport["discretionaryPlan"]>)=>p.entryBasis.kind==="entry_reaction"||p.entryReaction!==undefined||p.executionPolicy?.id==="entry-reaction-passive-v1";
+  for(const discretionary of [report.discretionaryPlan,...(report.alternatePlan&&isReaction(report.alternatePlan)?[report.alternatePlan]:[])]){
+    if(!discretionary)continue;
+    const reactionPlan=isReaction(discretionary),reaction=discretionary.entryReaction,study=report.entryStudy,cutoff=Date.parse(report.snapshot.observedAt);
+    const definition=discretionary===report.discretionaryPlan?report.scenario?.definition:undefined,retained=discretionary.version==="discretionary-plan-v8"&&definition!==undefined&&definition.createdAt<cutoff;
+    let verifiedReaction=false;
+    if(reactionPlan){
+      const p=discretionary,z=p.priceZones,policy=p.executionPolicy,duration=study?candleTimeframeMs(study.timeframe):0;
+      const source=study?.candles.find(c=>c.ts===reaction?.anchorTs),previous=study?.candles.find(c=>c.ts===reaction?.previousTs);
+      const level=reaction?.level,broken=level&&study?.pivots.find(a=>a.id===level.id&&a.kind===level.kind&&a.ts===level.anchorTs&&a.confirmedAt===level.confirmedAt&&a.price===level.price);
+      const breakWitness=Boolean(reaction?.kind==="completed_break"&&level&&broken&&source&&previous&&study&&level.kind===(p.side==="short"?"low":"high")&&
+        candleCloseTime(level.confirmedAt,study.timeframe)===level.knownAt&&level.knownAt<=source.ts&&
+        (p.side==="short"?previous.close>=level.price&&source.close<level.price:previous.close<=level.price&&source.close>level.price));
+      const atr=study?.atr.find(a=>a.ts===reaction?.atrTs&&a.value===reaction?.atrValue);
+      const completed=study?.candles.filter(c=>c.confirmed&&(candleCloseTime(c.ts,study.timeframe)??Infinity)<=cutoff)??[];
+      const later=completed.filter(c=>c.ts>(source?.ts??Infinity)),quote=report.currentMarket?.quote;
+      const current=quote&&quote.ts<=cutoff&&quote.ts>=cutoff-60_000?quote.price:completed.at(-1)?.close;
+      const sourceLive=Boolean(source&&reaction&&current!==undefined&&cutoff<reaction.expiresAt&&
+        (p.side==="long"?current>=p.entry:current<=p.entry)&&
+        later.every((c,i)=>c.ts===source.ts+(i+1)*duration)&&
+        !later.some(c=>p.side==="long"?c.close<(reaction.kind==="completed_break"?level?.price??NaN:source.low)||c.low<=p.stop:c.close>(reaction.kind==="completed_break"?level?.price??NaN:source.high)||c.high>=p.stop));
+      const rawEntry=reaction?.kind==="completed_break"?level?.price??NaN:source?(p.side==="short"?Math.max(source.open,source.close):Math.min(source.open,source.close)):NaN;
+      const entry=Number(rawEntry.toPrecision(12));
+      const boundary=reaction?.kind==="completed_break"?level?.price??NaN:source?(p.side==="short"?source.high:source.low):NaN;
+      const stop=source&&reaction?Number((p.side==="short"?Math.max(boundary+reaction.atrValue*.2,entry+reaction.atrValue*.5):Math.min(boundary-reaction.atrValue*.2,entry-reaction.atrValue*.5)).toPrecision(12)):NaN;
+      verifiedReaction=Boolean(reaction&&study&&study.status==="available"&&study.source===report.snapshot.source&&study.observedAt===report.snapshot.observedAt&&duration>0&&source&&previous&&atr&&source.confirmed&&previous.confirmed&&[source,previous].every(c=>c.high>=Math.max(c.open,c.close)&&c.low<=Math.min(c.open,c.close))&&
+        reaction.timeframe===study.timeframe&&source.ts===previous.ts+duration&&candleCloseTime(source.ts,study.timeframe)===reaction.knownAt&&reaction.knownAt<=cutoff&&
+        candleCloseTime(previous.ts,study.timeframe)!==null&&(candleCloseTime(previous.ts,study.timeframe)??Infinity)<=cutoff&&
+        (reaction.kind==="completed_break"?breakWitness:p.side==="short"?source.close<source.open&&source.close<previous.close&&
+          (reaction.kind==="completed_sweep"?source.high>previous.high&&source.close<previous.high:source.high<previous.high):
+          source.close>source.open&&source.close>previous.close&&
+          (reaction.kind==="completed_sweep"?source.low<previous.low&&source.close>previous.low:source.low>previous.low))&&
+        reaction.atrTs===reaction.anchorTs&&reaction.atrKnownAt===reaction.knownAt&&candleCloseTime(atr.ts,study.timeframe)===reaction.atrKnownAt&&reaction.atrKnownAt<=cutoff&&
+        (retained||sourceLive)&&reaction.expiresAt===reaction.knownAt+16*duration&&p.version==="discretionary-plan-v8"&&report.setupPolicyVersion==="source-limits-v4"&&p.family==="level_retest"&&
+        p.entryBasis.kind==="entry_reaction"&&p.entryBasis.timeframe===study.timeframe&&p.entryBasis.knownAt===reaction.knownAt&&p.entryBasis.price===entry&&p.entry===entry&&
+        p.stop===stop&&p.stopBasis.price===boundary&&p.stopBasis.timeframe===study.timeframe&&p.stopBasis.anchorTs===source.ts&&p.stopBasis.knownAt===Math.max(reaction.knownAt,reaction.atrKnownAt)&&
+        z&&z.entry.lower===entry&&z.entry.upper===entry&&z.entry.sourceLower===entry&&z.entry.sourceUpper===entry&&z.entry.sourcePrice===entry&&
+        policy&&policy.id==="entry-reaction-passive-v1"&&policy.family==="level_retest"&&policy.mode==="passive_limit"&&policy.entryRegion==="source_zone"&&policy.sourceBoundary===entry&&
+        policy.eventTimeframe===study.timeframe&&policy.eventKnownAt===reaction.knownAt&&policy.eventAfter===reaction.knownAt&&policy.expiresAt===reaction.expiresAt&&
+        policy.targetAllocations.length===p.targets.length&&policy.targetAllocations.every((a,i)=>a===(p.targets.length===1?[1]:p.targets.length===2?[.5,.5]:[.5,.3,.2])[i]));
+      if(!verifiedReaction)ctx.addIssue({code:"custom",message:"Entry reactions require their consecutive completed entry-study witness, exact causal ATR protection and fixed passive policy"});
+      if(p===report.alternatePlan&&(!report.alternatePlanReason||!report.discretionaryPlan||p.side===report.discretionaryPlan.side))ctx.addIssue({code:"custom",message:"Alternate entry reactions require a reason and the opposite side from the selected plan"});
+    }
+    let entryObjective:NonNullable<GlobalReport["discretionaryPlan"]>["targets"][number]|undefined;
+    if(verifiedReaction&&study){
+      const sign=discretionary.side==="long"?1:-1,bars=study.candles.filter(c=>c.confirmed&&(candleCloseTime(c.ts,study.timeframe)??Infinity)<=cutoff),last=bars.at(-1);
+      const candidates:NonNullable<GlobalReport["discretionaryPlan"]>["targets"]=study.pivots.flatMap(a=>{
+        const knownAt=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,study.timeframe);
+        return last&&knownAt!==null&&knownAt<=cutoff&&a.kind===(discretionary.side==="long"?"high":"low")&&sign*(last.close-a.price)<=0?[{price:a.price,timeframe:study.timeframe,anchorTs:a.ts,knownAt,basis:"confirmed_swing" as const}]:[];
+      });
+      if(last)for(const a of study.pivots){
+        const confirmed=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,study.timeframe),source=bars.find(c=>c.ts===a.ts);
+        if(confirmed===null||confirmed>cutoff||!source)continue;
+        const lower=a.kind==="low"?source.low:Math.max(source.open,source.close),upper=a.kind==="low"?Math.min(source.open,source.close):source.high;
+        const role=last.close>=upper?"support":last.close<=lower?"resistance":null;
+        if(role!==(discretionary.side==="short"?"support":"resistance"))continue;
+        for(const price of [lower,upper])candidates.push({price,timeframe:study.timeframe,anchorTs:a.ts,knownAt:candleCloseTime(last.ts,study.timeframe)!,basis:"structure_zone"});
+      }
+      const extreme=bars.slice(-20).reduce<(typeof bars)[number]|undefined>((best,c)=>!best||sign*((discretionary.side==="long"?c.high:c.low)-(discretionary.side==="long"?best.high:best.low))>0?c:best,undefined);
+      if(extreme)candidates.push({price:discretionary.side==="long"?extreme.high:extreme.low,timeframe:study.timeframe,anchorTs:extreme.ts,knownAt:candleCloseTime(extreme.ts,study.timeframe)!,basis:"observed_extreme"});
+      // Primary objectives are independently validated below; this candidate can
+      // only become TP1 when strictly nearer than that untouched sequence.
+      entryObjective=candidates.filter(t=>sign*(t.price-discretionary.entry)>10**-report.snapshot.pricePrecision).sort((a,b)=>sign*(a.price-b.price))[0];
+      if(retained){
+        const t=discretionary.targets[0],source=bars.find(c=>c.ts===t.anchorTs);
+        entryObjective=t.timeframe===study.timeframe&&(
+          t.basis==="confirmed_swing"&&study.pivots.some(a=>a.kind===(discretionary.side==="long"?"high":"low")&&a.ts===t.anchorTs&&a.price===t.price&&a.confirmedAt!==null&&candleCloseTime(a.confirmedAt,study.timeframe)===t.knownAt)||
+          t.basis==="observed_extreme"&&source&&(discretionary.side==="long"?source.high:source.low)===t.price&&candleCloseTime(source.ts,study.timeframe)===t.knownAt||
+          t.basis==="structure_zone"&&source&&study.pivots.some(a=>{
+            const confirmed=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,study.timeframe),classification=bars.find(c=>candleCloseTime(c.ts,study.timeframe)===t.knownAt);
+            if(a.ts!==source.ts||confirmed===null||confirmed>t.knownAt||!classification)return false;
+            const lower=a.kind==="low"?source.low:Math.max(source.open,source.close),upper=a.kind==="low"?Math.min(source.open,source.close):source.high;
+            const role=classification.close>=upper?"support":classification.close<=lower?"resistance":null;
+            return (t.price===lower||t.price===upper)&&role===(discretionary.side==="short"?"support":"resistance");
+          }))?t:undefined;
+      }
+    }
+    if(discretionary.priceZones?.payoffPolicy&&(!verifiedReaction||report.setupPolicyVersion!=="source-limits-v4"||discretionary.targets.length<2))ctx.addIssue({code:"custom",message:"Staged weighted payoff requires a verified passive entry reaction and at least two sourced exits"});
     if(retained&&definition&&discretionary.entryBasis.kind==="ema_ribbon"){
       const values=report.indicators.ema?.filter(e=>e.period===12||e.period===25).flatMap(e=>e.points.filter(v=>candleCloseTime(v.ts,report.snapshot.timeframe)===definition.sourceKnownAt).map(v=>v.value))??[];
       const near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
@@ -191,7 +267,7 @@ export const GlobalReportSchema = z.object({
         else if(p.entryBasis.kind==="ema_ribbon"){const values=report.indicators.ema?.filter(e=>e.period===12||e.period===25).flatMap(e=>e.points.at(-1)?.value??[])??[];if(values.length===2)expected=band(values[0],values[1]);}
         else if(p.entryBasis.kind==="range_edge"&&report.range){const source=p.side==="long"?(p.family==="range_rotation"?report.range.lower:report.range.upper):(p.family==="range_rotation"?report.range.upper:report.range.lower);expected=band(source[0],source[1]);}
         else if(p.entryBasis.kind==="vwap_band"){const outer=report.indicators.vwap?.bands?.find(b=>b.multiple===3)?.[p.side==="long"?"lower":"upper"].at(-1)?.value;if(outer!==undefined&&outer>0)expected=band(original,outer);}
-        else if(p.evidence){const e=p.evidence,source=[{timeframe:report.snapshot.timeframe,candles:report.candles},...(report.entryStudy?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])].find(s=>s.timeframe===e.timeframe)?.candles.find(c=>c.ts===e.testTs);if(source)expected=band(original,source.close);}
+        else if(p.entryBasis.kind!=="entry_reaction"&&p.evidence){const e=p.evidence,source=[{timeframe:report.snapshot.timeframe,candles:report.candles},...(report.entryStudy?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])].find(s=>s.timeframe===e.timeframe)?.candles.find(c=>c.ts===e.testTs);if(source)expected=band(original,source.close);}
       }
       if(retained&&z)expected={lower:z.entry.sourceLower,upper:z.entry.sourceUpper};
       const policy=p.executionPolicy,entryExpected=policy?.entryRegion==="source_edge"?point(p.side==="long"?expected.lower:expected.upper):{lower:z?.entry.lower??p.entry,upper:z?.entry.upper??p.entry};
@@ -213,18 +289,22 @@ export const GlobalReportSchema = z.object({
       const p=discretionary,policy=p.executionPolicy,cutoff=Date.parse(report.snapshot.observedAt),sign=p.side==="long"?1:-1;
       if(!policy||policy.family!==p.family||policy.eventTimeframe!==p.reference.timeframe||policy.eventKnownAt>cutoff||policy.eventAfter>cutoff||policy.targetAllocations.length!==p.targets.length||!p.priceZones||p.requiresNewTestAfter!==undefined||policy.entryRegion==="source_edge"&&(p.entryBasis.kind!=="structure_zone"||p.family!=="level_retest"||policy.mode!=="passive_limit"||policy.sourceBoundary!==(p.side==="long"?p.priceZones.entry.sourceLower:p.priceZones.entry.sourceUpper))||policy.mode==="passive_limit"&&policy.entryRegion==="source_zone"&&(Math.abs(p.priceZones.entry.lower-p.priceZones.entry.sourceLower)>1e-8*Math.max(1,p.priceZones.entry.sourceLower)||Math.abs(p.priceZones.entry.upper-p.priceZones.entry.sourceUpper)>1e-8*Math.max(1,p.priceZones.entry.sourceUpper)))ctx.addIssue({code:"custom",message:"Current execution plans require their own causal policy and event clock, separate from report time"});
       const sources=[{candles:report.candles,timeframe:report.snapshot.timeframe},...(report.entryStudy?.source===report.snapshot.source?[report.entryStudy]:[]),...(report.currentMarket?.frames??[])];
-      if(!retained&&p.targets.some(t=>sign*(t.price-p.entry)<=0||policy?.entryRegion!=="source_edge"&&["confirmed_swing","observed_extreme","structure_zone"].includes(t.basis)&&sources.some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,t.price,p.side,t.knownAt,cutoff))))ctx.addIssue({code:"custom",message:"Execution plans retain entry-relative objectives with unconsumed completed-candle sources"});
-      if(policy?.entryRegion==="source_edge"&&!retained){
+      if(!retained&&p.targets.some(t=>sign*(t.price-p.entry)<=0||!verifiedReaction&&policy?.entryRegion!=="source_edge"&&["confirmed_swing","observed_extreme","structure_zone"].includes(t.basis)&&sources.some(s=>candleLevelTouchedAfter(s.candles,s.timeframe,t.price,p.side,t.knownAt,cutoff))))ctx.addIssue({code:"custom",message:"Execution plans retain entry-relative objectives with unconsumed completed-candle sources"});
+      if((policy?.entryRegion==="source_edge"||verifiedReaction)&&!retained){
         const levels=[...report.indicators.pivots.flatMap(a=>{
           const known=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,report.snapshot.timeframe);
           return known!==null&&known<=cutoff&&a.kind===(p.side==="long"?"high":"low")&&sign*(report.candles.at(-1)!.close-a.price)<=0?[{price:a.price,anchorTs:a.ts,knownAt:known,basis:"confirmed_swing"}]:[];
         }),...(report.horizonContext?.zones??[]).filter(s=>s.knownAt<=cutoff&&s.role===(p.side==="long"?"resistance":"support")).flatMap(s=>[s.lower,s.upper].map(price=>({price,anchorTs:s.startTs,knownAt:s.knownAt,basis:"structure_zone"})))].filter(t=>sign*(t.price-p.entry)>10**-report.snapshot.pricePrecision).sort((a,b)=>sign*(a.price-b.price));
         const first=levels[0],target=p.targets[0];
-        const version2=policy.id==="structural-edge-passive-v2",version3=policy.id==="structural-edge-passive-v3";
+        const version2=policy?.id==="structural-edge-passive-v2",version3=policy?.id==="structural-edge-passive-v3"||verifiedReaction;
         const matching=first&&target.price===first.price&&target.anchorTs===first.anchorTs&&target.knownAt===first.knownAt&&target.basis===first.basis;
-        const expected=canonicalStructuralTargets(p,levels as StructuralObstacle[]);
-        const sequenceMatches=version3&&p.targets.length===expected.length&&p.targets.every((t,i)=>t.price===expected[i]?.price&&t.anchorTs===expected[i]?.anchorTs&&t.knownAt===expected[i]?.knownAt&&t.basis===expected[i]?.basis);
-        if(!(version2&&p.targets.length===1||version3&&p.targets.length>=1&&p.targets.length<=3&&sequenceMatches)||!matching||version2&&report.setupPolicyVersion!=="source-limits-v2"||version3&&report.setupPolicyVersion!=="source-limits-v3")ctx.addIssue({code:"custom",message:"Structural source-edge orders retain the first active primary obstacle and up to two nearest nonoverlapping evidenced objectives"});
+        const primary=canonicalStructuralTargets(p,levels as StructuralObstacle[]);
+        const local=entryObjective&&primary[0]&&sign*(primary[0].price-entryObjective.price)>10**-report.snapshot.pricePrecision?entryObjective:undefined;
+        const expected=local?[local,...primary.slice(0,2).map(t=>({...t,timeframe:report.snapshot.timeframe}))]:primary.map(t=>({...t,timeframe:report.snapshot.timeframe}));
+        const sequenceMatches=version3&&p.targets.length===expected.length&&p.targets.every((t,i)=>t.price===expected[i]?.price&&t.anchorTs===expected[i]?.anchorTs&&t.knownAt===expected[i]?.knownAt&&t.basis===expected[i]?.basis&&t.timeframe===expected[i]?.timeframe);
+        const matchingFirst=local?target.price===local.price&&target.anchorTs===local.anchorTs&&target.knownAt===local.knownAt&&target.basis===local.basis&&p.priceZones?.targets[0]?.lower===local.price&&p.priceZones?.targets[0]?.upper===local.price:matching;
+        if(!local)entryObjective=undefined;
+        if(!(version2&&p.targets.length===1||version3&&p.targets.length>=1&&p.targets.length<=3&&sequenceMatches)||!matchingFirst||version2&&report.setupPolicyVersion!=="source-limits-v2"||version3&&!["source-limits-v3","source-limits-v4"].includes(report.setupPolicyVersion??""))ctx.addIssue({code:"custom",message:"Structural source-edge orders retain the first active primary obstacle and up to two nearest nonoverlapping evidenced objectives"});
       }
       if(!retained&&p.targets.some(t=>t.basis==="executed_profile"&&!((report.marketEvidence??[]).some(e=>e.data.kind==="executed_profile"&&e.provenance==="executed_trades"&&e.coverage.complete&&!e.coverage.gaps.length&&e.coverage.start===t.anchorTs&&e.coverage.knownAt===t.knownAt&&[e.data.poc,e.data.val,e.data.vah].includes(t.price))||report.orderFlow&&report.orderFlow.profile.start===t.anchorTs&&report.orderFlow.profile.knownAt===t.knownAt&&[report.orderFlow.profile.poc,report.orderFlow.profile.val,report.orderFlow.profile.vah].includes(t.price))))ctx.addIssue({code:"custom",message:"Value-area objectives require their actual completed executed-profile source"});
 
@@ -233,7 +313,7 @@ export const GlobalReportSchema = z.object({
     const r=discretionary.reference,bars=r.timeframe===report.snapshot.timeframe?report.candles:r.timeframe===report.entryStudy?.timeframe?report.entryStudy.candles:[],bar=bars.find(c=>c.ts===r.candleTs),sign=discretionary.side==="long"?1:-1;
     if(!bar||bar.close!==r.price||candleCloseTime(r.candleTs,r.timeframe)!==r.completedAt||r.completedAt>Date.parse(report.snapshot.observedAt)||discretionary.entryBasis.price!==(["discretionary-plan-v7","discretionary-plan-v8"].includes(discretionary.version)?discretionary.priceZones?.entry.sourcePrice:discretionary.entry)||discretionary.entryBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan entry must retain its saved completed reference and entry basis"});
     if(sign*(discretionary.entry-discretionary.stop)<=0||discretionary.targets.some((t,i)=>sign*(t.price-discretionary.entry)<=0||i>0&&sign*(t.price-discretionary.targets[i-1].price)<=0||t.knownAt>Date.parse(report.snapshot.observedAt))||discretionary.stopBasis.knownAt>Date.parse(report.snapshot.observedAt))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional plan requires ordered protection, targets and available evidence"});
-    if(discretionary.objectiveTimeframe!==report.snapshot.timeframe||discretionary.stopBasis.timeframe!==report.snapshot.timeframe||discretionary.targets.some(t=>t.timeframe!==report.snapshot.timeframe)||sign*(discretionary.stopBasis.price-discretionary.stop)<=0)ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional protection and objectives must retain the primary horizon and protect beyond invalidation"});
+    if(discretionary.objectiveTimeframe!==report.snapshot.timeframe||!verifiedReaction&&discretionary.stopBasis.timeframe!==report.snapshot.timeframe||discretionary.targets.some((t,i)=>t.timeframe!==report.snapshot.timeframe&&!(verifiedReaction&&i===0&&entryObjective&&t.timeframe===entryObjective.timeframe&&t.price===entryObjective.price&&t.anchorTs===entryObjective.anchorTs&&t.knownAt===entryObjective.knownAt&&t.basis===entryObjective.basis&&discretionary.priceZones?.targets[0]?.lower===t.price&&discretionary.priceZones?.targets[0]?.upper===t.price))||sign*(discretionary.stopBasis.price-discretionary.stop)<=0)ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional protection and objectives must retain the primary horizon and protect beyond invalidation"});
     if(discretionary.stopBasis.anchorTs>discretionary.stopBasis.knownAt||discretionary.targets.some(t=>t.anchorTs>t.knownAt)||discretionary.barriers.some(b=>b.anchorTs>b.knownAt||b.knownAt>Date.parse(report.snapshot.observedAt)||b.timeframe!==report.entryStudy?.timeframe&&b.timeframe!==report.snapshot.timeframe&&!report.currentMarket?.frames.some(f=>f.timeframe===b.timeframe)||sign*(b.price-discretionary.entry)<=0||sign*(discretionary.targets[0].price-b.price)<=0))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Conditional levels must retain available source times and intermediate-barrier ordering"});
     if(["discretionary-plan-v7","discretionary-plan-v8"].includes(discretionary.version)&&discretionary.barriers.some((b,i,all)=>i>0&&sign*(b.price-all[i-1].price)<0||all.findIndex(a=>a.price===b.price&&a.timeframe===b.timeframe)!==i))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Current conditional barriers must be ordered nearest first without duplicate price/timeframe references"});
     if(!retained&&discretionary.version!=="discretionary-plan-v1"){
@@ -264,7 +344,8 @@ export const GlobalReportSchema = z.object({
     const s=report.scenario,d=s.definition,p=report.discretionaryPlan,z=p?.priceZones,policy=p?.executionPolicy,cutoff=Date.parse(report.snapshot.observedAt);
     if(!p||p.version!=="discretionary-plan-v8"||!z||!policy||d.market!==`${report.snapshot.source}:${report.snapshot.instId}`||d.timeframe!==report.snapshot.timeframe||d.family!==p.family||d.side!==p.side||d.hardStop!==p.stop||d.createdAt>cutoff||s.updatedAt>cutoff||d.entryZone[0]!==z.entry.lower||d.entryZone[1]!==z.entry.upper||d.sourceLower!==z.entry.sourceLower||d.sourceUpper!==z.entry.sourceUpper||d.sourcePrice!==p.entryBasis.price||d.sourceKnownAt!==p.entryBasis.knownAt||d.policyId!==policy.id||d.mode!==policy.mode||d.eventAfter!==policy.eventAfter||d.eventKnownAt!==policy.eventKnownAt||d.expiresAt!==policy.expiresAt||d.targets.length!==z.targets.length||d.targets.some((t,i)=>t.lower!==z.targets[i]?.lower||t.upper!==z.targets[i]?.upper||t.allocation!==policy.targetAllocations[i])||(d.stopBasis.price!==p.stopBasis.price||d.stopBasis.timeframe!==p.stopBasis.timeframe||d.stopBasis.anchorTs!==p.stopBasis.anchorTs||d.stopBasis.knownAt!==p.stopBasis.knownAt))ctx.addIssue({code:"custom",message:"Scenario state must match its immutable priced execution plan, source and policy"});
   }
-  if(report.alternatePlan){
+  if(report.alternatePlan&&!isReaction(report.alternatePlan)){
+    if(report.alternatePlan.priceZones?.payoffPolicy)ctx.addIssue({code:"custom",message:"Staged weighted payoff requires a verified passive entry reaction and at least two sourced exits"});
     const p=report.alternatePlan,z=p.priceZones,policy=p.executionPolicy,cutoff=Date.parse(report.snapshot.observedAt),sign=p.side==="long"?1:-1,sourcePrice=z?.entry.sourcePrice;
     const source=sourcePrice===undefined?undefined:report.horizonContext?.zones.find(s=>s.role===(p.side==="long"?"support":"resistance")&&(p.side==="long"?s.upper:s.lower)===sourcePrice&&s.knownAt===p.entryBasis.knownAt);
     const near=(a:number,b:number)=>Math.abs(a-b)<=1e-8*Math.max(1,Math.abs(a),Math.abs(b));
@@ -281,9 +362,9 @@ export const GlobalReportSchema = z.object({
     })());
     const active=[...report.indicators.pivots.flatMap(a=>{const known=a.confirmedAt===null?null:candleCloseTime(a.confirmedAt,report.snapshot.timeframe);return known!==null&&known<=cutoff&&a.kind===(p.side==="long"?"high":"low")&&sign*(report.candles.at(-1)!.close-a.price)<=0?[{price:a.price,anchorTs:a.ts,knownAt:known,basis:"confirmed_swing"}]:[];}),...(report.horizonContext?.zones??[]).filter(s=>s.knownAt<=cutoff&&s.role===(p.side==="long"?"resistance":"support")).flatMap(s=>[s.lower,s.upper].map(price=>({price,anchorTs:s.startTs,knownAt:s.knownAt,basis:"structure_zone"})))].filter(t=>sign*(t.price-p.entry)>10**-report.snapshot.pricePrecision).sort((a,b)=>sign*(a.price-b.price));
     const first=active[0],target=p.targets[0],expected=canonicalStructuralTargets(p,active as StructuralObstacle[]),version2=policy?.id==="structural-edge-passive-v2",version3=policy?.id==="structural-edge-passive-v3";
-    const targetSequence=(version2&&p.targets.length===1||version3&&p.targets.length>=1&&p.targets.length<=3&&p.targets.length===expected.length&&p.targets.every((t,i)=>t.price===expected[i]?.price&&t.anchorTs===expected[i]?.anchorTs&&t.knownAt===expected[i]?.knownAt&&t.basis===expected[i]?.basis))&&(version2&&report.setupPolicyVersion==="source-limits-v2"||version3&&report.setupPolicyVersion==="source-limits-v3");
+    const targetSequence=(version2&&p.targets.length===1||version3&&p.targets.length>=1&&p.targets.length<=3&&p.targets.length===expected.length&&p.targets.every((t,i)=>t.price===expected[i]?.price&&t.anchorTs===expected[i]?.anchorTs&&t.knownAt===expected[i]?.knownAt&&t.basis===expected[i]?.basis))&&(version2&&report.setupPolicyVersion==="source-limits-v2"||version3&&["source-limits-v3","source-limits-v4"].includes(report.setupPolicyVersion??""));
     if(!z||!policy||!source||!report.alternatePlanReason||!report.discretionaryPlan||p.side===report.discretionaryPlan.side||p.version!=="discretionary-plan-v8"||p.family!=="level_retest"||policy.mode!=="passive_limit"||policy.entryRegion!=="source_edge"||policy.sourceBoundary!==edge||(edge===null||!near(z.entry.lower,edge)||!near(z.entry.upper,edge))||z.entry.sourceLower!==source.lower||z.entry.sourceUpper!==source.upper||(edge===null||!near(p.entry,edge))||p.entryBasis.kind!=="structure_zone"||p.entryBasis.price!==sourcePrice||p.entryBasis.timeframe!==report.snapshot.timeframe||p.entryBasis.knownAt!==source.knownAt||p.entryBasis.knownAt>cutoff||!ref||ref.close!==p.reference.price||candleCloseTime(ref.ts,p.reference.timeframe)!==p.reference.completedAt||p.reference.completedAt>cutoff||p.stopBasis.price!==(p.side==="long"?source.lower:source.upper)||!fixedProtection||p.stopBasis.timeframe!==report.snapshot.timeframe||p.stopBasis.anchorTs!==source.startTs||p.stopBasis.knownAt!==source.knownAt||p.stopBasis.knownAt>cutoff||p.stopBasis.anchorTs>p.stopBasis.knownAt||!sameSources||p.targets.some(t=>sign*(t.price-p.entry)<=0)||policy.family!==p.family||policy.eventTimeframe!==p.reference.timeframe||policy.eventKnownAt>cutoff||policy.eventAfter>cutoff||policy.targetAllocations.length!==p.targets.length||z.targets.length!==p.targets.length||!targetSequence||!first||target.price!==first.price||target.anchorTs!==first.anchorTs||target.knownAt!==first.knownAt||target.basis!==first.basis)ctx.addIssue({code:"custom",message:"Alternate plans must retain an opposite-side source edge, fixed invalidation and canonical ordered structural objectives"});
-  }else if(report.alternatePlanReason)ctx.addIssue({code:"custom",message:"An alternate-plan reason requires a saved alternate plan"});
+  }else if(!report.alternatePlan&&report.alternatePlanReason)ctx.addIssue({code:"custom",message:"An alternate-plan reason requires a saved alternate plan"});
   if(report.decisionVersion){
     const rows=report.hierarchy??[];
     if(!rows.some(row=>row.timeframe===report.snapshot.timeframe)||new Set(rows.map(r=>r.timeframe)).size!==rows.length||rows.some(r=>r.observedAt!==report.snapshot.observedAt||r.source!==null&&r.source!==report.snapshot.source||r.completedAt!==null&&r.completedAt>Date.parse(report.snapshot.observedAt)||r.status==="available"&&(r.candles<55||r.price===null||r.sma55===null)))ctx.addIssue({code:z.ZodIssueCode.custom,message:"Decision hierarchy must retain one source, cutoff and evidenced completed frames"});

@@ -82,7 +82,7 @@ export function advanceGlobalScenario(
     if (!hadEntry) {
       const invalidation = priceEvents.find(e => e.kind === "invalidation" || e.kind === "failed_retest") ?? stopped;
       if (invalidation) { record(invalidation); state.state = "invalidated"; state.reason = invalidation.kind === "failed_retest" ? "failed_retest" : "premise_failed_before_entry"; break; }
-      if (targetEvents.length && !couldEnter && !["structural-edge-passive-v2","structural-edge-passive-v3"].includes(definition.policyId)) { targetEvents.forEach(record); state.state = "invalidated"; state.reason = "target_before_entry"; break; }
+      if (targetEvents.length && !couldEnter && !["structural-edge-passive-v2","structural-edge-passive-v3","entry-reaction-passive-v1"].includes(definition.policyId)) { targetEvents.forEach(record); state.state = "invalidated"; state.reason = "target_before_entry"; break; }
       for (const e of group) {
         if (e.kind === "location_test" || e.kind === "acceptance") { record(e); if (state.confirmationAt === undefined && definition.mode === "confirmed_retest") state.state = "awaiting_event"; }
         if (e.kind === "confirmation" && e.at >= definition.eventKnownAt && definition.mode === "confirmed_retest" && (e.at >= state.startedAt || state.startedAt - e.at <= definition.confirmationMaxAgeMs)) {
@@ -237,7 +237,7 @@ export function restoreGlobalScenarioBoundPlan(report: GlobalReport, boundPlan: 
   restored.reference = structuredClone(current.reference);
   const objective = restored.priceZones?.targets[0];
   const target = objective ? restored.side === "long" ? objective.lower : objective.upper : restored.targets[0].price;
-  restored.barriers = globalRouteObstacles(report, restored.side)
+  restored.barriers = globalRouteObstacles(report, restored.side,Boolean(restored.entryReaction))
     .filter(a => sign * (a.price - restored.entry) > 0 && sign * (target - a.price) > 0)
     .sort((a, b) => sign * (a.price - b.price)).slice(0, 5);
   if (restored.priceZones) {

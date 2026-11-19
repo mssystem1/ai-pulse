@@ -39,6 +39,9 @@ test("saved v3 reports offer the free correction while current v4 reports show t
   const singleTargetPolicy=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(singleTargetPolicy.includes('class="global-target-review"'));
   report.setupPolicyVersion="source-limits-v3";
+  const previousSourcePolicy=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
+  assert.ok(previousSourcePolicy.includes('class="global-target-review"'));
+  report.setupPolicyVersion="source-limits-v4";
   const current=renderToStaticMarkup(createElement(GlobalResearchReport,{report}));
   assert.ok(!current.includes('class="global-target-review"'));assert.ok(current.includes("planned entry is"));
   report.setupSelection!.version="single-setup-v3";

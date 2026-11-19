@@ -14,14 +14,10 @@ const make=(tf:string)=>{
 };
 test("October 25 daily mixed structure uses its own support, not the October 24 local breakdown",()=>{
   const r=make("1Dutc"),p=r.discretionaryPlan!;
-  assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(p.family,"level_retest");assert.equal(p.side,"long");
-  assert.equal(p.priceZones!.entry.sourcePrice,80018.2);assert.equal(p.entry,78649.3);assert.equal(p.stopBasis.price,78649.3);
-  assert.equal(p.evidence,undefined);assert.equal(p.executionPolicy!.id,"structural-edge-passive-v3");
-  const source=r.horizonContext!.zones.find(z=>z.role==="support"&&z.lower===78649.3&&z.upper===80018.2)!;
-  assert.ok(source&&source.anchorIds.every(id=>r.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null)));
-  assert.equal(p.targets[0].price,81260.1);assert.ok(p.targets.length>=1&&p.targets.length<=3);
-  assert.equal(p.priceZones!.entry.lower,78649.3);assert.equal(p.priceZones!.entry.upper,78649.3);
-  assert.equal(p.priceZones!.payoffLimited,false);assert.equal(GlobalReportSchema.safeParse(r).success,true);
+  assert.equal(r.setupSelection!.assessment,"sideways");assert.equal(p.family,"level_retest");
+  if(p.entryReaction){const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;assert.equal(p.entryReaction.knownAt,candleCloseTime(source.ts,p.entryReaction.timeframe));assert.equal(p.stopBasis.timeframe,r.entryStudy!.timeframe);assert.equal(p.priceZones!.entry.lower,p.entry);assert.equal(p.priceZones!.entry.upper,p.entry);if(p.entryReaction.kind==="completed_break"){assert.ok(p.entryReaction.level);assert.equal(p.entry,p.entryReaction.level.price);assert.ok(p.side==="long"?prior.close<=p.entry&&source.close>p.entry:prior.close>=p.entry&&source.close<p.entry);}else{assert.ok(["completed_rejection","completed_sweep"].includes(p.entryReaction.kind));assert.equal(p.entryReaction.level,undefined);assert.equal(p.entry,p.side==="long"?Math.min(source.open,source.close):Math.max(source.open,source.close));assert.ok(p.side==="long"?source.close>prior.close:source.close<prior.close);}}
+  else{assert.equal(p.side,"long");assert.equal(p.priceZones!.entry.sourcePrice,80018.2);assert.equal(p.entry,78649.3);assert.equal(p.stopBasis.price,78649.3);assert.equal(p.evidence,undefined);assert.equal(p.executionPolicy!.id,"structural-edge-passive-v3");const source=r.horizonContext!.zones.find(z=>z.role==="support"&&z.lower===78649.3&&z.upper===80018.2)!;assert.ok(source&&source.anchorIds.every(id=>r.indicators.pivots.some(a=>a.id===id&&a.confirmedAt!==null)));assert.equal(p.targets[0].price,81260.1);assert.equal(p.priceZones!.entry.lower,78649.3);assert.equal(p.priceZones!.entry.upper,78649.3);assert.equal(p.priceZones!.payoffLimited,false);}
+  assert.ok(p.targets.length>=1&&p.targets.length<=3);assert.equal(GlobalReportSchema.safeParse(r).success,true);
   const forged=structuredClone(r);forged.discretionaryPlan!.entry+=1;forged.discretionaryPlan!.entryBasis.price+=1;
   assert.equal(GlobalReportSchema.safeParse(forged).success,false);
 });
@@ -50,11 +46,12 @@ test("1H and 4H retain independent trend evidence and price risk, while explaini
 });
 test("weekly recovery retains its limiting resistance and does not claim a confirmed trend",()=>{
   const r=make("1Wutc"),p=r.discretionaryPlan!,text=globalSetupEvidenceLines(r).join(" ");
-  assert.equal(p.side,"long");assert.equal(p.objectiveTimeframe,"1Wutc");assert.equal(p.reference.timeframe,"1Dutc");
+  assert.equal(p.objectiveTimeframe,"1Wutc");assert.equal(p.reference.timeframe,"1Dutc");
   assert.match(text,/rising SMA21 71,678.23/);assert.match(text,/SMA55 has not confirmed/);
-  assert.equal(p.targets[0].price,82213.9);assert.match(text,/nearest obstacle offers 6.28R/);assert.equal(p.priceZones!.payoffLimited,false);
+  if(p.entryReaction){const source=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.anchorTs)!,prior=r.entryStudy!.candles.find(c=>c.ts===p.entryReaction!.previousTs)!;assert.equal(p.entryReaction.knownAt,candleCloseTime(source.ts,p.entryReaction.timeframe));assert.equal(p.stopBasis.timeframe,r.entryStudy!.timeframe);assert.ok(p.targets.every((t,i)=>t.timeframe==="1Wutc"||i===0&&t.timeframe===r.entryStudy!.timeframe));if(p.entryReaction.kind==="completed_break"){assert.ok(p.entryReaction.level);assert.equal(p.entry,p.entryReaction.level.price);assert.ok(p.side==="long"?prior.close<=p.entry&&source.close>p.entry:prior.close>=p.entry&&source.close<p.entry);}else{assert.ok(["completed_rejection","completed_sweep"].includes(p.entryReaction.kind));assert.equal(p.entryReaction.level,undefined);assert.equal(p.entry,p.side==="long"?Math.min(source.open,source.close):Math.max(source.open,source.close));assert.ok(p.side==="long"?source.close>prior.close:source.close<prior.close);}}
+  else{assert.equal(p.side,"long");assert.equal(p.targets[0].price,82213.9);assert.match(text,/nearest obstacle offers 6.28R/);assert.equal(p.priceZones!.payoffLimited,false);}
   assert.equal(r.strategyMix!.candidates.find(c=>c.id==="sweep_reclaim")!.status,"conflicted");assert.ok(r.strategyMix!.candidates.find(c=>c.id==="sweep_reclaim")!.conflicts.some(c=>/weekly assessment/.test(c)));
-  assert.ok(p.stop<p.entry&&p.targets.every(t=>t.timeframe==="1Wutc"));
+  assert.ok(p.side==="long"?p.stop<p.entry:p.stop>p.entry);assert.ok(p.targets.every((t,i)=>t.timeframe==="1Wutc"||Boolean(p.entryReaction&&i===0&&t.timeframe===r.entryStudy!.timeframe)));
 });
 test("fast protection uses the latest completed primary reaction for a new local breakdown",()=>{
   const r=make("15m"),p=r.discretionaryPlan!,bar=r.candles.find(c=>c.ts===p.stopBasis.anchorTs)!;
@@ -64,7 +61,7 @@ test("fast protection uses the latest completed primary reaction for a new local
 test("all horizons preserve provenance and exact chart ledger without creating an observed fill",()=>{
   for(const tf of ["15m","1H","4H","1Dutc","1Wutc"]){
     const r=make(tf),p=r.discretionaryPlan!,before=JSON.stringify(r),svg=globalReportChartSvg(r)!;
-    assert.equal(GlobalReportSchema.safeParse(r).success,true,tf);assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.stopBasis.timeframe,tf);
-    assert.ok(p.targets.every(t=>t.timeframe===tf));assert.ok(svg.includes(`data-price="${p.entry}"`));assert.equal(globalTradeCards(r)[0].confirmed,false);assert.equal(JSON.stringify(r),before);
+    assert.equal(GlobalReportSchema.safeParse(r).success,true,tf);assert.equal(p.version,"discretionary-plan-v8");assert.equal(p.stopBasis.timeframe,p.entryReaction?r.entryStudy!.timeframe:tf);
+    assert.ok(p.targets.every((t,i)=>t.timeframe===tf||Boolean(p.entryReaction&&i===0&&t.timeframe===r.entryStudy!.timeframe)));assert.ok(svg.includes(`data-price="${p.entry}"`));assert.equal(globalTradeCards(r)[0].confirmed,false);assert.equal(JSON.stringify(r),before);
   }
 });

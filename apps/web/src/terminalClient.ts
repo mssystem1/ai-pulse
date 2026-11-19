@@ -131,7 +131,7 @@ export function terminalFollowRestriction(report: Pick<GlobalReport, "scenario">
   const state = report.scenario?.state;
   if (state === "entry_observed") return "This setup's entry was already observed; review a separate new setup.";
   if(state === "invalidated" || state === "expired" || state === "completed")return "This opportunity ended; review a separate new setup.";
-  if(report.discretionaryPlan&&report.snapshot){const admission=globalSetupAdmission(report as GlobalReport);if(!admission.geometryEligible)return "WAIT: "+admission.reasons.join(" ");}
+  if(report.discretionaryPlan&&report.snapshot){const admission=globalSetupAdmission(report as GlobalReport);if(!admission.geometryEligible)return "Risk check failed: "+admission.reasons.join(" ");}
   return null;
 }
 /** Use the priced scenario's immutable protection, independently of current entry eligibility. */
@@ -141,6 +141,25 @@ export function terminalSetupReferences(report: Pick<GlobalReport, "scenario" | 
   const lines: string[] = [];
   if (plan) {
     lines.push(`${terminalLabel(plan.family)} · ${plan.side.toUpperCase()} uses ${terminalLabel(plan.entryBasis.kind)} at ${terminalPrice(plan.entryBasis.price, report.snapshot.pricePrecision)} on ${plan.entryBasis.timeframe.replace("utc", "")}, known at ${terminalUtc(plan.entryBasis.knownAt)}.`);
+    if(plan.entryReaction){
+      const reaction=plan.entryReaction,entryFrame=reaction.timeframe.replace("utc", ""),primaryFrame=report.snapshot.timeframe.replace("utc", "");
+      if(reaction.kind==="completed_break"){
+        const boundary=reaction.level?.price??plan.entryBasis.price,levelKind=reaction.level?.kind??(plan.side==="short"?"low":"high");
+        lines.push(`Entry reaction: a completed ${entryFrame} close broke the confirmed swing ${levelKind} at ${terminalPrice(boundary,report.snapshot.pricePrecision)}. The passive limit retests that boundary; no future candle confirmation is required. A later price return is a conditional entry, not a pump/dump forecast.`);
+        const tp1Frame=(plan.targets?.[0]?.timeframe??report.snapshot.timeframe).replace("utc", "");
+        lines.push(`Fixed SL is at least 0.5× ${entryFrame} ATR beyond the broken boundary. TP1 uses ${tp1Frame}; later targets remain on the primary ${primaryFrame} timeframe.`);
+      }else{
+        const event=reaction.kind==="completed_sweep"?"completed sweep":"completed rejection";
+        lines.push(`Entry reaction: ${event} in the declared ${entryFrame} entry study. The passive limit sits at the source candle body edge ${terminalPrice(plan.entryBasis.price, report.snapshot.pricePrecision)}; no future candle confirmation is required. A later price return is a conditional entry, not a pump/dump forecast.`);
+        const tp1Frame=(plan.targets?.[0]?.timeframe??report.snapshot.timeframe).replace("utc", "");
+        lines.push(`Fixed SL is 0.2× source ATR beyond the source candle wick ${terminalPrice(plan.stopBasis.price, report.snapshot.pricePrecision)}, with at least 0.5× source ATR between entry and SL. TP1 uses ${tp1Frame}; later targets remain on the primary ${primaryFrame} timeframe.`);
+      }
+      if(plan.priceZones?.payoffPolicy==="staged-weighted-v1"&&plan.executionPolicy?.targetAllocations.length===plan.targets.length){
+        const admission=globalSetupAdmission(report as GlobalReport),allocations=plan.executionPolicy.targetAllocations;
+        const exits=plan.targets.map((target,i)=>{const band=plan.priceZones!.targets[i],level=plan.side==="long"?band.lower:band.upper;return `TP${i+1} (${target.timeframe.replace("utc", "")}) ${Math.round(allocations[i]*100)}% at ${terminalPrice(level,report.snapshot.pricePrecision)}`;}).join("; ");
+        lines.push(`Staged exits: ${exits}. TP1 is ${admission.targetRewardRisk?.toFixed(2)??"—"}R; planned weighted payoff is ${admission.plannedWeightedRewardRisk?.toFixed(2)??"—"}R before costs. Any unclosed position remains exposed to the fixed hard SL ${terminalPrice(hardStop,report.snapshot.pricePrecision)}. This is planned payoff, not expected profit.`);
+      }
+    }
     if (plan.evidence) lines.push(`${terminalLabel(plan.evidence.kind)}: ${plan.evidence.timeframe.replace("utc", "")} test at ${terminalPrice(plan.evidence.level, report.snapshot.pricePrecision)}, started ${terminalUtc(plan.evidence.testTs)} and completed ${terminalUtc(plan.evidence.completedAt)}.`);
     if (report.setupSelection && report.setupSelection.assessment !== "sideways" && report.setupSelection.assessment !== plan.side) lines.push(`The primary ${report.snapshot.timeframe.replace("utc", "")} bias is ${report.setupSelection.assessment}; this ${plan.side} setup is a response against that bias, with its own entry and invalidation rules.`);
     lines.push(`Protection basis: ${plan.stopBasis.timeframe.replace("utc", "")} ${terminalPrice(plan.stopBasis.price, report.snapshot.pricePrecision)}, anchored ${terminalUtc(plan.stopBasis.anchorTs)}. Fixed hard SL ${terminalPrice(hardStop, report.snapshot.pricePrecision)}.`);

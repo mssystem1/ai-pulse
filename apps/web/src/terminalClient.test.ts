@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import type {GlobalReport} from "@pulse/domain";
 import {
   TerminalApiError, authorizeTerminal, clearTerminalSession, setTerminalSession, terminalExecutionTime,
   terminalReceiptComplete, terminalReceiptRequestId, terminalRequest, terminalSession, terminalUtc, terminalWorkspaceUpdate, terminalSetupReferences, terminalFollowRestriction, type TerminalWorkspace,
@@ -102,6 +103,26 @@ test("a late poll cannot hide a newly saved position or show a different owner's
   assert.equal(terminalWorkspaceUpdate(baseline, saved, owner), saved);
 });
 
+test("staged reaction references show saved partial exits, weighted R and fixed-stop exposure",()=>{
+  const report={snapshot:{pricePrecision:2,timeframe:"1Wutc"},discretionaryPlan:{version:"discretionary-plan-v8",family:"level_retest",side:"short",entry:100,stop:110,
+    entryBasis:{kind:"entry_reaction",timeframe:"1Dutc",knownAt:10,price:100},entryReaction:{kind:"completed_rejection",timeframe:"1Dutc"},
+    stopBasis:{timeframe:"1Dutc",price:105,anchorTs:5},targets:[{price:98,timeframe:"1Dutc"},{price:95,timeframe:"1Wutc"},{price:90,timeframe:"1Wutc"}],barriers:[],
+    priceZones:{payoffPolicy:"staged-weighted-v1",payoffFloor:1,entry:{lower:100,upper:100},stop:{lower:100,upper:110},targets:[{lower:98,upper:98},{lower:95,upper:95},{lower:90,upper:90}]},
+    executionPolicy:{targetAllocations:[.5,.3,.2]}}
+  } as unknown as GlobalReport;
+  const lines=terminalSetupReferences(report).lines.join(" ");
+  assert.match(lines,/TP1 \(1D\) 50% at 98/);assert.match(lines,/TP2 \(1W\) 30% at 95/);assert.match(lines,/TP3 \(1W\) 20% at 90/);
+  assert.match(lines,/TP1 is 0\.20R; planned weighted payoff is 0\.45R before costs/);
+  assert.match(lines,/Any unclosed position remains exposed to the fixed hard SL 110/);
+  assert.match(lines,/planned payoff, not expected profit/);
+  const breaking=structuredClone(report);breaking.discretionaryPlan!.entryReaction!.kind="completed_break";
+  breaking.discretionaryPlan!.entryReaction!.level={id:"swing-low",kind:"low",anchorTs:4,confirmedAt:5,knownAt:6,price:100};
+  const breakLines=terminalSetupReferences(breaking).lines.join(" ");
+  assert.match(breakLines,/completed 1D close broke the confirmed swing low at 100/);
+  assert.match(breakLines,/passive limit retests that boundary/);
+  assert.doesNotMatch(breakLines,/body edge|source candle wick/);
+});
+
 test("selected setup keeps its explicit hard SL and reclaim evidence when generic entry eligibility has no stop", () => {
   // Minimal saved-contract fields from the observed failure: generic entry gating
   // is unset while the priced scenario retains its actual immutable protection.
@@ -111,6 +132,7 @@ test("selected setup keeps its explicit hard SL and reclaim evidence when generi
     discretionaryPlan: { side: "long", family: "level_retest", stop: 76321.3421929,
       entryBasis: { kind: "reclaimed_level", timeframe: "1H", knownAt: Date.parse("2026-10-30T00:00:00Z"), price: 76602.7 },
       stopBasis: { timeframe: "1H", price: 76425.9, anchorTs: Date.parse("2026-11-04T03:00:00Z") },
+      entryReaction: { kind: "completed_sweep", timeframe: "4H" },
       evidence: { kind: "primary_reclaim", timeframe: "15m", level: 76602.7, testTs: Date.parse("2026-11-04T03:30:00Z"), completedAt: Date.parse("2026-11-04T04:00:00Z") },
     },
   } as unknown as Parameters<typeof terminalSetupReferences>[0];
@@ -119,6 +141,10 @@ test("selected setup keeps its explicit hard SL and reclaim evidence when generi
   assert.match(actual.lines.join(" "), /Primary Reclaim: 15m test at 76,602\.7/);
   assert.match(actual.lines.join(" "), /completed 2026-11-04 04:00:00 UTC/);
   assert.match(actual.lines.join(" "), /primary 1H bias is short; this long setup is a response against that bias/);
+  assert.match(actual.lines.join(" "), /completed sweep in the declared 4H entry study/);
+  assert.match(actual.lines.join(" "), /source candle body edge 76,602\.7; no future candle confirmation is required/);
+  assert.match(actual.lines.join(" "), /0\.2× source ATR beyond the source candle wick 76,425\.9, with at least 0\.5× source ATR between entry and SL/);
+  assert.match(actual.lines.join(" "), /TP1 uses 1H; later targets remain on the primary 1H timeframe/);
   assert.equal(terminalSetupReferences({ ...report, scenario: undefined }).hardStop, actual.hardStop);
   assert.equal(terminalSetupReferences({ ...report, scenario: undefined, discretionaryPlan: undefined }).hardStop, null);
 });
